@@ -1,0 +1,353 @@
+{
+  "evaluatedAt": "2026-11-11T17:44:16.932Z",
+  "textSummary": {
+    "total": 12,
+    "baselinePassed": 1,
+    "tunedPassed": 12
+  },
+  "detailedTextResults": [
+    {
+      "id": "zh-pl-vs-mk-disambiguation",
+      "input": "猴子分身斧已经好了，但是对面大圣没大招，我们可以开雾抓一波。",
+      "baseline": {
+        "output": "Monkey King's Manta Style is ready, but their Wukong's Command is on cooldown. We can smoke and go for a pick-off.",
+        "ms": 688,
+        "cachedTokens": 0,
+        "promptTokens": 66,
+        "passed": false,
+        "misses": [
+          "Missing one of [Phantom Lancer | PL]"
+        ]
+      },
+      "tuned": {
+        "output": "PL has Manta now, and Monkey King has no ult. We can pop smoke and go for a pick.",
+        "ms": 630,
+        "cachedTokens": 9728,
+        "promptTokens": 9937,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "zh-od-slark-bkb-save",
+      "input": "团战黑鸟先关一下小鱼，别让他开出BKB或者C解状态，大鱼给个点灯。",
+      "baseline": {
+        "output": "In team fights, focus on shutting down the small fish first with Black Bird, don't let him activate BKB or dispel status effects, and have Tide give a lantern.",
+        "ms": 744,
+        "cachedTokens": 0,
+        "promptTokens": 69,
+        "passed": false,
+        "misses": [
+          "Missing one of [Outworld Destroyer | OD]",
+          "Missing one of [Astral]",
+          "Missing one of [Slark]",
+          "Missing one of [Slardar]",
+          "Missing one of [Corrosive Haze | Amp | amplify | mark | ult]",
+          "Forbidden literal [Black Bird]"
+        ]
+      },
+      "tuned": {
+        "output": "In the teamfight, OD Astral Slark first, don't let him pop BKB or Dark Pact. Slardar, use Corrosive Haze.",
+        "ms": 1080,
+        "cachedTokens": 9984,
+        "promptTokens": 10133,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "zh-stack-deward-asr-homophones",
+      "input": "五号位去帮我堆也顺便屯远骨，把三角区的高台真假眼反演一下。",
+      "baseline": {
+        "output": "Position five, go help me stack and also stock up on distant bones. Reverse the real and fake wards on the high ground in the triangle area.",
+        "ms": 889,
+        "cachedTokens": 0,
+        "promptTokens": 68,
+        "passed": false,
+        "misses": [
+          "Missing one of [ancient | Ancient]",
+          "Missing one of [deward]"
+        ]
+      },
+      "tuned": {
+        "output": "Pos 5, stack the camp for me and stack ancients. Also deward the triangle cliff, both obs and sentry.",
+        "ms": 1781,
+        "cachedTokens": 9600,
+        "promptTokens": 9773,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "zh-new-heroes-largo-kez",
+      "input": "朗戈刚交了灵呱一闪和两栖狂想曲，等凯开完猛禽之舞我们直接打二代肉山。",
+      "baseline": {
+        "output": "Lang Ge just handed in Lightning Whip and Amphibious Rhapsody to Ling Gua. After Kai finishes Raptor Dance, we'll go straight to fight the second generation Wall of Flesh.",
+        "ms": 963,
+        "cachedTokens": 0,
+        "promptTokens": 76,
+        "passed": false,
+        "misses": [
+          "Missing one of [Largo]",
+          "Missing one of [Croak of Genius]",
+          "Missing one of [Amphibian Rhapsody]",
+          "Missing one of [Kez]",
+          "Missing one of [Rosh | Roshan]"
+        ]
+      },
+      "tuned": {
+        "output": "Largo just used Croak of Genius and Amphibian Rhapsody. Once Kez finishes Raptor Dance, we go for second Rosh.",
+        "ms": 1298,
+        "cachedTokens": 9728,
+        "promptTokens": 9920,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "zh-cows-and-cats",
+      "input": "小心白牛冲你，让小牛蹲后面反手沟壑，大牛踩住以后蓝猫直接滚后排。",
+      "baseline": {
+        "output": "Be careful of the white bull charging at you. Let the calf crouch behind and use a reverse ravine. After the big bull steps on it, the blue cat should immediately roll to the back row.",
+        "ms": 905,
+        "cachedTokens": 0,
+        "promptTokens": 71,
+        "passed": false,
+        "misses": [
+          "Missing one of [Spirit Breaker | SB | Bara]",
+          "Missing one of [Earthshaker | ES | Shaker]",
+          "Missing one of [Fissure]",
+          "Missing one of [Storm Spirit | Storm]"
+        ]
+      },
+      "tuned": {
+        "output": "Watch out for Spirit Breaker charging you. Have Earthshaker sit in the back for a counter-initiate with Fissure. Once Elder Titan lands his stomp, Storm Spirit should zip straight to their backline.",
+        "ms": 946,
+        "cachedTokens": 9856,
+        "promptTokens": 10086,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "zh-nullifier-saves-question",
+      "input": "对面辅助全是绿杖微光和推推，这把我要不要不出大炮改出否决和血棘？",
+      "baseline": {
+        "output": "The enemy support all have Force Staff, Glimmer Cape, and Eul's. Should I skip Daedalus this game and go for Nullifier and Bloodthorn instead?",
+        "ms": 973,
+        "cachedTokens": 0,
+        "promptTokens": 71,
+        "passed": false,
+        "misses": [
+          "Missing one of [Ghost]"
+        ]
+      },
+      "tuned": {
+        "output": "Their supports all have Ghost, Glimmer, and Force. Should I skip Daedalus and go Nullifier and Bloodthorn instead?",
+        "ms": 870,
+        "cachedTokens": 9600,
+        "promptTokens": 9757,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "zh-kns-vs-ynk",
+      "input": "老鹿这把出散慧配永世法衣，紫猫出慧夜配林肯。",
+      "baseline": {
+        "output": "Old Deer is building Scythe of Vyse and Eternal Shroud, while Purple Cat is building Eul's Scepter and pairing it with Lincoln's Sphere.",
+        "ms": 625,
+        "cachedTokens": 0,
+        "promptTokens": 63,
+        "passed": false,
+        "misses": [
+          "Missing one of [Leshrac | Lesh]",
+          "Missing one of [Kaya and Sange | KnS | K&S | Sange and Kaya]",
+          "Missing one of [Void Spirit]",
+          "Missing one of [Yasha and Kaya | YnK | Y&K | Kaya and Yasha]",
+          "Missing one of [Linken]"
+        ]
+      },
+      "tuned": {
+        "output": "Lesh is going Kaya and Sange with Eternal Shroud, Void Spirit is going Yasha and Kaya with Linken's.",
+        "ms": 1134,
+        "cachedTokens": 9728,
+        "promptTokens": 9902,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "student-english-passthrough",
+      "input": "I no TP right now, wait my BKB 10 seconds then we go Rosh.",
+      "baseline": {
+        "output": "I no TP right now, wait my BKB 10 seconds then we go Rosh.",
+        "ms": 461,
+        "cachedTokens": 0,
+        "promptTokens": 60,
+        "passed": true,
+        "misses": []
+      },
+      "tuned": {
+        "output": "I no TP right now, wait my BKB 10 seconds then we go Rosh.",
+        "ms": 0,
+        "cachedTokens": 0,
+        "promptTokens": 0,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "en-coach-laning-macro",
+      "input": "Pull aggro onto your ranged creep, half-pull the small camp, and contest the 7-minute Wisdom Rune and 20-minute Tormentor.",
+      "baseline": {
+        "output": "把仇恨拉到你的远程小兵上，半拉小野营地，并争夺7分钟的智慧神符和20分钟的折磨者。",
+        "ms": 817,
+        "cachedTokens": 0,
+        "promptTokens": 62,
+        "passed": false,
+        "misses": [
+          "Missing one of [远程兵]",
+          "Missing one of [魔方]"
+        ]
+      },
+      "tuned": {
+        "output": "拉兵线仇恨到远程兵，拉小野半拉，抢7分钟经验符和20分钟魔方。",
+        "ms": 1032,
+        "cachedTokens": 9472,
+        "promptTokens": 9642,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "en-coach-pl-mk-od-teamfight",
+      "input": "Kite Monkey King’s Wukong’s Command, save OD’s Astral for Slark, and don’t force high ground until Phantom Lancer finishes Manta and Heart.",
+      "baseline": {
+        "output": "风筝孙悟空的技能，保留OD的星体用于斯拉克，不要强行上高地，直到幻影长矛手做出分身和心脏。",
+        "ms": 803,
+        "cachedTokens": 0,
+        "promptTokens": 68,
+        "passed": false,
+        "misses": [
+          "Missing one of [大圣]",
+          "Missing one of [猴子猴孙 | 阵 | 大招]",
+          "Missing one of [关 | 星体禁锢]",
+          "Missing one of [龙心 | 恐鳌之心]"
+        ]
+      },
+      "tuned": {
+        "output": "拉扯一下大圣猴子猴孙，黑鸟关留给小鱼，等猴子分身斧和龙心好了再上高。",
+        "ms": 787,
+        "cachedTokens": 9984,
+        "promptTokens": 10219,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "en-coach-largo-roshan-buyback",
+      "input": "Largo used Croak of Genius and they have no buyback on Shadow Demon, deward their triangle cliff and take Roshan Banner and Aegis.",
+      "baseline": {
+        "output": "Largo使用了天才呱呱，现在暗影恶魔没有买活，他们拆掉了三角区高地的假眼，拿到了罗斯汉旗帜和不朽盾。",
+        "ms": 725,
+        "cachedTokens": 0,
+        "promptTokens": 64,
+        "passed": false,
+        "misses": [
+          "Missing one of [朗戈]",
+          "Missing one of [灵呱一闪]",
+          "Missing one of [没买活]",
+          "Missing one of [战旗 | 肉山旗 | 旗子]"
+        ]
+      },
+      "tuned": {
+        "output": "朗戈刚用灵呱一闪，毒狗没买活，把他们三角区高台眼反了，拿肉山旗和盾。",
+        "ms": 972,
+        "cachedTokens": 9728,
+        "promptTokens": 9876,
+        "passed": true,
+        "misses": []
+      }
+    },
+    {
+      "id": "en-coach-question-discipline",
+      "input": "Do you have enough gold for Buyback if we take Twin Gate and smoke gank their Medusa in the dead lane?",
+      "baseline": {
+        "output": "如果我们拿下双生之门并且烟游去抓他们在劣势路的美杜莎，你还有足够的钱买活吗？",
+        "ms": 806,
+        "cachedTokens": 0,
+        "promptTokens": 57,
+        "passed": false,
+        "misses": [
+          "Missing one of [传送门 | 双生门]",
+          "Missing one of [雾]"
+        ]
+      },
+      "tuned": {
+        "output": "如果我们走双生门开雾去死亡路抓一姐，你买活钱够吗？",
+        "ms": 727,
+        "cachedTokens": 9600,
+        "promptTokens": 9804,
+        "passed": true,
+        "misses": []
+      }
+    }
+  ],
+  "voiceResults": [
+    {
+      "engine": "cascade",
+      "role": "student",
+      "sourceText": "猴子分身斧好了大圣没大招去把三角区高台岩反了顺便屯波远古",
+      "targetText": "PL has Manta now, Monkey King has no ult. Go deward the triangle cliff ward and stack ancients while you're at it.",
+      "ttfaMs": 1198,
+      "passed": true,
+      "misses": []
+    },
+    {
+      "engine": "cascade",
+      "role": "coach",
+      "sourceText": "Save Astral for Slark, kite Monkey King ULT, and wait for Phantom Lancer Manta before Roshan.",
+      "targetText": "黑鸟关留给小鱼，拉扯一下大圣猴子猴孙，等猴子分身斧好了再打肉山。",
+      "ttfaMs": 2271,
+      "passed": true,
+      "misses": []
+    },
+    {
+      "engine": "gpt-realtime",
+      "role": "student",
+      "sourceText": "猴子分身符好了,大圣没大招,去把三角区高台眼反了顺便囤波远古。",
+      "targetText": "PL has Manta, Monkey King has no ult. Deward the cliff ward in the triangle and stack the ancients while you’re there.",
+      "ttfaMs": 896,
+      "passed": true,
+      "misses": []
+    },
+    {
+      "engine": "gpt-realtime",
+      "role": "coach",
+      "sourceText": "Save Astral for Slark, kite Monkey King ult, and wait for Phantom Lancer Manta before Roshan.",
+      "targetText": "星体禁锢留给小鱼，拉扯一下大圣的大，等猴子的分身斧好了再打肉山。",
+      "ttfaMs": 1217,
+      "passed": true,
+      "misses": []
+    },
+    {
+      "engine": "gpt-live",
+      "role": "student",
+      "sourceText": "猴子的分身斧好了,大圣没大招,去把三角区高台眼反了顺便囤波远古",
+      "targetText": "PL's got Manta, Monkey King has no ult. Go deward the high ground in triangle, and stack ancients on the way.",
+      "ttfaMs": 548,
+      "passed": true,
+      "misses": []
+    },
+    {
+      "engine": "gpt-live",
+      "role": "coach",
+      "sourceText": "Save Astral for Slark, kite Monkey King ulti, and wait for Phantom Lancer Manta before Roshan.",
+      "targetText": "打肉山之前留好星体禁锢应对小鱼,拉扯大圣的猴子猴孙,等猴子出分身斧再考虑动手。",
+      "ttfaMs": 621,
+      "passed": true,
+      "misses": []
+    }
+  ]
+}

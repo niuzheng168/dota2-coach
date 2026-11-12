@@ -1,0 +1,24 @@
+{
+  "name": "dota2-coach-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Low-latency real-time DOTA2 bilingual voice coaching room supporting Cascade (MAI-Transcribe + GPT + Azure TTS), gpt-realtime, and gpt-live",
+  "scripts": {
+    "start": "node src/server.ts",
+    "dev": "node --watch src/server.ts",
+    "build:dict": "node scripts/build-dota2-dictionary.ts",
+    "eval:domain": "node scripts/eval-dota2-translation.ts",
+    "benchmark": "node src/benchmark.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.14.1",
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/ws": "^8.18.2",
+    "typescript": "^7.0.2"
+  }
+}

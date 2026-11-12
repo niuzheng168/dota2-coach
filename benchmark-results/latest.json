@@ -1,0 +1,152 @@
+{
+  "generatedAt": "2026-11-11T16:38:58.428Z",
+  "results": [
+    {
+      "scenario": "coach_roshan_call",
+      "metrics": {
+        "turnId": "item_Ej5c6za9J06voZ3Iqx0vy",
+        "engine": "cascade",
+        "role": "coach",
+        "sourceText": "Pull the small camp and stack ancients, then pop smoke with your BKB and let us take Roshan.",
+        "targetText": "拉小野，屯远古，然后开雾配BKB，打肉山。",
+        "passThrough": "none",
+        "speechEndToFirstAudioMs": 1597,
+        "totalTurnMs": 2154,
+        "asrMs": 85,
+        "llmFirstTokenMs": 884,
+        "llmTotalMs": 1132,
+        "ttsFirstChunkMs": 508,
+        "outputAudioDurationMs": 6157,
+        "timestamp": 1794415054585
+      }
+    },
+    {
+      "scenario": "student_zh_question",
+      "metrics": {
+        "turnId": "item_Ej5cFakc0ZXns5u9IbZo6",
+        "engine": "cascade",
+        "role": "student",
+        "sourceText": "我有BKB和跳刀了等我10秒TP下路我们先打魔方还是直接上高？",
+        "targetText": "I have BKB and Blink now. Wait 10 seconds, I'll TP bot. Should we go for Tormentor first or just push high ground?",
+        "passThrough": "none",
+        "speechEndToFirstAudioMs": 1517,
+        "totalTurnMs": 2502,
+        "asrMs": 90,
+        "llmFirstTokenMs": 1048,
+        "llmTotalMs": 1666,
+        "ttsFirstChunkMs": 342,
+        "outputAudioDurationMs": 8987,
+        "timestamp": 1794415064843
+      }
+    },
+    {
+      "scenario": "student_en_passthrough",
+      "metrics": {
+        "turnId": "item_Ej5cPCRDpBrClhDXy0P6t",
+        "engine": "cascade",
+        "role": "student",
+        "sourceText": "My BKB is on cooldown for 15 seconds do not fight yet go back",
+        "targetText": "My BKB is on cooldown for 15 seconds do not fight yet go back",
+        "passThrough": "raw-voice",
+        "speechEndToFirstAudioMs": 187,
+        "totalTurnMs": 187,
+        "asrMs": 187,
+        "llmFirstTokenMs": 0,
+        "llmTotalMs": 0,
+        "ttsFirstChunkMs": 0,
+        "outputAudioDurationMs": 4511,
+        "timestamp": 1794415070777
+      }
+    },
+    {
+      "scenario": "coach_roshan_call",
+      "metrics": {
+        "turnId": "resp_Ej5cbSir7E2JyvxFMwmRG",
+        "engine": "gpt-realtime",
+        "role": "coach",
+        "sourceText": "Pull the small camp and stack ancients, then pop smoke with your BKB and let us take Roshan.",
+        "targetText": "先拉小野，顺便屯远古，然后开雾配合你的BKB，我们去打肉山。",
+        "passThrough": "none",
+        "speechEndToFirstAudioMs": 1119,
+        "totalTurnMs": 2433,
+        "outputAudioDurationMs": 6020,
+        "timestamp": 1794415080248
+      }
+    },
+    {
+      "scenario": "student_zh_question",
+      "metrics": {
+        "turnId": "resp_Ej5cmO8CTxNHAjWiaapuW",
+        "engine": "gpt-realtime",
+        "role": "student",
+        "sourceText": "我有BKB和跳刀了,等我十秒TP下路,我们先打魔方还是直接上高?",
+        "targetText": "I’ve got BKB and Blink now. Wait 10 seconds, I’ll TP bottom. Should we do the Tormentor first, or just go high ground?",
+        "passThrough": "none",
+        "speechEndToFirstAudioMs": 670,
+        "totalTurnMs": 2355,
+        "outputAudioDurationMs": 7633,
+        "timestamp": 1794415090381
+      }
+    },
+    {
+      "scenario": "student_en_passthrough",
+      "metrics": {
+        "turnId": "resp_Ej5cuVj582LdgSyMzKTmO",
+        "engine": "gpt-realtime",
+        "role": "student",
+        "sourceText": "My BKB is on cooldown for 15 seconds. Do not fight yet, go back.",
+        "targetText": "My BKB is on cooldown for 15 seconds. Do not fight yet, go back.",
+        "passThrough": "model-repeat",
+        "speechEndToFirstAudioMs": 1625,
+        "totalTurnMs": 2697,
+        "outputAudioDurationMs": 6020,
+        "timestamp": 1794415098917
+      }
+    },
+    {
+      "scenario": "coach_roshan_call",
+      "metrics": {
+        "turnId": "live_1fe02835",
+        "engine": "gpt-live",
+        "role": "coach",
+        "sourceText": "Pull the small camp and stack ancients. Then pop smoke with your BKB and let us take Roshan",
+        "targetText": "先拉小野、屯远古,然后带着BKB开雾,让我们去打肉山。",
+        "passThrough": "none",
+        "speechEndToFirstAudioMs": 65,
+        "totalTurnMs": 5765,
+        "outputAudioDurationMs": 5100,
+        "timestamp": 1794415112421
+      }
+    },
+    {
+      "scenario": "student_zh_question",
+      "metrics": {
+        "turnId": "live_5cf6486c",
+        "engine": "gpt-live",
+        "role": "student",
+        "sourceText": "我有BKB和跳刀了,等我十秒TP下路,我们先打魔方还是直接上高?",
+        "targetText": "I’ve got BKB and Blink—wait ten seconds for my TP bot—do we hit Tormentor first, or go straight high ground?",
+        "passThrough": "none",
+        "speechEndToFirstAudioMs": 600,
+        "totalTurnMs": 6301,
+        "outputAudioDurationMs": 5800,
+        "timestamp": 1794415127240
+      }
+    },
+    {
+      "scenario": "student_en_passthrough",
+      "metrics": {
+        "turnId": "live_00fe88ca",
+        "engine": "gpt-live",
+        "role": "student",
+        "sourceText": "My BKB is on cooldown for 15 seconds. Do not fight yet, go back.",
+        "targetText": "My BKB is on cooldown for 15 seconds. Don't fight yet, go back.",
+        "passThrough": "model-repeat",
+        "speechEndToFirstAudioMs": 358,
+        "totalTurnMs": 4468,
+        "outputAudioDurationMs": 4100,
+        "timestamp": 1794415138427
+      }
+    }
+  ]
+}

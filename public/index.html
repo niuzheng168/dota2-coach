@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DOTA2 Bilingual Voice Coach Room | 中英同传教练语音室</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-badge">DOTA2 LIVE</span>
+      <div>
+        <h1>Bilingual Voice Coaching Bridge · 中英同传语音室</h1>
+        <div class="brand-sub" id="foundryInfo">Microsoft Foundry · Azure Voice Live · 24kHz Low-Latency PCM</div>
+      </div>
+    </div>
+
+    <div class="room-controls">
+      <label>
+        Room:
+        <input id="roomInput" type="text" value="roshan-pit" style="width: 120px" />
+      </label>
+      <label>
+        Role / 身份:
+        <select id="roleSelect">
+          <option value="student">Student 学员 (说中文/基础英语 -> 听中文)</option>
+          <option value="coach">Coach 教练 (Speaks EN -> Hears EN)</option>
+        </select>
+      </label>
+      <input id="nameInput" type="text" placeholder="Nickname" value="CN Carry" style="width: 115px" />
+      <button id="joinBtn" class="btn-primary">Connect Room / 进入房间</button>
+      <button id="copyCoachLinkBtn" title="Copy direct invite URL for your English DOTA2 Coach">
+        Copy Coach Invite Link
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Left Column: Engine Switcher + Room Roster -->
+    <section class="panel">
+      <div class="panel-title">
+        <span>Translation Pipeline · 同传架构切换</span>
+      </div>
+
+      <div class="engine-cards" id="engineCards">
+        <div class="engine-card active" data-engine="cascade">
+          <div class="engine-card-head">
+            <span>1. Voice Live · Cascaded</span>
+            <span class="badge green">Unified gpt-6-luna</span>
+          </div>
+          <p><code>/voice-live/realtime</code> 统一服务端编排：语义 VAD + DOTA2 偏置 ASR → <code>gpt-6-luna</code> → 流式 Azure TTS。</p>
+        </div>
+
+        <div class="engine-card" data-engine="gpt-realtime">
+          <div class="engine-card-head">
+            <span>2. Voice Live · Realtime 2.1</span>
+            <span class="badge gold">Unified S2S</span>
+          </div>
+          <p><code>/voice-live/realtime</code> 统一协议直驱 <code>gpt-realtime-2.1</code>，支持<strong>同款 Azure TTS 音色</strong>公平对比延迟。</p>
+        </div>
+
+        <div class="engine-card" data-engine="gpt-live">
+          <div class="engine-card-head">
+            <span>3. GPT-Live 1 (Full-Duplex)</span>
+            <span class="badge purple">True Simultaneous</span>
+          </div>
+          <p><code>gpt-live-1-test</code> 原生全双工同传（<code>/openai/v1/live/sessions</code>），边听边译无需等待停顿提交。</p>
+        </div>
+      </div>
+
+      <label class="toggle-row" style="display: none">
+        <span>学员说英语时原声直通 (已弃用本地 Cascade 专用)</span>
+        <input id="rawVoiceRelayToggle" type="checkbox" checked />
+      </label>
+
+      <label class="toggle-row">
+        <span>单人测试监听 (听见自己的翻译输出)</span>
+        <input id="selfMonitorToggle" type="checkbox" />
+      </label>
+
+      <div id="cascadeTtsPanel" style="display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border)">
+        <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); display: flex; justify-content: space-between">
+          <span>Azure Voice Live 共享音色 &amp; ASR 热切换</span>
+          <span class="badge green" style="font-size: 10px">Cascaded / Realtime 通用</span>
+        </div>
+        <label style="font-size: 11px; display: flex; flex-direction: column; gap: 2px">
+          <span style="color: var(--text-muted)">中文合成音色 (Coach EN → 学员听中文):</span>
+          <select id="ttsZhVoiceSelect" style="font-size: 12px; padding: 4px 6px"></select>
+        </label>
+        <label style="font-size: 11px; display: flex; flex-direction: column; gap: 2px">
+          <span style="color: var(--text-muted)">英文合成音色 (学员 ZH → Coach 听英文):</span>
+          <select id="ttsEnVoiceSelect" style="font-size: 12px; padding: 4px 6px"></select>
+        </label>
+        <label style="font-size: 11px; display: flex; flex-direction: column; gap: 2px">
+          <span style="color: var(--text-muted)">Voice Live 输入转录 ASR (含本局英雄词表偏置):</span>
+          <select id="voiceLiveAsrSelect" style="font-size: 12px; padding: 4px 6px">
+            <option value="azure-speech">azure-speech + DOTA2 词表偏置 (推荐 · 支持中英双语混说)</option>
+            <option value="mai-transcribe-2-streaming">mai-transcribe-2-streaming (极低延迟流式转录)</option>
+            <option value="mai-transcribe-2">mai-transcribe-2 + DOTA2 词表偏置</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="panel-title" style="margin-top: 4px">
+        <span>Match Heroes · 本局阵容动态锁定</span>
+        <span style="display: flex; align-items: center; gap: 6px">
+          <span class="badge gold" id="matchHeroesCount">0 / 10</span>
+          <button
+            id="clearHeroesBtn"
+            type="button"
+            title="新开一局时一键清空本局英雄"
+            style="padding: 2px 6px; font-size: 11px; display: none"
+          >清空</button>
+        </span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 8px; background: rgba(61,214,140,0.06); border: 1px solid rgba(61,214,140,0.22)">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px">
+          <strong>免切屏自动识阵 (GSI + 窗口顶栏视觉)</strong>
+          <span class="badge" id="gsiStatusBadge" style="font-size: 10px">GSI 待接入</span>
+        </div>
+        <div style="display: flex; gap: 5px; flex-wrap: wrap">
+          <button
+            id="toggleVisionWatchBtn"
+            type="button"
+            class="btn-radiant"
+            style="flex: 1; padding: 5px 8px; font-size: 11px"
+            title="开局前点一次共享 DOTA2 窗口，后台每 12 秒仅截取顶部头像栏由 gpt-6-luna 自动识别 10 英雄"
+          >🖥️ 开启窗口自动识阵</button>
+          <button
+            id="scanVisionOnceBtn"
+            type="button"
+            style="padding: 5px 8px; font-size: 11px"
+            title="立即截取当前画面顶部头像栏识别一次 10 英雄"
+          >📸 扫一眼</button>
+          <button
+            id="downloadGsiCfgBtn"
+            type="button"
+            style="padding: 5px 8px; font-size: 11px"
+            title="下载 Valve 官方 GSI 配置文件放入 game/dota/cfg/gamestate_integration/，自动感知开局换局与英雄"
+          >⬇ GSI .cfg</button>
+        </div>
+        <div id="visionStatusLine" style="font-size: 11px; color: var(--text-muted); line-height: 1.35">
+          GSI 放入 <code>game/dota/cfg/gamestate_integration/</code> 自动跟局；或点「开启窗口自动识阵」免切屏认全 10 英雄。
+        </div>
+      </div>
+
+      <div class="hero-tags" id="selectedHeroTags"></div>
+      <div style="display: flex; gap: 6px">
+        <input
+          id="heroPickerInput"
+          list="heroPickerDatalist"
+          type="text"
+          placeholder="也可手动补充如 猴子 / PL / 朗戈 / OD..."
+          style="flex: 1; padding: 5px 8px; font-size: 12px"
+        />
+        <datalist id="heroPickerDatalist"></datalist>
+        <button id="addHeroBtn" type="button" style="padding: 5px 10px; font-size: 12px">+ 锁定</button>
+      </div>
+
+      <div class="panel-title" style="margin-top: 4px">
+        <span>Room Roster · 在线成员</span>
+        <span class="badge" id="connBadge">Disconnected</span>
+      </div>
+      <div class="participants-list" id="participantsList">
+        <div class="participant-item" style="color: var(--text-muted)">Click Connect Room to join</div>
+      </div>
+
+      <div class="status-bar" id="engineStatusBar">Engine idle — connect room to warm up sockets.</div>
+    </section>
+
+    <!-- Center Column: Voice Controls + Live Bilingual Transcript + Metrics -->
+    <section class="panel">
+      <div class="voice-controls">
+        <button id="openMicBtn" class="btn-radiant">Start Open Mic (免按键连麦)</button>
+        <button id="pttBtn">Hold Push-to-Talk (按住说话 / Space)</button>
+        <div class="mic-meter" title="Microphone level">
+          <div class="mic-meter-fill" id="micMeterFill"></div>
+        </div>
+        <span class="badge" id="audioOutBadge">Speaker Ready</span>
+      </div>
+
+      <div class="live-Banner" id="livePartialBanner">
+        Live ASR / Streaming Caption: <span style="color: var(--text-muted)">Waiting for speech...</span>
+      </div>
+
+      <div class="feed" id="transcriptFeed"></div>
+
+      <form class="text-input-row" id="textSendForm">
+        <input
+          id="textSendInput"
+          type="text"
+          placeholder="快捷文字测试（例：猴子分身斧好了，大圣没大，去把三角区高台眼反了顺便堆波远古）..."
+        />
+        <button type="submit" class="btn-primary">Send &amp; Speak</button>
+      </form>
+    </section>
+
+    <!-- Right Column: One-Click Live Voice Simulator + Benchmark + DOTA2 Full Dictionary -->
+    <section class="panel">
+      <div class="panel-title">
+        <span>One-Click Voice Simulator · 一键真声实测</span>
+      </div>
+      <p style="font-size: 12px; color: var(--text-muted)">
+        无需第二台设备：点击按钮用 Azure TTS 生成教练/学员语音并流式送入当前引擎，实测黑话消歧与延迟：
+      </p>
+      <div class="demo-buttons">
+        <button
+          class="demo-btn"
+          data-role="coach"
+          data-lang="en-US"
+          data-text="Save OD's Astral for Slark, kite Monkey King's ult, and wait for Phantom Lancer's Manta before Roshan."
+        >
+          🎙️ <strong>Simulate Coach (EN → ZH 外号消歧):</strong><br />
+          "Save OD's Astral for Slark, kite Monkey King's ult, and wait for Phantom Lancer's Manta before Roshan."
+        </button>
+
+        <button
+          class="demo-btn"
+          data-role="student"
+          data-lang="zh-CN"
+          data-text="猴子分身斧好了，大圣没大招，去把三角区高台眼反了顺便堆波远古。"
+        >
+          🎙️ <strong>Simulate Student (ZH → EN 堆野/反眼/猴子vs大圣):</strong><br />
+          "猴子分身斧好了，大圣没大招，去把三角区高台眼反了顺便堆波远古。"
+        </button>
+
+        <button
+          class="demo-btn"
+          data-role="student"
+          data-lang="en-US"
+          data-text="My BKB is on cooldown for fifteen seconds, don't fight yet, go back."
+        >
+          🎙️ <strong>Simulate Student (EN → EN 原声直通):</strong><br />
+          "My BKB is on cooldown for fifteen seconds, don't fight yet, go back."
+        </button>
+      </div>
+
+      <div class="panel-title" style="margin-top: 6px">
+        <span>Live Latency Telemetry · 实测延迟对比</span>
+      </div>
+      <div id="benchmarkContainer" style="overflow-x: auto">
+        <div style="font-size: 12px; color: var(--text-muted)">Loading benchmark telemetry...</div>
+      </div>
+
+      <div class="panel-title" style="margin-top: 6px">
+        <span>DOTA2 全量双语词典</span>
+        <a href="/api/dictionary.md" target="_blank" class="dict-link" title="打开本地完整 Markdown 中英词表">查看完整 MD 文档 ↗</a>
+      </div>
+      <div class="dict-tabs" id="dictTabs">
+        <button type="button" class="dict-tab active" data-cat="all">全部</button>
+        <button type="button" class="dict-tab" data-cat="tactics">常用术语</button>
+        <button type="button" class="dict-tab" data-cat="heroes">英雄(127)</button>
+        <button type="button" class="dict-tab" data-cat="abilities">技能(734)</button>
+        <button type="button" class="dict-tab" data-cat="items">装备(402)</button>
+      </div>
+      <input
+        id="glossarySearch"
+        type="text"
+        placeholder="搜索 堆野 / 反眼 / 猴子 / 灵呱一闪 / BKB / Gleipnir..."
+        style="width: 100%; padding: 6px 10px; font-size: 12px"
+      />
+      <div class="glossary-list" id="glossaryList"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
