@@ -1,71 +1,367 @@
-const roomInput = document.getElementById('roomInput');
-const roleSelect = document.getElementById('roleSelect');
-const nameInput = document.getElementById('nameInput');
-const joinBtn = document.getElementById('joinBtn');
-const copyCoachLinkBtn = document.getElementById('copyCoachLinkBtn');
-const engineCards = document.querySelectorAll('.engine-card');
-const rawVoiceRelayToggle = document.getElementById('rawVoiceRelayToggle');
-const selfMonitorToggle = document.getElementById('selfMonitorToggle');
-const cascadeTtsPanel = document.getElementById('cascadeTtsPanel');
-const ttsZhVoiceSelect = document.getElementById('ttsZhVoiceSelect');
-const ttsEnVoiceSelect = document.getElementById('ttsEnVoiceSelect');
-const ttsStreamModeSelect = document.getElementById('ttsStreamModeSelect');
-const voiceLiveAsrSelect = document.getElementById('voiceLiveAsrSelect');
-const connBadge = document.getElementById('connBadge');
-const participantsList = document.getElementById('participantsList');
-const engineStatusBar = document.getElementById('engineStatusBar');
-const openMicBtn = document.getElementById('openMicBtn');
-const pttBtn = document.getElementById('pttBtn');
-const micMeterFill = document.getElementById('micMeterFill');
-const audioOutBadge = document.getElementById('audioOutBadge');
-const livePartialBanner = document.getElementById('livePartialBanner');
-const transcriptFeed = document.getElementById('transcriptFeed');
-const textSendForm = document.getElementById('textSendForm');
-const textSendInput = document.getElementById('textSendInput');
-const benchmarkContainer = document.getElementById('benchmarkContainer');
-const glossarySearch = document.getElementById('glossarySearch');
-const glossaryList = document.getElementById('glossaryList');
-
-// Hydrate room & role from URL query params so Coach invite links open ready-to-join
-const params = new URLSearchParams(window.location.search);
-if (params.get('room')) roomInput.value = params.get('room');
-if (params.get('role') === 'coach') {
-  roleSelect.value = 'coach';
-  nameInput.value = params.get('name') || 'EN Coach';
-} else if (params.get('name')) {
-  nameInput.value = params.get('name');
-}
-
-roleSelect.addEventListener('change', () => {
-  if (roleSelect.value === 'coach' && nameInput.value === 'CN Carry') {
-    nameInput.value = 'EN Coach';
-  } else if (roleSelect.value === 'student' && nameInput.value === 'EN Coach') {
-    nameInput.value = 'CN Carry';
-  }
-});
-
+const $ = id => document.getElementById(id);
+const roleSelect = $('roleSelect');
+const joinBtn = $('joinBtn');
+const selfMonitorToggle = $('selfMonitorToggle');
+const ttsZhVoiceSelect = $('ttsZhVoiceSelect');
+const ttsEnVoiceSelect = $('ttsEnVoiceSelect');
+const voiceLiveAsrSelect = $('voiceLiveAsrSelect');
+const connBadge = $('connBadge');
+const participantsList = $('participantsList');
+const engineStatusBar = $('engineStatusBar');
+const openMicBtn = $('openMicBtn');
+const pttBtn = $('pttBtn');
+const micMeterFill = $('micMeterFill');
+const audioOutBadge = $('audioOutBadge');
+const micStatus = $('micStatus');
+const livePartialBanner = $('livePartialBanner');
+const transcriptFeed = $('transcriptFeed');
+const textSendForm = $('textSendForm');
+const textSendInput = $('textSendInput');
+const initialUrl = new URL(location.href);
+let pendingRoomId = initialUrl.searchParams.get('room');
+let pendingInvite = new URLSearchParams(initialUrl.hash.slice(1)).get('invite') || initialUrl.searchParams.get('invite') || '';
+let user = null;
+let csrfToken = '';
+let activeRoom = null;
+let activeInvite = '';
+let availableUsers = [];
+let config = null;
 let ws = null;
-let selectedEngine = 'cascade';
-let unifiedDictEntries = [];
+let engineReady = false;
 let heroCatalog = [];
-let activeDictCategory = 'all';
 let matchHeroes = [];
 const turnCards = new Map();
+const ENGINE_LABELS = { cascade: 'Voice Live · Cascaded', 'gpt-realtime': 'Voice Live · Realtime 2.1', 'gpt-live': 'GPT-Live 1' };
+
+function notice(message) {
+  $('appNotice').textContent = message;
+  $('appNotice').hidden = !message;
+}
+function formError(id, message = '') {
+  $(id).textContent = message;
+  $(id).hidden = !message;
+}
+async function api(url, options = {}) {
+  const method = options.method || 'GET';
+  const headers = { ...options.headers };
+  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
+  const response = await fetch(url, {
+    method, headers, credentials: 'same-origin',
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    const error = new Error(data.error || '请求失败');
+    error.status = response.status;
+    if (response.status === 401 && url !== '/api/auth/login') showLogin(error.message);
+    throw error;
+  }
+  return data;
+}
+
+function stopRoomMedia() {
+  openMicActive = false;
+  pttPressed = false;
+  pttRequested = false;
+  stopMicPipeline();
+  engineReady = false;
+  updateMicButtons();
+  const context = audioCtx;
+  audioCtx = null;
+  if (context && context.state !== 'closed') context.close().catch(() => {});
+  nextPlayTime = 0;
+  stopVisionWatch();
+  openMicBtn.textContent = 'Start Open Mic (免按键连麦)';
+  openMicBtn.className = 'btn-radiant';
+  pttBtn.textContent = 'Hold Push-to-Talk (按住说话 / Space)';
+  pttBtn.className = '';
+  micMeterFill.style.width = '0%';
+  audioOutBadge.textContent = 'Speaker Ready';
+  setMicStatus('麦克风未开启');
+}
+
+function leaveRoom(clearUrl = true) {
+  const previous = ws;
+  ws = null;
+  previous?.close();
+  stopRoomMedia();
+  activeRoom = null;
+  activeInvite = '';
+  matchHeroes = [];
+  turnCards.clear();
+  transcriptFeed.replaceChildren();
+  livePartialBanner.textContent = '等待发言…';
+  $('roomView').hidden = true;
+  for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+  if (clearUrl) {
+    pendingRoomId = null;
+    pendingInvite = '';
+    history.replaceState(null, '', location.pathname);
+  }
+}
+
+function showLogin(message = '') {
+  leaveRoom(false);
+  user = null;
+  csrfToken = '';
+  $('loginView').hidden = false;
+  $('lobbyView').hidden = true;
+  $('accountControls').hidden = true;
+  $('passwordInput').value = '';
+  formError('loginError', message);
+}
+
+async function showLobby() {
+  $('loginView').hidden = true;
+  $('roomView').hidden = true;
+  $('lobbyView').hidden = false;
+  $('createRoomBtn').hidden = !user?.canCreateRooms;
+  $('invitationNotice').hidden = !pendingRoomId;
+  $('welcomeName').textContent = user.canCreateRooms ? '我的房间' : `欢迎，${user.username}`;
+  $('lobbyDescription').textContent = user.canCreateRooms
+    ? '创建语音室，选好同传方案，再邀请获准加入的账号。'
+    : '请使用房主发来的邀请链接加入。你的账号不能创建或浏览他人的房间。';
+  try {
+    const data = await api('/api/rooms');
+    $('roomList').replaceChildren();
+    for (const room of data.rooms) {
+      const card = document.createElement('div');
+      card.className = 'room-card';
+      const label = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = room.name;
+      const subtitle = document.createElement('p');
+      subtitle.className = 'muted small';
+      subtitle.textContent = `${ENGINE_LABELS[room.settings.engineKind]} · ${room.allowedUsernames.length} 个允许加入的账号`;
+      label.append(title, subtitle);
+      const button = document.createElement('button');
+      button.textContent = '进入房间';
+      button.addEventListener('click', () => enterRoom(room.roomId).catch(error => notice(error.message)));
+      card.append(label, button);
+      $('roomList').append(card);
+    }
+    if (!data.rooms.length && user.canCreateRooms) $('roomList').textContent = '还没有房间，点击右上方创建。';
+  } catch (error) {
+    if (error.status === 401) showLogin(error.message);
+    else notice(error.message);
+  }
+}
+
+function renderRoomSettings() {
+  const settings = activeRoom.settings;
+  const voiceLabel = (language, id) => config.ttsVoiceCatalog[language].find(voice => voice.id === id)?.label || id;
+  const rows = settings.engineKind === 'gpt-live'
+    ? [['引擎', ENGINE_LABELS[settings.engineKind]], ['音色与转录', 'GPT-Live 内置']]
+    : [['引擎', ENGINE_LABELS[settings.engineKind]], ['中文', voiceLabel('zh', settings.ttsZhVoice)], ['英文', voiceLabel('en', settings.ttsEnVoice)], ['ASR', settings.voiceLiveAsrModel]];
+  $('roomSettingsSummary').innerHTML = rows.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join('');
+}
+
+async function enterRoom(roomId, invitation = '') {
+  const account = user;
+  const data = await api(`/api/rooms/${encodeURIComponent(roomId)}`, { headers: invitation ? { 'X-Room-Invite': invitation } : {} });
+  if (!account || user !== account) return;
+  leaveRoom(false);
+  activeRoom = data.room;
+  activeInvite = invitation;
+  pendingRoomId = roomId;
+  pendingInvite = invitation;
+  notice('');
+  $('loginView').hidden = true;
+  $('lobbyView').hidden = true;
+  $('roomView').hidden = false;
+  $('roomTitle').textContent = activeRoom.name;
+  $('roomOwner').textContent = `房主：${activeRoom.ownerUsername}`;
+  document.querySelectorAll('[data-owner-only]').forEach(element => { element.hidden = !activeRoom.isOwner; });
+  renderRoomSettings();
+  renderSelectedMatchHeroes();
+  const url = new URL(location.pathname, location.origin);
+  url.searchParams.set('room', roomId);
+  url.searchParams.set('role', roleSelect.value);
+  if (invitation) url.hash = new URLSearchParams({ invite: invitation }).toString();
+  history.replaceState(null, '', url);
+  connectRoom();
+}
+
+function invitationUrl() {
+  if (!activeRoom?.isOwner) return '';
+  const url = new URL(location.pathname, location.origin);
+  url.searchParams.set('room', activeRoom.roomId);
+  url.searchParams.set('role', 'coach');
+  url.hash = new URLSearchParams({ invite: activeRoom.inviteToken }).toString();
+  return url.toString();
+}
+
+function renderAllowedUsers(containerId, allowed = []) {
+  const container = $(containerId);
+  container.replaceChildren();
+  for (const candidate of availableUsers.filter(candidate => candidate.username !== user.username)) {
+    const label = document.createElement('label');
+    label.className = 'toggle-row';
+    const span = document.createElement('span');
+    span.textContent = candidate.username;
+    const input = document.createElement('input');
+    input.type = 'checkbox'; input.value = candidate.username; input.checked = allowed.includes(candidate.username);
+    label.append(span, input);
+    container.append(label);
+  }
+  if (!container.childElementCount) container.textContent = '当前没有其他账号。';
+}
+const allowedSelection = id => [...$(id).querySelectorAll('input:checked')].map(input => input.value);
+
+async function copyInvite() {
+  const value = invitationUrl();
+  if (!value) return;
+  try { await navigator.clipboard.writeText(value); notice('邀请链接已复制；只有允许名单内的账号能够加入。'); }
+  catch {
+    $('inviteLinkInput').value = value;
+    if (!$('accessDialog').open) await openAccessDialog();
+    $('inviteLinkInput').focus(); $('inviteLinkInput').select();
+    notice('浏览器未允许自动复制，请复制已选中的邀请链接。');
+  }
+}
+
+async function openAccessDialog() {
+  if (!activeRoom?.isOwner) return;
+  const roomId = activeRoom.roomId;
+  const [detail, users] = await Promise.all([api(`/api/rooms/${activeRoom.roomId}`), api('/api/users')]);
+  if (activeRoom?.roomId !== roomId) return;
+  activeRoom = detail.room;
+  availableUsers = users.users;
+  renderAllowedUsers('accessAllowedUsers', activeRoom.allowedUsernames);
+  $('inviteLinkInput').value = invitationUrl();
+  formError('accessError');
+  $('accessDialog').showModal();
+}
+
+async function initializeUser(session) {
+  user = session.user;
+  csrfToken = session.csrfToken;
+  $('currentUser').textContent = user.username;
+  $('accountControls').hidden = false;
+  $('loginView').hidden = true;
+  const [cfg, dict, accounts] = await Promise.all([
+    api('/api/config'), api('/api/dictionary'),
+    user.canCreateRooms ? api('/api/users') : Promise.resolve({ users: [] }),
+  ]);
+  config = cfg;
+  availableUsers = accounts.users;
+  heroCatalog = dict.heroes || [];
+  for (const [select, language] of [[ttsZhVoiceSelect, 'zh'], [ttsEnVoiceSelect, 'en']]) {
+    select.replaceChildren(...cfg.ttsVoiceCatalog[language].map(voice => new Option(voice.label, voice.id)));
+  }
+  $('heroPickerDatalist').replaceChildren(...heroCatalog.map(hero => {
+    const option = new Option(`${hero.zh} ${(hero.zhSlang || []).join('/')} ${(hero.enAliases || []).join('/')}`, hero.en);
+    return option;
+  }));
+  const requestedRole = initialUrl.searchParams.get('role');
+  roleSelect.value = ['coach', 'student'].includes(requestedRole) ? requestedRole : (user.canCreateRooms ? 'student' : 'coach');
+  await showLobby();
+  if (pendingRoomId) {
+    try { await enterRoom(pendingRoomId, pendingInvite); }
+    catch (error) { notice(error.message); }
+  }
+}
+
+$('loginForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  formError('loginError');
+  $('loginSubmitBtn').disabled = true;
+  try {
+    const session = await api('/api/auth/login', { method: 'POST', body: { username: $('usernameInput').value.trim(), password: $('passwordInput').value } });
+    $('passwordInput').value = '';
+    await initializeUser(session);
+  } catch (error) { showLogin(error.message); }
+  finally { $('loginSubmitBtn').disabled = false; }
+});
+$('logoutBtn').addEventListener('click', async () => {
+  try { await api('/api/auth/logout', { method: 'POST' }); showLogin(); notice('已退出登录'); }
+  catch (error) { if (error.status === 401) showLogin(); else notice(error.message); }
+});
+$('leaveRoomBtn').addEventListener('click', () => { leaveRoom(); showLobby(); });
+$('retryInviteBtn').addEventListener('click', () => enterRoom(pendingRoomId, pendingInvite).catch(error => notice(error.message)));
+$('copyCoachLinkBtn').addEventListener('click', () => copyInvite().catch(error => notice(error.message)));
+$('copyDialogInviteBtn').addEventListener('click', () => copyInvite().catch(error => notice(error.message)));
+$('manageAccessBtn').addEventListener('click', () => openAccessDialog().catch(error => notice(error.message)));
+document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => $(button.dataset.closeDialog).close()));
+$('createRoomBtn').addEventListener('click', async () => {
+  if (!user?.canCreateRooms) return;
+  try {
+    availableUsers = (await api('/api/users')).users;
+    $('createRoomForm').reset();
+    $('createEngineSelect').value = config.defaults.engineKind;
+    ttsZhVoiceSelect.value = config.defaults.ttsZhVoice;
+    ttsEnVoiceSelect.value = config.defaults.ttsEnVoice;
+    voiceLiveAsrSelect.value = config.defaults.voiceLiveAsrModel;
+    $('createVoiceOptions').hidden = false;
+    $('liveEngineNote').hidden = true;
+    renderAllowedUsers('createAllowedUsers');
+    formError('createRoomError');
+    $('createRoomDialog').showModal();
+  } catch (error) { notice(error.message); }
+});
+$('createEngineSelect').addEventListener('change', () => {
+  const live = $('createEngineSelect').value === 'gpt-live';
+  $('createVoiceOptions').hidden = live;
+  $('liveEngineNote').hidden = !live;
+});
+$('createRoomForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  $('createRoomSubmitBtn').disabled = true;
+  formError('createRoomError');
+  try {
+    const data = await api('/api/rooms', { method: 'POST', body: {
+      name: $('newRoomName').value.trim(), allowedUsernames: allowedSelection('createAllowedUsers'),
+      settings: { engineKind: $('createEngineSelect').value, ttsZhVoice: ttsZhVoiceSelect.value, ttsEnVoice: ttsEnVoiceSelect.value, voiceLiveAsrModel: voiceLiveAsrSelect.value },
+    } });
+    $('createRoomDialog').close();
+    roleSelect.value = 'student';
+    await enterRoom(data.room.roomId);
+  } catch (error) { formError('createRoomError', error.message); notice(error.message); }
+  finally { $('createRoomSubmitBtn').disabled = false; }
+});
+$('accessForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!activeRoom?.isOwner) return;
+  $('saveAccessBtn').disabled = true;
+  try {
+    const data = await api(`/api/rooms/${activeRoom.roomId}/access`, { method: 'PATCH', body: { allowedUsernames: allowedSelection('accessAllowedUsers') } });
+    activeRoom = data.room;
+    $('accessDialog').close();
+    notice('允许名单已保存，取消授权的用户已断开连接。');
+  } catch (error) { formError('accessError', error.message); }
+  finally { $('saveAccessBtn').disabled = false; }
+});
+roleSelect.addEventListener('change', () => {
+  if (activeRoom) enterRoom(activeRoom.roomId, activeInvite).catch(error => notice(error.message));
+});
 
 // WebAudio playback & 24kHz PCM16 capture state
 let audioCtx = null;
 let nextPlayTime = 0;
 let micStream = null;
 let workletNode = null;
+let micSource = null;
+let micSink = null;
+let micInitPromise = null;
+let micGeneration = 0;
+let pttRequested = false;
+let micHealthTimer = null;
+let micOpenedAt = 0;
+let micLastFrameAt = 0;
+let micLastLoudAt = 0;
+let micLastAckAt = 0;
+let lastCaptureStatus = '';
+const workletRegistrations = new WeakMap();
 let openMicActive = false;
 let pttPressed = false;
 
 function ensureAudioContext() {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
+    audioCtx.resume().catch(() => {});
   }
   return audioCtx;
 }
@@ -139,77 +435,176 @@ class Pcm24kCaptureProcessor extends AudioWorkletProcessor {
 registerProcessor('pcm24k-capture', Pcm24kCaptureProcessor);
 `;
 
-async function ensureMicPipeline() {
-  if (workletNode) return;
-  const ctx = ensureAudioContext();
-  micStream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      channelCount: 1,
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    },
-  });
+function setMicStatus(text, code = '') {
+  micStatus.textContent = text;
+  if (code && code !== lastCaptureStatus && ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'client.audio.status', status: code }));
+  }
+  lastCaptureStatus = code;
+}
 
-  const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
-  const blobUrl = URL.createObjectURL(blob);
-  await ctx.audioWorklet.addModule(blobUrl);
-  URL.revokeObjectURL(blobUrl);
+function updateMicButtons() {
+  openMicBtn.disabled = !engineReady;
+  pttBtn.disabled = !engineReady;
+}
 
-  const source = ctx.createMediaStreamSource(micStream);
-  workletNode = new AudioWorkletNode(ctx, 'pcm24k-capture');
-  workletNode.port.onmessage = (evt) => {
-    const { pcm, rms } = evt.data;
-    const pct = Math.min(100, Math.round(rms * 360));
-    micMeterFill.style.width = openMicActive || pttPressed ? `${pct}%` : '0%';
-    if ((openMicActive || pttPressed) && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(pcm);
+function stopMicPipeline() {
+  micGeneration++;
+  micInitPromise = null;
+  if (micHealthTimer) clearInterval(micHealthTimer);
+  micHealthTimer = null;
+  if (workletNode) {
+    workletNode.port.onmessage = null;
+    workletNode.port.close();
+    workletNode.onprocessorerror = null;
+  }
+  for (const node of [micSource, workletNode, micSink]) {
+    try { node?.disconnect(); } catch { /* Already detached. */ }
+  }
+  micStream?.getTracks().forEach(track => track.stop());
+  micStream = micSource = workletNode = micSink = null;
+  micMeterFill.style.width = '0%';
+}
+
+function microphoneFailed(message) {
+  openMicActive = pttPressed = pttRequested = false;
+  stopMicPipeline();
+  openMicBtn.textContent = 'Start Open Mic (免按键连麦)';
+  openMicBtn.className = 'btn-radiant';
+  pttBtn.textContent = 'Hold Push-to-Talk (按住说话 / Space)';
+  pttBtn.className = '';
+  setMicStatus(message, 'capture_error');
+  notice(message);
+}
+
+function startMicHealth() {
+  if (micHealthTimer) return;
+  micOpenedAt = Date.now();
+  micLastFrameAt = micLastLoudAt = micLastAckAt = 0;
+  setMicStatus(`正在采集：${micStream?.getAudioTracks()[0]?.label || '默认麦克风'}`, 'capturing');
+  micHealthTimer = setInterval(() => {
+    if (!openMicActive && !pttPressed) return;
+    const now = Date.now();
+    if (audioCtx?.state !== 'running') {
+      setMicStatus('浏览器暂停了音频，请关闭再重新开启麦克风', 'context_suspended');
+    } else if (now - micOpenedAt > 3000 && now - micLastFrameAt > 2500) {
+      setMicStatus('麦克风没有输出音频，请检查权限或重新开启麦克风', 'capture_stalled');
+    } else if (micStream?.getAudioTracks()[0]?.muted || (now - micOpenedAt > 5000 && now - micLastLoudAt > 5000)) {
+      setMicStatus('已采集但没有检测到声音，请检查输入设备或系统静音', 'input_silent');
+    } else if (now - micOpenedAt > 3000 && now - micLastAckAt > 3000) {
+      setMicStatus('已采集，但服务器尚未确认音频，请重新连接', 'upload_stalled');
+    } else if (micLastAckAt) {
+      setMicStatus('服务器已收到语音，等待转录 / 翻译', 'capturing');
     }
-  };
-  source.connect(workletNode);
+  }, 1000);
+}
+
+async function ensureMicPipeline() {
+  const requestedGeneration = micGeneration;
+  const ctx = ensureAudioContext();
+  await ctx.resume();
+  if (requestedGeneration !== micGeneration) throw new DOMException('已取消麦克风请求', 'AbortError');
+  if (ctx.state !== 'running') throw new Error('浏览器音频未运行，请重新点击开启麦克风');
+  if (workletNode && micStream?.getAudioTracks()[0]?.readyState === 'live') return;
+  if (micInitPromise) return micInitPromise;
+  const generation = micGeneration;
+  const roomId = activeRoom?.roomId;
+  const connection = ws;
+  const isCurrent = () => generation === micGeneration && activeRoom?.roomId === roomId && ws === connection && engineReady && ctx.state !== 'closed';
+  const pending = (async () => {
+    setMicStatus('正在请求麦克风权限…');
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: {
+        channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+      } });
+      if (!isCurrent()) throw new DOMException('已取消麦克风请求', 'AbortError');
+      micStream = stream;
+      if (!workletRegistrations.has(ctx)) {
+        const registration = (async () => {
+          const blobUrl = URL.createObjectURL(new Blob([WORKLET_CODE], { type: 'application/javascript' }));
+          try { await ctx.audioWorklet.addModule(blobUrl); }
+          catch (error) { workletRegistrations.delete(ctx); throw error; }
+          finally { URL.revokeObjectURL(blobUrl); }
+        })();
+        workletRegistrations.set(ctx, registration);
+      }
+      await workletRegistrations.get(ctx);
+      if (!isCurrent()) throw new DOMException('已取消麦克风请求', 'AbortError');
+      micSource = ctx.createMediaStreamSource(stream);
+      workletNode = new AudioWorkletNode(ctx, 'pcm24k-capture');
+      // Keep the processing graph pulled by the destination without playing microphone audio locally.
+      micSink = ctx.createGain();
+      micSink.gain.value = 0;
+      workletNode.port.onmessage = ({ data: { pcm, rms } }) => {
+        if (!isCurrent()) return;
+        micLastFrameAt = Date.now();
+        if (rms > 0.003) micLastLoudAt = micLastFrameAt;
+        micMeterFill.style.width = openMicActive || pttPressed ? `${Math.min(100, Math.round(rms * 360))}%` : '0%';
+        if ((openMicActive || pttPressed) && ws?.readyState === WebSocket.OPEN && engineReady) ws.send(pcm);
+      };
+      workletNode.onprocessorerror = () => microphoneFailed('音频采集处理器中断，请重新开启麦克风');
+      stream.getAudioTracks()[0]?.addEventListener('ended', () => {
+        if (isCurrent()) microphoneFailed('麦克风设备已断开，请重新连接输入设备');
+      });
+      micSource.connect(workletNode);
+      workletNode.connect(micSink);
+      micSink.connect(ctx.destination);
+    } catch (error) {
+      stream?.getTracks().forEach(track => track.stop());
+      if (generation === micGeneration) stopMicPipeline();
+      throw error;
+    }
+  })();
+  micInitPromise = pending;
+  try { await pending; }
+  finally { if (micInitPromise === pending) micInitPromise = null; }
 }
 
 function connectRoom() {
-  ensureAudioContext();
-  if (ws) {
-    ws.close();
-    ws = null;
-  }
-  const room = encodeURIComponent(roomInput.value.trim() || 'roshan-pit');
-  const role = encodeURIComponent(roleSelect.value);
-  const name = encodeURIComponent(nameInput.value.trim() || 'Player');
-  const selfMon = selfMonitorToggle.checked ? '1' : '0';
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(
-    `${proto}//${window.location.host}/ws?room=${room}&role=${role}&name=${name}&selfMonitor=${selfMon}`,
-  );
-  ws.binaryType = 'arraybuffer';
-
+  if (!user || !activeRoom) return;
+  const previous = ws;
+  ws = null;
+  previous?.close();
+  engineReady = false;
+  updateMicButtons();
+  setMicStatus('等待语音引擎就绪后才能开麦…');
+  const query = new URLSearchParams({ room: activeRoom.roomId, role: roleSelect.value, selfMonitor: selfMonitorToggle.checked ? '1' : '0' });
+  if (activeInvite) query.set('invite', activeInvite);
+  const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws?${query}`);
+  ws = socket;
+  socket.binaryType = 'arraybuffer';
   connBadge.textContent = 'Connecting...';
   connBadge.className = 'badge gold';
-
-  ws.onopen = () => {
+  engineStatusBar.textContent = '正在连接语音服务…';
+  socket.onopen = () => {
+    if (ws !== socket) return;
     connBadge.textContent = 'Connected';
     connBadge.className = 'badge green';
-    joinBtn.textContent = 'Reconnect / 刷新重连';
   };
-
-  ws.onclose = () => {
+  socket.onclose = event => {
+    if (ws !== socket) return;
+    ws = null;
+    stopRoomMedia();
     connBadge.textContent = 'Disconnected';
     connBadge.className = 'badge';
+    if (event.code === 4001) showLogin('登录已失效，请重新登录');
+    else if (event.code === 4003) {
+      leaveRoom(false);
+      showLobby();
+      notice('房主已取消你的加入权限。');
+    } else engineStatusBar.textContent = '连接已断开，请点击重新连接。';
   };
-
-  ws.onmessage = (evt) => {
-    if (evt.data instanceof ArrayBuffer) {
-      if (evt.data.byteLength > 2) {
-        const pcmSlice = new Uint8Array(evt.data, 2);
-        playPcm24kMono(pcmSlice);
-      }
+  socket.onerror = () => {
+    if (ws === socket) notice('无法加入房间，请确认登录、邀请链接和房主授权仍有效。');
+  };
+  socket.onmessage = event => {
+    if (ws !== socket || !activeRoom) return;
+    if (event.data instanceof ArrayBuffer) {
+      if (event.data.byteLength > 2) playPcm24kMono(new Uint8Array(event.data, 2));
       return;
     }
-
-    const msg = JSON.parse(evt.data);
-    handleServerMessage(msg);
+    handleServerMessage(JSON.parse(event.data));
   };
 }
 
@@ -247,18 +642,6 @@ function getOrCreateTurnCard(turnId, role, speaker) {
 function handleServerMessage(msg) {
   switch (msg.type) {
     case 'room.state': {
-      selectedEngine = msg.engineKind;
-      rawVoiceRelayToggle.checked = Boolean(msg.englishOriginalVoiceRelay);
-      if (cascadeTtsPanel) {
-        cascadeTtsPanel.style.display =
-          selectedEngine === 'cascade' || selectedEngine === 'gpt-realtime' ? 'flex' : 'none';
-      }
-      if (msg.ttsZhVoice && ttsZhVoiceSelect) ttsZhVoiceSelect.value = msg.ttsZhVoice;
-      if (msg.ttsEnVoice && ttsEnVoiceSelect) ttsEnVoiceSelect.value = msg.ttsEnVoice;
-      if (msg.ttsStreamMode && ttsStreamModeSelect) ttsStreamModeSelect.value = msg.ttsStreamMode;
-      if (msg.voiceLiveAsrModel && voiceLiveAsrSelect) {
-        voiceLiveAsrSelect.value = msg.voiceLiveAsrModel;
-      }
       if (Array.isArray(msg.matchHeroes)) {
         matchHeroes = msg.matchHeroes;
         renderSelectedMatchHeroes();
@@ -266,9 +649,6 @@ function handleServerMessage(msg) {
       if (msg.gsiState) {
         renderGsiStatus(msg.gsiState);
       }
-      engineCards.forEach((c) => {
-        c.classList.toggle('active', c.dataset.engine === selectedEngine);
-      });
       renderParticipants(msg.participants || []);
       break;
     }
@@ -297,13 +677,43 @@ function handleServerMessage(msg) {
       break;
     }
 
+    case 'engine.state': {
+      engineReady = msg.state === 'ready';
+      updateMicButtons();
+      if (!engineReady) {
+        openMicActive = pttPressed = pttRequested = false;
+        stopMicPipeline();
+        openMicBtn.textContent = 'Start Open Mic (免按键连麦)';
+        openMicBtn.className = 'btn-radiant';
+        pttBtn.textContent = 'Hold Push-to-Talk (按住说话 / Space)';
+        pttBtn.className = '';
+      }
+      setMicStatus(engineReady
+        ? '语音已就绪，点击开启麦克风或按住说话'
+        : msg.state === 'failed' ? '语音连接失败，请点击重新连接' : '语音服务连接中，暂不能开麦…');
+      break;
+    }
+
+    case 'audio.input.status': {
+      if (msg.engineReady && msg.forwardedFrames > 0) micLastAckAt = Date.now();
+      else setMicStatus('服务器语音引擎尚未就绪，请等待连接完成');
+      break;
+    }
+
     case 'engine.status': {
-      engineStatusBar.textContent = `[${msg.speaker}] ${msg.status}`;
+      if (msg.speaker === user?.username && (!msg.role || msg.role === roleSelect.value)) {
+        engineStatusBar.textContent = msg.status;
+      }
+      break;
+    }
+
+    case 'room.error': {
+      notice(msg.message);
       break;
     }
 
     case 'engine.error': {
-      engineStatusBar.textContent = `⚠️ [${msg.speaker}] ${msg.message}`;
+      if (msg.speaker === user?.username && (!msg.role || msg.role === roleSelect.value)) engineStatusBar.textContent = `⚠️ ${msg.message}`;
       break;
     }
 
@@ -386,54 +796,16 @@ function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-// UI Bindings
-joinBtn.addEventListener('click', connectRoom);
-
-copyCoachLinkBtn.addEventListener('click', async () => {
-  const url = new URL(window.location.href);
-  url.searchParams.set('room', roomInput.value.trim() || 'roshan-pit');
-  url.searchParams.set('role', 'coach');
-  url.searchParams.set('name', 'Coach');
-  await navigator.clipboard.writeText(url.toString());
-  const old = copyCoachLinkBtn.textContent;
-  copyCoachLinkBtn.textContent = 'Copied Coach URL!';
-  setTimeout(() => (copyCoachLinkBtn.textContent = old), 1600);
-});
-
-engineCards.forEach((card) => {
-  card.addEventListener('click', () => {
-    const kind = card.dataset.engine;
-    selectedEngine = kind;
-    engineCards.forEach((c) => c.classList.toggle('active', c.dataset.engine === kind));
-    if (cascadeTtsPanel) {
-      cascadeTtsPanel.style.display =
-        kind === 'cascade' || kind === 'gpt-realtime' ? 'flex' : 'none';
-    }
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(
-        JSON.stringify({
-          type: 'room.set_engine',
-          engineKind: kind,
-          englishOriginalVoiceRelay: rawVoiceRelayToggle.checked,
-        }),
-      );
-    }
+joinBtn.addEventListener('click', () => {
+  if (activeRoom) enterRoom(activeRoom.roomId, activeInvite).catch(error => {
+    if (error.status === 401) showLogin(error.message);
+    else notice(error.message);
   });
-});
-
-rawVoiceRelayToggle.addEventListener('change', () => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(
-      JSON.stringify({
-        type: 'room.set_engine',
-        engineKind: selectedEngine,
-        englishOriginalVoiceRelay: rawVoiceRelayToggle.checked,
-      }),
-    );
-  }
 });
 
 selfMonitorToggle.addEventListener('change', () => {
@@ -448,68 +820,73 @@ selfMonitorToggle.addEventListener('change', () => {
 });
 
 openMicBtn.addEventListener('click', async () => {
-  if (!ws || ws.readyState !== WebSocket.OPEN) connectRoom();
-  await ensureMicPipeline();
-  openMicActive = !openMicActive;
   if (openMicActive) {
-    openMicBtn.textContent = 'Stop Open Mic (正在连麦...)';
-    openMicBtn.className = 'btn-dire';
-  } else {
+    openMicActive = false;
     openMicBtn.textContent = 'Start Open Mic (免按键连麦)';
     openMicBtn.className = 'btn-radiant';
-    micMeterFill.style.width = '0%';
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'speech.end' }));
-    }
+    if (!pttPressed) stopMicPipeline();
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'speech.end' }));
+    setMicStatus('麦克风已关闭', 'stopped');
+    return;
   }
+  if (!activeRoom || ws?.readyState !== WebSocket.OPEN || !engineReady) { notice('请等待自己的语音引擎就绪'); return; }
+  try {
+    await ensureMicPipeline();
+    if (!engineReady || !micStream) return;
+    openMicActive = true;
+    openMicBtn.textContent = 'Stop Open Mic (正在连麦...)';
+    openMicBtn.className = 'btn-dire';
+    startMicHealth();
+  } catch (error) { if (error.name !== 'AbortError') microphoneFailed(`麦克风不可用：${error.message}`); }
 });
 
 async function startPtt() {
-  if (pttPressed) return;
-  if (!ws || ws.readyState !== WebSocket.OPEN) connectRoom();
-  await ensureMicPipeline();
-  pttPressed = true;
-  pttBtn.className = 'btn-dire';
-  pttBtn.textContent = 'Speaking... Release to Commit';
+  if (pttRequested || pttPressed) return;
+  if (!activeRoom || ws?.readyState !== WebSocket.OPEN || !engineReady) { notice('请等待自己的语音引擎就绪'); return; }
+  pttRequested = true;
+  try {
+    await ensureMicPipeline();
+    if (!pttRequested || !engineReady || !micStream) return;
+    pttPressed = true;
+    pttBtn.className = 'btn-dire';
+    pttBtn.textContent = 'Speaking... Release to Commit';
+    startMicHealth();
+  } catch (error) { if (error.name !== 'AbortError') microphoneFailed(`麦克风不可用：${error.message}`); }
 }
 
 function stopPtt() {
-  if (!pttPressed) return;
-  pttPressed = false;
+  const wasPressed = pttPressed;
+  pttPressed = pttRequested = false;
   pttBtn.className = '';
   pttBtn.textContent = 'Hold Push-to-Talk (按住说话 / Space)';
-  micMeterFill.style.width = '0%';
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'speech.end' }));
+  if (!openMicActive) {
+    stopMicPipeline();
+    setMicStatus('麦克风未开启，点击开麦或按住说话', 'stopped');
   }
+  if (wasPressed && ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'speech.end' }));
 }
 
 pttBtn.addEventListener('mousedown', startPtt);
-window.addEventListener('mouseup', stopPtt);
-pttBtn.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  startPtt();
-});
-window.addEventListener('touchend', stopPtt);
-
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && document.activeElement?.tagName !== 'INPUT') {
-    e.preventDefault();
-    startPtt();
+window.addEventListener('mouseup', () => { if (pttRequested || pttPressed) stopPtt(); });
+pttBtn.addEventListener('touchstart', event => { event.preventDefault(); startPtt(); });
+window.addEventListener('touchend', () => { if (pttRequested || pttPressed) stopPtt(); });
+window.addEventListener('blur', () => { if (pttRequested || pttPressed) stopPtt(); });
+window.addEventListener('keydown', event => {
+  const target = document.activeElement;
+  const editing = target?.closest('input, textarea, select, [contenteditable=true]');
+  if (!$('roomView').hidden && !document.querySelector('dialog[open]') && event.code === 'Space' && !event.repeat && !editing && (!target?.closest('button') || target === pttBtn)) {
+    event.preventDefault(); startPtt();
   }
 });
-window.addEventListener('keyup', (e) => {
-  if (e.code === 'Space' && document.activeElement?.tagName !== 'INPUT') {
-    e.preventDefault();
-    stopPtt();
-  }
+window.addEventListener('keyup', event => {
+  if (event.code === 'Space' && (pttRequested || pttPressed)) { event.preventDefault(); stopPtt(); }
 });
 
 textSendForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const txt = textSendInput.value.trim();
   if (!txt) return;
-  if (!ws || ws.readyState !== WebSocket.OPEN) connectRoom();
+  if (!activeRoom || !ws || ws.readyState !== WebSocket.OPEN) { notice('请先连接房间'); return; }
   ensureAudioContext();
   const sendNow = () => {
     ws.send(JSON.stringify({ type: 'text.send', text: txt }));
@@ -519,101 +896,6 @@ textSendForm.addEventListener('submit', (e) => {
   else ws.addEventListener('open', sendNow, { once: true });
 });
 
-document.querySelectorAll('.demo-btn').forEach((btn) => {
-  btn.addEventListener('click', async () => {
-    ensureAudioContext();
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      connectRoom();
-      await new Promise((r) => ws.addEventListener('open', r, { once: true }));
-    }
-    await fetch('/api/demo-speak', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        roomId: roomInput.value.trim() || 'roshan-pit',
-        role: btn.dataset.role,
-        lang: btn.dataset.lang,
-        text: btn.dataset.text,
-      }),
-    });
-  });
-});
-
-function toggleMatchHero(canonicalEn) {
-  if (!canonicalEn) return;
-  const exists = matchHeroes.some((h) => h.toLowerCase() === canonicalEn.toLowerCase());
-  if (exists) {
-    matchHeroes = matchHeroes.filter((h) => h.toLowerCase() !== canonicalEn.toLowerCase());
-  } else {
-    if (matchHeroes.length >= 10) return;
-    matchHeroes.push(canonicalEn);
-  }
-  renderSelectedMatchHeroes();
-  renderDictionary();
-  syncMatchHeroesToRoom();
-}
-
-function renderDictionary() {
-  const q = glossarySearch.value.trim().toLowerCase();
-  const pool =
-    activeDictCategory === 'all'
-      ? unifiedDictEntries
-      : unifiedDictEntries.filter((e) => e.cat === activeDictCategory);
-
-  const filtered = q
-    ? pool.filter((e) => e.searchBlob.includes(q))
-    : pool;
-
-  const shown = filtered.slice(0, 120);
-  glossaryList.innerHTML = shown
-    .map((g) => {
-      const isHero = g.cat === 'heroes';
-      const locked =
-        isHero && matchHeroes.some((h) => h.toLowerCase() === g.en.toLowerCase());
-      const heroBtn = isHero
-        ? `<button type="button" data-toggle-hero="${escapeHtml(g.en)}" style="margin-left:6px;padding:1px 6px;font-size:11px;${
-            locked ? 'border-color:var(--radiant);color:var(--radiant)' : ''
-          }">${locked ? '✓ 已锁' : '+ 本局'}</button>`
-        : '';
-      return `
-      <div class="glossary-item">
-        <div class="glossary-item-row">
-          <span><strong>${escapeHtml(g.en)}</strong></span>
-          <span style="display:flex;align-items:center;justify-content:flex-end">
-            <strong style="color: var(--gold); text-align: right">${escapeHtml(g.zh)}</strong>${heroBtn}
-          </span>
-        </div>
-        ${g.sub ? `<div class="glossary-sub">${escapeHtml(g.sub)}</div>` : ''}
-      </div>`;
-    })
-    .join('');
-
-  glossaryList.querySelectorAll('[data-toggle-hero]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      toggleMatchHero(btn.getAttribute('data-toggle-hero'));
-    });
-  });
-
-  if (filtered.length > shown.length) {
-    glossaryList.insertAdjacentHTML(
-      'beforeend',
-      `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px">Showing 120 of ${filtered.length} entries — type above to filter</div>`,
-    );
-  } else if (filtered.length === 0) {
-    glossaryList.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:6px">No matching DOTA2 term found.</div>`;
-  }
-}
-
-glossarySearch.addEventListener('input', renderDictionary);
-
-document.querySelectorAll('.dict-tab').forEach((tab) => {
-  tab.addEventListener('click', () => {
-    activeDictCategory = tab.dataset.cat;
-    document.querySelectorAll('.dict-tab').forEach((t) => t.classList.toggle('active', t === tab));
-    renderDictionary();
-  });
-});
-
 function renderSelectedMatchHeroes() {
   const countEl = document.getElementById('matchHeroesCount');
   const clearBtn = document.getElementById('clearHeroesBtn');
@@ -621,7 +903,7 @@ function renderSelectedMatchHeroes() {
   if (!countEl || !container) return;
   countEl.textContent = `${matchHeroes.length} / 10`;
   if (clearBtn) {
-    clearBtn.style.display = matchHeroes.length > 0 ? 'inline-block' : 'none';
+    clearBtn.style.display = activeRoom?.isOwner && matchHeroes.length > 0 ? 'inline-block' : 'none';
   }
   if (!matchHeroes.length) {
     container.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">未限定（已内置全部 127 英雄名与黑话；BP 选出英雄后点选可动态追加全技能）</span>`;
@@ -637,7 +919,7 @@ function renderSelectedMatchHeroes() {
             h.key === keyOrName,
         ) || { en: keyOrName, zh: '' };
       const label = hero.zh ? `${hero.zh} (${hero.en})` : hero.en;
-      return `<span class="hero-tag">${escapeHtml(label)} <button type="button" data-remove-hero="${escapeHtml(keyOrName)}">×</button></span>`;
+      return `<span class="hero-tag">${escapeHtml(label)} ${activeRoom?.isOwner ? `<button type="button" data-remove-hero="${escapeHtml(keyOrName)}">×</button>` : ''}</span>`;
     })
     .join('');
 
@@ -646,13 +928,13 @@ function renderSelectedMatchHeroes() {
       const target = btn.getAttribute('data-remove-hero');
       matchHeroes = matchHeroes.filter((h) => h !== target);
       renderSelectedMatchHeroes();
-      renderDictionary();
       syncMatchHeroesToRoom();
     });
   });
 }
 
 function syncMatchHeroesToRoom() {
+  if (!activeRoom?.isOwner) return;
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: 'room.set_match_heroes', matchHeroes }));
   }
@@ -661,10 +943,9 @@ function syncMatchHeroesToRoom() {
 const clearHeroesBtn = document.getElementById('clearHeroesBtn');
 if (clearHeroesBtn) {
   clearHeroesBtn.addEventListener('click', () => {
-    if (!matchHeroes.length) return;
+    if (!activeRoom?.isOwner || !matchHeroes.length) return;
     matchHeroes = [];
     renderSelectedMatchHeroes();
-    renderDictionary();
     syncMatchHeroesToRoom();
   });
 }
@@ -673,6 +954,7 @@ const heroPickerInput = document.getElementById('heroPickerInput');
 const addHeroBtn = document.getElementById('addHeroBtn');
 if (addHeroBtn && heroPickerInput) {
   const tryAddHero = () => {
+    if (!activeRoom?.isOwner) return;
     const raw = heroPickerInput.value.trim();
     if (!raw || matchHeroes.length >= 10) return;
     const q = raw.toLowerCase();
@@ -693,7 +975,6 @@ if (addHeroBtn && heroPickerInput) {
     if (!matchHeroes.some((h) => h.toLowerCase() === canonical.toLowerCase())) {
       matchHeroes.push(canonical);
       renderSelectedMatchHeroes();
-      renderDictionary();
       syncMatchHeroesToRoom();
     }
     heroPickerInput.value = '';
@@ -712,170 +993,6 @@ if (addHeroBtn && heroPickerInput) {
       tryAddHero();
     }
   });
-}
-
-function renderBenchmark(bench, domainAcc) {
-  let html = '';
-  if (domainAcc && domainAcc.textSummary) {
-    const s = domainAcc.textSummary;
-    const basePct = Math.round((s.baselinePassed / s.total) * 100);
-    const tunedPct = Math.round((s.tunedPassed / s.total) * 100);
-    html += `<div style="font-size:12px;margin-bottom:6px;padding:6px 8px;border-radius:6px;background:rgba(61,214,140,0.12);border:1px solid rgba(61,214,140,0.3)">
-      🎯 <strong>DOTA2 专有名词评测:</strong> 裸模型 <code>${s.baselinePassed}/${s.total} (${basePct}%)</code> → 词典调优后 <strong style="color:var(--radiant)">${s.tunedPassed}/${s.total} (${tunedPct}%)</strong>
-    </div>`;
-  }
-  if (!bench || !Array.isArray(bench.results) || !bench.results.length) {
-    benchmarkContainer.innerHTML =
-      html +
-      `<div style="font-size:12px;color:var(--text-muted)">Run <code>npm run benchmark</code> to populate latency comparison.</div>`;
-    return;
-  }
-  const rows = bench.results
-    .map((r) => {
-      const m = r.metrics;
-      const shortScenario =
-        r.scenario === 'coach_roshan_call'
-          ? 'Coach EN→ZH'
-          : r.scenario === 'student_zh_question'
-            ? 'Student ZH→EN'
-            : 'Student EN→EN';
-      return `<tr>
-        <td><strong>${escapeHtml(m.engine)}</strong></td>
-        <td>${shortScenario}</td>
-        <td style="color:var(--radiant);font-weight:700">${m.speechEndToFirstAudioMs} ms</td>
-        <td>${escapeHtml(m.passThrough)}</td>
-      </tr>`;
-    })
-    .join('');
-  benchmarkContainer.innerHTML = `
-    ${html}
-    <table class="bench-table">
-      <thead>
-        <tr><th>Engine</th><th>Case</th><th>TTFA</th><th>Mode</th></tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
-}
-
-function syncTtsOptionsToRoom() {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(
-      JSON.stringify({
-        type: 'room.set_tts_options',
-        ttsZhVoice: ttsZhVoiceSelect?.value,
-        ttsEnVoice: ttsEnVoiceSelect?.value,
-        ttsStreamMode: ttsStreamModeSelect?.value,
-        voiceLiveAsrModel: voiceLiveAsrSelect?.value,
-      }),
-    );
-  }
-}
-
-[ttsZhVoiceSelect, ttsEnVoiceSelect, ttsStreamModeSelect, voiceLiveAsrSelect].forEach((sel) => {
-  if (sel) sel.addEventListener('change', syncTtsOptionsToRoom);
-});
-
-async function initConfig() {
-  const [cfgRes, dictRes] = await Promise.all([fetch('/api/config'), fetch('/api/dictionary')]);
-  const cfg = await cfgRes.json();
-  const dict = await dictRes.json();
-
-  if (cfg.ttsVoiceCatalog) {
-    if (ttsZhVoiceSelect && Array.isArray(cfg.ttsVoiceCatalog.zh)) {
-      ttsZhVoiceSelect.innerHTML = cfg.ttsVoiceCatalog.zh
-        .map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.label)}</option>`)
-        .join('');
-    }
-    if (ttsEnVoiceSelect && Array.isArray(cfg.ttsVoiceCatalog.en)) {
-      ttsEnVoiceSelect.innerHTML = cfg.ttsVoiceCatalog.en
-        .map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.label)}</option>`)
-        .join('');
-    }
-  }
-
-  heroCatalog = dict.heroes || [];
-  const dl = document.getElementById('heroPickerDatalist');
-  if (dl) {
-    dl.innerHTML = heroCatalog
-      .map((h) => {
-        const slang = [...(h.zhSlang || []), ...(h.enAliases || [])].join('/');
-        return `<option value="${escapeHtml(h.en)}">${escapeHtml(h.zh)} ${slang ? `(${escapeHtml(slang)})` : ''}</option>`;
-      })
-      .join('');
-  }
-
-  unifiedDictEntries = [];
-  for (const t of dict.tacticalTerms || []) {
-    const sub = [...(t.enAliases || []), ...(t.zhAliases || [])].slice(0, 6).join(' · ');
-    unifiedDictEntries.push({
-      cat: 'tactics',
-      en: t.en,
-      zh: t.zh,
-      sub: `[${t.category}] ${sub}`,
-      searchBlob: `${t.en} ${t.zh} ${(t.enAliases || []).join(' ')} ${(t.zhAliases || []).join(' ')}`.toLowerCase(),
-    });
-  }
-  for (const h of dict.heroes || []) {
-    const sub = [
-      h.enAliases?.length ? `EN: ${h.enAliases.join('/')}` : '',
-      h.zhSlang?.length ? `俗称: ${h.zhSlang.join('/')}` : '',
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    unifiedDictEntries.push({
-      cat: 'heroes',
-      en: h.en,
-      zh: h.zh,
-      sub,
-      searchBlob: `${h.en} ${h.zh} ${(h.enAliases || []).join(' ')} ${(h.zhSlang || []).join(' ')}`.toLowerCase(),
-    });
-    for (const ab of h.abilities || []) {
-      const abSub = [
-        `${h.zh} (${h.en})`,
-        ab.isInnate ? '先天技能' : '',
-        ...(ab.enAliases || []),
-        ...(ab.zhSlang || []),
-      ]
-        .filter(Boolean)
-        .join(' · ');
-      unifiedDictEntries.push({
-        cat: 'abilities',
-        en: ab.en,
-        zh: ab.zh,
-        sub: abSub,
-        searchBlob: `${ab.en} ${ab.zh} ${h.en} ${h.zh} ${(ab.enAliases || []).join(' ')} ${(ab.zhSlang || []).join(' ')} ${(h.zhSlang || []).join(' ')}`.toLowerCase(),
-      });
-    }
-  }
-  for (const it of [...(dict.shopItems || []), ...(dict.neutralItems || [])]) {
-    const tier =
-      it.isEnhancement
-        ? '中立附魔'
-        : it.neutralTier >= 0
-          ? `Tier ${it.neutralTier + 1} 中立道具`
-          : '商店装备';
-    const sub = [
-      tier,
-      it.enAliases?.length ? `EN: ${it.enAliases.join('/')}` : '',
-      it.zhSlang?.length ? `俗称: ${it.zhSlang.join('/')}` : '',
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    unifiedDictEntries.push({
-      cat: 'items',
-      en: it.en,
-      zh: it.zh,
-      sub,
-      searchBlob: `${it.en} ${it.zh} ${(it.enAliases || []).join(' ')} ${(it.zhSlang || []).join(' ')}`.toLowerCase(),
-    });
-  }
-
-  renderDictionary();
-  renderSelectedMatchHeroes();
-  renderBenchmark(cfg.benchmark, cfg.domainAccuracy);
-  // Auto-connect room on page load so user can click Simulator or Mic immediately!
-  connectRoom();
 }
 
 // ============================================================================
@@ -904,7 +1021,8 @@ function renderGsiStatus(gsiState) {
 
 if (downloadGsiCfgBtn) {
   downloadGsiCfgBtn.addEventListener('click', () => {
-    const room = encodeURIComponent(roomInput.value.trim() || 'roshan-pit');
+    if (!activeRoom?.isOwner) return;
+    const room = encodeURIComponent(activeRoom.roomId);
     window.location.href = `/api/gsi-config?room=${room}`;
   });
 }
@@ -971,7 +1089,7 @@ function extractTopBarFrameAndDiff(videoEl) {
 }
 
 async function runVisionTick(force = false) {
-  if (visionBusy || !visionVideo) return;
+  if (!activeRoom?.isOwner || visionBusy || !visionVideo) return;
   const snap = extractTopBarFrameAndDiff(visionVideo);
   if (!snap) return;
 
@@ -993,9 +1111,9 @@ async function runVisionTick(force = false) {
   try {
     const resp = await fetch('/api/vision-draft', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
       body: JSON.stringify({
-        roomId: roomInput.value.trim() || 'roshan-pit',
+        roomId: activeRoom.roomId,
         imageDataUrl: snap.dataUrl,
       }),
     });
@@ -1035,10 +1153,13 @@ function stopVisionWatch() {
 }
 
 async function startVisionWatch() {
+  const roomId = activeRoom?.roomId;
+  if (!activeRoom?.isOwner) return;
   const stream = await navigator.mediaDevices.getDisplayMedia({
     video: { frameRate: { ideal: 1, max: 2 } },
     audio: false,
   });
+  if (activeRoom?.roomId !== roomId) { stream.getTracks().forEach(track => track.stop()); return; }
   const video = document.createElement('video');
   video.muted = true;
   video.playsInline = true;
@@ -1092,10 +1213,13 @@ if (scanVisionOnceBtn) {
       return;
     }
     try {
+      const roomId = activeRoom?.roomId;
+      if (!activeRoom?.isOwner) return;
       const tempStream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: { ideal: 1, max: 2 } },
         audio: false,
       });
+      if (activeRoom?.roomId !== roomId) { tempStream.getTracks().forEach(track => track.stop()); return; }
       const tempVideo = document.createElement('video');
       tempVideo.muted = true;
       tempVideo.playsInline = true;
@@ -1114,4 +1238,6 @@ if (scanVisionOnceBtn) {
   });
 }
 
-initConfig();
+api('/api/auth/session')
+  .then(session => session.user ? initializeUser(session) : showLogin())
+  .catch(error => showLogin(error.message));

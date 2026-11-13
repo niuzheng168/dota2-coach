@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import WebSocket from 'ws';
-import { DEFAULT_FOUNDRY_CONFIG, tokenManager } from '../azure-auth.ts';
+import { connectSessionSocket } from './ws-session.ts';
+import { getGptLiveFoundryConfig, tokenManager } from '../azure-auth.ts';
 import type { FoundryConfig } from '../azure-auth.ts';
 import {
   buildInterpreterSystemPrompt,
@@ -54,7 +55,7 @@ export class GptLiveEngine implements TranslationEngine {
   constructor(
     options: EngineOptions,
     callbacks: EngineCallbacks,
-    config: FoundryConfig = DEFAULT_FOUNDRY_CONFIG,
+    config: FoundryConfig = getGptLiveFoundryConfig(),
   ) {
     this.role = options.role;
     this.direction = options.role === 'coach' ? 'coach-en-to-zh' : 'student-zh-or-en-to-en';
@@ -83,65 +84,26 @@ export class GptLiveEngine implements TranslationEngine {
   }
 
   private async connect(): Promise<void> {
-    const authHeaders = await tokenManager.getAuthHeaders();
+    this.callbacks.onConnectionState?.('connecting');
+    const authHeaders = await tokenManager.getAuthHeaders(this.config);
     const url = `wss://${this.config.openAiHost}/openai/v1/live/sessions`;
 
-    const ws = await new Promise<WebSocket>((resolve, reject) => {
-      const sock = new WebSocket(url, {
-        headers: {
-          ...authHeaders,
-          'x-ms-client-request-id': crypto.randomUUID(),
+    const ws = await connectSessionSocket(url, {
+      headers: { ...authHeaders, 'x-ms-client-request-id': crypto.randomUUID() },
+      handshakeTimeout: 12_000,
+      maxPayload: 2 * 1024 * 1024,
+    }, 'session.started', {
+      type: 'session.start',
+      session: {
+        model: this.deployment, store: false, instructions: this.systemPrompt,
+        audio: {
+          format: { type: 'audio/pcm', rate: 24000 },
+          output: { voice: this.role === 'coach' ? 'marin' : 'cedar' },
         },
-        handshakeTimeout: 12_000,
-        maxPayload: 2 * 1024 * 1024,
-      });
-
-      sock.once('open', () => {
-        sock.send(
-          JSON.stringify({
-            type: 'session.start',
-            session: {
-              model: this.deployment,
-              store: false,
-              instructions: this.systemPrompt,
-              audio: {
-                format: { type: 'audio/pcm', rate: 24000 },
-                output: { voice: this.role === 'coach' ? 'marin' : 'cedar' },
-              },
-            },
-          }),
-        );
-      });
-
-      const onStartup = (raw: WebSocket.RawData) => {
-        try {
-          const evt = JSON.parse(raw.toString());
-          if (evt.type === 'session.started') {
-            sock.off('message', onStartup);
-            this.sessionStarted = true;
-            resolve(sock);
-          } else if (evt.type === 'error') {
-            sock.off('message', onStartup);
-            reject(
-              new Error(
-                `GPT-Live startup error: ${evt.error?.code || ''} ${evt.error?.message || JSON.stringify(evt)}`,
-              ),
-            );
-          }
-        } catch (err) {
-          sock.off('message', onStartup);
-          reject(err);
-        }
-      };
-
-      sock.on('message', onStartup);
-      sock.once('error', reject);
-      sock.once('unexpected-response', (_req, res) => {
-        let body = '';
-        res.on('data', (c) => (body += c));
-        res.on('end', () => reject(new Error(`GPT-Live HTTP ${res.statusCode}: ${body}`)));
-      });
+      },
     });
+    if (this.stopped) { ws.terminate(); throw new Error('GPT-Live startup cancelled'); }
+    this.sessionStarted = true;
 
     ws.on('message', (raw: WebSocket.RawData, isBinary: boolean) => {
       if (isBinary) return;
@@ -149,14 +111,18 @@ export class GptLiveEngine implements TranslationEngine {
     });
 
     ws.on('close', () => {
+      if (this.ws !== ws) return;
       this.sessionStarted = false;
-      if (!this.stopped) {
+      if (!this.stopped && this.ws === ws) {
+        this.callbacks.onConnectionState?.('reconnecting');
         this.callbacks.onStatus('GPT-Live reconnecting...');
         setTimeout(() => {
           if (!this.stopped) {
-            this.connect().catch((err) =>
-              this.callbacks.onError(`GPT-Live reconnect failed: ${err.message}`),
-            );
+            this.connect().catch((err) => {
+              if (this.stopped) return;
+              this.callbacks.onConnectionState?.('failed');
+              this.callbacks.onError(`GPT-Live reconnect failed: ${err.message}`);
+            });
           }
         }, 1000);
       }
@@ -169,6 +135,7 @@ export class GptLiveEngine implements TranslationEngine {
     });
 
     this.ws = ws;
+    this.callbacks.onConnectionState?.('ready');
   }
 
   private startPacer(): void {
@@ -462,6 +429,7 @@ export class GptLiveEngine implements TranslationEngine {
 
   async stop(): Promise<void> {
     this.stopped = true;
+    this.sessionStarted = false;
     if (this.pacerTimer) {
       clearInterval(this.pacerTimer);
       this.pacerTimer = null;

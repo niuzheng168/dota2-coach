@@ -1,5 +1,6 @@
 export type EngineKind = 'cascade' | 'gpt-realtime' | 'gpt-live';
 export type ParticipantRole = 'coach' | 'student';
+export type EngineConnectionState = 'connecting' | 'ready' | 'reconnecting' | 'failed';
 export type TtsStreamMode =
   | 'v2-text-flush'
   | 'v2-comma-period'
@@ -54,6 +55,7 @@ export interface TurnMetrics {
 }
 
 export interface EngineCallbacks {
+  onConnectionState?: (state: EngineConnectionState) => void;
   onSourcePartial: (text: string) => void;
   onSourceFinal: (turnId: string, text: string) => void;
   onTargetPartial: (turnId: string, text: string) => void;

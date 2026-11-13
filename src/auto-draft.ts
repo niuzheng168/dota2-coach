@@ -177,7 +177,7 @@ export function parseDota2GsiPayload(
   };
 }
 
-export function generateDota2GsiConfigFile(serverOrigin: string, roomId: string): string {
+export function generateDota2GsiConfigFile(serverOrigin: string, roomId: string, token: string): string {
   const safeRoom = encodeURIComponent(roomId.trim() || 'roshan-pit');
   const uri = `${serverOrigin.replace(/\/+$/, '')}/api/gsi?room=${safeRoom}`;
   return `"DOTA2 Bilingual Voice Coach Integration"
@@ -187,6 +187,11 @@ export function generateDota2GsiConfigFile(serverOrigin: string, roomId: string)
     "buffer"        "0.5"
     "throttle"      "1.0"
     "heartbeat"     "15.0"
+    "auth"
+    {
+        "room"          "${safeRoom}"
+        "token"         "${token}"
+    }
     "data"
     {
         "provider"      "1"

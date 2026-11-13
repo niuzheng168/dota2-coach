@@ -1,4 +1,6 @@
 import path from 'node:path';
+import fs from 'node:fs';
+import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { AzureCliCredential, ChainedTokenCredential, DefaultAzureCredential } from '@azure/identity';
 
@@ -12,6 +14,8 @@ try {
 const COGNITIVE_SCOPE = 'https://cognitiveservices.azure.com/.default';
 
 export interface FoundryConfig {
+  /** Server-side only. Never include a FoundryConfig in an HTTP response or logs. */
+  apiKey?: string;
   accountName: string;
   region: string;
   resourceId: string;
@@ -64,6 +68,37 @@ export const DEFAULT_FOUNDRY_CONFIG: FoundryConfig = {
   },
 };
 
+export function loadFoundryConfig(filename: string, base: FoundryConfig = DEFAULT_FOUNDRY_CONFIG): FoundryConfig {
+  const env = parseEnv(fs.readFileSync(filename, 'utf8'));
+  if (!env.FOUNDRY_KEY) throw new Error('Foundry credential file is missing FOUNDRY_KEY');
+  if (!env.FOUNDRY_ENDPOINT || !env.AOAI_ENDPOINT) throw new Error('Foundry credential file is missing endpoint URLs');
+  const foundry = new URL(env.FOUNDRY_ENDPOINT);
+  const openai = new URL(env.AOAI_ENDPOINT);
+  if ([foundry, openai].some(url => url.protocol !== 'https:' || url.username || url.password)) {
+    throw new Error('Foundry endpoints must be HTTPS URLs without embedded credentials');
+  }
+  const accountName = foundry.hostname.split('.')[0];
+  return {
+    ...base,
+    apiKey: env.FOUNDRY_KEY,
+    accountName,
+    aiServicesHost: foundry.hostname,
+    openAiHost: openai.hostname,
+    cognitiveHost: `${accountName}.cognitiveservices.azure.com`,
+    deployments: { ...base.deployments, gptLive: env.DEPLOYMENT_GPT_LIVE || base.deployments.gptLive },
+  };
+}
+
+let liveConfigCache: { filename: string; config: FoundryConfig } | undefined;
+export function getGptLiveFoundryConfig(): FoundryConfig {
+  const filename = process.env.GPT_LIVE_FOUNDRY_ENV_FILE;
+  if (!filename) return DEFAULT_FOUNDRY_CONFIG;
+  if (liveConfigCache?.filename !== filename) {
+    liveConfigCache = { filename, config: loadFoundryConfig(filename) };
+  }
+  return liveConfigCache.config;
+}
+
 class AzureTokenManager {
   private credential = new ChainedTokenCredential(
     new AzureCliCredential(),
@@ -99,7 +134,8 @@ class AzureTokenManager {
     return this.pendingFetch;
   }
 
-  async getAuthHeaders(): Promise<Record<string, string>> {
+  async getAuthHeaders(config: FoundryConfig = DEFAULT_FOUNDRY_CONFIG): Promise<Record<string, string>> {
+    if (config.apiKey) return { 'api-key': config.apiKey };
     if (process.env.AZURE_API_KEY) {
       return { 'api-key': process.env.AZURE_API_KEY };
     }

@@ -10,7 +10,9 @@
     "build:dict": "node scripts/build-dota2-dictionary.ts",
     "eval:domain": "node scripts/eval-dota2-translation.ts",
     "benchmark": "node src/benchmark.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.ts",
+    "create-user": "node scripts/create-user.ts"
   },
   "dependencies": {
     "@azure/identity": "^4.14.1",

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import WebSocket from 'ws';
+import { connectSessionSocket, waitForSessionEvent } from './ws-session.ts';
 import { DEFAULT_FOUNDRY_CONFIG, tokenManager } from '../azure-auth.ts';
 import type { FoundryConfig } from '../azure-auth.ts';
 import {
@@ -222,61 +223,38 @@ export class VoiceLiveEngine implements TranslationEngine {
   }
 
   private async connect(): Promise<void> {
-    const authHeaders = await tokenManager.getAuthHeaders();
+    this.callbacks.onConnectionState?.('connecting');
+    const authHeaders = await tokenManager.getAuthHeaders(this.config);
     const query = new URLSearchParams({
       'api-version': 'v1',
       model: this.model,
     });
     const url = `wss://${this.config.aiServicesHost}/voice-live/realtime?${query.toString()}`;
 
-    const ws = await new Promise<WebSocket>((resolve, reject) => {
-      const sock = new WebSocket(url, {
-        headers: {
-          ...authHeaders,
-          'x-ms-client-request-id': crypto.randomUUID(),
-        },
-        handshakeTimeout: 12_000,
-      });
-
-      const onInit = (raw: WebSocket.RawData) => {
-        try {
-          const evt = JSON.parse(raw.toString());
-          if (evt.type === 'session.created') {
-            sock.off('message', onInit);
-            resolve(sock);
-          } else if (evt.type === 'error') {
-            sock.off('message', onInit);
-            reject(new Error(`VoiceLive init error: ${evt.error?.message || JSON.stringify(evt)}`));
-          }
-        } catch (err) {
-          sock.off('message', onInit);
-          reject(err);
-        }
-      };
-
-      sock.on('message', onInit);
-      sock.once('error', reject);
-      sock.once('unexpected-response', (_req, res) => {
-        let body = '';
-        res.on('data', (c) => (body += c));
-        res.on('end', () => reject(new Error(`VoiceLive HTTP ${res.statusCode}: ${body}`)));
-      });
-    });
-
-    await this.sendSessionUpdateAndWait(ws, this.buildSessionPayload());
+    const ws = await connectSessionSocket(url, {
+      headers: { ...authHeaders, 'x-ms-client-request-id': crypto.randomUUID() },
+      handshakeTimeout: 12_000,
+    }, 'session.created');
+    try {
+      await this.sendSessionUpdateAndWait(ws, this.buildSessionPayload());
+      if (this.stopped) throw new Error('VoiceLive startup cancelled');
+    } catch (error) { ws.terminate(); throw error; }
 
     ws.on('message', (raw: WebSocket.RawData) => {
       this.handleServerEvent(raw.toString());
     });
 
     ws.on('close', () => {
-      if (!this.stopped) {
+      if (!this.stopped && this.ws === ws) {
+        this.callbacks.onConnectionState?.('reconnecting');
         this.callbacks.onStatus(`VoiceLive [${this.kind}] reconnecting...`);
         setTimeout(() => {
           if (!this.stopped) {
-            this.connect().catch((err) =>
-              this.callbacks.onError(`VoiceLive reconnect failed: ${err.message}`),
-            );
+            this.connect().catch((err) => {
+              if (this.stopped) return;
+              this.callbacks.onConnectionState?.('failed');
+              this.callbacks.onError(`VoiceLive reconnect failed: ${err.message}`);
+            });
           }
         }, 800);
       }
@@ -289,35 +267,13 @@ export class VoiceLiveEngine implements TranslationEngine {
     });
 
     this.ws = ws;
+    this.callbacks.onConnectionState?.('ready');
   }
 
   private sendSessionUpdateAndWait(ws: WebSocket, sessionPayload: Record<string, unknown>): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        ws.off('message', onUpd);
-        resolve();
-      }, 4000);
-
-      const onUpd = (raw: WebSocket.RawData) => {
-        try {
-          const evt = JSON.parse(raw.toString());
-          if (evt.type === 'session.updated') {
-            clearTimeout(timer);
-            ws.off('message', onUpd);
-            resolve();
-          } else if (evt.type === 'error') {
-            clearTimeout(timer);
-            ws.off('message', onUpd);
-            reject(new Error(`VoiceLive session.update rejected: ${evt.error?.message || JSON.stringify(evt)}`));
-          }
-        } catch {
-          // ignore non-JSON frame
-        }
-      };
-
-      ws.on('message', onUpd);
+    return waitForSessionEvent(ws, 'session.updated', () => {
       ws.send(JSON.stringify({ type: 'session.update', session: sessionPayload }));
-    });
+    }, 10_000);
   }
 
   private handleServerEvent(jsonStr: string): void {
@@ -403,6 +359,11 @@ export class VoiceLiveEngine implements TranslationEngine {
           }
           this.callbacks.onSourceFinal(this.activeResponse?.turnId || itemId, transcript);
         }
+        break;
+      }
+
+      case 'conversation.item.input_audio_transcription.failed': {
+        this.callbacks.onError(`VoiceLive [${this.asrModel}] 输入转录失败: ${evt.error?.message || evt.error?.code || 'Unknown error'}`);
         break;
       }
 

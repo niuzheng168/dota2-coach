@@ -1,0 +1,67 @@
+name: dota2-coach
+
+services:
+  app:
+    build:
+      context: ..
+      network: host
+    image: dota2-coach:local
+    container_name: dota2-coach
+    restart: unless-stopped
+    init: true
+    # This VM intentionally disables IP forwarding. Do not change its networking;
+    # use host networking with a loopback-only listener behind the existing Caddy.
+    network_mode: host
+    user: "1000:1000"
+    environment:
+      NODE_ENV: production
+      HOST: 127.0.0.1
+      PORT: "3210"
+      APP_DATA_DIR: /var/lib/dota2-coach
+      COOKIE_SECURE: "1"
+      PUBLIC_ORIGIN: https://dota2.largeniu.com
+      GPT_LIVE_FOUNDRY_ENV_FILE: /run/secrets/foundry-live.env
+      NODE_OPTIONS: --max-old-space-size=512
+    volumes:
+      - type: bind
+        source: /var/lib/dota2-coach
+        target: /var/lib/dota2-coach
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/dota2-coach/app.env
+        target: /app/.env
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/dota2-coach/foundry-live.env
+        target: /run/secrets/foundry-live.env
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    pids_limit: 128
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --input-type=module
+        - -e
+        - "const r = await fetch('http://127.0.0.1:3210/api/auth/session'); if (!r.ok || (await r.json()).user !== null) process.exit(1);"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

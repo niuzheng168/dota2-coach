@@ -1,0 +1,14 @@
+# Allowlist the build context: never send credentials, account data or Git history.
+**
+!package.json
+!package-lock.json
+!src/
+!src/**
+!public/
+!public/**
+!data/
+!data/dota2-dictionary.json
+!docs/
+!docs/dota2-bilingual-dictionary.md
+!scripts/
+!scripts/create-user.ts
