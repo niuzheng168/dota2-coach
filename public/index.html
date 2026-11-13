@@ -48,7 +48,8 @@
       </div>
       <div class="panel-title">本房间同传设置</div>
       <dl id="roomSettingsSummary" class="settings-summary"></dl>
-      <p class="muted small">由房主创建时确定，房间内不可修改。</p>
+      <button id="editRoomSettingsBtn" type="button" data-owner-only hidden>修改同传设置</button>
+      <p class="muted small">房主可修改设置；保存后所有成员自动重新连接，需重新开启麦克风。</p>
       <label class="field">我的身份<select id="roleSelect"><option value="student">学员 · 说中文 / 听中文翻译</option><option value="coach">教练 · 说英文 / 听英文翻译</option></select></label>
       <label class="toggle-row"><span>监听自己的翻译输出</span><input id="selfMonitorToggle" type="checkbox" /></label>
       <div class="panel-title" style="margin-top: 4px">
@@ -129,7 +130,7 @@
   <dialog id="createRoomDialog" class="modal" aria-labelledby="createRoomTitle">
     <form id="createRoomForm" class="modal-content">
       <div class="section-heading"><h2 id="createRoomTitle">创建语音室</h2><button type="button" data-close-dialog="createRoomDialog" aria-label="关闭">×</button></div>
-      <p class="muted">一次选好同传方案。创建后设置固定；允许加入的用户可随时调整。</p>
+      <p class="muted">选择初始同传方案。房主可在房间内修改设置和允许加入的用户。</p>
       <label class="field">房间名称<input id="newRoomName" required maxlength="64" placeholder="例如：今晚的 DOTA2 教练课" /></label>
       <label class="field">同传引擎<select id="createEngineSelect"><option value="cascade">Voice Live · Cascaded</option><option value="gpt-realtime">Voice Live · Realtime 2.1</option><option value="gpt-live">GPT-Live 1 · 全双工（需资源支持）</option></select></label>
       <div id="createVoiceOptions" class="form-grid">
@@ -141,6 +142,22 @@
       <fieldset><legend>允许哪些账号通过邀请加入？</legend><div id="createAllowedUsers" class="user-options"></div><p class="muted small">不勾选时，仅你自己可进入。仅持有链接但未获允许的账号仍无法加入。</p></fieldset>
       <p id="createRoomError" class="form-error" role="alert" hidden></p>
       <div class="modal-actions"><button type="button" data-close-dialog="createRoomDialog">取消</button><button id="createRoomSubmitBtn" type="submit" class="btn-primary">创建并进入</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="roomSettingsDialog" class="modal" aria-labelledby="roomSettingsTitle">
+    <form id="roomSettingsForm" class="modal-content">
+      <div class="section-heading"><h2 id="roomSettingsTitle">修改同传设置</h2><button type="button" data-close-dialog="roomSettingsDialog" aria-label="关闭">×</button></div>
+      <p class="muted">保存更改会重置全房间的连接和语音会话，所有成员将自动重新连接。语音就绪后请重新开启麦克风。</p>
+      <label class="field">同传引擎<select id="editEngineSelect"></select></label>
+      <div id="editVoiceOptions" class="form-grid">
+        <label class="field">中文音色（教练 → 学员）<select id="editTtsZhVoiceSelect"></select></label>
+        <label class="field">英文音色（学员 → 教练）<select id="editTtsEnVoiceSelect"></select></label>
+        <label class="field full-width">输入转录 ASR<select id="editVoiceLiveAsrSelect"></select></label>
+      </div>
+      <p id="editLiveEngineNote" class="muted small" hidden>GPT-Live 使用引擎内置音色与转录。请确认 Foundry 资源已开通对应接口和部署后选用。</p>
+      <p id="roomSettingsError" class="form-error" role="alert" hidden></p>
+      <div class="modal-actions"><button type="button" data-close-dialog="roomSettingsDialog">取消</button><button id="saveRoomSettingsBtn" type="submit" class="btn-primary">保存并让所有人重连</button></div>
     </form>
   </dialog>
 

@@ -165,7 +165,7 @@ test('HTTP and WebSocket validate origin and CSRF independently of UI restrictio
   assert.equal(f.started.length, 0);
 });
 
-test('WebSocket derives identity from login and rejects all post-creation settings changes', async t => {
+test('WebSocket derives identity from login and rejects legacy settings commands', async t => {
   const f = await fixture(t);
   const owner = await f.login('largeniu'), guest = await f.login('coach1');
   const room = await f.create(owner);
@@ -184,12 +184,225 @@ test('WebSocket derives identity from login and rejects all post-creation settin
     ws.send(JSON.stringify(message));
     return pending;
   }
-  assert.match((await rejected({ type: 'room.set_engine', engineKind: 'gpt-live' })).message, /不可修改/);
-  assert.match((await rejected({ type: 'room.set_tts_options', ttsZhVoice: 'evil' })).message, /不可修改/);
+  assert.match((await rejected({ type: 'room.set_engine', engineKind: 'gpt-live' })).message, /只有房主/);
+  assert.match((await rejected({ type: 'room.set_tts_options', ttsZhVoice: 'evil' })).message, /只有房主/);
   assert.match((await rejected({ type: 'room.set_match_heroes', matchHeroes: ['Axe'] })).message, /房主/);
   assert.equal(f.store.getRoom(room.roomId)?.settings.engineKind, 'gpt-realtime');
   assert.equal(f.started[0].ttsZhVoice, DEFAULT_ROOM_SETTINGS.ttsZhVoice);
   assert.equal((await f.request(`/api/rooms/${room.roomId}`, 'PATCH', { settings: DEFAULT_ROOM_SETTINGS }, owner)).status, 405);
+});
+
+async function waitUntil(check: () => boolean) {
+  for (let i = 0; i < 200; i++) {
+    if (check()) return;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  assert.ok(check(), 'timed out waiting for expected state');
+}
+
+function recordMessages(ws: WebSocket) {
+  const events: any[] = [];
+  ws.on('message', (raw, binary) => events.push(binary ? { type: 'audio' } : JSON.parse(raw.toString())));
+  return events;
+}
+
+test('only the owner can save validated settings with a same-origin CSRF-protected request', async t => {
+  const f = await fixture(t);
+  const owner = await f.login('largeniu'), guest = await f.login('coach1');
+  const room = await f.create(owner);
+  const route = `/api/rooms/${room.roomId}/settings`;
+  const body = { settings: DEFAULT_ROOM_SETTINGS };
+  assert.equal((await f.request(route, 'PATCH', body)).status, 401);
+  assert.equal((await f.request(route, 'PATCH', body, guest, { 'X-Room-Invite': room.inviteToken })).status, 403);
+  assert.equal((await f.request(route, 'PATCH', body, owner, { 'X-CSRF-Token': '' })).status, 403);
+  assert.equal((await f.request(route, 'PATCH', body, owner, { Origin: 'https://evil.example' })).status, 403);
+  for (const settings of [
+    null, [], {}, { ...DEFAULT_ROOM_SETTINGS, engineKind: 'unknown' },
+    { ...DEFAULT_ROOM_SETTINGS, ttsZhVoice: 'unknown' },
+    { ...DEFAULT_ROOM_SETTINGS, ttsEnVoice: 'unknown' },
+    { ...DEFAULT_ROOM_SETTINGS, voiceLiveAsrModel: 'unknown' },
+    { ...DEFAULT_ROOM_SETTINGS, ownerUsername: 'coach1' },
+  ]) assert.equal((await f.request(route, 'PATCH', { settings }, owner)).status, 400);
+  await assert.rejects(f.store.updateSettings({ username: 'coach1', canCreateRooms: false }, room.roomId, DEFAULT_ROOM_SETTINGS), /只有房主/);
+  assert.deepEqual(f.store.getRoom(room.roomId)?.settings, room.settings);
+  const response = await f.request(route, 'PATCH', body, owner);
+  assert.equal(response.status, 200);
+  const reopened = await AccessStore.open(f.directory);
+  const stored = reopened.getRoom(room.roomId)!;
+  assert.deepEqual(stored.settings, DEFAULT_ROOM_SETTINGS);
+  assert.equal(stored.inviteToken, room.inviteToken);
+  assert.equal(stored.ownerUsername, 'largeniu');
+  assert.deepEqual(stored.allowedUsernames, room.allowedUsernames);
+});
+
+test('saving settings resets all room connections, preserves other rooms and rejoins with new options', async t => {
+  const engines: { kind: string; options: EngineOptions; stopped: boolean }[] = [];
+  const f = await fixture(t, (kind, options) => {
+    const item = { kind, options, stopped: false };
+    engines.push(item);
+    return {
+      kind, role: options.role, async start() {}, async stop() { item.stopped = true; },
+      appendAudio() {}, markSpeechEnd() {}, async updateMatchHeroes() {},
+    };
+  });
+  const owner = await f.login('largeniu'), guest = await f.login('coach1');
+  const room = await f.create(owner), other = await f.create(owner);
+  const ownerQuery = `room=${room.roomId}&role=student&selfMonitor=1`;
+  const guestQuery = `room=${room.roomId}&role=coach&invite=${room.inviteToken}`;
+  const ownerWs = f.socket(owner, ownerQuery), guestWs = f.socket(guest, guestQuery);
+  const ownerTabWs = f.socket(owner, ownerQuery);
+  const otherWs = f.socket(owner, `room=${other.roomId}&role=student`);
+  const all = [ownerWs, guestWs, ownerTabWs, otherWs];
+  const messages = all.map(recordMessages);
+  await waitUntil(() => messages.every(events => events.some(event => event.state === 'ready')));
+  ownerWs.send(JSON.stringify({ type: 'room.set_match_heroes', matchHeroes: ['Axe'] }));
+  await waitUntil(() => messages[0].some(event => event.matchHeroes?.includes('Axe')));
+  const oldEngines = engines.slice();
+  const closed = [ownerWs, guestWs, ownerTabWs].map(ws => once(ws, 'close'));
+  const settings = { ...DEFAULT_ROOM_SETTINGS, engineKind: 'gpt-live', ttsZhVoice: 'zh-CN-YunxiNeural', voiceLiveAsrModel: 'mai-transcribe-2-streaming' };
+  const response = await f.request(`/api/rooms/${room.roomId}/settings`, 'PATCH', { settings }, owner);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).reconnected, true);
+  for (const result of await Promise.all(closed)) assert.equal(result[0], 4000);
+  assert.equal(oldEngines.filter(engine => engine.stopped).length, 3);
+  assert.equal(otherWs.readyState, WebSocket.OPEN);
+  for (const events of messages.slice(0, 3)) {
+    assert.deepEqual(events.find(event => event.type === 'room.settings.changed')?.settings, settings);
+  }
+  assert.ok(!messages[3].some(event => event.type === 'room.settings.changed'));
+  const nextOwner = f.socket(owner, ownerQuery), nextGuest = f.socket(guest, guestQuery);
+  const nextMessages = [nextOwner, nextGuest].map(recordMessages);
+  await waitUntil(() => nextMessages.every(events => events.some(event => event.state === 'ready')));
+  for (const engine of engines.slice(4)) {
+    assert.equal(engine.kind, 'gpt-live');
+    assert.equal(engine.options.ttsZhVoice, settings.ttsZhVoice);
+    assert.equal(engine.options.voiceLiveAsrModel, settings.voiceLiveAsrModel);
+    assert.deepEqual(engine.options.matchHeroes, ['Axe']);
+  }
+  assert.deepEqual(engines.slice(4).map(engine => engine.options.role).sort(), ['coach', 'student']);
+  const state = nextMessages[0].findLast(event => event.type === 'room.state');
+  assert.equal(state.engineKind, 'gpt-live');
+  assert.equal(state.participants.find((p: any) => p.name === 'largeniu').selfMonitor, true);
+  assert.deepEqual((await AccessStore.open(f.directory)).getRoom(room.roomId)?.settings, settings);
+});
+
+test('unchanged or invalid settings do not interrupt active engines', async t => {
+  const f = await fixture(t);
+  const owner = await f.login('largeniu'), room = await f.create(owner);
+  const ws = f.socket(owner, `room=${room.roomId}&role=student`);
+  const events = recordMessages(ws);
+  await waitUntil(() => events.some(event => event.state === 'ready'));
+  const route = `/api/rooms/${room.roomId}/settings`;
+  const response = await f.request(route, 'PATCH', { settings: room.settings }, owner);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).reconnected, false);
+  assert.equal((await f.request(route, 'PATCH', { settings: { ...room.settings, ttsEnVoice: 'bad' } }, owner)).status, 400);
+  assert.equal(ws.readyState, WebSocket.OPEN);
+  assert.equal(f.started.length, 1);
+  assert.ok(!events.some(event => event.type === 'room.settings.changed'));
+  ws.send(JSON.stringify({ type: 'text.send', text: 'still connected' }));
+  await waitUntil(() => events.some(event => event.text === 'translated: still connected'));
+});
+
+test('a failed settings write leaves the runtime and persisted configuration untouched', async t => {
+  const f = await fixture(t);
+  const owner = await f.login('largeniu'), room = await f.create(owner);
+  const ws = f.socket(owner, `room=${room.roomId}&role=student`);
+  const events = recordMessages(ws);
+  await waitUntil(() => events.some(event => event.state === 'ready'));
+  const write = t.mock.method(fs, 'writeFile', async () => { throw new Error('test disk failure'); });
+  let response: Response;
+  try {
+    response = await f.request(`/api/rooms/${room.roomId}/settings`, 'PATCH', { settings: DEFAULT_ROOM_SETTINGS }, owner);
+  } finally { write.mock.restore(); }
+  assert.equal(response.status, 500);
+  assert.deepEqual(f.store.getRoom(room.roomId)?.settings, room.settings);
+  assert.deepEqual((await AccessStore.open(f.directory)).getRoom(room.roomId)?.settings, room.settings);
+  assert.equal(ws.readyState, WebSocket.OPEN);
+  assert.ok(!events.some(event => event.type === 'room.settings.changed'));
+});
+
+test('settings reset cancels startup and discards every stale engine callback after rejoin', async t => {
+  let release = () => {};
+  let stops = 0;
+  const callbacks: Parameters<NonNullable<Parameters<typeof createCoachServer>[1]>>[2][] = [];
+  const f = await fixture(t, (kind, options, cb) => {
+    callbacks.push(cb);
+    const first = callbacks.length === 1;
+    return {
+      kind, role: options.role,
+      start: () => first ? new Promise<void>(resolve => { release = resolve; }) : Promise.resolve(),
+      async stop() { if (first) stops++; },
+      appendAudio() {}, markSpeechEnd() {},
+    };
+  });
+  const owner = await f.login('largeniu'), room = await f.create(owner);
+  const query = `room=${room.roomId}&role=student&selfMonitor=1`;
+  const ws = f.socket(owner, query);
+  await once(ws, 'open');
+  const closed = once(ws, 'close');
+  assert.equal((await f.request(`/api/rooms/${room.roomId}/settings`, 'PATCH', { settings: DEFAULT_ROOM_SETTINGS }, owner)).status, 200);
+  assert.equal((await closed)[0], 4000);
+  assert.ok(stops > 0, 'pending engine must be stopped before startup resolves');
+  const next = f.socket(owner, query);
+  const events = recordMessages(next);
+  await waitUntil(() => events.some(event => event.state === 'ready'));
+  const old = callbacks[0];
+  const count = events.length;
+  old.onConnectionState?.('failed');
+  old.onSourcePartial('STALE');
+  old.onSourceFinal('old', 'STALE');
+  old.onTargetPartial('old', 'STALE');
+  old.onTargetFinal('old', 'STALE');
+  old.onTargetAudio('old', Buffer.alloc(20));
+  old.onStatus('STALE');
+  old.onError('STALE');
+  old.onTurnMetrics({
+    turnId: 'old', engine: 'gpt-realtime', role: 'student', sourceText: 'STALE', targetText: 'STALE',
+    passThrough: 'none', speechEndToFirstAudioMs: 1, totalTurnMs: 1, outputAudioDurationMs: 1, timestamp: Date.now(),
+  });
+  release();
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.equal(events.length, count);
+  next.send(JSON.stringify({ type: 'client.set_self_monitor', selfMonitor: true }));
+  await waitUntil(() => events.length > count);
+  assert.deepEqual(events.findLast(event => event.type === 'room.state').recentMetrics, []);
+});
+
+test('voice-only and ASR-only changes reset connections even when the engine kind stays the same', async t => {
+  const f = await fixture(t);
+  const owner = await f.login('largeniu'), room = await f.create(owner);
+  let settings = room.settings;
+  for (const change of [{ ttsEnVoice: 'en-US-EmmaMultilingualNeural' }, { voiceLiveAsrModel: 'mai-transcribe-2' }]) {
+    const ws = f.socket(owner, `room=${room.roomId}&role=student`);
+    const events = recordMessages(ws);
+    await waitUntil(() => events.some(event => event.state === 'ready'));
+    const closed = once(ws, 'close');
+    settings = { ...settings, ...change };
+    const response = await f.request(`/api/rooms/${room.roomId}/settings`, 'PATCH', { settings }, owner);
+    assert.equal(response.status, 200);
+    assert.equal((await closed)[0], 4000);
+    assert.deepEqual(f.store.getRoom(room.roomId)?.settings, settings);
+  }
+});
+
+test('concurrent owner saves leave reconnecting clients on the final durable configuration', async t => {
+  const f = await fixture(t);
+  const owner = await f.login('largeniu'), room = await f.create(owner);
+  const ws = f.socket(owner, `room=${room.roomId}&role=student`);
+  const events = recordMessages(ws);
+  await waitUntil(() => events.some(event => event.state === 'ready'));
+  const closed = once(ws, 'close');
+  const responses = await Promise.all(['zh-CN-YunxiNeural', 'zh-CN-XiaoxiaoNeural'].map(ttsZhVoice =>
+    f.request(`/api/rooms/${room.roomId}/settings`, 'PATCH', { settings: { ...room.settings, ttsZhVoice } }, owner)));
+  assert.ok(responses.every(response => response.status === 200));
+  assert.equal((await closed)[0], 4000);
+  const stored = (await AccessStore.open(f.directory)).getRoom(room.roomId)!;
+  const next = f.socket(owner, `room=${room.roomId}&role=student`);
+  const nextEvents = recordMessages(next);
+  await waitUntil(() => nextEvents.some(event => event.state === 'ready'));
+  assert.equal(nextEvents.find(event => event.type === 'room.state').ttsZhVoice, stored.settings.ttsZhVoice);
+  assert.equal(f.started.at(-1)?.ttsZhVoice, stored.settings.ttsZhVoice);
 });
 
 test('revoking access and logging out close active sockets and block reconnection', async t => {

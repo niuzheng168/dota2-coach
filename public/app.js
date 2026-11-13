@@ -27,6 +27,9 @@ let activeInvite = '';
 let availableUsers = [];
 let config = null;
 let ws = null;
+let roomReconnectTimer = null;
+let settingsReconnectAttempts = 0;
+let reconnectForSettings = false;
 let engineReady = false;
 let heroCatalog = [];
 let matchHeroes = [];
@@ -82,6 +85,10 @@ function stopRoomMedia() {
 }
 
 function leaveRoom(clearUrl = true) {
+  clearTimeout(roomReconnectTimer);
+  roomReconnectTimer = null;
+  reconnectForSettings = false;
+  settingsReconnectAttempts = 0;
   const previous = ws;
   ws = null;
   previous?.close();
@@ -155,6 +162,34 @@ function renderRoomSettings() {
     ? [['引擎', ENGINE_LABELS[settings.engineKind]], ['音色与转录', 'GPT-Live 内置']]
     : [['引擎', ENGINE_LABELS[settings.engineKind]], ['中文', voiceLabel('zh', settings.ttsZhVoice)], ['英文', voiceLabel('en', settings.ttsEnVoice)], ['ASR', settings.voiceLiveAsrModel]];
   $('roomSettingsSummary').innerHTML = rows.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join('');
+}
+
+function updateEditVoiceOptions() {
+  const live = $('editEngineSelect').value === 'gpt-live';
+  $('editVoiceOptions').hidden = live;
+  $('editLiveEngineNote').hidden = !live;
+}
+
+async function openRoomSettingsDialog() {
+  if (!activeRoom?.isOwner) return;
+  const room = activeRoom;
+  const data = await api(`/api/rooms/${room.roomId}`);
+  if (activeRoom !== room) return;
+  activeRoom.settings = data.room.settings;
+  renderRoomSettings();
+  for (const [target, source] of [
+    ['editEngineSelect', 'createEngineSelect'],
+    ['editTtsZhVoiceSelect', 'ttsZhVoiceSelect'],
+    ['editTtsEnVoiceSelect', 'ttsEnVoiceSelect'],
+    ['editVoiceLiveAsrSelect', 'voiceLiveAsrSelect'],
+  ]) $(target).replaceChildren(...[...$(source).options].map(option => option.cloneNode(true)));
+  $('editEngineSelect').value = activeRoom.settings.engineKind;
+  $('editTtsZhVoiceSelect').value = activeRoom.settings.ttsZhVoice;
+  $('editTtsEnVoiceSelect').value = activeRoom.settings.ttsEnVoice;
+  $('editVoiceLiveAsrSelect').value = activeRoom.settings.voiceLiveAsrModel;
+  updateEditVoiceOptions();
+  formError('roomSettingsError');
+  $('roomSettingsDialog').showModal();
 }
 
 async function enterRoom(roomId, invitation = '') {
@@ -283,6 +318,33 @@ $('retryInviteBtn').addEventListener('click', () => enterRoom(pendingRoomId, pen
 $('copyCoachLinkBtn').addEventListener('click', () => copyInvite().catch(error => notice(error.message)));
 $('copyDialogInviteBtn').addEventListener('click', () => copyInvite().catch(error => notice(error.message)));
 $('manageAccessBtn').addEventListener('click', () => openAccessDialog().catch(error => notice(error.message)));
+$('editRoomSettingsBtn').addEventListener('click', () => openRoomSettingsDialog().catch(error => notice(error.message)));
+$('editEngineSelect').addEventListener('change', updateEditVoiceOptions);
+$('roomSettingsForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!activeRoom?.isOwner) return;
+  const room = activeRoom;
+  $('saveRoomSettingsBtn').disabled = true;
+  formError('roomSettingsError');
+  try {
+    const data = await api(`/api/rooms/${room.roomId}/settings`, { method: 'PATCH', body: {
+      settings: {
+        engineKind: $('editEngineSelect').value,
+        ttsZhVoice: $('editTtsZhVoiceSelect').value,
+        ttsEnVoice: $('editTtsEnVoiceSelect').value,
+        voiceLiveAsrModel: $('editVoiceLiveAsrSelect').value,
+      },
+    } });
+    if (activeRoom !== room) return;
+    // Live room.state broadcasts are authoritative if another owner tab saved meanwhile.
+    if (!ws || ws.readyState !== WebSocket.OPEN) activeRoom.settings = data.room.settings;
+    renderRoomSettings();
+    $('roomSettingsDialog').close();
+    notice(data.reconnected ? '同传设置已保存，所有成员正在自动重连；就绪后请重新开启麦克风。' : '同传设置已保存，无需重连。');
+  } catch (error) {
+    if (activeRoom === room) formError('roomSettingsError', error.message);
+  } finally { $('saveRoomSettingsBtn').disabled = false; }
+});
 document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => $(button.dataset.closeDialog).close()));
 $('createRoomBtn').addEventListener('click', async () => {
   if (!user?.canCreateRooms) return;
@@ -563,6 +625,8 @@ async function ensureMicPipeline() {
 
 function connectRoom() {
   if (!user || !activeRoom) return;
+  clearTimeout(roomReconnectTimer);
+  roomReconnectTimer = null;
   const previous = ws;
   ws = null;
   previous?.close();
@@ -579,6 +643,8 @@ function connectRoom() {
   engineStatusBar.textContent = '正在连接语音服务…';
   socket.onopen = () => {
     if (ws !== socket) return;
+    reconnectForSettings = false;
+    settingsReconnectAttempts = 0;
     connBadge.textContent = 'Connected';
     connBadge.className = 'badge green';
   };
@@ -593,7 +659,25 @@ function connectRoom() {
       leaveRoom(false);
       showLobby();
       notice('房主已取消你的加入权限。');
-    } else engineStatusBar.textContent = '连接已断开，请点击重新连接。';
+    } else {
+      if (event.code === 4000) {
+        reconnectForSettings = true;
+        settingsReconnectAttempts = 0;
+      }
+      if (reconnectForSettings && activeRoom && settingsReconnectAttempts < 3) {
+        const room = activeRoom;
+        connBadge.textContent = 'Reconnecting...';
+        connBadge.className = 'badge gold';
+        engineStatusBar.textContent = '同传设置已更新，正在自动重新连接…';
+        roomReconnectTimer = setTimeout(() => {
+          roomReconnectTimer = null;
+          if (activeRoom === room) connectRoom();
+        }, 250 * 2 ** settingsReconnectAttempts++);
+      } else {
+        reconnectForSettings = false;
+        engineStatusBar.textContent = '连接已断开，请点击重新连接。';
+      }
+    }
   };
   socket.onerror = () => {
     if (ws === socket) notice('无法加入房间，请确认登录、邀请链接和房主授权仍有效。');
@@ -642,6 +726,13 @@ function getOrCreateTurnCard(turnId, role, speaker) {
 function handleServerMessage(msg) {
   switch (msg.type) {
     case 'room.state': {
+      if (activeRoom && msg.roomId === activeRoom.roomId) {
+        activeRoom.settings = {
+          engineKind: msg.engineKind, ttsZhVoice: msg.ttsZhVoice,
+          ttsEnVoice: msg.ttsEnVoice, voiceLiveAsrModel: msg.voiceLiveAsrModel,
+        };
+        renderRoomSettings();
+      }
       if (Array.isArray(msg.matchHeroes)) {
         matchHeroes = msg.matchHeroes;
         renderSelectedMatchHeroes();
@@ -650,6 +741,18 @@ function handleServerMessage(msg) {
         renderGsiStatus(msg.gsiState);
       }
       renderParticipants(msg.participants || []);
+      break;
+    }
+
+    case 'room.settings.changed': {
+      if (!activeRoom) break;
+      activeRoom.settings = msg.settings;
+      renderRoomSettings();
+      reconnectForSettings = true;
+      settingsReconnectAttempts = 0;
+      stopRoomMedia();
+      livePartialBanner.textContent = '同传设置已更新，等待重新连接…';
+      notice('房主已修改同传设置，所有成员将自动重连；就绪后请重新开启麦克风。');
       break;
     }
 

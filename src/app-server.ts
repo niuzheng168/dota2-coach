@@ -26,6 +26,7 @@ interface ClientConn {
   invitation?: string;
   selfMonitor: boolean;
   engine: TranslationEngine | null;
+  pendingEngine: TranslationEngine | null;
   startingEngine: Promise<void> | null;
   engineState: EngineConnectionState;
   engineGeneration: number;
@@ -143,12 +144,17 @@ export function createCoachServer(
     if (!room.clients.has(client.id)) return;
     voiceDiagnostic(room, client, 'disconnected', { code });
     room.clients.delete(client.id);
+    client.engineGeneration++;
     if (client.retryTimer) clearTimeout(client.retryTimer);
     client.retryTimer = null;
     client.ws.close(code, reason);
     if (client.engine) {
       client.engine.stop().catch(() => {});
       client.engine = null;
+    }
+    if (client.pendingEngine) {
+      client.pendingEngine.stop().catch(() => {});
+      client.pendingEngine = null;
     }
   }
 
@@ -160,7 +166,7 @@ export function createCoachServer(
     // Metadata only: never audio, transcripts, account passwords, cookies or invite/API keys.
     console.info(JSON.stringify({
       at: new Date().toISOString(), event: `voice.${event}`, roomId: room.roomId,
-      connectionId: client.id, role: client.role, engine: room.engineKind,
+      connectionId: client.id, role: client.role, engine: client.engine?.kind || client.pendingEngine?.kind || room.engineKind,
       state: client.engineState, inputFrames: client.inputFrames,
       forwardedFrames: client.forwardedFrames, ...extra,
     }));
@@ -244,15 +250,20 @@ export function createCoachServer(
     sourceClientId: string,
     generation: number,
   ) {
+    const isCurrent = () => {
+      const client = room.clients.get(sourceClientId);
+      return client?.engineGeneration === generation && authorized(room, client);
+    };
     return {
       onConnectionState: (state: EngineConnectionState) => {
         const client = room.clients.get(sourceClientId);
-        if (!client || client.engineGeneration !== generation) return;
+        if (!client || !isCurrent()) return;
         // Initial readiness is published only after ensureClientEngine assigns the engine.
         if (state === 'ready' && !client.engine) return;
         setEngineState(room, client, state);
       },
       onSourcePartial: (text: string) => {
+        if (!isCurrent()) return;
         broadcastJson(room, {
           type: 'subtitle.source.partial',
           role,
@@ -261,6 +272,7 @@ export function createCoachServer(
         });
       },
       onSourceFinal: (turnId: string, text: string) => {
+        if (!isCurrent()) return;
         const client = room.clients.get(sourceClientId);
         if (client) voiceDiagnostic(room, client, 'source_final');
         broadcastJson(room, {
@@ -272,6 +284,7 @@ export function createCoachServer(
         });
       },
       onTargetPartial: (turnId: string, text: string) => {
+        if (!isCurrent()) return;
         broadcastJson(room, {
           type: 'subtitle.target.partial',
           turnId,
@@ -281,6 +294,7 @@ export function createCoachServer(
         });
       },
       onTargetFinal: (turnId: string, text: string) => {
+        if (!isCurrent()) return;
         broadcastJson(room, {
           type: 'subtitle.target.final',
           turnId,
@@ -290,9 +304,11 @@ export function createCoachServer(
         });
       },
       onTargetAudio: (_turnId: string, pcm24kMono: Buffer) => {
+        if (!isCurrent()) return;
         routeTranslatedAudio(room, role, sourceClientId, pcm24kMono);
       },
       onTurnMetrics: (metrics: TurnMetrics) => {
+        if (!isCurrent()) return;
         room.metricsHistory.push(metrics);
         if (room.metricsHistory.length > 50) {
           room.metricsHistory.shift();
@@ -304,6 +320,7 @@ export function createCoachServer(
         });
       },
       onStatus: (status: string) => {
+        if (!isCurrent()) return;
         broadcastJson(room, {
           type: 'engine.status',
           role,
@@ -312,6 +329,7 @@ export function createCoachServer(
         });
       },
       onError: (message: string) => {
+        if (!isCurrent()) return;
         const client = room.clients.get(sourceClientId);
         if (client) voiceDiagnostic(room, client, 'engine_error', { code: voiceErrorCode(message) });
         broadcastJson(room, {
@@ -343,10 +361,12 @@ export function createCoachServer(
       ttsEnVoice: room.ttsEnVoice, ttsStreamMode: room.ttsStreamMode,
       voiceLiveAsrModel: room.voiceLiveAsrModel,
     }, buildEngineCallbacks(room, client.role, client.name, client.id, generation));
+    client.pendingEngine = next;
     client.startingEngine = (async () => {
       try {
         await next.start();
-        if (!authorized(room, client) || !room.clients.has(client.id) || client.ws.readyState !== WebSocket.OPEN) {
+        if (!authorized(room, client) || !room.clients.has(client.id) ||
+            client.engineGeneration !== generation || client.ws.readyState !== WebSocket.OPEN) {
           throw new AppError(403, '已离开房间');
         }
         client.engine = next;
@@ -358,7 +378,10 @@ export function createCoachServer(
         await next.stop().catch(() => {});
         setEngineState(room, client, 'failed');
         throw error;
-      } finally { client.startingEngine = null; }
+      } finally {
+        if (client.pendingEngine === next) client.pendingEngine = null;
+        client.startingEngine = null;
+      }
     })();
     await client.startingEngine;
     return next;
@@ -387,6 +410,23 @@ export function createCoachServer(
       participants,
       recentMetrics: room.metricsHistory.slice(-15),
     });
+  }
+
+  function applyRoomSettings(record: StoredRoom): boolean {
+    const room = runtimeRoom(record);
+    const changed = (Object.keys(record.settings) as (keyof RoomSettings)[])
+      .some(key => room[key] !== record.settings[key]);
+    room.record = record;
+    Object.assign(room, record.settings);
+    if (!changed) return false;
+    room.metricsHistory = [];
+    broadcastJson(room, { type: 'room.settings.changed', settings: record.settings });
+    // Close every browser/upstream session, including sessions still starting.
+    // Rejoining clients retain their authentication, invitation, role and monitor choice.
+    for (const client of room.clients.values()) {
+      disconnect(room, client, 4000, 'Room settings changed');
+    }
+    return true;
   }
 
   async function updateRoomMatchHeroes(room: RoomState, heroes: string[]): Promise<void> {
@@ -544,8 +584,16 @@ export function createCoachServer(
           reply(res, 201, { room: roomView(room, auth.user) });
           return;
         }
-        const roomRoute = /^\/api\/rooms\/([a-f0-9-]+)(\/access)?$/.exec(route);
+        const roomRoute = /^\/api\/rooms\/([a-f0-9-]+)(\/access|\/settings)?$/.exec(route);
         if (roomRoute) {
+          if (roomRoute[2] === '/settings' && req.method === 'PATCH') {
+            store.requireOwner(auth.user, roomRoute[1]);
+            const body = await readJson(req);
+            const record = await store.updateSettings(auth.user, roomRoute[1], validateRoomSettings(body.settings));
+            const reconnected = applyRoomSettings(record);
+            reply(res, 200, { room: roomView(record, auth.user), reconnected });
+            return;
+          }
           if (roomRoute[2] === '/access' && req.method === 'PATCH') {
             store.requireOwner(auth.user, roomRoute[1]);
             const body = await readJson(req);
@@ -559,7 +607,7 @@ export function createCoachServer(
             reply(res, 200, { room: roomView(room, auth.user) });
             return;
           }
-          throw new AppError(405, '房间同传设置创建后不可修改');
+          throw new AppError(405, '不支持的房间操作');
         }
         if (route === '/api/dictionary' && isRead) {
           reply(res, 200, DOTA2_DICTIONARY);
@@ -681,7 +729,7 @@ export function createCoachServer(
           id: crypto.randomUUID(), name: auth.user.username, role, ws,
           sessionToken: sessionCookie(req)!, invitation,
           selfMonitor: url.searchParams.get('selfMonitor') === '1',
-          engine: null, startingEngine: null,
+          engine: null, pendingEngine: null, startingEngine: null,
           engineState: 'connecting', engineGeneration: 0, startupRetries: 0, retryTimer: null,
           inputFrames: 0, forwardedFrames: 0, lastInputAckAt: 0, lastInputLogAt: 0,
           lastCaptureLogAt: 0,
@@ -695,6 +743,7 @@ export function createCoachServer(
           broadcastRoomRoster(room);
         });
         ws.on('message', (data, binary) => {
+          if (!room.clients.has(client.id)) return;
           if (!authorized(room, client)) { disconnect(room, client, 4003, 'Access denied'); return; }
           if (binary) {
             const pcm = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
@@ -742,7 +791,7 @@ export function createCoachServer(
             }
             case 'room.set_engine':
             case 'room.set_tts_options':
-              reject('同传设置在创建房间时确定，创建后不可修改');
+              reject('只有房主可以通过「修改同传设置」保存配置');
               break;
             case 'room.set_match_heroes': {
               if (client.name !== room.record.ownerUsername) { reject('只有房主可以修改阵容'); break; }

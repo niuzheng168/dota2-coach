@@ -221,4 +221,14 @@ export class AccessStore {
       return room;
     });
   }
+
+  async updateSettings(user: PublicUser, roomId: string, settings: RoomSettings): Promise<StoredRoom> {
+    return this.mutate(data => {
+      const room = data.rooms.find(item => item.roomId === roomId);
+      if (!room) throw new AppError(404, '房间不存在');
+      if (room.ownerUsername !== user.username) throw new AppError(403, '只有房主可以修改同传设置');
+      room.settings = structuredClone(settings);
+      return room;
+    });
+  }
 }
