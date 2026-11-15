@@ -1,6 +1,6 @@
 {
   "patch": "7.41f",
-  "generatedAt": "2026-11-14T18:01:03.841Z",
+  "generatedAt": "2026-11-15T04:06:17.213Z",
   "sources": {
     "game": "https://raw.githubusercontent.com/SteamDatabase/GameTracking-Dota2/b8fbea101ddaeaf069b32d3a86a3476969a207f4/game/dota/pak01_dir/scripts/npc/",
     "map": "https://raw.githubusercontent.com/Reino-Doce/dota-maps-data/adbd856cd23bc8d4f3b974a04ef8855047d2b35a/assets/data/741f/",

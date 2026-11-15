@@ -13,7 +13,9 @@ const BURSTS: Record<string, { field?: string; targets: number }> = {
   ursa_earthshock: { targets: 4 },
 };
 export function isModeledAbility(name: string): boolean {
-  return Object.hasOwn(BURSTS, name) || ['sven_great_cleave', 'ursa_fury_swipes', 'axe_counter_helix'].includes(name);
+  return Object.hasOwn(BURSTS, name) ||
+    ['sven_great_cleave', 'luna_moon_glaive', 'luna_lunar_blessing',
+      'ursa_fury_swipes', 'axe_counter_helix'].includes(name);
 }
 export function burstAbility(ability: AbilityState, data: AbilityData | undefined):
   { damage: number; type: DamageType; targets: number; mana: number; cooldown: number; castPoint: number } | null {

@@ -1,6 +1,6 @@
 {
   "patch": "7.41f",
-  "generatedAt": "2026-11-14T18:01:03.841Z",
+  "generatedAt": "2026-11-15T04:06:17.213Z",
   "sources": {
     "game": "https://raw.githubusercontent.com/SteamDatabase/GameTracking-Dota2/b8fbea101ddaeaf069b32d3a86a3476969a207f4/game/dota/pak01_dir/scripts/npc/",
     "map": "https://raw.githubusercontent.com/Reino-Doce/dota-maps-data/adbd856cd23bc8d4f3b974a04ef8855047d2b35a/assets/data/741f/",
@@ -43823,6 +43823,12 @@
       ],
       "blink_range_clamp": [
         960
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_overwhelming_blink": {
@@ -43858,6 +43864,12 @@
       ],
       "damage_pct_over_time": [
         100
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_swift_blink": {
@@ -43881,6 +43893,12 @@
       ],
       "duration": [
         6
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_arcane_blink": {
@@ -43907,32 +43925,48 @@
       ],
       "duration": [
         0
+      ],
+      "AbilityCooldown": [
+        9
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_blades_of_attack": {
       "bonus_damage": [
         9
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_broadsword": {
       "bonus_damage": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_chainmail": {
       "bonus_armor": [
         4
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_splintmail": {
       "bonus_armor": [
         7
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_claymore": {
       "bonus_damage": [
         20
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_helm_of_iron_will": {
       "bonus_armor": [
@@ -43940,7 +43974,9 @@
       ],
       "bonus_regen": [
         4
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_javelin": {
       "bonus_chance": [
@@ -43948,17 +43984,23 @@
       ],
       "bonus_chance_damage": [
         60
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_mithril_hammer": {
       "bonus_damage": [
         24
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_platemail": {
       "bonus_armor": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_quarterstaff": {
       "bonus_speed": [
@@ -43966,7 +44008,9 @@
       ],
       "bonus_damage": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_quelling_blade": {
       "damage_bonus": [
@@ -43977,6 +44021,12 @@
       ],
       "quelling_range_tooltip": [
         350
+      ],
+      "AbilityCooldown": [
+        4
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_faerie_fire": {
@@ -43985,7 +44035,11 @@
       ],
       "hp_restore": [
         85
-      ]
+      ],
+      "AbilityCooldown": [
+        5
+      ],
+      "AbilityManaCost": []
     },
     "item_infused_raindrop": {
       "mana_regen": [
@@ -43999,17 +44053,25 @@
       ],
       "initial_charges": [
         6
-      ]
+      ],
+      "AbilityCooldown": [
+        7
+      ],
+      "AbilityManaCost": []
     },
     "item_wind_lace": {
       "movement_speed": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ring_of_protection": {
       "bonus_armor": [
         2
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_stout_shield": {
       "damage_block_melee": [
@@ -44020,7 +44082,9 @@
       ],
       "block_chance": [
         50
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_moon_shard": {
       "bonus_attack_speed": [
@@ -44034,22 +44098,30 @@
       ],
       "consumed_bonus_night_vision": [
         200
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_gauntlets": {
       "bonus_strength": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_slippers": {
       "bonus_agility": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_mantle": {
       "bonus_intellect": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_branches": {
       "bonus_all_stats": [
@@ -44057,92 +44129,130 @@
       ],
       "tree_duration": [
         20
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_belt_of_strength": {
       "bonus_strength": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_boots_of_elves": {
       "bonus_agility": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_robe": {
       "bonus_intellect": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_circlet": {
       "bonus_all_stats": [
         2
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_crown": {
       "bonus_all_stats": [
         4
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_diadem": {
       "bonus_all_stats": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ogre_axe": {
       "bonus_strength": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_blade_of_alacrity": {
       "bonus_agility": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_staff_of_wizardry": {
       "bonus_intellect": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ultimate_orb": {
       "bonus_all_stats": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_gloves": {
       "bonus_attack_speed": [
         20
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_blitz_knuckles": {
       "bonus_attack_speed": [
         35
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_lifesteal": {
       "lifesteal_percent": [
         18
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_voodoo_mask": {
       "spell_lifesteal": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ring_of_regen": {
       "bonus_health_regen": [
         1.25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_sobi_mask": {
       "bonus_mana_regen": [
         0.7
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_boots": {
       "bonus_movement_speed": [
         45
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_gem": {
       "radius": [
@@ -44153,7 +44263,11 @@
       ],
       "duration": [
         4
-      ]
+      ],
+      "AbilityCooldown": [
+        12
+      ],
+      "AbilityManaCost": []
     },
     "item_shawl": {
       "bonus_magical_armor": [
@@ -44161,7 +44275,9 @@
       ],
       "tooltip_resist": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_cloak": {
       "bonus_magical_armor": [
@@ -44169,12 +44285,16 @@
       ],
       "tooltip_resist": [
         18
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_talisman_of_evasion": {
       "bonus_evasion": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_cheese": {
       "health_restore": [
@@ -44182,7 +44302,11 @@
       ],
       "mana_restore": [
         1500
-      ]
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": []
     },
     "item_magic_stick": {
       "max_charges": [
@@ -44193,7 +44317,11 @@
       ],
       "restore_per_charge": [
         15
-      ]
+      ],
+      "AbilityCooldown": [
+        17
+      ],
+      "AbilityManaCost": []
     },
     "item_magic_wand": {
       "max_charges": [
@@ -44207,7 +44335,11 @@
       ],
       "restore_per_charge": [
         15
-      ]
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": []
     },
     "item_ghost": {
       "bonus_all_stats": [
@@ -44218,7 +44350,11 @@
       ],
       "extra_spell_damage_percent": [
         -30
-      ]
+      ],
+      "AbilityCooldown": [
+        22
+      ],
+      "AbilityManaCost": []
     },
     "item_clarity": {
       "mana_regen": [
@@ -44226,7 +44362,9 @@
       ],
       "buff_duration": [
         25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enchanted_mango": {
       "hp_regen": [
@@ -44234,22 +44372,36 @@
       ],
       "replenish_amount": [
         100
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_famango": {
       "replenish_amount": [
         125
-      ]
+      ],
+      "AbilityCooldown": [
+        5
+      ],
+      "AbilityManaCost": []
     },
     "item_great_famango": {
       "replenish_amount": [
         400
-      ]
+      ],
+      "AbilityCooldown": [
+        5
+      ],
+      "AbilityManaCost": []
     },
     "item_greater_famango": {
       "replenish_amount": [
         900
-      ]
+      ],
+      "AbilityCooldown": [
+        5
+      ],
+      "AbilityManaCost": []
     },
     "item_blood_grenade": {
       "speed": [
@@ -44275,7 +44427,11 @@
       ],
       "debuff_duration": [
         5
-      ]
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": []
     },
     "item_royale_with_cheese": {
       "shield": [
@@ -44295,7 +44451,11 @@
       ],
       "mana_restore": [
         2000
-      ]
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": []
     },
     "item_flask": {
       "buff_duration": [
@@ -44306,7 +44466,9 @@
       ],
       "break_on_hero_damage": [
         1
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_dust": {
       "duration": [
@@ -44323,6 +44485,12 @@
       ],
       "linger_duration": [
         8
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_bottle": {
@@ -44349,7 +44517,11 @@
       ],
       "rune_expire_time": [
         90
-      ]
+      ],
+      "AbilityCooldown": [
+        0.5
+      ],
+      "AbilityManaCost": []
     },
     "item_ward_observer": {
       "lifetime": [
@@ -44363,7 +44535,11 @@
       ],
       "duration_minutes_tooltip": [
         6
-      ]
+      ],
+      "AbilityCooldown": [
+        1
+      ],
+      "AbilityManaCost": []
     },
     "item_ward_sentry": {
       "lifetime": [
@@ -44380,7 +44556,11 @@
       ],
       "duration_minutes_tooltip": [
         7
-      ]
+      ],
+      "AbilityCooldown": [
+        1
+      ],
+      "AbilityManaCost": []
     },
     "item_ward_dispenser": {
       "bonus_health": [
@@ -44415,7 +44595,11 @@
       ],
       "cast_range_sentry": [
         500
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_tango": {
       "health_regen": [
@@ -44426,7 +44610,9 @@
       ],
       "tooltip_charges": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_tango_single": {
       "health_regen": [
@@ -44437,10 +44623,18 @@
       ],
       "duration_to_use": [
         40
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
-    "item_courier": {},
-    "item_flying_courier": {},
+    "item_courier": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
+    "item_flying_courier": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
     "item_tpscroll": {
       "minimum_distance": [
         70
@@ -44453,6 +44647,12 @@
       ],
       "tooltip_channel_time": [
         3
+      ],
+      "AbilityCooldown": [
+        80
+      ],
+      "AbilityManaCost": [
+        75
       ]
     },
     "item_travel_boots": {
@@ -44467,7 +44667,9 @@
       ],
       "tp_cooldown": [
         40
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_travel_boots_2": {
       "bonus_movement_speed": [
@@ -44484,7 +44686,9 @@
       ],
       "tp_channel_time": [
         2
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_phase_boots": {
       "bonus_movement_speed": [
@@ -44510,62 +44714,88 @@
       ],
       "bonus_armor": [
         4
-      ]
+      ],
+      "AbilityCooldown": [
+        8
+      ],
+      "AbilityManaCost": []
     },
     "item_demon_edge": {
       "bonus_damage": [
         40
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_eagle": {
       "bonus_agility": [
         25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_reaver": {
       "bonus_strength": [
         25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_relic": {
       "bonus_damage": [
         55
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_hyperstone": {
       "bonus_attack_speed": [
         60
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ring_of_health": {
       "bonus_health_regen": [
         4.5
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ring_of_tarrasque": {
       "bonus_health_regen": [
         12
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_void_stone": {
       "bonus_mana_regen": [
         1.75
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_tiara_of_selemene": {
       "bonus_mana_regen": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_mystic_staff": {
       "bonus_intellect": [
         25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_energy_booster": {
       "bonus_mana": [
         250
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_point_booster": {
       "bonus_mana": [
@@ -44573,22 +44803,30 @@
       ],
       "bonus_health": [
         175
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_vitality_booster": {
       "bonus_health": [
         250
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_fluffy_hat": {
       "bonus_health": [
         125
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_wizard_hat": {
       "bonus_mana": [
         125
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_power_treads": {
       "bonus_movement_speed_ranged": [
@@ -44605,7 +44843,9 @@
       ],
       "bonus_damage": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_phylactery": {
       "bonus_all_stats": [
@@ -44634,7 +44874,11 @@
       ],
       "max_kill_bonus": [
         0
-      ]
+      ],
+      "AbilityCooldown": [
+        9
+      ],
+      "AbilityManaCost": []
     },
     "item_angels_demise": {
       "bonus_health": [
@@ -44660,7 +44904,11 @@
       ],
       "bonus_spell_damage": [
         250
-      ]
+      ],
+      "AbilityCooldown": [
+        9
+      ],
+      "AbilityManaCost": []
     },
     "item_hand_of_midas": {
       "bonus_attack_speed": [
@@ -44668,6 +44916,12 @@
       ],
       "bonus_gold": [
         160
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_oblivion_staff": {
@@ -44679,7 +44933,9 @@
       ],
       "bonus_mana_regen": [
         1.25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_witch_blade": {
       "bonus_attack_speed": [
@@ -44705,7 +44961,11 @@
       ],
       "projectile_speed": [
         300
-      ]
+      ],
+      "AbilityCooldown": [
+        9
+      ],
+      "AbilityManaCost": []
     },
     "item_pers": {
       "bonus_health_regen": [
@@ -44713,7 +44973,9 @@
       ],
       "bonus_mana_regen": [
         2.25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_cornucopia": {
       "bonus_health_regen": [
@@ -44724,7 +44986,9 @@
       ],
       "bonus_damage": [
         7
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_poor_mans_shield": {
       "bonus_agility": [
@@ -44741,7 +45005,9 @@
       ],
       "block_chance_hero": [
         100
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_bracer": {
       "bonus_strength": [
@@ -44761,7 +45027,9 @@
       ],
       "bonus_health": [
         50
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_wraith_band": {
       "bonus_agility": [
@@ -44778,7 +45046,9 @@
       ],
       "bonus_armor": [
         1.75
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_null_talisman": {
       "bonus_intellect": [
@@ -44795,7 +45065,9 @@
       ],
       "bonus_mana_regen": [
         1
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_mekansm": {
       "bonus_armor": [
@@ -44812,6 +45084,12 @@
       ],
       "heal_radius": [
         1200
+      ],
+      "AbilityCooldown": [
+        50
+      ],
+      "AbilityManaCost": [
+        100
       ]
     },
     "item_vladmir": {
@@ -44844,7 +45122,9 @@
       ],
       "lifesteal_creeps_tooltip": [
         12
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_wraith_pact": {
       "bonus_health": [
@@ -44879,6 +45159,12 @@
       ],
       "aura_dps": [
         45
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": [
+        100
       ]
     },
     "item_buckler": {
@@ -44890,7 +45176,9 @@
       ],
       "bonus_aoe_radius": [
         1200
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ring_of_basilius": {
       "mana_regen": [
@@ -44901,7 +45189,9 @@
       ],
       "aura_radius": [
         1200
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_holy_locket": {
       "bonus_health": [
@@ -44939,7 +45229,11 @@
       ],
       "use_cooldown": [
         13
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_pipe": {
       "health_regen": [
@@ -44974,6 +45268,12 @@
       ],
       "barrier_block_creep": [
         425
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": [
+        150
       ]
     },
     "item_urn_of_shadows": {
@@ -45003,7 +45303,11 @@
       ],
       "duration": [
         8
-      ]
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": []
     },
     "item_headdress": {
       "health_regen": [
@@ -45014,7 +45318,9 @@
       ],
       "aura_radius": [
         1200
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_sheepstick": {
       "bonus_intellect": [
@@ -45031,6 +45337,12 @@
       ],
       "upgrade_radius": [
         200
+      ],
+      "AbilityCooldown": [
+        20
+      ],
+      "AbilityManaCost": [
+        250
       ]
     },
     "item_caster_rapier": {
@@ -45042,7 +45354,11 @@
       ],
       "backstab_duration": [
         3
-      ]
+      ],
+      "AbilityCooldown": [
+        9
+      ],
+      "AbilityManaCost": []
     },
     "item_orchid": {
       "bonus_attack_speed": [
@@ -45065,6 +45381,12 @@
       ],
       "silence_duration": [
         5
+      ],
+      "AbilityCooldown": [
+        18
+      ],
+      "AbilityManaCost": [
+        125
       ]
     },
     "item_bloodthorn": {
@@ -45106,6 +45428,12 @@
       ],
       "proc_chance": [
         40
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        150
       ]
     },
     "item_echo_sabre": {
@@ -45123,6 +45451,12 @@
       ],
       "slow_duration": [
         0.8
+      ],
+      "AbilityCooldown": [
+        5
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_cyclone": {
@@ -45140,6 +45474,12 @@
       ],
       "tooltip_drop_damage": [
         50
+      ],
+      "AbilityCooldown": [
+        23
+      ],
+      "AbilityManaCost": [
+        175
       ]
     },
     "item_wind_waker": {
@@ -45160,6 +45500,12 @@
       ],
       "tornado_speed": [
         300
+      ],
+      "AbilityCooldown": [
+        19
+      ],
+      "AbilityManaCost": [
+        175
       ]
     },
     "item_aether_lens": {
@@ -45171,7 +45517,9 @@
       ],
       "cast_range_bonus": [
         225
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_force_staff": {
       "bonus_intellect": [
@@ -45188,6 +45536,12 @@
       ],
       "push_time": [
         0.5
+      ],
+      "AbilityCooldown": [
+        19
+      ],
+      "AbilityManaCost": [
+        150
       ]
     },
     "item_hurricane_pike": {
@@ -45232,6 +45586,12 @@
       ],
       "dizzy_distance_pct": [
         0
+      ],
+      "AbilityCooldown": [
+        19
+      ],
+      "AbilityManaCost": [
+        150
       ]
     },
     "item_dagon": {
@@ -45279,6 +45639,20 @@
         120,
         150,
         180
+      ],
+      "AbilityCooldown": [
+        27,
+        24,
+        21,
+        18,
+        15
+      ],
+      "AbilityManaCost": [
+        120,
+        140,
+        160,
+        180,
+        200
       ]
     },
     "item_dagon_2": {
@@ -45326,6 +45700,20 @@
         120,
         150,
         180
+      ],
+      "AbilityCooldown": [
+        27,
+        24,
+        21,
+        18,
+        15
+      ],
+      "AbilityManaCost": [
+        120,
+        140,
+        160,
+        180,
+        200
       ]
     },
     "item_dagon_3": {
@@ -45373,6 +45761,20 @@
         120,
         150,
         180
+      ],
+      "AbilityCooldown": [
+        27,
+        24,
+        21,
+        18,
+        15
+      ],
+      "AbilityManaCost": [
+        120,
+        140,
+        160,
+        180,
+        200
       ]
     },
     "item_dagon_4": {
@@ -45420,6 +45822,20 @@
         120,
         150,
         180
+      ],
+      "AbilityCooldown": [
+        27,
+        24,
+        21,
+        18,
+        15
+      ],
+      "AbilityManaCost": [
+        120,
+        140,
+        160,
+        180,
+        200
       ]
     },
     "item_dagon_5": {
@@ -45467,6 +45883,20 @@
         120,
         150,
         180
+      ],
+      "AbilityCooldown": [
+        27,
+        24,
+        21,
+        18,
+        15
+      ],
+      "AbilityManaCost": [
+        120,
+        140,
+        160,
+        180,
+        200
       ]
     },
     "item_necronomicon": {
@@ -45535,6 +45965,12 @@
         5,
         7,
         9
+      ],
+      "AbilityCooldown": [
+        80
+      ],
+      "AbilityManaCost": [
+        150
       ]
     },
     "item_necronomicon_2": {
@@ -45603,6 +46039,12 @@
         5,
         7,
         9
+      ],
+      "AbilityCooldown": [
+        80
+      ],
+      "AbilityManaCost": [
+        150
       ]
     },
     "item_necronomicon_3": {
@@ -45671,6 +46113,12 @@
         5,
         7,
         9
+      ],
+      "AbilityCooldown": [
+        80
+      ],
+      "AbilityManaCost": [
+        150
       ]
     },
     "item_ultimate_scepter": {
@@ -45682,16 +46130,34 @@
       ],
       "bonus_mana": [
         175
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
-    "item_ultimate_scepter_2": {},
-    "item_ultimate_scepter_roshan": {},
-    "item_aghanims_shard": {},
-    "item_aghanims_shard_roshan": {},
+    "item_ultimate_scepter_2": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
+    "item_ultimate_scepter_roshan": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
+    "item_aghanims_shard": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
+    "item_aghanims_shard_roshan": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
     "item_eldwurms_edda": {
       "intellect_pct": [
         25
-      ]
+      ],
+      "AbilityCooldown": [
+        600
+      ],
+      "AbilityManaCost": []
     },
     "item_refresher": {
       "bonus_health_regen": [
@@ -45711,6 +46177,12 @@
       ],
       "refresh_items": [
         0
+      ],
+      "AbilityCooldown": [
+        180
+      ],
+      "AbilityManaCost": [
+        325
       ]
     },
     "item_assault": {
@@ -45731,7 +46203,9 @@
       ],
       "aura_negative_armor": [
         -5
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_heart": {
       "bonus_strength": [
@@ -45742,7 +46216,9 @@
       ],
       "missing_health_regen": [
         1.5
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_black_king_bar": {
       "bonus_strength": [
@@ -45764,6 +46240,12 @@
       ],
       "spell_reduce": [
         60
+      ],
+      "AbilityCooldown": [
+        95
+      ],
+      "AbilityManaCost": [
+        50
       ]
     },
     "item_aegis": {
@@ -45778,7 +46260,9 @@
       ],
       "disappear_time_turbo": [
         240
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_shivas_guard": {
       "bonus_hp_regen": [
@@ -45810,6 +46294,12 @@
       ],
       "blast_speed": [
         400
+      ],
+      "AbilityCooldown": [
+        27
+      ],
+      "AbilityManaCost": [
+        75
       ]
     },
     "item_bloodstone": {
@@ -45845,6 +46335,12 @@
       ],
       "aura_radius": [
         1200
+      ],
+      "AbilityCooldown": [
+        35
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_sphere": {
@@ -45865,7 +46361,11 @@
       ],
       "damage_absorb": [
         300
-      ]
+      ],
+      "AbilityCooldown": [
+        14
+      ],
+      "AbilityManaCost": []
     },
     "item_lotus_orb": {
       "bonus_armor": [
@@ -45882,6 +46382,12 @@
       ],
       "active_duration": [
         5
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        175
       ]
     },
     "item_meteor_hammer": {
@@ -45935,6 +46441,12 @@
       ],
       "enemy_particles_visible": [
         0
+      ],
+      "AbilityCooldown": [
+        24
+      ],
+      "AbilityManaCost": [
+        75
       ]
     },
     "item_nullifier": {
@@ -45958,6 +46470,12 @@
       ],
       "slow_interval_duration": [
         0.5
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_aeon_disk": {
@@ -45987,7 +46505,14 @@
       ],
       "initial_cooldown": [
         6
-      ]
+      ],
+      "AbilityCooldown": [
+        105,
+        125,
+        145,
+        165
+      ],
+      "AbilityManaCost": []
     },
     "item_kaya": {
       "bonus_intellect": [
@@ -45998,7 +46523,9 @@
       ],
       "mana_regen_multiplier": [
         20
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_trident": {
       "bonus_strength": [
@@ -46030,7 +46557,9 @@
       ],
       "magic_damage_attack": [
         30
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_refresher_shard": {
       "bonus_health_regen": [
@@ -46044,6 +46573,12 @@
       ],
       "refresh_items": [
         0
+      ],
+      "AbilityCooldown": [
+        180
+      ],
+      "AbilityManaCost": [
+        200
       ]
     },
     "item_spirit_vessel": {
@@ -46085,7 +46620,11 @@
       ],
       "enemy_slow_pct": [
         0
-      ]
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": []
     },
     "item_essence_distiller": {
       "mana_regen": [
@@ -46129,7 +46668,11 @@
       ],
       "linger_after_latch_duration": [
         0.5
-      ]
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": []
     },
     "item_vanguard": {
       "bonus_health": [
@@ -46146,7 +46689,9 @@
       ],
       "block_chance": [
         60
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_crimson_guard": {
       "bonus_health": [
@@ -46184,6 +46729,12 @@
       ],
       "max_hp_pct": [
         2
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": [
+        75
       ]
     },
     "item_blade_mail": {
@@ -46207,6 +46758,12 @@
       ],
       "active_reflection_pct": [
         85
+      ],
+      "AbilityCooldown": [
+        25
+      ],
+      "AbilityManaCost": [
+        25
       ]
     },
     "item_soul_booster": {
@@ -46215,7 +46772,9 @@
       ],
       "bonus_mana": [
         425
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_hood_of_defiance": {
       "bonus_spell_resist": [
@@ -46232,6 +46791,12 @@
       ],
       "barrier_duration": [
         12
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": [
+        50
       ]
     },
     "item_eternal_shroud": {
@@ -46258,7 +46823,9 @@
       ],
       "max_stacks": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_consecrated_wraps": {
       "bonus_spell_resist": [
@@ -46287,7 +46854,11 @@
       ],
       "damage_must_be_player_owned_or_roshan": [
         1
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_crellas_crozier": {
       "bonus_all_stats": [
@@ -46325,7 +46896,11 @@
       ],
       "stack_duration": [
         2
-      ]
+      ],
+      "AbilityCooldown": [
+        20
+      ],
+      "AbilityManaCost": []
     },
     "item_rapier": {
       "bonus_spell_amp": [
@@ -46336,7 +46911,11 @@
       ],
       "bonus_damage_base": [
         100
-      ]
+      ],
+      "AbilityCooldown": [
+        6
+      ],
+      "AbilityManaCost": []
     },
     "item_monkey_king_bar": {
       "bonus_damage": [
@@ -46353,7 +46932,9 @@
       ],
       "melee_attack_range": [
         50
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_radiance": {
       "bonus_damage": [
@@ -46379,7 +46960,9 @@
       ],
       "illusion_multiplier_pct": [
         100
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_butterfly": {
       "bonus_agility": [
@@ -46393,7 +46976,9 @@
       ],
       "bonus_damage": [
         30
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_greater_crit": {
       "bonus_damage": [
@@ -46404,7 +46989,9 @@
       ],
       "crit_multiplier": [
         225
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_basher": {
       "bonus_damage": [
@@ -46427,7 +47014,11 @@
       ],
       "bonus_chance_damage": [
         100
-      ]
+      ],
+      "AbilityCooldown": [
+        2.3
+      ],
+      "AbilityManaCost": []
     },
     "item_bfury": {
       "bonus_damage": [
@@ -46465,7 +47056,11 @@
       ],
       "upgraded_damage_bonus": [
         15
-      ]
+      ],
+      "AbilityCooldown": [
+        3
+      ],
+      "AbilityManaCost": []
     },
     "item_manta": {
       "bonus_strength": [
@@ -46512,6 +47107,12 @@
       ],
       "vision_radius": [
         1000
+      ],
+      "AbilityCooldown": [
+        34
+      ],
+      "AbilityManaCost": [
+        125
       ]
     },
     "item_lesser_crit": {
@@ -46526,7 +47127,9 @@
       ],
       "tooltip_crit_damage": [
         60
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_dragon_lance": {
       "bonus_agility": [
@@ -46540,7 +47143,9 @@
       ],
       "base_attack_range_melee": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_armlet": {
       "bonus_damage": [
@@ -46572,7 +47177,11 @@
       ],
       "toggle_cooldown": [
         0.036
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_invis_sword": {
       "bonus_damage": [
@@ -46592,6 +47201,12 @@
       ],
       "windwalk_bonus_damage": [
         175
+      ],
+      "AbilityCooldown": [
+        25
+      ],
+      "AbilityManaCost": [
+        75
       ]
     },
     "item_silver_edge": {
@@ -46630,6 +47245,12 @@
       ],
       "visibility_radius": [
         1025
+      ],
+      "AbilityCooldown": [
+        23
+      ],
+      "AbilityManaCost": [
+        75
       ]
     },
     "item_sange_and_yasha": {
@@ -46656,7 +47277,9 @@
       ],
       "slow_resistance": [
         30
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_kaya_and_sange": {
       "bonus_strength": [
@@ -46679,7 +47302,9 @@
       ],
       "manacost_reduction": [
         25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_yasha_and_kaya": {
       "bonus_agility": [
@@ -46705,7 +47330,9 @@
       ],
       "cast_speed_pct": [
         25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_satanic": {
       "bonus_strength": [
@@ -46725,7 +47352,11 @@
       ],
       "unholy_duration": [
         6
-      ]
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": []
     },
     "item_mjollnir": {
       "bonus_damage": [
@@ -46781,6 +47412,12 @@
       ],
       "illusion_multiplier_pct": [
         100
+      ],
+      "AbilityCooldown": [
+        35
+      ],
+      "AbilityManaCost": [
+        50
       ]
     },
     "item_skadi": {
@@ -46810,7 +47447,9 @@
       ],
       "restoration_reduction": [
         50
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_sange": {
       "bonus_strength": [
@@ -46821,7 +47460,9 @@
       ],
       "hp_regen_amp": [
         12
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_helm_of_the_dominator": {
       "bonus_stats": [
@@ -46867,6 +47508,12 @@
         3
       ],
       "bounty_pct": [
+        50
+      ],
+      "AbilityCooldown": [
+        45
+      ],
+      "AbilityManaCost": [
         50
       ]
     },
@@ -46918,6 +47565,12 @@
       ],
       "bounty_pct": [
         100
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": [
+        50
       ]
     },
     "item_maelstrom": {
@@ -46947,7 +47600,9 @@
       ],
       "illusion_multiplier_pct": [
         100
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_gungir": {
       "bonus_hp": [
@@ -46970,6 +47625,12 @@
       ],
       "duration": [
         2
+      ],
+      "AbilityCooldown": [
+        18
+      ],
+      "AbilityManaCost": [
+        150
       ]
     },
     "item_desolator": {
@@ -46990,7 +47651,9 @@
       ],
       "max_damage": [
         30
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_yasha": {
       "bonus_agility": [
@@ -47001,7 +47664,9 @@
       ],
       "movement_speed_percent_bonus": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_mask_of_madness": {
       "bonus_damage": [
@@ -47030,6 +47695,12 @@
       ],
       "berserk_duration": [
         6
+      ],
+      "AbilityCooldown": [
+        16
+      ],
+      "AbilityManaCost": [
+        25
       ]
     },
     "item_diffusal_blade": {
@@ -47059,6 +47730,12 @@
       ],
       "damage_per_burn": [
         1
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        25
       ]
     },
     "item_disperser": {
@@ -47100,6 +47777,12 @@
       ],
       "slow_resist": [
         40
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        75
       ]
     },
     "item_ethereal_blade": {
@@ -47132,6 +47815,12 @@
       ],
       "projectile_speed": [
         1400
+      ],
+      "AbilityCooldown": [
+        22
+      ],
+      "AbilityManaCost": [
+        100
       ]
     },
     "item_soul_ring": {
@@ -47146,7 +47835,11 @@
       ],
       "duration": [
         10
-      ]
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": []
     },
     "item_arcane_boots": {
       "bonus_movement": [
@@ -47169,6 +47862,12 @@
       ],
       "replenish_radius": [
         1200
+      ],
+      "AbilityCooldown": [
+        55
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_octarine_core": {
@@ -47186,7 +47885,9 @@
       ],
       "bonus_mana_regen": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_orb_of_venom": {
       "damage": [
@@ -47197,7 +47898,11 @@
       ],
       "poison_duration": [
         3
-      ]
+      ],
+      "AbilityCooldown": [
+        9
+      ],
+      "AbilityManaCost": []
     },
     "item_blight_stone": {
       "corruption_armor": [
@@ -47205,7 +47910,9 @@
       ],
       "corruption_duration": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_orb_of_corrosion": {
       "corruption_armor": [
@@ -47225,7 +47932,9 @@
       ],
       "bonus_agility": [
         7
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_orb_of_frost": {
       "slow_melee": [
@@ -47239,7 +47948,9 @@
       ],
       "heal_reduction": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_falcon_blade": {
       "bonus_health": [
@@ -47250,7 +47961,9 @@
       ],
       "bonus_damage": [
         14
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_mage_slayer": {
       "bonus_magical_armor": [
@@ -47273,7 +47986,9 @@
       ],
       "dps": [
         35
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ancient_janggo": {
       "aura_movement_speed": [
@@ -47302,7 +48017,11 @@
       ],
       "charges_tooltip": [
         8
-      ]
+      ],
+      "AbilityCooldown": [
+        45
+      ],
+      "AbilityManaCost": []
     },
     "item_boots_of_bearing": {
       "aura_movement_speed": [
@@ -47337,7 +48056,11 @@
       ],
       "bonus_ms_duration": [
         1.5
-      ]
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": []
     },
     "item_medallion_of_courage": {
       "ally_armor": [
@@ -47348,6 +48071,12 @@
       ],
       "duration": [
         8
+      ],
+      "AbilityCooldown": [
+        18
+      ],
+      "AbilityManaCost": [
+        30
       ]
     },
     "item_solar_crest": {
@@ -47380,6 +48109,12 @@
       ],
       "absorb_amount": [
         350
+      ],
+      "AbilityCooldown": [
+        16
+      ],
+      "AbilityManaCost": [
+        100
       ]
     },
     "item_pavise": {
@@ -47397,6 +48132,12 @@
       ],
       "absorb_amount": [
         250
+      ],
+      "AbilityCooldown": [
+        16
+      ],
+      "AbilityManaCost": [
+        60
       ]
     },
     "item_smoke_of_deceit": {
@@ -47417,7 +48158,11 @@
       ],
       "secondary_application_radius": [
         300
-      ]
+      ],
+      "AbilityCooldown": [
+        1
+      ],
+      "AbilityManaCost": []
     },
     "item_tome_of_knowledge": {
       "xp_bonus": [
@@ -47425,7 +48170,9 @@
       ],
       "xp_per_use": [
         150
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_veil_of_discord": {
       "bonus_health": [
@@ -47445,6 +48192,12 @@
       ],
       "resist_debuff_duration": [
         16
+      ],
+      "AbilityCooldown": [
+        16
+      ],
+      "AbilityManaCost": [
+        25
       ]
     },
     "item_revenants_brooch": {
@@ -47459,7 +48212,9 @@
       ],
       "crit_multiplier": [
         80
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_devastator": {
       "bonus_intellect": [
@@ -47491,7 +48246,11 @@
       ],
       "passive_cooldown": [
         4
-      ]
+      ],
+      "AbilityCooldown": [
+        7
+      ],
+      "AbilityManaCost": []
     },
     "item_guardian_greaves": {
       "bonus_movement": [
@@ -47532,6 +48291,12 @@
       ],
       "max_health_pct_heal_amount": [
         0
+      ],
+      "AbilityCooldown": [
+        45
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_rod_of_atos": {
@@ -47543,6 +48308,12 @@
       ],
       "duration": [
         2
+      ],
+      "AbilityCooldown": [
+        18
+      ],
+      "AbilityManaCost": [
+        100
       ]
     },
     "item_iron_talon": {
@@ -47563,6 +48334,12 @@
       ],
       "alternative_cooldown": [
         4
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_abyssal_blade": {
@@ -47595,6 +48372,12 @@
       ],
       "stun_duration": [
         1.6
+      ],
+      "AbilityCooldown": [
+        35
+      ],
+      "AbilityManaCost": [
+        75
       ]
     },
     "item_heavens_halberd": {
@@ -47612,6 +48395,12 @@
       ],
       "disarm_melee": [
         3.5
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        25
       ]
     },
     "item_ring_of_aquila": {
@@ -47635,7 +48424,9 @@
       ],
       "aura_bonus_armor": [
         2
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_tranquil_boots": {
       "bonus_movement_speed": [
@@ -47667,6 +48458,12 @@
       ],
       "broken_movement_speed": [
         40
+      ],
+      "AbilityCooldown": [
+        13
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_shadow_amulet": {
@@ -47678,6 +48475,12 @@
       ],
       "fade_duration": [
         3.5
+      ],
+      "AbilityCooldown": [
+        18
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_glimmer_cape": {
@@ -47698,56 +48501,112 @@
       ],
       "barrier_block": [
         375
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        125
       ]
     },
     "item_river_painter": {
       "paint_duration": [
         900
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_river_painter2": {
       "paint_duration": [
         900
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_river_painter3": {
       "paint_duration": [
         900
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_river_painter4": {
       "paint_duration": [
         900
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_river_painter5": {
       "paint_duration": [
         900
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_river_painter6": {
       "paint_duration": [
         900
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
     "item_river_painter7": {
       "paint_duration": [
         900
-      ]
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": []
     },
-    "item_mutation_tombstone": {},
+    "item_mutation_tombstone": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
     "item_super_blink": {
       "blink_range": [
         1200
       ],
       "blink_range_clamp": [
         960
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
-    "item_pocket_tower": {},
+    "item_pocket_tower": {
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": [
+        0
+      ]
+    },
     "item_pocket_roshan": {
       "summon_duration": [
         60
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_keen_optic": {
@@ -47756,7 +48615,9 @@
       ],
       "bonus_mana_regen": [
         1.25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_grove_bow": {
       "attack_range_bonus": [
@@ -47770,7 +48631,9 @@
       ],
       "debuff_duration": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_quickening_charm": {
       "bonus_cooldown": [
@@ -47778,7 +48641,9 @@
       ],
       "bonus_health_regen": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_philosophers_stone": {
       "bonus_gpm": [
@@ -47792,7 +48657,9 @@
       "bonus_damage": [
         -30,
         -60
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_force_boots": {
       "bonus_movement_speed": [
@@ -47806,6 +48673,12 @@
       ],
       "hp_regen": [
         30
+      ],
+      "AbilityCooldown": [
+        8
+      ],
+      "AbilityManaCost": [
+        75
       ]
     },
     "item_desolator_2": {
@@ -47817,12 +48690,16 @@
       ],
       "corruption_duration": [
         7
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_phoenix_ash": {
       "health_pct": [
         50
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_seer_stone": {
       "cast_range_bonus": [
@@ -47839,9 +48716,16 @@
       ],
       "duration": [
         6
-      ]
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": []
     },
-    "item_greater_mango": {},
+    "item_greater_mango": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
     "item_elixer": {
       "health": [
         500
@@ -47851,7 +48735,9 @@
       ],
       "duration": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_vampire_fangs": {
       "attack_lifesteal": [
@@ -47869,7 +48755,9 @@
       ],
       "vision_loss": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_force_field": {
       "bonus_aoe_radius": [
@@ -47889,7 +48777,11 @@
       ],
       "active_reflection_pct": [
         25
-      ]
+      ],
+      "AbilityCooldown": [
+        35
+      ],
+      "AbilityManaCost": []
     },
     "item_black_powder_bag": {
       "bonus_armor": [
@@ -47906,7 +48798,11 @@
       ],
       "blind_pct": [
         100
-      ]
+      ],
+      "AbilityCooldown": [
+        20
+      ],
+      "AbilityManaCost": []
     },
     "item_mechanical_arm": {
       "bat": [
@@ -47917,7 +48813,9 @@
       ],
       "stun_duration": [
         0.1
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_craggy_coat": {
       "armor_bonus": [
@@ -47934,7 +48832,11 @@
       ],
       "bonus_health": [
         0
-      ]
+      ],
+      "AbilityCooldown": [
+        12
+      ],
+      "AbilityManaCost": []
     },
     "item_greater_faerie_fire": {
       "bonus_damage": [
@@ -47942,7 +48844,11 @@
       ],
       "hp_restore": [
         250
-      ]
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": []
     },
     "item_timeless_relic": {
       "debuff_amp": [
@@ -47952,7 +48858,9 @@
       "spell_amp": [
         10,
         20
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_mirror_shield": {
       "reflect_chance": [
@@ -47963,7 +48871,9 @@
       ],
       "block_cooldown": [
         12
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ironwood_tree": {
       "bonus_all_stats": [
@@ -47971,12 +48881,18 @@
       ],
       "tree_duration": [
         20
-      ]
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": []
     },
     "item_mango_tree": {
       "seconds": [
         60
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_royal_jelly": {
       "bonus_health": [
@@ -47999,17 +48915,23 @@
       ],
       "regen_duration": [
         8
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_pupils_gift": {
       "secondary_stats": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_tome_of_aghanim": {
       "duration_minutes": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_repair_kit": {
       "duration": [
@@ -48023,7 +48945,11 @@
       ],
       "hp_regen": [
         25
-      ]
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": []
     },
     "item_mind_breaker": {
       "magic_damage": [
@@ -48034,7 +48960,11 @@
       ],
       "duration": [
         1.5
-      ]
+      ],
+      "AbilityCooldown": [
+        16
+      ],
+      "AbilityManaCost": []
     },
     "item_third_eye": {
       "truesight_radius": [
@@ -48045,7 +48975,9 @@
       ],
       "bonus_all_stats": [
         7
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_spell_prism": {
       "bonus_cooldown": [
@@ -48056,7 +48988,9 @@
       ],
       "mana_regen": [
         2
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_princes_knife": {
       "duration": [
@@ -48067,7 +49001,11 @@
       ],
       "projectile_bonus": [
         60
-      ]
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": []
     },
     "item_witless_shako": {
       "max_health": [
@@ -48075,7 +49013,9 @@
       ],
       "max_mana": [
         400
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_imp_claw": {
       "crit_multiplier": [
@@ -48083,7 +49023,11 @@
       ],
       "bonus_damage": [
         0
-      ]
+      ],
+      "AbilityCooldown": [
+        5
+      ],
+      "AbilityManaCost": []
     },
     "item_flicker": {
       "max_range": [
@@ -48094,7 +49038,11 @@
       ],
       "bonus_movement_speed": [
         35
-      ]
+      ],
+      "AbilityCooldown": [
+        5
+      ],
+      "AbilityManaCost": []
     },
     "item_spy_gadget": {
       "scan_cooldown_reduction": [
@@ -48108,7 +49056,9 @@
       ],
       "aura_range": [
         1200
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_spider_legs": {
       "turn_rate": [
@@ -48119,7 +49069,11 @@
       ],
       "duration": [
         12
-      ]
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": []
     },
     "item_helm_of_the_undying": {
       "duration": [
@@ -48130,7 +49084,11 @@
       ],
       "kill_radius": [
         1200
-      ]
+      ],
+      "AbilityCooldown": [
+        100
+      ],
+      "AbilityManaCost": []
     },
     "item_vambrace": {
       "bonus_primary_stat": [
@@ -48147,7 +49105,9 @@
       ],
       "bonus_attack_speed": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_horizon": {
       "knockback_distance": [
@@ -48155,12 +49115,20 @@
       ],
       "knockback_duration": [
         1
-      ]
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": []
     },
     "item_fusion_rune": {
       "duration": [
         50
-      ]
+      ],
+      "AbilityCooldown": [
+        120
+      ],
+      "AbilityManaCost": []
     },
     "item_ocean_heart": {
       "all_stats": [
@@ -48171,7 +49139,9 @@
       ],
       "water_mp_regen": [
         5
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_spark_of_courage": {
       "damage": [
@@ -48182,7 +49152,9 @@
       ],
       "health_pct": [
         50
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_broom_handle": {
       "melee_attack_range": [
@@ -48193,7 +49165,9 @@
       ],
       "bonus_armor": [
         4
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_trusty_shovel": {
       "bonus_health": [
@@ -48207,7 +49181,11 @@
       ],
       "kobold_duration": [
         60
-      ]
+      ],
+      "AbilityCooldown": [
+        70
+      ],
+      "AbilityManaCost": []
     },
     "item_nether_shawl": {
       "bonus_magic_resistance": [
@@ -48218,7 +49196,9 @@
       ],
       "bonus_armor": [
         2
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_dragon_scale": {
       "damage_per_sec": [
@@ -48226,7 +49206,9 @@
       ],
       "duration": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_essence_ring": {
       "bonus_int": [
@@ -48240,6 +49222,12 @@
       ],
       "health_gain_duration": [
         10
+      ],
+      "AbilityCooldown": [
+        25
+      ],
+      "AbilityManaCost": [
+        160
       ]
     },
     "item_clumsy_net": {
@@ -48251,7 +49239,11 @@
       ],
       "mana_regen": [
         0
-      ]
+      ],
+      "AbilityCooldown": [
+        25
+      ],
+      "AbilityManaCost": []
     },
     "item_enchanted_quiver": {
       "bonus_attack_range": [
@@ -48262,7 +49254,11 @@
       ],
       "active_bonus_attack_range": [
         350
-      ]
+      ],
+      "AbilityCooldown": [
+        4
+      ],
+      "AbilityManaCost": []
     },
     "item_ninja_gear": {
       "bonus_agility": [
@@ -48282,6 +49278,12 @@
       ],
       "secondary_application_radius": [
         0
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": [
+        100
       ]
     },
     "item_illusionsts_cape": {
@@ -48308,7 +49310,11 @@
       ],
       "bonus_str": [
         14
-      ]
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": []
     },
     "item_havoc_hammer": {
       "bonus_damage": [
@@ -48340,7 +49346,11 @@
       ],
       "nuke_str_dmg": [
         1.5
-      ]
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": []
     },
     "item_panic_button": {
       "bonus_health": [
@@ -48351,7 +49361,11 @@
       ],
       "health_threshold": [
         20
-      ]
+      ],
+      "AbilityCooldown": [
+        75
+      ],
+      "AbilityManaCost": []
     },
     "item_apex": {
       "primary_stat": [
@@ -48359,7 +49373,9 @@
       ],
       "primary_stat_universal": [
         24
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ballista": {
       "attack_range_bonus": [
@@ -48373,7 +49389,9 @@
       ],
       "bonus_damage": [
         50
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_woodland_striders": {
       "bonus_movement_speed": [
@@ -48387,7 +49405,11 @@
       ],
       "tree_duration": [
         15
-      ]
+      ],
+      "AbilityCooldown": [
+        20
+      ],
+      "AbilityManaCost": []
     },
     "item_demonicon": {
       "bonus_strength": [
@@ -48398,7 +49420,11 @@
       ],
       "summon_duration": [
         65
-      ]
+      ],
+      "AbilityCooldown": [
+        80
+      ],
+      "AbilityManaCost": []
     },
     "item_fallen_sky": {
       "bonus_strength": [
@@ -48445,7 +49471,11 @@
       ],
       "blink_damage_cooldown": [
         3
-      ]
+      ],
+      "AbilityCooldown": [
+        25
+      ],
+      "AbilityManaCost": []
     },
     "item_pirate_hat": {
       "gold_steal_base": [
@@ -48459,11 +49489,19 @@
       ],
       "gold_loss_reduction": [
         100
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ex_machina": {
       "bonus_armor": [
         0
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": [
+        350
       ]
     },
     "item_faded_broach": {
@@ -48472,7 +49510,9 @@
       ],
       "bonus_movement_speed": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_paladin_sword": {
       "bonus_damage": [
@@ -48489,7 +49529,9 @@
       ],
       "creep_lifesteal_reduction_pct": [
         40
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_minotaur_horn": {
       "duration": [
@@ -48500,7 +49542,11 @@
       ],
       "model_scale": [
         40
-      ]
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": []
     },
     "item_orb_of_destruction": {
       "armor_reduction": [
@@ -48514,7 +49560,9 @@
       ],
       "duration": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_the_leveller": {
       "bonus_attack_speed": [
@@ -48525,7 +49573,9 @@
       ],
       "demolish": [
         35
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_arcane_ring": {
       "bonus_intelligence": [
@@ -48542,7 +49592,11 @@
       ],
       "radius": [
         1200
-      ]
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": []
     },
     "item_titan_sliver": {
       "base_attack_damage": [
@@ -48552,7 +49606,9 @@
       "status_resistance": [
         10,
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_chipped_vest": {
       "hp_regen": [
@@ -48563,7 +49619,9 @@
       ],
       "damage_return_creep": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_elven_tunic": {
       "attack_speed": [
@@ -48574,7 +49632,9 @@
       ],
       "movment": [
         7
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_cloak_of_flames": {
       "armor": [
@@ -48591,7 +49651,9 @@
       ],
       "damage_illusions": [
         25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_trickster_cloak": {
       "evasion": [
@@ -48602,7 +49664,11 @@
       ],
       "duration": [
         6
-      ]
+      ],
+      "AbilityCooldown": [
+        25
+      ],
+      "AbilityManaCost": []
     },
     "item_possessed_mask": {
       "primary_attribute": [
@@ -48610,7 +49676,9 @@
       ],
       "lifesteal": [
         5
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_penta_edged_sword": {
       "damage": [
@@ -48630,7 +49698,9 @@
       ],
       "maim_duration": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_bullwhip": {
       "bonus_health_regen": [
@@ -48647,7 +49717,11 @@
       ],
       "bullwhip_delay_time": [
         0.3
-      ]
+      ],
+      "AbilityCooldown": [
+        11
+      ],
+      "AbilityManaCost": []
     },
     "item_psychic_headband": {
       "intelligence_pct": [
@@ -48661,7 +49735,11 @@
       ],
       "push_duration": [
         0.3
-      ]
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": []
     },
     "item_ceremonial_robe": {
       "bonus_mana": [
@@ -48675,7 +49753,9 @@
       ],
       "magic_resistance": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_quicksilver_amulet": {
       "base_movement": [
@@ -48695,7 +49775,9 @@
       ],
       "projectile_increase": [
         40
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_book_of_shadows": {
       "bonus_all_stats": [
@@ -48706,7 +49788,11 @@
       ],
       "duration": [
         4
-      ]
+      ],
+      "AbilityCooldown": [
+        8
+      ],
+      "AbilityManaCost": []
     },
     "item_giants_ring": {
       "bonus_strength": [
@@ -48723,7 +49809,9 @@
       ],
       "damage_radius": [
         100
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_stormcrafter": {
       "range": [
@@ -48746,7 +49834,11 @@
       ],
       "passive_movement_bonus": [
         0
-      ]
+      ],
+      "AbilityCooldown": [
+        6
+      ],
+      "AbilityManaCost": []
     },
     "item_mysterious_hat": {
       "bonus_health": [
@@ -48757,13 +49849,23 @@
       ],
       "manacost_reduction": [
         5
-      ]
+      ],
+      "AbilityCooldown": [
+        8
+      ],
+      "AbilityManaCost": []
     },
     "item_ascetic_cap": {
       "bonus_health": [
         0
       ],
       "hp_regen": [
+        0
+      ],
+      "AbilityCooldown": [
+        25
+      ],
+      "AbilityManaCost": [
         0
       ]
     },
@@ -48779,7 +49881,9 @@
       ],
       "aspd": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_heavy_blade": {
       "radius": [
@@ -48790,6 +49894,12 @@
       ],
       "attack_speed": [
         0
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": [
+        50
       ]
     },
     "item_unstable_wand": {
@@ -48801,6 +49911,12 @@
       ],
       "active_movespeed_pct": [
         20
+      ],
+      "AbilityCooldown": [
+        20
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_pogo_stick": {
@@ -48815,7 +49931,11 @@
       ],
       "bonus_mana": [
         0
-      ]
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": []
     },
     "item_paintball": {
       "movespeed": [
@@ -48826,6 +49946,12 @@
       ],
       "duration": [
         7
+      ],
+      "AbilityCooldown": [
+        20
+      ],
+      "AbilityManaCost": [
+        25
       ]
     },
     "item_seeds_of_serenity": {
@@ -48846,7 +49972,11 @@
       ],
       "duration": [
         8
-      ]
+      ],
+      "AbilityCooldown": [
+        35
+      ],
+      "AbilityManaCost": []
     },
     "item_lance_of_pursuit": {
       "bonus_mana": [
@@ -48869,7 +49999,9 @@
       ],
       "slow_pct_ranged": [
         8
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_occult_bracelet": {
       "bonus_all_stats": [
@@ -48886,7 +50018,9 @@
       ],
       "magic_resistance": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ogre_seal_totem": {
       "bonus_strength": [
@@ -48918,6 +50052,12 @@
       ],
       "max_bounces": [
         2
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": [
+        25
       ]
     },
     "item_harpoon": {
@@ -48965,12 +50105,22 @@
       ],
       "projectile_speed": [
         2000
+      ],
+      "AbilityCooldown": [
+        19
+      ],
+      "AbilityManaCost": [
+        50
       ]
     },
     "item_defiant_shell": {
       "counter_damage": [
         80
-      ]
+      ],
+      "AbilityCooldown": [
+        5
+      ],
+      "AbilityManaCost": []
     },
     "item_eye_of_the_vizier": {
       "cast_range_bonus": [
@@ -48983,7 +50133,9 @@
       ],
       "mana_reduction_pct": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_bottomless_chalice": {
       "duration": [
@@ -49009,7 +50161,11 @@
       ],
       "bonus_intellect": [
         40
-      ]
+      ],
+      "AbilityCooldown": [
+        0.5
+      ],
+      "AbilityManaCost": []
     },
     "item_dagger_of_ristul": {
       "aspd": [
@@ -49023,14 +50179,31 @@
       ],
       "health_sacrifice": [
         0
-      ]
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": []
     },
     "item_ofrenda": {
       "speed": [
         1000
+      ],
+      "AbilityCooldown": [
+        3
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
-    "item_ofrenda_shovel": {},
+    "item_ofrenda_shovel": {
+      "AbilityCooldown": [
+        8
+      ],
+      "AbilityManaCost": [
+        0
+      ]
+    },
     "item_ofrenda_pledge": {
       "radius": [
         600
@@ -49040,6 +50213,12 @@
       ],
       "linger_duration": [
         5
+      ],
+      "AbilityCooldown": [
+        0.5
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_muertas_gun": {
@@ -49084,13 +50263,34 @@
       ],
       "health_pct_penalty": [
         70
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": [
+        160
       ]
     },
-    "item_tier1_token": {},
-    "item_tier2_token": {},
-    "item_tier3_token": {},
-    "item_tier4_token": {},
-    "item_tier5_token": {},
+    "item_tier1_token": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
+    "item_tier2_token": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
+    "item_tier3_token": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
+    "item_tier4_token": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
+    "item_tier5_token": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
     "item_vindicators_axe": {
       "bonus_attack_speed": [
         35
@@ -49103,7 +50303,9 @@
       ],
       "bonus_slow_resist": [
         20
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_duelist_gloves": {
       "bonus_attack_speed": [
@@ -49114,7 +50316,9 @@
       ],
       "radius": [
         1200
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ancient_guardian": {
       "extra_bonus_damage": [
@@ -49125,7 +50329,9 @@
       ],
       "radius": [
         2000
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_safety_bubble": {
       "shield": [
@@ -49136,7 +50342,9 @@
       ],
       "bonus_hp_regen": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_whisper_of_the_dread": {
       "vision_penalty": [
@@ -49147,7 +50355,9 @@
       ],
       "bonus_mana": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_nemesis_curse": {
       "debuff_self": [
@@ -49161,7 +50371,9 @@
       ],
       "bonus_damage": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_avianas_feather": {
       "evasion": [
@@ -49172,7 +50384,9 @@
       ],
       "flight_threshold": [
         30
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_unwavering_condition": {
       "max_health": [
@@ -49180,7 +50394,9 @@
       ],
       "magic_resist": [
         95
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_dandelion_amulet": {
       "move_speed": [
@@ -49194,7 +50410,11 @@
       ],
       "min_damage": [
         75
-      ]
+      ],
+      "AbilityCooldown": [
+        12
+      ],
+      "AbilityManaCost": []
     },
     "item_martyrs_plate": {
       "duration": [
@@ -49211,12 +50431,20 @@
       ],
       "hp_regen": [
         7
-      ]
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": []
     },
     "item_gossamer_cape": {
       "movement_speed": [
         0
-      ]
+      ],
+      "AbilityCooldown": [
+        6
+      ],
+      "AbilityManaCost": []
     },
     "item_light_collector": {
       "health_regen": [
@@ -49242,7 +50470,11 @@
       ],
       "duration": [
         2.5
-      ]
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": []
     },
     "item_rattlecage": {
       "radius": [
@@ -49271,7 +50503,9 @@
       ],
       "bonus_armor": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_doubloon": {
       "conversion_pct": [
@@ -49285,7 +50519,11 @@
       ],
       "regen_bonus_pct": [
         0
-      ]
+      ],
+      "AbilityCooldown": [
+        5
+      ],
+      "AbilityManaCost": []
     },
     "item_roshans_banner": {
       "duration": [
@@ -49320,12 +50558,20 @@
       ],
       "max_level": [
         3
-      ]
+      ],
+      "AbilityCooldown": [
+        1
+      ],
+      "AbilityManaCost": []
     },
     "item_black_grimoire": {
       "xp_per_charge": [
         200
-      ]
+      ],
+      "AbilityCooldown": [
+        420
+      ],
+      "AbilityManaCost": []
     },
     "item_grisgris": {
       "death_gold_lost_reduction_pct": [
@@ -49333,7 +50579,9 @@
       ],
       "gold_tick_interval": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_vast": {
       "attack_range": [
@@ -49350,7 +50598,9 @@
         -4,
         -6,
         -8
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_quickened": {
       "movement_speed": [
@@ -49370,7 +50620,9 @@
         0,
         0,
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_audacious": {
       "attack_speed": [
@@ -49381,7 +50633,9 @@
       ],
       "incoming_damage": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_mystical": {
       "mana_regen": [
@@ -49401,7 +50655,9 @@
         0,
         0,
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_alert": {
       "bonus_attack_speed": [
@@ -49421,7 +50677,9 @@
         0,
         0,
         80
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_brawny": {
       "health_bonus": [
@@ -49441,7 +50699,9 @@
         0,
         0,
         25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_tough": {
       "bonus_damage": [
@@ -49461,7 +50721,9 @@
         0,
         0,
         40
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_feverish": {
       "cooldown_reduction": [
@@ -49469,12 +50731,16 @@
       ],
       "max_mana": [
         20
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_fleetfooted": {
       "movespeed": [
         115
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_crude": {
       "health_restoration": [
@@ -49489,7 +50755,9 @@
       ],
       "intelligence_pct": [
         -9
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_boundless": {
       "bonus_attack_range": [
@@ -49497,7 +50765,9 @@
       ],
       "bonus_cast_range": [
         275
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_wise": {
       "bonus_xpm": [
@@ -49505,7 +50775,9 @@
       ],
       "max_mana_pct": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_timeless": {
       "debuff_amp": [
@@ -49515,7 +50787,9 @@
       "spell_amp": [
         5,
         12
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_greedy": {
       "bonus_gpm": [
@@ -49529,7 +50803,9 @@
       "bonus_damage": [
         -35,
         -70
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_vampiric": {
       "attack_lifesteal": [
@@ -49540,7 +50816,9 @@
       ],
       "bonus_night_vision": [
         300
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_keen_eyed": {
       "cast_range_bonus": [
@@ -49557,7 +50835,9 @@
         10,
         12,
         14
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_evolved": {
       "primary_stat": [
@@ -49565,7 +50845,9 @@
       ],
       "primary_stat_universal": [
         24
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_titanic": {
       "base_attack_damage": [
@@ -49580,7 +50862,9 @@
       ],
       "attack_speed": [
         -9
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_unrelenting_eye": {
       "max_slow_res": [
@@ -49591,7 +50875,9 @@
       ],
       "status_res_pct_increase_per_hero": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_mana_draught": {
       "mana_restore": [
@@ -49605,7 +50891,11 @@
       ],
       "water_acceleration": [
         30
-      ]
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": []
     },
     "item_rippers_lash": {
       "thorn_area": [
@@ -49619,6 +50909,12 @@
       ],
       "duration": [
         10
+      ],
+      "AbilityCooldown": [
+        25
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_crippling_crossbow": {
@@ -49636,6 +50932,12 @@
       ],
       "projectile_speed": [
         1400
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": [
+        50
       ]
     },
     "item_gale_guard": {
@@ -49650,7 +50952,11 @@
       ],
       "slow_resist": [
         50
-      ]
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": []
     },
     "item_gunpowder_gauntlets": {
       "bonus_damage": [
@@ -49661,7 +50967,11 @@
       ],
       "splash_pct": [
         50
-      ]
+      ],
+      "AbilityCooldown": [
+        10
+      ],
+      "AbilityManaCost": []
     },
     "item_searing_signet": {
       "damage_threshold": [
@@ -49681,7 +50991,9 @@
       ],
       "max_range": [
         2000
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_serrated_shiv": {
       "proc_chance": [
@@ -49692,7 +51004,11 @@
       ],
       "hp_dmg_rosh": [
         200
-      ]
+      ],
+      "AbilityCooldown": [
+        1.5
+      ],
+      "AbilityManaCost": []
     },
     "item_polliwog_charm": {
       "regen_boost": [
@@ -49703,7 +51019,11 @@
       ],
       "duration": [
         14
-      ]
+      ],
+      "AbilityCooldown": [
+        45
+      ],
+      "AbilityManaCost": []
     },
     "item_magnifying_monocle": {
       "bonus_attack_range": [
@@ -49717,6 +51037,12 @@
       ],
       "damage_threshold": [
         25
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_pyrrhic_cloak": {
@@ -49728,6 +51054,12 @@
       ],
       "damage_time": [
         6
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_madstone_bundle": {
@@ -49753,7 +51085,9 @@
       ],
       "die_time": [
         20
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_miniboss_minion_summoner": {
       "disappear_time": [
@@ -49785,7 +51119,11 @@
       ],
       "duration": [
         20
-      ]
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": []
     },
     "item_kobold_cup": {
       "movespeed_pct": [
@@ -49796,12 +51134,20 @@
       ],
       "buff_duration": [
         6
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": [
+        40
       ]
     },
     "item_dormant_curio": {
       "item_potency": [
         30
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_sisters_shroud": {
       "hp_threshold": [
@@ -49815,7 +51161,9 @@
       ],
       "max_duration": [
         5
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_jidi_pollen_bag": {
       "health_regen_loss": [
@@ -49832,7 +51180,11 @@
       ],
       "damage_interval": [
         1
-      ]
+      ],
+      "AbilityCooldown": [
+        25
+      ],
+      "AbilityManaCost": []
     },
     "item_outworld_staff": {
       "invuln_duration": [
@@ -49840,6 +51192,12 @@
       ],
       "self_dmg_pct": [
         5
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": [
+        65
       ]
     },
     "item_dezun_bloodrite": {
@@ -49848,7 +51206,9 @@
       ],
       "aoe_pct": [
         20
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_giant_maul": {
       "crit_multiplier": [
@@ -49865,14 +51225,23 @@
       ],
       "debuff_duration": [
         3
-      ]
+      ],
+      "AbilityCooldown": [
+        15
+      ],
+      "AbilityManaCost": []
     },
     "item_divine_regalia": {
       "outgoing_damage": [
         20
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
-    "item_divine_regalia_broken": {},
+    "item_divine_regalia_broken": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    },
     "item_enhancement_fierce": {
       "movement_speed": [
         30
@@ -49882,7 +51251,9 @@
       ],
       "bonus_damage": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_dominant": {
       "attack_speed": [
@@ -49893,7 +51264,9 @@
       ],
       "bonus_health": [
         205
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_restorative": {
       "bonus_mana": [
@@ -49904,7 +51277,9 @@
       ],
       "heal_amp": [
         10
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_thick": {
       "bonus_health": [
@@ -49915,17 +51290,23 @@
       ],
       "bonus_armor": [
         7
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_curious": {
       "item_potency": [
         30
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_furion_gold_bag": {
       "gold_bag_duration": [
         15
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_specialists_array": {
       "all_stats": [
@@ -49957,6 +51338,12 @@
       ],
       "proc_dmg_pct_primary_tooltip": [
         100
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_hydras_breath": {
@@ -50004,6 +51391,12 @@
       ],
       "poison_damage_per_second": [
         2.5
+      ],
+      "AbilityCooldown": [
+        0
+      ],
+      "AbilityManaCost": [
+        0
       ]
     },
     "item_weighted_dice": {
@@ -50012,7 +51405,9 @@
       ],
       "bonus_max_damage": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_ash_legion_shield": {
       "slow": [
@@ -50026,7 +51421,11 @@
       ],
       "duration": [
         6
-      ]
+      ],
+      "AbilityCooldown": [
+        40
+      ],
+      "AbilityManaCost": []
     },
     "item_riftshadow_prism": {
       "outgoing_damage": [
@@ -50040,7 +51439,11 @@
       ],
       "health_cost": [
         8
-      ]
+      ],
+      "AbilityCooldown": [
+        27
+      ],
+      "AbilityManaCost": []
     },
     "item_metamorphic_mandible": {
       "duration": [
@@ -50057,7 +51460,11 @@
       ],
       "armor_decrease": [
         45
-      ]
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": []
     },
     "item_idol_of_screeauk": {
       "duration": [
@@ -50068,7 +51475,11 @@
       ],
       "evasion": [
         35
-      ]
+      ],
+      "AbilityCooldown": [
+        30
+      ],
+      "AbilityManaCost": []
     },
     "item_flayers_bota": {
       "duration": [
@@ -50082,7 +51493,11 @@
       ],
       "death_radius": [
         1500
-      ]
+      ],
+      "AbilityCooldown": [
+        65
+      ],
+      "AbilityManaCost": []
     },
     "item_spellslinger": {
       "mana_pct": [
@@ -50093,7 +51508,9 @@
       ],
       "restore_tickrate": [
         2
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_prophets_pendulum": {
       "delay_pct": [
@@ -50104,7 +51521,9 @@
       ],
       "damage_interval": [
         1
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_stonefeather_satchel": {
       "knockback_resistance": [
@@ -50115,7 +51534,11 @@
       ],
       "rocks_armor": [
         3
-      ]
+      ],
+      "AbilityCooldown": [
+        6
+      ],
+      "AbilityManaCost": []
     },
     "item_enchanters_bauble": {
       "enchantment_bonus_base": [
@@ -50126,7 +51549,9 @@
       ],
       "current_bonus": [
         0
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_harmonizer": {
       "manacost_reduction": [
@@ -50134,7 +51559,9 @@
       ],
       "spell_amp": [
         6
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_conjurers_catalyst": {
       "duration": [
@@ -50154,12 +51581,16 @@
       ],
       "cooldown": [
         0.1
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_vital": {
       "health_regen": [
         2.25
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_hulking": {
       "max_health": [
@@ -50170,7 +51601,9 @@
       ],
       "attack_speed": [
         -30
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_manic": {
       "bat_reduce": [
@@ -50181,7 +51614,9 @@
       ],
       "vision_reduce": [
         20
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_foragers_kit": {
       "gold_amount": [
@@ -50201,7 +51636,11 @@
       ],
       "old_destroy_radius": [
         2500
-      ]
+      ],
+      "AbilityCooldown": [
+        60
+      ],
+      "AbilityManaCost": []
     },
     "item_foragers_health": {
       "buff_duration": [
@@ -50215,7 +51654,9 @@
       ],
       "bonus_damage": [
         2
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_foragers_stats": {
       "bonus_stat": [
@@ -50226,7 +51667,9 @@
       ],
       "bonus_move_speed": [
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_foragers_mana": {
       "bonus_int": [
@@ -50237,7 +51680,9 @@
       ],
       "mana_pct": [
         5
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_chasm_stone": {
       "bonus_health": [
@@ -50245,12 +51690,16 @@
       ],
       "aoe_bonus": [
         40
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_partisans_brand": {
       "bonus_damage_pct": [
         9
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
     "item_enhancement_nimble": {
       "movespeed_pct": [
@@ -50267,9 +51716,14 @@
         1.5,
         2.25,
         3
-      ]
+      ],
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
     },
-    "item_tidehunter_fish": {}
+    "item_tidehunter_fish": {
+      "AbilityCooldown": [],
+      "AbilityManaCost": []
+    }
   },
   "neutrals": {
     "npc_dota_neutral_kobold": {

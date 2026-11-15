@@ -1,0 +1,18 @@
+{
+  "patch": "7.41f",
+  "quality": "reviewed-topology-provisional-evolution-order",
+  "sources": [
+    "https://www.dota2.com/datafeed/patchnotes?version=7.38&language=english",
+    "https://www.dota2.com/datafeed/patchnotes?version=7.41&language=english",
+    "https://whanyu1212.github.io/gem-dota/experimental/map-annotations"
+  ],
+  "note": "Camp identity cross-checked by all 28 centers against the 7.41 replay catalog (offset 16384, error <1 world unit). One unit evolves each 300s when unblocked. Unknown upgrade order is enumerated, not asserted to be uniformly random in-game. Blocked/evolving/stacked states still require observation. Stream movement bonuses are NOT inferred from these points.",
+  "camps": {
+    "neutralcamp_good_4": { "initialTier": 1, "maxTier": 3 },
+    "neutralcamp_good_11": { "initialTier": 1, "maxTier": 2 },
+    "neutralcamp_good_14": { "initialTier": 0, "maxTier": 2 },
+    "neutralcamp_evil_6": { "initialTier": 1, "maxTier": 3 },
+    "neutralcamp_evil_14": { "initialTier": 1, "maxTier": 2 },
+    "neutralcamp_evil_11": { "initialTier": 0, "maxTier": 2 }
+  }
+}

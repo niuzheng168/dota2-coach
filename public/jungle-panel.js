@@ -41,6 +41,7 @@ export class JunglePanel {
   reset() {
     clearTimeout(this.controlTimer);
     this.stopVoice(); this.state = null; this.selected = null;
+    this.renderedPlanAt = null;
     $('jungleVoice').checked = false; $('jungleEnabled').checked = false;
     $('jungleEnabled').disabled = true; $('jungleRequest').disabled = true; $('jungleCleared').disabled = true;
     $('jungleBody').hidden = true;
@@ -101,21 +102,37 @@ export class JunglePanel {
     }));
     $('jungleCamp').value = this.selected || '';
     const route = state.route;
+    const scrollTop = this.renderedPlanAt === route?.plannedAt ? $('jungleSteps').scrollTop : 0;
     $('jungleSteps').replaceChildren();
     if (route) {
-      $('jungleSummary').textContent = `约 ${integer(route.seconds)} 秒 · ${integer(route.gold)} 金 / ${integer(route.xp)} 经验（期望）`;
+      const uniqueCamps = new Set(route.steps.map(step => step.campId)).size;
+      $('jungleSummary').textContent = `预计总金钱 ${integer(route.gold)} 金 · ${integer(route.horizonSeconds)} 秒窗口内金钱优先\n` +
+        `约 ${integer(route.seconds)} 秒 · ${route.steps.length} 次清野 / ${uniqueCamps} 个野点 · ${integer(route.xp)} 经验（仅展示）`;
+      const visited = new Set();
+      let cumulativeGold = 0;
       for (const step of route.steps) {
         const item = document.createElement('li');
-        const title = document.createElement('strong'); title.textContent = `${step.label} · ${clock(step.arrival)} 到达`;
+        item.dataset.campId = step.campId;
+        item.dataset.gold = String(step.gold);
+        const title = document.createElement('strong');
+        title.textContent = `${step.label}${visited.has(step.campId) ? ' · 回访' : ''} · ${clock(step.arrival)} 到达`;
+        visited.add(step.campId);
+        cumulativeGold += step.gold;
+        const money = document.createElement('span');
+        money.className = 'jungle-step-gold';
+        money.textContent = `预计 +${integer(step.gold)} 金 · 累计 ${integer(cumulativeGold)} 金`;
         const detail = document.createElement('span');
         detail.textContent = `路程 ${Math.ceil(step.travelSeconds)} 秒 · 清野 ${Math.ceil(step.clearRange[0])}–${Math.ceil(step.clearRange[1])} 秒` +
           ` · 剩 HP 约 ${integer(step.healthAfter)} / MP ${integer(step.manaAfter)}` +
           (step.waitSeconds ? ` · 框外等待 ${Math.ceil(step.waitSeconds)} 秒` : '');
         const spells = document.createElement('small');
-        spells.textContent = Object.keys(step.casts).length ? `技能计划：${Object.entries(step.casts).map(([k, v]) => `${k} ×${v}`).join('，')}` : '仅普攻/被动';
-        item.append(title, detail, spells); $('jungleSteps').append(item);
+        spells.textContent = (step.spawnAt != null ? `假定 ${clock(step.spawnAt)} 刷新 · ` : '') +
+          (Object.keys(step.casts).length ? `技能计划：${Object.entries(step.casts).map(([k, v]) => `${k} ×${v}`).join('，')}` : '仅普攻/被动');
+        item.append(title, money, detail, spells); $('jungleSteps').append(item);
       }
     }
+    $('jungleSteps').scrollTop = scrollTop;
+    this.renderedPlanAt = route?.plannedAt ?? null;
     $('jungleWarnings').replaceChildren(...(route?.warnings || stats?.warnings || []).map(text => {
       const li = document.createElement('li'); li.textContent = text; return li;
     }));
@@ -149,11 +166,27 @@ export class JunglePanel {
         node.addEventListener('click', () => { this.selected = camp.id; $('jungleCamp').value = camp.id; this.draw(); });
       }
     }
-    if (this.fresh()) (this.state.route?.steps || []).forEach((step, i) => {
-      const [x, y] = project(step.position);
-      const label = element('text', { x: x + 7, y: y - 7, fill: '#f5b942', 'font-size': 12, 'font-weight': 700 });
-      label.textContent = String(i + 1);
-    });
+    if (this.fresh()) {
+      const stops = new Map();
+      (this.state.route?.steps || []).forEach((step, i) => {
+        if (!stops.has(step.campId)) stops.set(step.campId, { position: step.position, visits: [] });
+        stops.get(step.campId).visits.push(i + 1);
+        if (step.waitAt) {
+          const [x, y] = project(step.waitAt);
+          const marker = element('path', { d: `M${x - 2} ${y - 2}h4v4h-4z`, fill: '#a78bfa' });
+          const title = document.createElementNS(svgNS, 'title');
+          title.textContent = `第 ${i + 1} 步：在此框外等待约 ${Math.ceil(step.waitSeconds)} 秒`;
+          marker.append(title);
+        }
+      });
+      for (const { position, visits } of stops.values()) {
+        const [x, y] = project(position);
+        const label = element('text', { x: x + 7, y: y - 7, fill: '#f5b942', 'font-size': 10, 'font-weight': 700 });
+        label.textContent = visits.slice(0, 3).join('/') + (visits.length > 3 ? '/…' : '');
+        const title = document.createElementNS(svgNS, 'title');
+        title.textContent = `路线第 ${visits.join('、')} 步`; label.append(title);
+      }
+    }
     if (this.state.player) {
       const [cx, cy] = project(this.state.player.position);
       element('circle', { cx, cy, r: 5, fill: '#fff', stroke: '#4f9cff', 'stroke-width': 2 });

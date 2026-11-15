@@ -48,6 +48,10 @@ export function simulateClear(
     .filter(a => a.model !== null);
   const swipes = learned.find(a => a.name === 'ursa_fury_swipes');
   const swipeDamage = swipes ? levelValue(h?.abilities[swipes.name]?.values.damage_per_stack, swipes.level) : 0;
+  const glaive = learned.find(a => a.name === 'luna_moon_glaive');
+  const glaiveValues = glaive && h?.abilities[glaive.name]?.values;
+  const bounces = glaiveValues ? levelValue(glaiveValues.bounces, glaive!.level) : 0;
+  const retention = glaiveValues ? 1 - levelValue(glaiveValues.damage_reduction_percent, glaive!.level) / 100 : 0;
   const helix = learned.find(a => a.name === 'axe_counter_helix');
   const helixValues = helix && h?.abilities[helix.name]?.values;
   const helixAttacks = helixValues ? levelValue(helixValues.trigger_attacks, helix!.level) : 0;
@@ -81,6 +85,18 @@ export function simulateClear(
       target.stacks++;
       damage(target, stats.damage + stats.creepDamage + target.stacks * swipeDamage, 'physical');
       for (const creep of alive.slice(1)) damage(creep, stats.damage * stats.cleave, 'physical');
+      // Moon Glaives are attack-derived physical damage, NOT the default damage
+      // type of a passive's datafeed entry. Bounce from the raw attack value so
+      // each target's own armor applies exactly once, without extra attack modifiers.
+      const struck = new Set([target]);
+      let previous = target;
+      for (let bounce = 1; bounce <= bounces; bounce++) {
+        const targets = creeps.filter(c => c.hp > 0 && c !== previous);
+        if (!targets.length) break;
+        const next = targets.find(c => !struck.has(c)) ?? targets[0];
+        damage(next, stats.damage * retention ** bounce, 'physical');
+        struck.add(next); previous = next;
+      }
       nextAttack += tax / stats.attacksPerSecond;
     }
     alive = creeps.filter(c => c.hp > 0);

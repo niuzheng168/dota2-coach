@@ -7,8 +7,11 @@ export function insideCamp(point: Point, camp: Camp): boolean {
 }
 export const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 export function nextSpawn(after: number, map: MapData = MAP): number {
-  return after < map.spawn.first ? map.spawn.first
-    : map.spawn.first + (Math.floor((after - map.spawn.first) / map.spawn.interval) + 1) * map.spawn.interval;
+  // Treat sub-microsecond rounding at a minute as that minute, not a free extra
+  // pack immediately after a simulated clear ending at 659.9999999999999.
+  const at = after + 1e-6;
+  return at < map.spawn.first ? map.spawn.first
+    : map.spawn.first + (Math.floor((at - map.spawn.first) / map.spawn.interval) + 1) * map.spawn.interval;
 }
 class Heap {
   data: [number, number][] = [];

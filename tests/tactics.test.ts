@@ -10,10 +10,12 @@ import { burstAbility } from '../src/tactics/skills.ts';
 import { estimateCamp, simulateClear } from '../src/tactics/clear-model.ts';
 import { GridNavigation, insideCamp, NAVIGATION, nextSpawn } from '../src/tactics/map-data.ts';
 import { CampTracker, planJungleRoute } from '../src/tactics/jungle.ts';
+import { travelToCamp } from '../src/tactics/travel.ts';
+import { RULES } from '../src/tactics/rules.ts';
 import { TacticalEngine } from '../src/tactics/index.ts';
 import { GsiCapture, sanitizeGsiCapture } from '../src/tactics/capture.ts';
 import { parseKeyValues, numbers } from '../scripts/lib/valve-kv.ts';
-import type { CombatData, MapData, PlayerSnapshot, SelfStats } from '../src/tactics/types.ts';
+import type { Camp, CombatData, MapData, PlayerSnapshot, SelfStats } from '../src/tactics/types.ts';
 
 const camp = MAP.camps.find(c => c.id === 'neutralcamp_good_5')!;
 function player(overrides: Partial<PlayerSnapshot> = {}): PlayerSnapshot {
@@ -175,6 +177,49 @@ test('Ursa fury swipes accumulate on the attacked target instead of being a cons
   assert.ok(stacked.seconds < base.seconds * 0.6);
 });
 
+test('Luna moon glaives speed up packs, scale with level, and cannot bounce to a lone surviving target itself', () => {
+  const plain = player({ hero: 'npc_dota_hero_luna', abilities: [] });
+  const withGlaive = (level: number) => ({ ...plain, abilities: [{ name: 'luna_moon_glaive', level, cooldown: 0 }] });
+  const pack = { ...dummyComposition, units: { dummy: 3 } };
+  const base = simulateClear(plain, dummyStats, pack, 600, resources, 1, dummyData);
+  const low = simulateClear(withGlaive(1), dummyStats, pack, 600, resources, 1, dummyData);
+  const high = simulateClear(withGlaive(4), dummyStats, pack, 600, resources, 1, dummyData);
+  assert.ok(high.seconds < low.seconds && low.seconds < base.seconds);
+  const single = simulateClear(withGlaive(4), dummyStats, dummyComposition, 600, resources, 1, dummyData);
+  assert.ok(Math.abs(single.seconds - 10.1) < 0.11);
+  const stats = calculateSelfStats(withGlaive(4))!;
+  assert.ok(!stats.warnings.some(w => w.includes('未建模技能：luna_moon_glaive')));
+  assert.ok(stats.warnings.some(w => w.includes('弹射距离')));
+});
+
+test('moon glaive bounces apply each target armor, ignore magic resistance, and do not copy quelling damage', () => {
+  const p = player({ hero: 'npc_dota_hero_luna', abilities: [{ name: 'luna_moon_glaive', level: 4, cooldown: 0 }] });
+  const data = { ...dummyData, neutrals: {
+    front: { ...unit, name: 'front', health: 60 },
+    back: { ...unit, name: 'back', health: 40, armor: 10, magicResistance: 1 },
+  } };
+  const pack = { ...dummyComposition, units: { front: 1, back: 1 } };
+  // Focus order is lowest HP first; make both initial HP equal so front is attacked.
+  data.neutrals.front.health = 40;
+  const result = simulateClear(p, dummyStats, pack, 600, resources, 1, data);
+  assert.ok(Math.abs(result.seconds - 1.1) < 0.11); // 100 × 0.65 × 0.625 kills the second unit.
+  data.neutrals.front.health = data.neutrals.back.health = 45;
+  const quelling = simulateClear(p, { ...dummyStats, creepDamage: 100 }, pack, 600, resources, 1, data);
+  assert.ok(Math.abs(quelling.seconds - 2.1) < 0.11, 'extra creep damage must not be added to the bounce');
+});
+
+test('moon glaives can return to a previously hit living unit after other eligible targets have been hit', () => {
+  const luna = COMBAT.heroes.npc_dota_hero_luna;
+  const data = { ...dummyData, heroes: { ...COMBAT.heroes, npc_dota_hero_luna: {
+    ...luna, abilities: { ...luna.abilities, luna_moon_glaive: {
+      ...luna.abilities.luna_moon_glaive, values: { bounces: [3], damage_reduction_percent: [0] },
+    } },
+  } } };
+  const p = player({ hero: 'npc_dota_hero_luna', abilities: [{ name: 'luna_moon_glaive', level: 1, cooldown: 0 }] });
+  const result = simulateClear(p, dummyStats, { ...dummyComposition, units: { dummy: 2 } }, 600, resources, 1, data);
+  assert.ok(Math.abs(result.seconds - 5.1) < 0.11, 'two targets receive primary + three separate bounces per attack');
+});
+
 test('neutral time upgrades and camp uncertainty envelope affect rewards and safety', () => {
   const p = player(), s = calculateSelfStats(p)!;
   const early = estimateCamp(p, s, 'medium', 100, { ...resources, health: 2500 });
@@ -182,6 +227,15 @@ test('neutral time upgrades and camp uncertainty envelope affect rewards and saf
   assert.ok(late.gold > early.gold); assert.ok(late.xp > early.xp);
   assert.ok(early.clearRange[0] <= early.clearRange[1]);
   assert.ok(late.damageTaken > early.damageTaken);
+});
+
+test('expected camp gold comes from the unit bounties in each composition, not the number of visits', () => {
+  const samples = COMPOSITIONS.filter(c => c.kind === 'small');
+  const expectedGold = samples.reduce((sum, c) => sum +
+    Object.entries(c.units).reduce((total, [name, count]) => total + COMBAT.neutrals[name].gold * count, 0), 0) / samples.length;
+  const result = estimateCamp(player(), { ...dummyStats, damage: 10000 }, 'small', 100, { ...resources, health: 2500 });
+  assert.ok(result.feasible);
+  assert.equal(result.gold, expectedGold);
 });
 
 test('grid paths avoid walls and diagonal corner cutting, blocked endpoints fail closed', () => {
@@ -207,11 +261,21 @@ test('snapshot camp centers are traversable and paths use actual grid rather tha
 test('route search is deterministic, own-side only, bounded, and carries health/mana through steps', () => {
   const p = player(), s = calculateSelfStats(p)!, tracker = new CampTracker();
   const a = planJungleRoute(p, s, tracker), b = planJungleRoute(p, s, tracker);
-  assert.deepEqual(a, b); assert.equal(a.status, 'ready'); assert.equal(a.steps.length, 3);
+  assert.deepEqual(a, b); assert.equal(a.status, 'ready'); assert.ok(a.steps.length > 3);
   assert.ok(a.seconds <= 180);
+  assert.equal(a.horizonSeconds, 180);
+  assert.equal(a.score, a.gold);
+  const cleared = new Map<string, number>();
+  let previousFinish = p.clock;
   for (const step of a.steps) {
     assert.ok(step.campId.includes('_good_')); assert.ok(step.healthAfter >= p.maxHealth * 0.3);
     assert.ok(step.manaAfter >= 0); assert.ok(step.finish >= step.arrival);
+    assert.ok(Math.abs(step.arrival - previousFinish - step.travelSeconds - step.waitSeconds) < 1e-6);
+    if (cleared.has(step.campId)) {
+      assert.ok(step.spawnAt! >= nextSpawn(cleared.get(step.campId)!));
+      assert.ok(step.arrival >= step.spawnAt!);
+    }
+    cleared.set(step.campId, step.finish); previousFinish = step.finish;
   }
   assert.equal(tracker.cleared.size, 0, 'search must not mutate observed state');
   assert.equal(planJungleRoute(player({ health: 100 }), s, tracker).status, 'recover');
@@ -219,6 +283,7 @@ test('route search is deterministic, own-side only, bounded, and carries health/
 
 test('spawns are strict next-minute events; self-blocking and gaps do not produce false refresh evidence', () => {
   assert.equal(nextSpawn(0), 60); assert.equal(nextSpawn(60), 120); assert.equal(nextSpawn(59.99), 60);
+  assert.equal(nextSpawn(120 - 1e-10), 180, 'floating-point rounding must not create a same-tick second pack');
   const tracker = new CampTracker(), p = player({ clock: 59 }), s = calculateSelfStats(p)!;
   tracker.markCleared(camp.id, 50);
   tracker.ingest(p, s); tracker.ingest({ ...p, clock: 60 }, s);
@@ -230,13 +295,179 @@ test('manual cleared camp can be revisited after a spawn, not by waiting in its 
   const p = player({ clock: 650 }), s = calculateSelfStats(p)!;
   const single: MapData = { ...MAP, camps: [camp] };
   const tracker = new CampTracker(single); tracker.markCleared(camp.id, 645);
-  assert.equal(planJungleRoute(p, s, tracker).steps.length, 0);
+  const fromInside = planJungleRoute(p, s, tracker);
+  assert.ok(fromInside.steps.length > 0);
+  assert.ok(fromInside.steps[0].waitSeconds > 0 && fromInside.steps[0].waitAt);
+  assert.ok(!insideCamp(fromInside.steps[0].waitAt!, camp), 'first leave the box, then wait and return');
   const outside = { ...p, position: { x: camp.bounds.max.x + 200, y: camp.y } };
   const direct = { path: (from: { x: number; y: number }, to: { x: number; y: number }) =>
     ({ distance: Math.hypot(from.x - to.x, from.y - to.y), points: [from, to] }) };
   const plan = planJungleRoute(outside, s, tracker, direct);
   assert.equal(plan.status, 'ready'); assert.ok(plan.steps[0].waitSeconds > 0);
   assert.equal(plan.steps[0].availability, 'respawn-assumed');
+  assert.ok(plan.steps[0].arrival >= 660);
+});
+
+const directNavigation = { path: (from: { x: number; y: number }, to: { x: number; y: number }) =>
+  ({ distance: Math.hypot(from.x - to.x, from.y - to.y), points: [from, to] }) };
+const makeCamp = (id: string, x: number, kind: Camp['kind'] = 'small'): Camp => ({
+  id, label: id, team: 'radiant', kind, x, y: 0,
+  bounds: { min: { x: x - 40, y: -40 }, max: { x: x + 40, y: 40 } },
+});
+const fastEstimate: typeof estimateCamp = (_p, _s, _kind, start, before) => ({
+  seconds: 2, clearRange: [2, 2], healthAfter: before.health - 10, manaAfter: before.mana - 20,
+  damageTaken: 10, gold: 100, xp: 100, readyAt: { ...before.readyAt, test_spell: start + 20 }, casts: {}, feasible: true,
+});
+
+test('a three-camp circuit farms three refresh cycles within the horizon, with resources carried across all nine visits', () => {
+  const camps = [makeCamp('a', 0), makeCamp('b', 300), makeCamp('c', 600)];
+  const tracker = new CampTracker({ ...MAP, camps });
+  const p = player({ position: camps[0], health: 1000, maxHealth: 1000, mana: 1000, maxMana: 1000, abilities: [] });
+  const result = planJungleRoute(p, dummyStats, tracker, directNavigation, fastEstimate);
+  assert.equal(result.steps.length, 9);
+  assert.equal(result.steps.at(-1)!.healthAfter, 910);
+  assert.equal(result.steps.at(-1)!.manaAfter, 820);
+  assert.equal(result.gold, 900);
+  for (const camp of camps) {
+    const visits = result.steps.filter(step => step.campId === camp.id);
+    assert.equal(visits.length, 3);
+    assert.deepEqual(visits.map(step => step.spawnAt), [null, 660, 720]);
+  }
+  assert.ok(result.steps.some(step => step.waitSeconds > 12), 'a useful refresh wait is no longer dropped at 12 seconds');
+  assert.ok(result.steps.at(-1)!.finish <= p.clock + RULES.horizon);
+  assert.equal(tracker.cleared.size, 0);
+});
+
+test('visit count responds to clearing speed instead of being filled to a fixed route length', () => {
+  const camps = [makeCamp('a', 0), makeCamp('b', 300), makeCamp('c', 600)];
+  const tracker = new CampTracker({ ...MAP, camps });
+  const p = player({ position: camps[0], health: 1000, maxHealth: 1000, mana: 1000, maxMana: 1000, abilities: [] });
+  const fast = planJungleRoute(p, dummyStats, tracker, directNavigation, fastEstimate);
+  const slow = planJungleRoute(p, dummyStats, tracker, directNavigation,
+    (...args) => ({ ...fastEstimate(...args), seconds: 40, clearRange: [40, 40] }));
+  assert.ok(slow.steps.length > 0 && fast.steps.length > slow.steps.length);
+  assert.ok(slow.steps.at(-1)!.finish <= p.clock + 180);
+});
+
+test('real Luna/Sven static models produce multi-minute routes with more than three visits', () => {
+  for (const hero of ['luna', 'sven']) {
+    const p = player({
+      hero: `npc_dota_hero_${hero}`, level: 20, clock: 1200, health: 2600, maxHealth: 2600, mana: 800, maxMana: 800,
+      abilities: [{ name: hero === 'luna' ? 'luna_moon_glaive' : 'sven_great_cleave', level: 4, cooldown: 0 }],
+      items: ['item_power_treads', 'item_butterfly', 'item_greater_crit'].map(name => ({ name, passive: true })),
+    });
+    const route = planJungleRoute(p, calculateSelfStats(p)!, new CampTracker());
+    assert.ok(route.steps.length > 6, `${hero} should not stop at three camps`);
+    assert.ok(route.seconds > 120 && route.seconds <= 180);
+    assert.ok(route.steps.some(step => step.availability === 'respawn-assumed'));
+  }
+});
+
+test('longer-horizon search considers the whole reachable own jungle, including valuable camps outside the old nearest eight', () => {
+  const camps = Array.from({ length: 10 }, (_, i) => makeCamp(`camp-${i}`, i * 200, i === 9 ? 'ancient' : 'small'));
+  const tracker = new CampTracker({ ...MAP, camps });
+  const p = player({ position: camps[0], health: 1000, maxHealth: 1000, mana: 1000, maxMana: 1000, abilities: [] });
+  const estimate: typeof estimateCamp = (...args) => ({ ...fastEstimate(...args), gold: args[2] === 'ancient' ? 1000 : 1 });
+  const result = planJungleRoute(p, dummyStats, tracker, directNavigation, estimate);
+  assert.ok(result.steps.some(step => step.campId === 'camp-9'));
+  assert.ok(result.steps.length > 3);
+});
+
+test('fixed-window total rewards win over a very short route with an inflated reward/elapsed ratio', () => {
+  const camps = [makeCamp('quick', 0), makeCamp('valuable', 100, 'ancient')];
+  const tracker = new CampTracker({ ...MAP, camps });
+  const p = player({ position: camps[0], health: 1000, maxHealth: 1000, mana: 1000, maxMana: 1000, abilities: [] });
+  const estimate: typeof estimateCamp = (...args) => ({
+    ...fastEstimate(...args), gold: args[2] === 'ancient' ? 300 : 8, xp: 0,
+    seconds: args[2] === 'ancient' ? 55 : 1, clearRange: args[2] === 'ancient' ? [55, 55] : [1, 1],
+  });
+  const result = planJungleRoute(p, dummyStats, tracker, directNavigation, estimate);
+  assert.ok(result.gold >= 600, 'do not choose one 8-gold/second stop over hundreds of gold across the window');
+  assert.equal(result.score, result.gold);
+});
+
+test('fewer richer clears beat a route with more low-gold high-XP clears', () => {
+  // Both clusters are reachable, but crossing between them consumes the window.
+  const rich = makeCamp('cash', -8500, 'ancient');
+  const cheap = Array.from({ length: 8 }, (_, i) => makeCamp(`cheap-${i}`, 8500 + i * 120));
+  const p = player({ position: { x: 0, y: 0 }, health: 1000, maxHealth: 1000, mana: 1000, maxMana: 1000, abilities: [] });
+  const stats = { ...dummyStats, moveSpeed: 100 };
+  const estimate: typeof estimateCamp = (...args) => ({
+    ...fastEstimate(...args), gold: args[2] === 'ancient' ? 300 : 15,
+    xp: args[2] === 'ancient' ? 0 : 10000,
+    seconds: args[2] === 'ancient' ? 20 : 2, clearRange: args[2] === 'ancient' ? [20, 20] : [2, 2],
+  });
+  const cheapRoute = planJungleRoute(p, stats, new CampTracker({ ...MAP, camps: cheap }), directNavigation, estimate);
+  const chosen = planJungleRoute(p, stats, new CampTracker({ ...MAP, camps: [rich, ...cheap] }), directNavigation, estimate);
+  assert.ok(chosen.steps.length < cheapRoute.steps.length);
+  assert.ok(chosen.gold > cheapRoute.gold);
+  assert.ok(chosen.xp < cheapRoute.xp, 'experience must not displace a richer route');
+  assert.deepEqual(chosen.steps.map(step => step.campId), ['cash', 'cash']);
+  assert.equal(chosen.gold, 600);
+  assert.equal(chosen.score, chosen.gold);
+});
+
+test('experience cannot affect gold ranking, beam ordering, or equal-gold tie breaking', () => {
+  const camps = [makeCamp('a-gold', -100, 'ancient'), makeCamp('b-experience', 100)];
+  const p = player({ position: { x: 0, y: 0 }, health: 1000, maxHealth: 1000, mana: 1000, maxMana: 1000, abilities: [] });
+  // 90-second clears plus walking allow only one clear in this window.
+  for (const otherGold of [99, 100]) {
+    const route = (otherXp: number) => planJungleRoute(p, dummyStats, new CampTracker({ ...MAP, camps }), directNavigation,
+      (...args) => ({
+        ...fastEstimate(...args), seconds: 90, clearRange: [90, 90],
+        gold: args[2] === 'ancient' ? 100 : otherGold, xp: args[2] === 'ancient' ? 17 : otherXp,
+      }));
+    const noXp = route(0), hugeXp = route(1_000_000);
+    assert.deepEqual(hugeXp, noXp);
+    assert.deepEqual(hugeXp.steps.map(step => step.campId), ['a-gold']);
+    assert.equal(hugeXp.score, 100);
+    assert.equal(hugeXp.xp, 17, 'XP is still reported for display');
+  }
+});
+
+test('the money objective never bypasses health or horizon constraints to chase a lucrative camp', () => {
+  const p = player({ position: { x: 0, y: 0 }, health: 1000, maxHealth: 1000, mana: 1000, maxMana: 1000, abilities: [] });
+  for (const reason of ['unsafe', 'too-far']) {
+    const camps = [makeCamp('safe', 0), makeCamp('lucrative', reason === 'unsafe' ? 100 : 10000, 'ancient')];
+    const estimate: typeof estimateCamp = (...args) => ({
+      ...fastEstimate(...args), gold: args[2] === 'ancient' ? 1_000_000 : 100,
+      seconds: args[2] === 'ancient' ? 90 : 2, clearRange: args[2] === 'ancient' ? [90, 90] : [2, 2],
+      healthAfter: args[2] === 'ancient' && reason === 'unsafe' ? 100 : args[4].health - 10,
+    });
+    const route = planJungleRoute(p, { ...dummyStats, moveSpeed: 100 }, new CampTracker({ ...MAP, camps }), directNavigation, estimate);
+    assert.equal(route.status, 'ready');
+    assert.ok(route.steps.every(step => step.campId === 'safe'));
+    assert.ok(route.seconds <= 180);
+    assert.ok(route.steps.every(step => step.healthAfter >= p.maxHealth * 0.3));
+  }
+});
+
+test('arrival after a minute does not justify walking into an empty spawn box before the minute', () => {
+  const c = { ...makeCamp('target', 1000), bounds: { min: { x: 900, y: -100 }, max: { x: 1100, y: 100 } } };
+  const path = { distance: 1000, points: [{ x: 0, y: 0 }, { x: 850, y: 0 }, c] };
+  const travel = travelToCamp(path, c, 0, [c], [60], 50, 100, 230, MAP)!;
+  assert.ok(travel.waitSeconds > 0);
+  assert.ok(Math.abs(travel.arrival - 61.32) < 1e-6);
+  assert.ok(travel.waitAt && !insideCamp(travel.waitAt, c));
+});
+
+test('a delayed box exit blocks that refresh even when the destination is another camp', () => {
+  const from = makeCamp('source', 0), to = makeCamp('target', 1000);
+  const path = directNavigation.path(from, to);
+  const travel = travelToCamp(path, to, 1, [from, to], [60, 60], 59.8, 100, 239.8, MAP)!;
+  assert.equal(travel.availableAt[0], 120, 'source still occupied at 60, must not become available at 60');
+  const occupied = travelToCamp(path, to, 1, [from, to], [0, 60], 59.8, 100, 239.8, MAP)!;
+  assert.equal(occupied.availableAt[0], 0, 'a camp that already contains a pack is not made empty by crossing a minute');
+});
+
+test('single-camp farming walks out and delays a missed refresh instead of inventing a pack while blocking it', () => {
+  const c = makeCamp('single', 0), tracker = new CampTracker({ ...MAP, camps: [c] });
+  tracker.markCleared(c.id, 50);
+  const p = player({ clock: 59.8, position: c, health: 1000, maxHealth: 1000, mana: 1000, maxMana: 1000, abilities: [] });
+  const result = planJungleRoute(p, dummyStats, tracker, directNavigation, fastEstimate);
+  assert.equal(result.steps[0].spawnAt, 120);
+  assert.ok(result.steps[0].arrival > 120);
+  assert.ok(result.steps[0].waitAt && !insideCamp(result.steps[0].waitAt, c));
 });
 
 test('camp clear inference requires in-camp kills plus departure, gold alone does not count', () => {

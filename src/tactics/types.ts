@@ -54,6 +54,7 @@ export interface Camp extends Point {
   label: string;
   team: Team;
   kind: CampKind;
+  flooded?: { initialTier: number; maxTier: number };
   bounds: { min: Point; max: Point };
 }
 export interface MapData {
@@ -78,8 +79,9 @@ export interface PlayerSnapshot {
   maxMana: number;
   alive: boolean;
   canAct: boolean;
+  silenced?: boolean;
   abilities: AbilityState[];
-  items: { name: string; passive: boolean }[];
+  items: { name: string; passive: boolean; cooldown?: number; attribute?: 'str' | 'agi' | 'int' }[];
   lastHits: number | null;
 }
 export interface SelfStats {
@@ -92,6 +94,7 @@ export interface SelfStats {
   manaRegen: number;
   cleave: number;
   creepDamage: number;
+  lifesteal?: number;
   warnings: string[];
 }
 export interface Resources {
@@ -99,7 +102,14 @@ export interface Resources {
   mana: number;
   // Absolute game clock when an ability can next be used.
   readyAt: Record<string, number>;
+  activeUntil?: Record<string, number>;
 }
+export interface CombatOptions {
+  camp?: Camp;
+  limitSeconds?: number;
+  policy?: 'auto' | 'attacks-only';
+}
+export interface KillEvent { seconds: number; unit: string; gold: number; xp: number }
 export interface ClearEstimate {
   seconds: number;
   healthAfter: number;
@@ -110,6 +120,9 @@ export interface ClearEstimate {
   readyAt: Record<string, number>;
   casts: Record<string, number>;
   feasible: boolean;
+  complete?: boolean;
+  activeUntil?: Record<string, number>;
+  kills?: KillEvent[];
 }
 export interface RouteStep extends ClearEstimate {
   campId: string;
@@ -120,21 +133,28 @@ export interface RouteStep extends ClearEstimate {
   finish: number;
   travelSeconds: number;
   waitSeconds: number;
+  waitAt?: Point;
+  // Assumed refresh after a known clear/block; null means an unobserved initial pack.
+  spawnAt: number | null;
   path: Point[];
   availability: 'assumed' | 'respawn-assumed';
   clearRange: [number, number];
+  policy?: 'auto' | 'attacks-only';
 }
 export interface JungleRoute {
   plannedAt: number;
+  horizonSeconds: number;
   validUntil: number;
   steps: RouteStep[];
   gold: number;
   xp: number;
   seconds: number;
+  // Expected total camp gold within horizonSeconds, not gold/sec or gold + XP.
   score: number;
   nextAction: string;
   warnings: string[];
   status: 'ready' | 'recover' | 'unavailable';
+  search?: { engine: string; expanded: number; evaluated: number; beamWidth: number; optimal: false };
 }
 export interface JungleState {
   enabled: boolean;
@@ -146,4 +166,5 @@ export interface JungleState {
   camps: (Camp & { clearedAt: number | null })[];
   calibration: number;
   updatedAt: number | null;
+  options?: { treadsAttribute: 'unknown' | 'str' | 'agi' | 'int' };
 }

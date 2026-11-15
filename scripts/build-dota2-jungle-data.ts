@@ -107,7 +107,9 @@ for (const [key, raw] of Object.entries(units)) {
 }
 for (const [key, raw] of Object.entries(itemSource)) {
   if (key.startsWith('item_') && !key.startsWith('item_recipe_')) {
-    combat.items[key] = numericValues(kvObject(raw).AbilityValues);
+    const item = kvObject(raw);
+    combat.items[key] = { ...numericValues(item.AbilityValues),
+      AbilityCooldown: numbers(item.AbilityCooldown), AbilityManaCost: numbers(item.AbilityManaCost) };
   }
 }
 combat.heroes = Object.fromEntries(Object.entries(combat.heroes).sort(([a], [b]) => a.localeCompare(b)));

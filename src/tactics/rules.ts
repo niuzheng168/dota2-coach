@@ -3,7 +3,9 @@ export const RULES = {
   healthRegenPerStrength: 0.1, manaRegenPerInt: 0.05,
   minAttackSpeed: 20, maxAttackSpeed: 700, minMoveSpeed: 100, maxMoveSpeed: 550,
   horizon: 180, maxClearSeconds: 90, minHealthFraction: 0.3,
-  maxWaitSeconds: 12, staleAfterMs: 8_000, replanMs: 10_000,
+  // Bound search work per time bucket, not the number of camps in the output.
+  routeBucketSeconds: 5, routeBeamWidth: 12,
+  staleAfterMs: 8_000, replanMs: 10_000,
 } as const;
 export const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 export function physicalMultiplier(armor: number): number {

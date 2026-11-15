@@ -58,13 +58,36 @@ try {
   });
   assert.equal(response.status, 200);
   await page.locator('#jungleSteps li').first().waitFor({ state: 'visible' });
-  assert.equal(await page.locator('#jungleSteps li').count(), 3);
+  const visitCount = await page.locator('#jungleSteps li').count();
+  assert.ok(visitCount > 3, `expected a multi-minute farming route, got ${visitCount} visits`);
   assert.equal(await page.locator('#jungleMap circle').count(), 29);
-  assert.equal(await page.locator('#jungleMap polyline').count(), 3);
+  assert.equal(await page.locator('#jungleMap polyline').count(), visitCount);
+  assert.match(await page.locator('#jungleSummary').textContent(), /^预计总金钱 \d+ 金 · 180 秒窗口内金钱优先/);
+  assert.match(await page.locator('#jungleSummary').textContent(), /经验（仅展示）/);
+  const expectedGold = await page.locator('#jungleSteps li').evaluateAll(nodes =>
+    nodes.reduce((sum, node) => sum + Number(node.dataset.gold), 0));
+  assert.match(await page.locator('#jungleSummary').textContent(), new RegExp(`^预计总金钱 ${Math.round(expectedGold)} 金`));
+  assert.equal(await page.locator('.jungle-step-gold').count(), visitCount);
+  assert.match(await page.locator('.jungle-step-gold').last().textContent(), new RegExp(`累计 ${Math.round(expectedGold)} 金$`));
+  assert.match(await page.locator('#jungleSteps').textContent(), /回访/);
+  assert.match(await page.locator('#jungleSteps').textContent(), /假定.*刷新/);
+  const campIds = await page.locator('#jungleSteps li').evaluateAll(nodes => nodes.map(node => node.dataset.campId));
+  assert.ok(new Set(campIds).size < campIds.length);
+  assert.equal(await page.locator('#jungleMap text').count(), new Set(campIds).size,
+    'repeat visits share a map label instead of overlapping labels');
   assert.equal(await page.locator('#jungleCamp option').count(), 14);
   assert.equal(await page.locator('#jungleVoice').isChecked(), false);
   assert.match(await page.locator('#jungleStats').textContent(), /ATK.*ARM/);
   assert.match(await page.locator('#jungleWarnings').textContent(), /未模拟野怪技能/);
+  await page.locator('#jungleSteps').evaluate(element => { element.scrollTop = 120; });
+  await new Promise(resolve => setTimeout(resolve, 550));
+  payload.map.clock_time = 601;
+  assert.equal((await fetch(`${base}/api/gsi?room=${room.roomId}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  })).status, 200);
+  await page.waitForFunction(() => document.getElementById('jungleStats').textContent.startsWith('10:01'));
+  assert.ok(await page.locator('#jungleSteps').evaluate(element => element.scrollTop >= 119),
+    'regular GSI updates must not reset the long route list scroll position');
   const initialStarts = starts;
   await new Promise(resolve => setTimeout(resolve, 1050));
   await page.locator('#jungleRequest').click();
@@ -79,7 +102,7 @@ try {
   assert.equal(starts, initialStarts);
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   assert.deepEqual(errors, []);
-  console.log('PASS jungle browser: opt-in, live GSI, 3-step route/map, warnings, no voice restart, disable, mobile width');
+  console.log('PASS jungle browser: opt-in, live GSI, time-horizon route/respawn revisits, map labels, warnings, no voice restart, disable, mobile width');
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));
