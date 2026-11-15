@@ -184,8 +184,8 @@ export function generateDota2GsiConfigFile(serverOrigin: string, roomId: string,
 {
     "uri"           "${uri}"
     "timeout"       "5.0"
-    "buffer"        "0.5"
-    "throttle"      "1.0"
+    "buffer"        "0.1"
+    "throttle"      "0.5"
     "heartbeat"     "15.0"
     "auth"
     {
@@ -198,6 +198,8 @@ export function generateDota2GsiConfigFile(serverOrigin: string, roomId: string,
         "map"           "1"
         "player"        "1"
         "hero"          "1"
+        "abilities"     "1"
+        "items"         "1"
         "draft"         "1"
     }
 }
@@ -205,7 +207,7 @@ export function generateDota2GsiConfigFile(serverOrigin: string, roomId: string,
 }
 
 // ============================================================================
-// Option 3: Browser Window Top-Bar Vision Scanner (powered by gpt-6-luna)
+// Option 3: Browser Window Top-Bar Vision Scanner (configured GPT vision deployment)
 // ============================================================================
 
 export interface VisionDraftResult {
@@ -263,7 +265,7 @@ export async function recognizeDraftFromTopBarImage(
   }
 
   const model = config.deployments.visionLlm;
-  const authHeaders = await tokenManager.getAuthHeaders();
+  const authHeaders = await tokenManager.getAuthHeaders(config);
   const t0 = performance.now();
 
   const body: Record<string, unknown> = {
@@ -293,7 +295,10 @@ export async function recognizeDraftFromTopBarImage(
     },
   };
 
-  if (model.startsWith('gpt-6')) {
+  if (model.startsWith('gpt-6.1-sol')) {
+    // Sol requires reasoning; unlike Terra/Luna it does not support "none".
+    body.reasoning = { effort: 'low' };
+  } else if (model.startsWith('gpt-6')) {
     body.reasoning = { effort: 'none' };
   } else if (model.startsWith('gpt-5')) {
     body.reasoning = { effort: 'minimal' };
@@ -306,10 +311,17 @@ export async function recognizeDraftFromTopBarImage(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!resp.ok) {
     const errBody = await resp.text().catch(() => '');
+    if (resp.status === 404 && errBody.includes('DeploymentNotFound')) {
+      throw new Error(
+        `视觉部署「${model}」在资源「${config.openAiHost}」中不存在（DeploymentNotFound，HTTP 404）。` +
+        '请检查主资源配置，将 DEPLOYMENT_GPT_VISION 设为该资源的实际部署名并重启服务；不要自行添加部署名后缀。',
+      );
+    }
     throw new Error(`Vision API HTTP ${resp.status}: ${errBody.slice(0, 260)}`);
   }
 
@@ -327,7 +339,14 @@ export async function recognizeDraftFromTopBarImage(
     }
   }
 
-  const parsed = JSON.parse(rawText || '{"phase":"menu_or_other","radiant":[],"dire":[]}');
+  if (!rawText.trim()) {
+    throw new Error('视觉模型未返回识别结果，请稍后重试');
+  }
+  const parsed = JSON.parse(rawText);
+  if (!parsed || !['draft', 'in_game', 'menu_or_other'].includes(parsed.phase) ||
+      !Array.isArray(parsed.radiant) || !Array.isArray(parsed.dire)) {
+    throw new Error('视觉模型返回的阵容格式无效，请稍后重试');
+  }
   const radiant: string[] = [];
   const dire: string[] = [];
   const all: string[] = [];

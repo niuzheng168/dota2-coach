@@ -28,6 +28,7 @@ export interface FoundryConfig {
     cascadeAsrBatch: string;
     cascadeLlm: string;
     cascadeLlmFast: string;
+    listenerLlm: string;
     visionLlm: string;
     gptRealtime: string;
     gptRealtimeMini: string;
@@ -57,8 +58,10 @@ export const DEFAULT_FOUNDRY_CONFIG: FoundryConfig = {
       process.env.DEPLOYMENT_GPT_TEXT || 'gpt-6-luna-datazone-standard',
     cascadeLlmFast:
       process.env.DEPLOYMENT_GPT_TEXT_FAST || 'gpt-6-luna-datazone-standard',
+    listenerLlm:
+      process.env.DEPLOYMENT_LISTENER_TEXT || 'gpt-6-luna',
     visionLlm:
-      process.env.DEPLOYMENT_GPT_VISION || 'gpt-6-luna-datazone-standard',
+      process.env.DEPLOYMENT_GPT_VISION || 'gpt-6.1-terra',
     gptRealtime:
       process.env.DEPLOYMENT_GPT_REALTIME || 'gpt-realtime-2.1-global-standard',
     gptRealtimeMini:

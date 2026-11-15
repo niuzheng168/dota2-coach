@@ -52,18 +52,20 @@
       <p class="muted small">房主可修改设置；保存后所有成员自动重新连接，需重新开启麦克风。</p>
       <label class="field">我的身份<select id="roleSelect"><option value="student">学员 · 说中文 / 听中文翻译</option><option value="coach">教练 · 说英文 / 听英文翻译</option></select></label>
       <label class="toggle-row"><span>监听自己的翻译输出</span><input id="selfMonitorToggle" type="checkbox" /></label>
-      <div class="panel-title" style="margin-top: 4px">
-        <span>Match Heroes · 本局阵容动态锁定</span>
-        <span style="display: flex; align-items: center; gap: 6px">
+      <div class="panel-title roster-heading">
+        <span>本局阵容</span>
+        <span class="roster-heading-actions">
           <span class="badge gold" id="matchHeroesCount">0 / 10</span>
-          <button
-            id="clearHeroesBtn"
-            type="button"
-            title="新开一局时一键清空本局英雄"
-            style="padding: 2px 6px; font-size: 11px; display: none"
-          >清空</button>
+          <button id="clearHeroesBtn" type="button" class="roster-clear" title="新开一局时清空本局英雄" hidden>清空</button>
         </span>
       </div>
+      <div class="hero-lineup hero-lineup--compact" id="selectedHeroTags" aria-label="本局已选英雄"></div>
+      <button id="openHeroPickerBtn" type="button" class="open-hero-picker" data-owner-only hidden aria-haspopup="dialog" aria-controls="heroPickerDialog">
+        <span class="hero-picker-grid-icon" aria-hidden="true">▦</span>
+        <span><strong>选择英雄</strong><small>打开英雄面板 · 点击头像加入</small></span>
+        <span class="hero-picker-open-arrow" aria-hidden="true">↗</span>
+      </button>
+      <p id="heroSelectionFeedback" class="hero-selection-feedback" role="status">未限定阵容，通用英雄词表仍然生效。</p>
 
       <div data-owner-only style="display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 8px; background: rgba(61,214,140,0.06); border: 1px solid rgba(61,214,140,0.22)">
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px">
@@ -76,7 +78,7 @@
             type="button"
             class="btn-radiant"
             style="flex: 1; padding: 5px 8px; font-size: 11px"
-            title="开局前点一次共享 DOTA2 窗口，后台每 12 秒仅截取顶部头像栏由 gpt-6-luna 自动识别 10 英雄"
+            title="开局前共享 DOTA2 窗口，后台每 12 秒仅截取顶部头像栏自动识别英雄"
           >🖥️ 开启窗口自动识阵</button>
           <button
             id="scanVisionOnceBtn"
@@ -96,18 +98,31 @@
         </div>
       </div>
 
-      <div class="hero-tags" id="selectedHeroTags"></div>
-      <div data-owner-only style="display: flex; gap: 6px">
-        <input
-          id="heroPickerInput"
-          list="heroPickerDatalist"
-          type="text"
-          placeholder="也可手动补充如 猴子 / PL / 朗戈 / OD..."
-          style="flex: 1; padding: 5px 8px; font-size: 12px"
-        />
-        <datalist id="heroPickerDatalist"></datalist>
-        <button id="addHeroBtn" type="button" style="padding: 5px 10px; font-size: 12px">+ 锁定</button>
-      </div>
+      <section class="jungle-panel" aria-labelledby="jungleTitle">
+        <div class="panel-title"><span id="jungleTitle">刷野路线 · 实验功能</span><span class="badge">Jungle</span></div>
+        <p class="muted small">仅供研究/自定义局验证。实时辅助存在政策风险；默认关闭，不读取敌方隐藏信息。</p>
+        <label class="toggle-row"><span>开启刷野规划</span><input id="jungleEnabled" type="checkbox" disabled /></label>
+        <p id="jungleStatus" class="jungle-status" role="status">刷野规划默认关闭。</p>
+        <div id="jungleBody" hidden>
+          <p id="jungleStats" class="jungle-stats"></p>
+          <p id="jungleVersion" class="muted small"></p>
+          <svg id="jungleMap" viewBox="0 0 360 360" role="img" aria-label="营地与步行路线坐标示意图"></svg>
+          <p class="muted small">真实坐标示意，非地形贴图。绿：天辉 · 红：夜魇 · 白：你 · 黄：路径。仅规划己方野区。</p>
+          <button id="jungleRequest" type="button" class="btn-radiant" disabled>规划下一步 · Alt+J</button>
+          <label class="toggle-row"><span>朗读下一步（学员 · 本地中文音色）</span><input id="jungleVoice" type="checkbox" /></label>
+          <p id="jungleVoiceStatus" class="muted small">不占用同传音频队列；快捷键仅在本页面有焦点时有效。</p>
+          <div id="junglePlan" hidden>
+            <p id="jungleSummary" class="jungle-summary"></p>
+            <ol id="jungleSteps" class="jungle-steps"></ol>
+          </div>
+          <div class="jungle-camp-controls">
+            <label class="field">校正野点状态<select id="jungleCamp" aria-label="营地"></select></label>
+            <button id="jungleCleared" type="button" disabled>这里已清空</button>
+          </div>
+          <details class="jungle-assumptions"><summary>估算依据与未建模项</summary><ul id="jungleWarnings"></ul></details>
+        </div>
+      </section>
+
       <div class="panel-title"><span>在线成员</span><span class="badge" id="connBadge">未连接</span></div>
       <div class="participants-list" id="participantsList"></div>
       <div class="status-bar" id="engineStatusBar">正在连接语音服务…</div>
@@ -121,11 +136,79 @@
         <span class="badge" id="audioOutBadge">Speaker Ready</span>
       </div>
       <div id="micStatus" class="muted small" role="status">等待语音引擎就绪后才能开麦…</div>
+      <details class="desktop-listener">
+        <summary>桌面双语字幕 · 外部程序监听 <span class="badge">Windows 11</span></summary>
+        <p id="desktopUnavailable" class="muted small">请用 Windows 本地采集助手打开本页面，启用游戏上方的鼠标穿透字幕和进程监听。普通浏览器的连麦功能不受影响。</p>
+        <div id="desktopControls" hidden>
+          <p class="muted small">现有 App 连麦与外部监听相互独立。监听所选进程及子进程，自动筛选英语，只显示文字，不播放或回传译音。</p>
+          <div class="listener-process-row">
+            <label class="field">声音来源<select id="processSelect" aria-label="监听进程"></select></label>
+            <button id="refreshProcessesBtn" type="button">刷新进程</button>
+            <button id="listenProcessBtn" type="button" class="btn-primary">开始监听</button>
+          </div>
+          <label class="listener-consent"><input id="processConsent" type="checkbox" />我有权采集所选程序的声音，已告知对方音频会上传到云端识别与翻译。</label>
+          <p id="processListenStatus" class="muted small" role="status">监听未开启</p>
+          <div class="overlay-settings">
+            <label class="toggle-row"><span>置顶双语字幕</span><input id="overlayEnabled" type="checkbox" checked /></label>
+            <label class="field">显示器<select id="overlayMonitor" aria-label="字幕显示器"></select></label>
+            <label class="field">原文颜色<input id="overlaySourceColor" type="color" value="#ffffff" /></label>
+            <label class="field">译文颜色<input id="overlayTargetColor" type="color" value="#ffe082" /></label>
+            <label class="field">文字不透明度<input id="overlayOpacity" type="range" min="0.15" max="1" step="0.05" value="0.95" /></label>
+            <label class="field">背景不透明度<input id="overlayBackground" type="range" min="0" max="0.9" step="0.05" value="0.35" /></label>
+            <label class="field">字号<input id="overlayFontSize" type="range" min="16" max="48" step="1" value="28" /></label>
+            <label class="field"><span><span id="overlayPositionLabel">字幕垂直位置</span> · <output id="overlayTopValue" for="overlayTop">5%</output></span><input id="overlayTop" type="range" min="0" max="100" step="1" value="5" aria-describedby="overlayPositionHint" /></label>
+            <label class="field">停留时间 (秒)<input id="overlaySeconds" type="range" min="3" max="30" step="1" value="8" /></label>
+            <button id="previewOverlayBtn" type="button">预览字幕</button>
+          </div>
+          <p id="overlayPositionHint" class="muted small">0% 顶部 · 50% 居中 · 100% 底部，自动预留字幕高度和少量边距。</p>
+          <p class="muted small">建议游戏使用无边框窗口模式。游戏音效、英雄台词和其他人声也可能被采到；不能保证只识别教练。监听记录仅自己可见，离开房间后清空，不保存录音。</p>
+        </div>
+      </details>
       <div class="live-Banner" id="livePartialBanner">等待发言…</div>
       <div class="feed" id="transcriptFeed" aria-live="polite"></div>
       <form class="text-input-row" id="textSendForm"><input id="textSendInput" type="text" placeholder="输入文字并翻译…" maxlength="4000" aria-label="发送文字" /><button type="submit" class="btn-primary">发送并朗读</button></form>
     </section>
   </main>
+
+  <dialog id="heroPickerDialog" class="modal hero-picker" aria-labelledby="heroPickerTitle" aria-describedby="heroPickerDescription">
+    <div class="hero-picker-shell">
+      <header class="hero-picker-header">
+        <div>
+          <p class="hero-picker-eyebrow">HERO SELECTION</p>
+          <h2 id="heroPickerTitle">选择本局英雄 <span id="heroPickerCount">0 / 10</span></h2>
+          <p id="heroPickerDescription">点击头像加入阵容，再次点击取消。自动识阵的结果也会同步显示。</p>
+        </div>
+        <button type="button" class="hero-picker-close" data-close-dialog="heroPickerDialog" aria-label="关闭英雄面板">×</button>
+      </header>
+      <div class="hero-picker-toolbar">
+        <label class="hero-search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+          <input id="heroPickerSearch" type="search" placeholder="搜索英雄、英文名或外号… 如 猴子 / PL" aria-label="搜索英雄" autocomplete="off" />
+        </label>
+        <div id="heroAttributeFilters" class="hero-attribute-filters" role="group" aria-label="按属性筛选">
+          <button type="button" data-attribute-filter="all" aria-pressed="true">全部</button>
+          <button type="button" data-attribute-filter="0" aria-pressed="false">力量</button>
+          <button type="button" data-attribute-filter="1" aria-pressed="false">敏捷</button>
+          <button type="button" data-attribute-filter="2" aria-pressed="false">智力</button>
+          <button type="button" data-attribute-filter="3" aria-pressed="false">全才</button>
+        </div>
+        <label class="hero-selected-filter"><input id="heroOnlySelected" type="checkbox" />只看已选</label>
+      </div>
+      <div class="hero-picker-scroll">
+        <div id="heroPickerBoard" class="hero-board"></div>
+        <div id="heroPickerEmpty" class="hero-picker-empty" hidden>
+          <strong>没有找到英雄</strong>
+          <p>试试中文名、英文名或常用外号，或清除筛选重新查看。</p>
+          <button id="resetHeroFiltersBtn" type="button">清除筛选</button>
+        </div>
+      </div>
+      <footer class="hero-picker-footer">
+        <div class="hero-picker-roster-heading"><strong>本局已选</strong><span id="heroPickerFeedback" role="status">最多选择 10 位英雄 · 点击即同步</span><button id="clearPickerHeroesBtn" type="button" class="roster-clear">清空阵容</button></div>
+        <div id="heroPickerLineup" class="hero-lineup" aria-label="点击移除已选英雄"></div>
+        <div class="hero-picker-footer-note"><span>选择即时生效，不打断语音 <span class="hero-art-credit">· 英雄图像 © Valve</span></span><button type="button" class="hero-picker-done" data-close-dialog="heroPickerDialog">完成选择 <span aria-hidden="true">✓</span></button></div>
+      </footer>
+    </div>
+  </dialog>
 
   <dialog id="createRoomDialog" class="modal" aria-labelledby="createRoomTitle">
     <form id="createRoomForm" class="modal-content">

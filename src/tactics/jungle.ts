@@ -1,0 +1,157 @@
+import { COMPOSITIONS, MAP } from './combat-data.ts';
+import { estimateCamp } from './clear-model.ts';
+import { distance, insideCamp, NAVIGATION, nextSpawn } from './map-data.ts';
+import type { GridNavigation } from './map-data.ts';
+import { clamp, RULES } from './rules.ts';
+import type { Camp, JungleRoute, MapData, PlayerSnapshot, Point, Resources, RouteStep, SelfStats } from './types.ts';
+
+export class CampTracker {
+  readonly cleared = new Map<string, number>();
+  calibration = 1;
+  private visit: { camp: Camp; since: number; hits: number; lastKill: number; predicted: number | null } | null = null;
+  private previousClock: number | null = null;
+  private previousPosition: Point | null = null;
+  readonly map: MapData;
+  constructor(map: MapData = MAP) { this.map = map; }
+  invalidateVisit(): void { this.visit = null; this.previousClock = null; this.previousPosition = null; }
+  markCleared(id: string, clock: number): void {
+    if (!this.map.camps.some(c => c.id === id)) throw new Error('未知营地');
+    this.cleared.set(id, clock); this.visit = null;
+  }
+  ingest(player: PlayerSnapshot, stats: SelfStats): boolean {
+    let changed = false;
+    const discontinuity = this.previousClock !== null && (player.clock < this.previousClock || player.clock - this.previousClock > 4);
+    if (discontinuity) this.visit = null;
+    // A minute boundary crossed while our own hero is inside the spawn box blocks it.
+    // Other players/wards are unknowable; a later spawn remains explicitly an assumption.
+    if (player.alive && !discontinuity && this.previousClock !== null && nextSpawn(this.previousClock, this.map) <= player.clock) {
+      for (const camp of this.map.camps) {
+        if (this.cleared.has(camp.id) && insideCamp(player.position, camp) &&
+            this.previousPosition && insideCamp(this.previousPosition, camp)) {
+          this.cleared.set(camp.id, player.clock); changed = true;
+        }
+      }
+    }
+    this.previousClock = player.clock; this.previousPosition = player.position;
+    if (!player.alive || !player.canAct || player.lastHits === null || discontinuity) { this.visit = null; return changed; }
+    const camp = this.map.camps.find(c => insideCamp(player.position, c));
+    if (this.visit && this.visit.camp.id !== camp?.id) {
+      const visit = this.visit;
+      // Conservative inference: require the largest initial pack count, not just gold income.
+      const threshold = Math.max(...COMPOSITIONS.filter(c => c.kind === visit.camp.kind)
+        .map(c => Object.values(c.units).reduce((a, b) => a + b, 0)));
+      if (visit.hits >= threshold && visit.lastKill > visit.since && player.clock - visit.since <= 90) {
+        this.cleared.set(visit.camp.id, visit.lastKill); changed = true;
+        if (visit.predicted && visit.predicted >= 3) {
+          const ratio = clamp((visit.lastKill - visit.since) / visit.predicted, 0.5, 2);
+          this.calibration = clamp(this.calibration * 0.8 + ratio * 0.2, 0.5, 2);
+        }
+      }
+      this.visit = null;
+    }
+    if (camp && !this.visit) {
+      const predicted = estimateCamp(player, stats, camp.kind, player.clock, {
+        health: player.health, mana: player.mana,
+        readyAt: Object.fromEntries(player.abilities.map(a => [a.name, player.clock + a.cooldown])),
+      });
+      this.visit = { camp, since: player.clock, hits: 0, lastKill: player.clock,
+        predicted: predicted.feasible ? predicted.seconds : null };
+    }
+    return changed;
+  }
+  // Count only increments observed while remaining in the SAME camp, never a kill on departure.
+  observeKills(previous: PlayerSnapshot | null, player: PlayerSnapshot): void {
+    if (!this.visit || !previous || previous.lastHits === null || player.lastHits === null) return;
+    if (!insideCamp(previous.position, this.visit.camp) || !insideCamp(player.position, this.visit.camp) ||
+        player.clock - previous.clock > 4 || player.clock < previous.clock) return;
+    const delta = player.lastHits - previous.lastHits;
+    if (delta > 0 && delta <= 10) { this.visit.hits += delta; this.visit.lastKill = player.clock; }
+    if (delta < 0) this.visit = null;
+  }
+}
+
+export function planJungleRoute(
+  player: PlayerSnapshot, stats: SelfStats, tracker: CampTracker,
+  navigation: Pick<GridNavigation, 'path'> = NAVIGATION,
+): JungleRoute {
+  const map = tracker.map;
+  const warnings = [
+    `数据快照 ${map.patch}，无法从 GSI 核实客户端补丁；不同版本请勿信任坐标和数值。`,
+    '营地按假设有野处理，无法知道别人清野、封野、堆野或敌人位置。',
+    '营地组合为待实机核验的代表样本，金钱/经验等权估计；耗时、血蓝取样本保守包络，不是保证。',
+    '地形使用静态寻路网格与树木；不计砍树、跳跃、传送、动态阻挡和引野走位。',
+    '未模拟野怪技能、光环、召唤、攻击类型特殊修正；承伤另加 15% 余量，仍可能低估。',
+    ...stats.warnings,
+  ];
+  const base: JungleRoute = {
+    plannedAt: player.clock, validUntil: player.clock + 180, steps: [], gold: 0, xp: 0, seconds: 0,
+    score: 0, nextAction: '暂无可验证的刷野路线。', status: 'unavailable', warnings,
+  };
+  if (!player.alive || !player.canAct) return { ...base, nextAction: '等待英雄存活且可行动后重新规划。' };
+  if (player.health < player.maxHealth * RULES.minHealthFraction) {
+    return { ...base, status: 'recover', nextAction: '血量偏低，先补给或回到安全位置，不建议继续刷野。' };
+  }
+  const candidates = map.camps.filter(c => c.team === player.team)
+    .map(camp => ({ camp, path: navigation.path(player.position, camp) }))
+    .filter(c => c.path !== null).sort((a, b) => a.path!.distance - b.path!.distance || a.camp.id.localeCompare(b.camp.id))
+    .slice(0, 8).map(c => c.camp);
+  const bestByLength = new Map<number, JungleRoute>();
+  // Branch-local resources, camp spawn times and cooldowns. A route can revisit only after respawn.
+  function visit(position: Point, clock: number, resources: Resources, cleared: Map<string, number>,
+    steps: RouteStep[], totalGold: number, totalXp: number): void {
+    if (steps.length) {
+      const seconds = clock - player.clock;
+      const score = (totalGold + 0.5 * totalXp) / seconds;
+      if (score > (bestByLength.get(steps.length)?.score ?? -Infinity)) {
+        bestByLength.set(steps.length, { ...base, steps, seconds, score, gold: totalGold, xp: totalXp,
+          validUntil: clock, status: 'ready' });
+      }
+    }
+    if (steps.length >= 3) return;
+    for (const camp of candidates) {
+      if (steps.at(-1)?.campId === camp.id) continue;
+      const path = navigation.path(position, camp);
+      if (!path) continue;
+      const travelSeconds = path.distance / stats.moveSpeed + (path.distance > 100 ? 0.5 : 0);
+      const arrival = clock + travelSeconds;
+      const lastClear = cleared.get(camp.id);
+      const spawnAt = lastClear === undefined ? map.spawn.first : nextSpawn(lastClear, map);
+      const waitSeconds = Math.max(0, spawnAt - arrival);
+      // A wait is staged OUTSIDE the target spawn box. Never recommend blocking our own refresh.
+      if (waitSeconds > RULES.maxWaitSeconds || (waitSeconds > 0 && insideCamp(position, camp))) continue;
+      const start = arrival + waitSeconds;
+      if (start - player.clock >= RULES.horizon) continue;
+      const elapsed = start - clock;
+      const before: Resources = {
+        health: Math.min(player.maxHealth, resources.health + stats.healthRegen * elapsed),
+        mana: Math.min(player.maxMana, resources.mana + stats.manaRegen * elapsed), readyAt: resources.readyAt,
+      };
+      const result = estimateCamp(player, stats, camp.kind, start, before, tracker.calibration);
+      if (!result.feasible || result.healthAfter < player.maxHealth * RULES.minHealthFraction ||
+          start + result.seconds - player.clock > RULES.horizon) continue;
+      const finish = start + result.seconds;
+      const nextCleared = new Map(cleared); nextCleared.set(camp.id, finish);
+      const step: RouteStep = {
+        ...result, campId: camp.id, label: camp.label, kind: camp.kind, position: { x: camp.x, y: camp.y },
+        arrival, finish, travelSeconds, waitSeconds, path: path.points,
+        availability: lastClear === undefined ? 'assumed' : 'respawn-assumed',
+      };
+      visit(camp, finish, { health: result.healthAfter, mana: result.manaAfter, readyAt: result.readyAt },
+        nextCleared, [...steps, step], totalGold + result.gold, totalXp + result.xp);
+    }
+  }
+  visit(player.position, player.clock, {
+    health: player.health, mana: player.mana,
+    readyAt: Object.fromEntries(player.abilities.map(a => [a.name, player.clock + a.cooldown])),
+  }, new Map(tracker.cleared), [], 0, 0);
+  const best = bestByLength.get(3) ?? bestByLength.get(2) ?? bestByLength.get(1);
+  if (!best) return {
+    ...base, status: candidates.length ? 'recover' : 'unavailable',
+    nextAction: candidates.length ? '保守估计下没有安全刷野路线，先补给或回到安全位置。' : '当前位置没有静态网格可验证的步行路线，请移动到开阔地后重试。',
+  };
+  const first = best.steps[0];
+  best.nextAction = `下一个：${first.label}，约 ${Math.ceil(first.travelSeconds)} 秒到。` +
+    (first.waitSeconds ? `在刷新框外等约 ${Math.ceil(first.waitSeconds)} 秒。` : '') +
+    `清野约 ${Math.ceil(first.clearRange[0])}–${Math.ceil(first.clearRange[1])} 秒。`;
+  return best;
+}

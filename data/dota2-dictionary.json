@@ -709,7 +709,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/abaddon.jpg"
     },
     {
       "id": 73,
@@ -784,7 +786,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/alchemist.jpg"
     },
     {
       "id": 68,
@@ -849,7 +853,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/ancient_apparition.jpg"
     },
     {
       "id": 1,
@@ -924,7 +930,9 @@
             "敌法大"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/antimage.jpg"
     },
     {
       "id": 113,
@@ -989,7 +997,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/arc_warden.jpg"
     },
     {
       "id": 2,
@@ -1062,7 +1072,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/axe.jpg"
     },
     {
       "id": 3,
@@ -1135,7 +1147,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/bane.jpg"
     },
     {
       "id": 65,
@@ -1204,7 +1218,9 @@
             "蝙蝠拉"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/batrider.jpg"
     },
     {
       "id": 38,
@@ -1279,7 +1295,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/beastmaster.jpg"
     },
     {
       "id": 4,
@@ -1345,7 +1363,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/bloodseeker.jpg"
     },
     {
       "id": 62,
@@ -1426,7 +1446,9 @@
             "追踪术"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/bounty_hunter.jpg"
     },
     {
       "id": 78,
@@ -1492,7 +1514,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/brewmaster.jpg"
     },
     {
       "id": 99,
@@ -1567,7 +1591,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/bristleback.jpg"
     },
     {
       "id": 61,
@@ -1641,7 +1667,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/broodmother.jpg"
     },
     {
       "id": 96,
@@ -1716,7 +1744,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/centaur.jpg"
     },
     {
       "id": 81,
@@ -1781,7 +1811,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/chaos_knight.jpg"
     },
     {
       "id": 66,
@@ -1843,7 +1875,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/chen.jpg"
     },
     {
       "id": 56,
@@ -1926,7 +1960,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/clinkz.jpg"
     },
     {
       "id": 51,
@@ -2010,7 +2046,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/rattletrap.jpg"
     },
     {
       "id": 5,
@@ -2086,7 +2124,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/crystal_maiden.jpg"
     },
     {
       "id": 55,
@@ -2167,7 +2207,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/dark_seer.jpg"
     },
     {
       "id": 119,
@@ -2244,7 +2286,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/dark_willow.jpg"
     },
     {
       "id": 135,
@@ -2310,7 +2354,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/dawnbreaker.png"
     },
     {
       "id": 50,
@@ -2377,7 +2423,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/dazzle.jpg"
     },
     {
       "id": 43,
@@ -2443,7 +2491,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/death_prophet.jpg"
     },
     {
       "id": 87,
@@ -2527,7 +2577,9 @@
             "萨尔框大"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/disruptor.jpg"
     },
     {
       "id": 69,
@@ -2594,7 +2646,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/doom_bringer.jpg"
     },
     {
       "id": 49,
@@ -2669,7 +2723,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/dragon_knight.jpg"
     },
     {
       "id": 6,
@@ -2745,7 +2801,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/drow_ranger.jpg"
     },
     {
       "id": 107,
@@ -2819,7 +2877,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/earth_spirit.jpg"
     },
     {
       "id": 7,
@@ -2897,7 +2957,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/earthshaker.jpg"
     },
     {
       "id": 103,
@@ -2962,7 +3024,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/elder_titan.jpg"
     },
     {
       "id": 106,
@@ -3042,7 +3106,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/ember_spirit.jpg"
     },
     {
       "id": 58,
@@ -3126,7 +3192,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/enchantress.jpg"
     },
     {
       "id": 33,
@@ -3194,7 +3262,9 @@
             "拉大"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/enigma.jpg"
     },
     {
       "id": 41,
@@ -3280,7 +3350,9 @@
             "罩大"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/faceless_void.jpg"
     },
     {
       "id": 121,
@@ -3354,7 +3426,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/grimstroke.jpg"
     },
     {
       "id": 72,
@@ -3428,7 +3502,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/gyrocopter.jpg"
     },
     {
       "id": 123,
@@ -3513,7 +3589,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/hoodwink.jpg"
     },
     {
       "id": 59,
@@ -3576,7 +3654,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/huskar.jpg"
     },
     {
       "id": 74,
@@ -3753,7 +3833,9 @@
             "超震声波"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/invoker.jpg"
     },
     {
       "id": 91,
@@ -3843,7 +3925,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/wisp.jpg"
     },
     {
       "id": 64,
@@ -3917,7 +4001,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/jakiro.jpg"
     },
     {
       "id": 8,
@@ -4002,7 +4088,9 @@
             "无敌斩"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/juggernaut.jpg"
     },
     {
       "id": 90,
@@ -4087,7 +4175,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/keeper_of_the_light.jpg"
     },
     {
       "id": 145,
@@ -4190,7 +4280,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/kez.jpg"
     },
     {
       "id": 23,
@@ -4273,7 +4365,9 @@
             "船油减伤"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/kunkka.jpg"
     },
     {
       "id": 155,
@@ -4367,7 +4461,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/largo.jpg"
     },
     {
       "id": 104,
@@ -4442,7 +4538,9 @@
             "决斗"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/legion_commander.jpg"
     },
     {
       "id": 52,
@@ -4518,7 +4616,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/leshrac.jpg"
     },
     {
       "id": 31,
@@ -4590,7 +4690,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/lich.jpg"
     },
     {
       "id": 54,
@@ -4667,7 +4769,9 @@
             "感染"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/life_stealer.jpg"
     },
     {
       "id": 25,
@@ -4745,7 +4849,9 @@
             "火女大"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/lina.jpg"
     },
     {
       "id": 26,
@@ -4818,7 +4924,9 @@
             "莱恩大"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/lion.jpg"
     },
     {
       "id": 80,
@@ -4885,7 +4993,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/lone_druid.jpg"
     },
     {
       "id": 48,
@@ -4948,7 +5058,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/luna.jpg"
     },
     {
       "id": 77,
@@ -5020,7 +5132,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/lycan.jpg"
     },
     {
       "id": 97,
@@ -5106,7 +5220,9 @@
             "RP"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/magnataur.jpg"
     },
     {
       "id": 136,
@@ -5168,7 +5284,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/marci.png"
     },
     {
       "id": 129,
@@ -5240,7 +5358,9 @@
             "框大"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/mars.jpg"
     },
     {
       "id": 94,
@@ -5316,7 +5436,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/medusa.jpg"
     },
     {
       "id": 82,
@@ -5409,7 +5531,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/meepo.jpg"
     },
     {
       "id": 9,
@@ -5486,7 +5610,9 @@
             "白虎大群体隐身"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/mirana.jpg"
     },
     {
       "id": 114,
@@ -5568,7 +5694,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/monkey_king.jpg"
     },
     {
       "id": 10,
@@ -5647,7 +5775,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/morphling.jpg"
     },
     {
       "id": 138,
@@ -5720,7 +5850,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/muerta.png"
     },
     {
       "id": 89,
@@ -5784,7 +5916,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/naga_siren.jpg"
     },
     {
       "id": 53,
@@ -5864,7 +5998,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/furion.jpg"
     },
     {
       "id": 36,
@@ -5946,7 +6082,9 @@
             "斩"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/necrolyte.jpg"
     },
     {
       "id": 60,
@@ -6012,7 +6150,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/night_stalker.jpg"
     },
     {
       "id": 88,
@@ -6088,7 +6228,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/nyx_assassin.jpg"
     },
     {
       "id": 84,
@@ -6172,7 +6314,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/ogre_magi.jpg"
     },
     {
       "id": 57,
@@ -6236,7 +6380,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/omniknight.jpg"
     },
     {
       "id": 111,
@@ -6313,7 +6459,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/oracle.jpg"
     },
     {
       "id": 76,
@@ -6383,7 +6531,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/obsidian_destroyer.jpg"
     },
     {
       "id": 120,
@@ -6457,7 +6607,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/pangolier.jpg"
     },
     {
       "id": 44,
@@ -6533,7 +6685,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/phantom_assassin.jpg"
     },
     {
       "id": 12,
@@ -6599,7 +6753,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/phantom_lancer.jpg"
     },
     {
       "id": 110,
@@ -6669,7 +6825,9 @@
             "超新星"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/phoenix.jpg"
     },
     {
       "id": 137,
@@ -6744,7 +6902,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/primal_beast.png"
     },
     {
       "id": 13,
@@ -6813,7 +6973,9 @@
             "帕克大"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/puck.jpg"
     },
     {
       "id": 14,
@@ -6887,7 +7049,9 @@
             "咬住"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/pudge.jpg"
     },
     {
       "id": 45,
@@ -6949,7 +7113,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/pugna.jpg"
     },
     {
       "id": 39,
@@ -7016,7 +7182,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/queenofpain.jpg"
     },
     {
       "id": 15,
@@ -7079,7 +7247,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/razor.jpg"
     },
     {
       "id": 32,
@@ -7145,7 +7315,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/riki.jpg"
     },
     {
       "id": 131,
@@ -7260,7 +7432,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/ringmaster.jpg"
     },
     {
       "id": 86,
@@ -7324,7 +7498,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/rubick.jpg"
     },
     {
       "id": 16,
@@ -7389,7 +7565,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/sand_king.jpg"
     },
     {
       "id": 79,
@@ -7469,7 +7647,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/shadow_demon.jpg"
     },
     {
       "id": 11,
@@ -7534,7 +7714,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/nevermore.png"
     },
     {
       "id": 27,
@@ -7625,7 +7807,9 @@
             "蛇棒"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/shadow_shaman.jpg"
     },
     {
       "id": 75,
@@ -7692,7 +7876,9 @@
             "大招沉默"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/silencer.jpg"
     },
     {
       "id": 101,
@@ -7756,7 +7942,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/skywrath_mage.jpg"
     },
     {
       "id": 28,
@@ -7825,7 +8013,9 @@
             "减甲"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/slardar.jpg"
     },
     {
       "id": 93,
@@ -7913,7 +8103,9 @@
             "小鱼大"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/slark.jpg"
     },
     {
       "id": 128,
@@ -7997,7 +8189,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/snapfire.jpg"
     },
     {
       "id": 35,
@@ -8070,7 +8264,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/sniper.jpg"
     },
     {
       "id": 67,
@@ -8140,7 +8336,9 @@
             "开大传"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/spectre.jpg"
     },
     {
       "id": 71,
@@ -8216,7 +8414,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/spirit_breaker.jpg"
     },
     {
       "id": 17,
@@ -8286,7 +8486,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/storm_spirit.jpg"
     },
     {
       "id": 18,
@@ -8349,7 +8551,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/sven.jpg"
     },
     {
       "id": 105,
@@ -8421,7 +8625,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/techies.jpg"
     },
     {
       "id": 46,
@@ -8497,7 +8703,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/templar_assassin.jpg"
     },
     {
       "id": 109,
@@ -8592,7 +8800,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/terrorblade.jpg"
     },
     {
       "id": 29,
@@ -8671,7 +8881,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/tidehunter.jpg"
     },
     {
       "id": 98,
@@ -8745,7 +8957,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/shredder.jpg"
     },
     {
       "id": 34,
@@ -8820,7 +9034,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/tinker.jpg"
     },
     {
       "id": 19,
@@ -8908,7 +9124,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/tiny.jpg"
     },
     {
       "id": 83,
@@ -8983,7 +9201,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/treant.jpg"
     },
     {
       "id": 95,
@@ -9057,7 +9277,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/troll_warlord.jpg"
     },
     {
       "id": 100,
@@ -9144,7 +9366,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/tusk.jpg"
     },
     {
       "id": 108,
@@ -9209,7 +9433,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/abyssal_underlord.jpg"
     },
     {
       "id": 85,
@@ -9278,7 +9504,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/undying.jpg"
     },
     {
       "id": 70,
@@ -9341,7 +9569,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/ursa.jpg"
     },
     {
       "id": 20,
@@ -9412,7 +9642,9 @@
             "VS换"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/vengefulspirit.jpg"
     },
     {
       "id": 40,
@@ -9476,7 +9708,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/venomancer.jpg"
     },
     {
       "id": 47,
@@ -9549,7 +9783,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/viper.jpg"
     },
     {
       "id": 92,
@@ -9612,7 +9848,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/visage.jpg"
     },
     {
       "id": 126,
@@ -9676,7 +9914,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/void_spirit.jpg"
     },
     {
       "id": 37,
@@ -9745,7 +9985,9 @@
             "砸地狱火"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/warlock.jpg"
     },
     {
       "id": 63,
@@ -9807,7 +10049,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 1,
+      "portrait": "/heroes/weaver.jpg"
     },
     {
       "id": 21,
@@ -9883,7 +10127,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 3,
+      "portrait": "/heroes/windrunner.jpg"
     },
     {
       "id": 112,
@@ -9959,7 +10205,9 @@
             "冰龙大"
           ]
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/winter_wyvern.jpg"
     },
     {
       "id": 30,
@@ -10034,7 +10282,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/witch_doctor.jpg"
     },
     {
       "id": 42,
@@ -10101,7 +10351,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 0,
+      "portrait": "/heroes/skeleton_king.jpg"
     },
     {
       "id": 22,
@@ -10188,7 +10440,9 @@
           "enAliases": [],
           "zhSlang": []
         }
-      ]
+      ],
+      "primaryAttr": 2,
+      "portrait": "/heroes/zuus.jpg"
     }
   ],
   "shopItems": [

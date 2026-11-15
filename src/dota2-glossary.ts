@@ -33,6 +33,9 @@ export interface HeroEntry {
   enAliases: string[];
   zhSlang: string[];
   abilities: HeroAbilityEntry[];
+  /** Valve primary_attr: strength, agility, intelligence, universal. */
+  primaryAttr?: 0 | 1 | 2 | 3;
+  portrait?: string;
 }
 
 export interface ItemEntry {

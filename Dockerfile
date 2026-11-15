@@ -9,6 +9,7 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY src/ ./src/
 COPY public/ ./public/
 COPY data/dota2-dictionary.json ./data/dota2-dictionary.json
+COPY data/dota2-combat.json data/dota2-map.json data/dota2-camp-compositions.json ./data/
 COPY docs/dota2-bilingual-dictionary.md ./docs/dota2-bilingual-dictionary.md
 COPY scripts/create-user.ts ./scripts/create-user.ts
 

@@ -1,0 +1,1234 @@
+[
+  {
+    "name": "Abaddon",
+    "zh": "亚巴顿",
+    "aliases": [
+      "Aba",
+      "LoA",
+      "亚巴顿",
+      "LOA"
+    ],
+    "portrait": "heroes/abaddon.jpg"
+  },
+  {
+    "name": "Alchemist",
+    "zh": "炼金术士",
+    "aliases": [
+      "Alch",
+      "炼金",
+      "GA"
+    ],
+    "portrait": "heroes/alchemist.jpg"
+  },
+  {
+    "name": "Ancient Apparition",
+    "zh": "远古冰魄",
+    "aliases": [
+      "AA",
+      "冰魂",
+      "AA"
+    ],
+    "portrait": "heroes/ancient_apparition.jpg"
+  },
+  {
+    "name": "Anti-Mage",
+    "zh": "敌法师",
+    "aliases": [
+      "AM",
+      "敌法",
+      "AM"
+    ],
+    "portrait": "heroes/antimage.jpg"
+  },
+  {
+    "name": "Arc Warden",
+    "zh": "天穹守望者",
+    "aliases": [
+      "Arc",
+      "Zet",
+      "电狗"
+    ],
+    "portrait": "heroes/arc_warden.jpg"
+  },
+  {
+    "name": "Axe",
+    "zh": "斧王",
+    "aliases": [
+      "斧王"
+    ],
+    "portrait": "heroes/axe.jpg"
+  },
+  {
+    "name": "Bane",
+    "zh": "祸乱之源",
+    "aliases": [
+      "痛苦之源",
+      "祸乱"
+    ],
+    "portrait": "heroes/bane.jpg"
+  },
+  {
+    "name": "Batrider",
+    "zh": "蝙蝠骑士",
+    "aliases": [
+      "Bat",
+      "蝙蝠"
+    ],
+    "portrait": "heroes/batrider.jpg"
+  },
+  {
+    "name": "Beastmaster",
+    "zh": "兽王",
+    "aliases": [
+      "BM",
+      "Beast",
+      "兽王"
+    ],
+    "portrait": "heroes/beastmaster.jpg"
+  },
+  {
+    "name": "Bloodseeker",
+    "zh": "血魔",
+    "aliases": [
+      "BS",
+      "Blood",
+      "血魔",
+      "BS"
+    ],
+    "portrait": "heroes/bloodseeker.jpg"
+  },
+  {
+    "name": "Bounty Hunter",
+    "zh": "赏金猎人",
+    "aliases": [
+      "BH",
+      "Gondar",
+      "赏金",
+      "BH"
+    ],
+    "portrait": "heroes/bounty_hunter.jpg"
+  },
+  {
+    "name": "Brewmaster",
+    "zh": "酒仙",
+    "aliases": [
+      "Brew",
+      "Panda",
+      "酒仙",
+      "熊猫"
+    ],
+    "portrait": "heroes/brewmaster.jpg"
+  },
+  {
+    "name": "Bristleback",
+    "zh": "钢背兽",
+    "aliases": [
+      "BB",
+      "Bristle",
+      "钢背"
+    ],
+    "portrait": "heroes/bristleback.jpg"
+  },
+  {
+    "name": "Broodmother",
+    "zh": "育母蜘蛛",
+    "aliases": [
+      "Brood",
+      "蜘蛛"
+    ],
+    "portrait": "heroes/broodmother.jpg"
+  },
+  {
+    "name": "Centaur Warrunner",
+    "zh": "半人马战行者",
+    "aliases": [
+      "Cent",
+      "CW",
+      "人马"
+    ],
+    "portrait": "heroes/centaur.jpg"
+  },
+  {
+    "name": "Chaos Knight",
+    "zh": "混沌骑士",
+    "aliases": [
+      "CK",
+      "混沌",
+      "CK"
+    ],
+    "portrait": "heroes/chaos_knight.jpg"
+  },
+  {
+    "name": "Chen",
+    "zh": "陈",
+    "aliases": [
+      "陈"
+    ],
+    "portrait": "heroes/chen.jpg"
+  },
+  {
+    "name": "Clinkz",
+    "zh": "克林克兹",
+    "aliases": [
+      "小骷髅",
+      "骨弓"
+    ],
+    "portrait": "heroes/clinkz.jpg"
+  },
+  {
+    "name": "Clockwerk",
+    "zh": "发条技师",
+    "aliases": [
+      "Clock",
+      "发条"
+    ],
+    "portrait": "heroes/rattletrap.jpg"
+  },
+  {
+    "name": "Crystal Maiden",
+    "zh": "水晶室女",
+    "aliases": [
+      "CM",
+      "Rylai",
+      "冰女",
+      "CM"
+    ],
+    "portrait": "heroes/crystal_maiden.jpg"
+  },
+  {
+    "name": "Dark Seer",
+    "zh": "黑暗贤者",
+    "aliases": [
+      "DS",
+      "黑贤",
+      "兔子",
+      "DS"
+    ],
+    "portrait": "heroes/dark_seer.jpg"
+  },
+  {
+    "name": "Dark Willow",
+    "zh": "邪影芳灵",
+    "aliases": [
+      "DW",
+      "Willow",
+      "Mireska",
+      "花仙子",
+      "小仙女"
+    ],
+    "portrait": "heroes/dark_willow.jpg"
+  },
+  {
+    "name": "Dawnbreaker",
+    "zh": "破晓辰星",
+    "aliases": [
+      "DB",
+      "Valora",
+      "锤妹",
+      "大锤"
+    ],
+    "portrait": "heroes/dawnbreaker.png"
+  },
+  {
+    "name": "Dazzle",
+    "zh": "戴泽",
+    "aliases": [
+      "暗牧",
+      "戴泽"
+    ],
+    "portrait": "heroes/dazzle.jpg"
+  },
+  {
+    "name": "Death Prophet",
+    "zh": "死亡先知",
+    "aliases": [
+      "DP",
+      "Krob",
+      "DP",
+      "死亡先知"
+    ],
+    "portrait": "heroes/death_prophet.jpg"
+  },
+  {
+    "name": "Disruptor",
+    "zh": "干扰者",
+    "aliases": [
+      "Thrall",
+      "萨尔"
+    ],
+    "portrait": "heroes/disruptor.jpg"
+  },
+  {
+    "name": "Doom",
+    "zh": "末日使者",
+    "aliases": [
+      "末日",
+      "DOOM"
+    ],
+    "portrait": "heroes/doom_bringer.jpg"
+  },
+  {
+    "name": "Dragon Knight",
+    "zh": "龙骑士",
+    "aliases": [
+      "DK",
+      "龙骑",
+      "DK"
+    ],
+    "portrait": "heroes/dragon_knight.jpg"
+  },
+  {
+    "name": "Drow Ranger",
+    "zh": "卓尔游侠",
+    "aliases": [
+      "Drow",
+      "Traxex",
+      "小黑",
+      "卓尔"
+    ],
+    "portrait": "heroes/drow_ranger.jpg"
+  },
+  {
+    "name": "Earth Spirit",
+    "zh": "大地之灵",
+    "aliases": [
+      "Earth",
+      "土猫"
+    ],
+    "portrait": "heroes/earth_spirit.jpg"
+  },
+  {
+    "name": "Earthshaker",
+    "zh": "撼地者",
+    "aliases": [
+      "ES",
+      "Shaker",
+      "小牛",
+      "牛头",
+      "撼地神牛"
+    ],
+    "portrait": "heroes/earthshaker.jpg"
+  },
+  {
+    "name": "Elder Titan",
+    "zh": "上古巨神",
+    "aliases": [
+      "ET",
+      "大牛",
+      "ET"
+    ],
+    "portrait": "heroes/elder_titan.jpg"
+  },
+  {
+    "name": "Ember Spirit",
+    "zh": "灰烬之灵",
+    "aliases": [
+      "Ember",
+      "火猫"
+    ],
+    "portrait": "heroes/ember_spirit.jpg"
+  },
+  {
+    "name": "Enchantress",
+    "zh": "魅惑魔女",
+    "aliases": [
+      "Ench",
+      "小鹿"
+    ],
+    "portrait": "heroes/enchantress.jpg"
+  },
+  {
+    "name": "Enigma",
+    "zh": "谜团",
+    "aliases": [
+      "谜团"
+    ],
+    "portrait": "heroes/enigma.jpg"
+  },
+  {
+    "name": "Faceless Void",
+    "zh": "虚空假面",
+    "aliases": [
+      "Void",
+      "FV",
+      "虚空",
+      "FV"
+    ],
+    "portrait": "heroes/faceless_void.jpg"
+  },
+  {
+    "name": "Grimstroke",
+    "zh": "天涯墨客",
+    "aliases": [
+      "Grim",
+      "墨客"
+    ],
+    "portrait": "heroes/grimstroke.jpg"
+  },
+  {
+    "name": "Gyrocopter",
+    "zh": "矮人直升机",
+    "aliases": [
+      "Gyro",
+      "飞机"
+    ],
+    "portrait": "heroes/gyrocopter.jpg"
+  },
+  {
+    "name": "Hoodwink",
+    "zh": "森海飞霞",
+    "aliases": [
+      "Hood",
+      "小松鼠",
+      "松鼠"
+    ],
+    "portrait": "heroes/hoodwink.jpg"
+  },
+  {
+    "name": "Huskar",
+    "zh": "哈斯卡",
+    "aliases": [
+      "神灵",
+      "哈斯卡"
+    ],
+    "portrait": "heroes/huskar.jpg"
+  },
+  {
+    "name": "Invoker",
+    "zh": "祈求者",
+    "aliases": [
+      "Invo",
+      "Carl",
+      "卡尔"
+    ],
+    "portrait": "heroes/invoker.jpg"
+  },
+  {
+    "name": "Io",
+    "zh": "艾欧",
+    "aliases": [
+      "Wisp",
+      "小精灵",
+      "精灵"
+    ],
+    "portrait": "heroes/wisp.jpg"
+  },
+  {
+    "name": "Jakiro",
+    "zh": "杰奇洛",
+    "aliases": [
+      "THD",
+      "双头龙"
+    ],
+    "portrait": "heroes/jakiro.jpg"
+  },
+  {
+    "name": "Juggernaut",
+    "zh": "主宰",
+    "aliases": [
+      "Jugg",
+      "Jug",
+      "剑圣",
+      "JUGG"
+    ],
+    "portrait": "heroes/juggernaut.jpg"
+  },
+  {
+    "name": "Keeper of the Light",
+    "zh": "光之守卫",
+    "aliases": [
+      "KotL",
+      "光法",
+      "KOTL"
+    ],
+    "portrait": "heroes/keeper_of_the_light.jpg"
+  },
+  {
+    "name": "Kez",
+    "zh": "凯",
+    "aliases": [
+      "凯",
+      "鸟人"
+    ],
+    "portrait": "heroes/kez.jpg"
+  },
+  {
+    "name": "Kunkka",
+    "zh": "昆卡",
+    "aliases": [
+      "船长",
+      "昆卡"
+    ],
+    "portrait": "heroes/kunkka.jpg"
+  },
+  {
+    "name": "Largo",
+    "zh": "朗戈",
+    "aliases": [
+      "朗戈",
+      "青蛙",
+      "蛤蟆"
+    ],
+    "portrait": "heroes/largo.jpg"
+  },
+  {
+    "name": "Legion Commander",
+    "zh": "军团指挥官",
+    "aliases": [
+      "LC",
+      "Legion",
+      "军团",
+      "LC"
+    ],
+    "portrait": "heroes/legion_commander.jpg"
+  },
+  {
+    "name": "Leshrac",
+    "zh": "拉席克",
+    "aliases": [
+      "Lesh",
+      "老鹿",
+      "拉席克",
+      "TS"
+    ],
+    "portrait": "heroes/leshrac.jpg"
+  },
+  {
+    "name": "Lich",
+    "zh": "巫妖",
+    "aliases": [
+      "巫妖"
+    ],
+    "portrait": "heroes/lich.jpg"
+  },
+  {
+    "name": "Lifestealer",
+    "zh": "噬魂鬼",
+    "aliases": [
+      "LS",
+      "Naix",
+      "小狗",
+      "噬魂鬼",
+      "LS"
+    ],
+    "portrait": "heroes/life_stealer.jpg"
+  },
+  {
+    "name": "Lina",
+    "zh": "莉娜",
+    "aliases": [
+      "火女",
+      "莉娜"
+    ],
+    "portrait": "heroes/lina.jpg"
+  },
+  {
+    "name": "Lion",
+    "zh": "莱恩",
+    "aliases": [
+      "莱恩",
+      "恶魔巫师"
+    ],
+    "portrait": "heroes/lion.jpg"
+  },
+  {
+    "name": "Lone Druid",
+    "zh": "独行德鲁伊",
+    "aliases": [
+      "LD",
+      "Sylla",
+      "德鲁伊",
+      "熊德",
+      "LD"
+    ],
+    "portrait": "heroes/lone_druid.jpg"
+  },
+  {
+    "name": "Luna",
+    "zh": "露娜",
+    "aliases": [
+      "月骑",
+      "露娜"
+    ],
+    "portrait": "heroes/luna.jpg"
+  },
+  {
+    "name": "Lycan",
+    "zh": "狼人",
+    "aliases": [
+      "狼人"
+    ],
+    "portrait": "heroes/lycan.jpg"
+  },
+  {
+    "name": "Magnus",
+    "zh": "马格纳斯",
+    "aliases": [
+      "Mag",
+      "RP",
+      "猛犸"
+    ],
+    "portrait": "heroes/magnataur.jpg"
+  },
+  {
+    "name": "Marci",
+    "zh": "玛西",
+    "aliases": [
+      "玛西"
+    ],
+    "portrait": "heroes/marci.png"
+  },
+  {
+    "name": "Mars",
+    "zh": "玛尔斯",
+    "aliases": [
+      "玛尔斯"
+    ],
+    "portrait": "heroes/mars.jpg"
+  },
+  {
+    "name": "Medusa",
+    "zh": "美杜莎",
+    "aliases": [
+      "Dusa",
+      "美杜莎",
+      "一姐",
+      "大娜迦"
+    ],
+    "portrait": "heroes/medusa.jpg"
+  },
+  {
+    "name": "Meepo",
+    "zh": "米波",
+    "aliases": [
+      "米波",
+      "地卜师"
+    ],
+    "portrait": "heroes/meepo.jpg"
+  },
+  {
+    "name": "Mirana",
+    "zh": "米拉娜",
+    "aliases": [
+      "PotM",
+      "白虎",
+      "POM"
+    ],
+    "portrait": "heroes/mirana.jpg"
+  },
+  {
+    "name": "Monkey King",
+    "zh": "齐天大圣",
+    "aliases": [
+      "MK",
+      "大圣",
+      "齐天大圣",
+      "MK"
+    ],
+    "portrait": "heroes/monkey_king.jpg"
+  },
+  {
+    "name": "Morphling",
+    "zh": "变体精灵",
+    "aliases": [
+      "Morph",
+      "水人"
+    ],
+    "portrait": "heroes/morphling.jpg"
+  },
+  {
+    "name": "Muerta",
+    "zh": "琼英碧灵",
+    "aliases": [
+      "奶绿",
+      "琼英碧灵"
+    ],
+    "portrait": "heroes/muerta.png"
+  },
+  {
+    "name": "Naga Siren",
+    "zh": "娜迦海妖",
+    "aliases": [
+      "Naga",
+      "小娜迦"
+    ],
+    "portrait": "heroes/naga_siren.jpg"
+  },
+  {
+    "name": "Nature's Prophet",
+    "zh": "自然先知",
+    "aliases": [
+      "NP",
+      "Furion",
+      "Prophet",
+      "先知",
+      "NP"
+    ],
+    "portrait": "heroes/furion.jpg"
+  },
+  {
+    "name": "Necrophos",
+    "zh": "瘟疫法师",
+    "aliases": [
+      "Necro",
+      "NEC",
+      "死灵法",
+      "瘟疫法师"
+    ],
+    "portrait": "heroes/necrolyte.jpg"
+  },
+  {
+    "name": "Night Stalker",
+    "zh": "暗夜魔王",
+    "aliases": [
+      "NS",
+      "Balanar",
+      "夜魔",
+      "NS"
+    ],
+    "portrait": "heroes/night_stalker.jpg"
+  },
+  {
+    "name": "Nyx Assassin",
+    "zh": "司夜刺客",
+    "aliases": [
+      "Nyx",
+      "NA",
+      "小强",
+      "NA"
+    ],
+    "portrait": "heroes/nyx_assassin.jpg"
+  },
+  {
+    "name": "Ogre Magi",
+    "zh": "食人魔魔法师",
+    "aliases": [
+      "Ogre",
+      "蓝胖"
+    ],
+    "portrait": "heroes/ogre_magi.jpg"
+  },
+  {
+    "name": "Omniknight",
+    "zh": "全能骑士",
+    "aliases": [
+      "Omni",
+      "全能"
+    ],
+    "portrait": "heroes/omniknight.jpg"
+  },
+  {
+    "name": "Oracle",
+    "zh": "神谕者",
+    "aliases": [
+      "神谕"
+    ],
+    "portrait": "heroes/oracle.jpg"
+  },
+  {
+    "name": "Outworld Destroyer",
+    "zh": "殁境神蚀者",
+    "aliases": [
+      "OD",
+      "黑鸟",
+      "OD"
+    ],
+    "portrait": "heroes/obsidian_destroyer.jpg"
+  },
+  {
+    "name": "Pangolier",
+    "zh": "石鳞剑士",
+    "aliases": [
+      "Pango",
+      "滚滚"
+    ],
+    "portrait": "heroes/pangolier.jpg"
+  },
+  {
+    "name": "Phantom Assassin",
+    "zh": "幻影刺客",
+    "aliases": [
+      "PA",
+      "Mortred",
+      "PA",
+      "幻刺"
+    ],
+    "portrait": "heroes/phantom_assassin.jpg"
+  },
+  {
+    "name": "Phantom Lancer",
+    "zh": "幻影长矛手",
+    "aliases": [
+      "PL",
+      "猴子",
+      "幻刺长矛",
+      "PL"
+    ],
+    "portrait": "heroes/phantom_lancer.jpg"
+  },
+  {
+    "name": "Phoenix",
+    "zh": "凤凰",
+    "aliases": [
+      "Birb",
+      "凤凰"
+    ],
+    "portrait": "heroes/phoenix.jpg"
+  },
+  {
+    "name": "Primal Beast",
+    "zh": "獸",
+    "aliases": [
+      "PB",
+      "Beast",
+      "兽"
+    ],
+    "portrait": "heroes/primal_beast.png"
+  },
+  {
+    "name": "Puck",
+    "zh": "帕克",
+    "aliases": [
+      "精灵龙",
+      "帕克"
+    ],
+    "portrait": "heroes/puck.jpg"
+  },
+  {
+    "name": "Pudge",
+    "zh": "帕吉",
+    "aliases": [
+      "屠夫",
+      "胖子"
+    ],
+    "portrait": "heroes/pudge.jpg"
+  },
+  {
+    "name": "Pugna",
+    "zh": "帕格纳",
+    "aliases": [
+      "骨法"
+    ],
+    "portrait": "heroes/pugna.jpg"
+  },
+  {
+    "name": "Queen of Pain",
+    "zh": "痛苦女王",
+    "aliases": [
+      "QoP",
+      "Queen",
+      "女王",
+      "痛苦女王",
+      "QOP"
+    ],
+    "portrait": "heroes/queenofpain.jpg"
+  },
+  {
+    "name": "Razor",
+    "zh": "雷泽",
+    "aliases": [
+      "电魂",
+      "电棍"
+    ],
+    "portrait": "heroes/razor.jpg"
+  },
+  {
+    "name": "Riki",
+    "zh": "力丸",
+    "aliases": [
+      "SA",
+      "隐刺",
+      "力丸",
+      "SA"
+    ],
+    "portrait": "heroes/riki.jpg"
+  },
+  {
+    "name": "Ringmaster",
+    "zh": "百戏大王",
+    "aliases": [
+      "Ring",
+      "百戏大王",
+      "马戏团"
+    ],
+    "portrait": "heroes/ringmaster.jpg"
+  },
+  {
+    "name": "Rubick",
+    "zh": "拉比克",
+    "aliases": [
+      "拉比克"
+    ],
+    "portrait": "heroes/rubick.jpg"
+  },
+  {
+    "name": "Sand King",
+    "zh": "沙王",
+    "aliases": [
+      "SK",
+      "沙王",
+      "SK"
+    ],
+    "portrait": "heroes/sand_king.jpg"
+  },
+  {
+    "name": "Shadow Demon",
+    "zh": "暗影恶魔",
+    "aliases": [
+      "SD",
+      "毒狗",
+      "SD"
+    ],
+    "portrait": "heroes/shadow_demon.jpg"
+  },
+  {
+    "name": "Shadow Fiend",
+    "zh": "影魔",
+    "aliases": [
+      "SF",
+      "影魔",
+      "SF"
+    ],
+    "portrait": "heroes/nevermore.png"
+  },
+  {
+    "name": "Shadow Shaman",
+    "zh": "暗影萨满",
+    "aliases": [
+      "SS",
+      "Rhasta",
+      "小Y",
+      "暗影萨满"
+    ],
+    "portrait": "heroes/shadow_shaman.jpg"
+  },
+  {
+    "name": "Silencer",
+    "zh": "沉默术士",
+    "aliases": [
+      "沉默"
+    ],
+    "portrait": "heroes/silencer.jpg"
+  },
+  {
+    "name": "Skywrath Mage",
+    "zh": "天怒法师",
+    "aliases": [
+      "Sky",
+      "天怒"
+    ],
+    "portrait": "heroes/skywrath_mage.jpg"
+  },
+  {
+    "name": "Slardar",
+    "zh": "斯拉达",
+    "aliases": [
+      "大鱼",
+      "大鱼人"
+    ],
+    "portrait": "heroes/slardar.jpg"
+  },
+  {
+    "name": "Slark",
+    "zh": "斯拉克",
+    "aliases": [
+      "小鱼",
+      "小鱼人"
+    ],
+    "portrait": "heroes/slark.jpg"
+  },
+  {
+    "name": "Snapfire",
+    "zh": "电炎绝手",
+    "aliases": [
+      "Snap",
+      "老奶奶"
+    ],
+    "portrait": "heroes/snapfire.jpg"
+  },
+  {
+    "name": "Sniper",
+    "zh": "狙击手",
+    "aliases": [
+      "火枪",
+      "矮子"
+    ],
+    "portrait": "heroes/sniper.jpg"
+  },
+  {
+    "name": "Spectre",
+    "zh": "幽鬼",
+    "aliases": [
+      "Spec",
+      "幽鬼",
+      "SPE"
+    ],
+    "portrait": "heroes/spectre.jpg"
+  },
+  {
+    "name": "Spirit Breaker",
+    "zh": "裂魂人",
+    "aliases": [
+      "SB",
+      "Bara",
+      "白牛",
+      "SB"
+    ],
+    "portrait": "heroes/spirit_breaker.jpg"
+  },
+  {
+    "name": "Storm Spirit",
+    "zh": "风暴之灵",
+    "aliases": [
+      "Storm",
+      "蓝猫"
+    ],
+    "portrait": "heroes/storm_spirit.jpg"
+  },
+  {
+    "name": "Sven",
+    "zh": "斯温",
+    "aliases": [
+      "斯温",
+      "流浪剑客"
+    ],
+    "portrait": "heroes/sven.jpg"
+  },
+  {
+    "name": "Techies",
+    "zh": "工程师",
+    "aliases": [
+      "炸弹人"
+    ],
+    "portrait": "heroes/techies.jpg"
+  },
+  {
+    "name": "Templar Assassin",
+    "zh": "圣堂刺客",
+    "aliases": [
+      "TA",
+      "Lanaya",
+      "TA",
+      "圣堂"
+    ],
+    "portrait": "heroes/templar_assassin.jpg"
+  },
+  {
+    "name": "Terrorblade",
+    "zh": "恐怖利刃",
+    "aliases": [
+      "TB",
+      "TB",
+      "魂守"
+    ],
+    "portrait": "heroes/terrorblade.jpg"
+  },
+  {
+    "name": "Tidehunter",
+    "zh": "潮汐猎人",
+    "aliases": [
+      "Tide",
+      "潮汐"
+    ],
+    "portrait": "heroes/tidehunter.jpg"
+  },
+  {
+    "name": "Timbersaw",
+    "zh": "伐木机",
+    "aliases": [
+      "Timber",
+      "伐木机"
+    ],
+    "portrait": "heroes/shredder.jpg"
+  },
+  {
+    "name": "Tinker",
+    "zh": "修补匠",
+    "aliases": [
+      "TK",
+      "TK",
+      "修补匠"
+    ],
+    "portrait": "heroes/tinker.jpg"
+  },
+  {
+    "name": "Tiny",
+    "zh": "小小",
+    "aliases": [
+      "小小",
+      "山岭巨人"
+    ],
+    "portrait": "heroes/tiny.jpg"
+  },
+  {
+    "name": "Treant Protector",
+    "zh": "树精卫士",
+    "aliases": [
+      "Treant",
+      "Tree",
+      "大树"
+    ],
+    "portrait": "heroes/treant.jpg"
+  },
+  {
+    "name": "Troll Warlord",
+    "zh": "巨魔战将",
+    "aliases": [
+      "Troll",
+      "巨魔"
+    ],
+    "portrait": "heroes/troll_warlord.jpg"
+  },
+  {
+    "name": "Tusk",
+    "zh": "巨牙海民",
+    "aliases": [
+      "海民"
+    ],
+    "portrait": "heroes/tusk.jpg"
+  },
+  {
+    "name": "Underlord",
+    "zh": "孽主",
+    "aliases": [
+      "Pitlord",
+      "大屁股",
+      "孽主"
+    ],
+    "portrait": "heroes/abyssal_underlord.jpg"
+  },
+  {
+    "name": "Undying",
+    "zh": "不朽尸王",
+    "aliases": [
+      "Dirge",
+      "尸王"
+    ],
+    "portrait": "heroes/undying.jpg"
+  },
+  {
+    "name": "Ursa",
+    "zh": "熊战士",
+    "aliases": [
+      "拍拍",
+      "拍拍熊"
+    ],
+    "portrait": "heroes/ursa.jpg"
+  },
+  {
+    "name": "Vengeful Spirit",
+    "zh": "复仇之魂",
+    "aliases": [
+      "VS",
+      "Venge",
+      "VS",
+      "复仇"
+    ],
+    "portrait": "heroes/vengefulspirit.jpg"
+  },
+  {
+    "name": "Venomancer",
+    "zh": "剧毒术士",
+    "aliases": [
+      "Veno",
+      "剧毒"
+    ],
+    "portrait": "heroes/venomancer.jpg"
+  },
+  {
+    "name": "Viper",
+    "zh": "冥界亚龙",
+    "aliases": [
+      "毒龙",
+      "VIP"
+    ],
+    "portrait": "heroes/viper.jpg"
+  },
+  {
+    "name": "Visage",
+    "zh": "维萨吉",
+    "aliases": [
+      "死灵龙",
+      "维萨吉"
+    ],
+    "portrait": "heroes/visage.jpg"
+  },
+  {
+    "name": "Void Spirit",
+    "zh": "虚无之灵",
+    "aliases": [
+      "Inai",
+      "紫猫"
+    ],
+    "portrait": "heroes/void_spirit.jpg"
+  },
+  {
+    "name": "Warlock",
+    "zh": "术士",
+    "aliases": [
+      "WL",
+      "术士"
+    ],
+    "portrait": "heroes/warlock.jpg"
+  },
+  {
+    "name": "Weaver",
+    "zh": "编织者",
+    "aliases": [
+      "蚂蚁"
+    ],
+    "portrait": "heroes/weaver.jpg"
+  },
+  {
+    "name": "Windranger",
+    "zh": "风行者",
+    "aliases": [
+      "WR",
+      "Wind",
+      "风行",
+      "WR"
+    ],
+    "portrait": "heroes/windrunner.jpg"
+  },
+  {
+    "name": "Winter Wyvern",
+    "zh": "寒冬飞龙",
+    "aliases": [
+      "WW",
+      "Wyvern",
+      "冰龙",
+      "WW"
+    ],
+    "portrait": "heroes/winter_wyvern.jpg"
+  },
+  {
+    "name": "Witch Doctor",
+    "zh": "巫医",
+    "aliases": [
+      "WD",
+      "巫医",
+      "WD"
+    ],
+    "portrait": "heroes/witch_doctor.jpg"
+  },
+  {
+    "name": "Wraith King",
+    "zh": "冥魂大帝",
+    "aliases": [
+      "WK",
+      "Leoric",
+      "骷髅王",
+      "冥魂大帝",
+      "WK"
+    ],
+    "portrait": "heroes/skeleton_king.jpg"
+  },
+  {
+    "name": "Zeus",
+    "zh": "宙斯",
+    "aliases": [
+      "宙斯"
+    ],
+    "portrait": "heroes/zuus.jpg"
+  }
+]

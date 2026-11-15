@@ -13,14 +13,23 @@ import { createTranslationEngine } from './engines/index.ts';
 import type { EngineConnectionState, ParticipantRole, TranslationEngine, TurnMetrics, TtsStreamMode } from './engines/types.ts';
 import { DEFAULT_ROOM_SETTINGS, TTS_VOICE_CATALOG, validateRoomSettings } from './room-settings.ts';
 import type { RoomSettings } from './room-settings.ts';
+import { TacticalEngine } from './tactics/index.ts';
+import { GsiCapture } from './tactics/capture.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const COOKIE_NAME = 'dota2_session';
+const HERO_ASSET_PATHS = new Set([
+  ...DOTA2_DICTIONARY.heroes.map(hero => hero.portrait).filter((value): value is string =>
+    typeof value === 'string' && /^\/heroes\/[a-z0-9_]+\.(jpg|png)$/.test(value)),
+  ...['strength', 'agility', 'intelligence', 'universal'].map(attr => `/heroes/attr_${attr}.png`),
+]);
 
 interface ClientConn {
   id: string;
   name: string;
   role: ParticipantRole;
+  inputKind: 'microphone' | 'process';
+  sourceLabel: string;
   ws: WebSocket;
   sessionToken: string;
   invitation?: string;
@@ -37,6 +46,7 @@ interface ClientConn {
   lastInputAckAt: number;
   lastInputLogAt: number;
   lastCaptureLogAt: number;
+  lastTacticsAt: number;
 }
 
 interface RoomState extends RoomSettings {
@@ -49,6 +59,9 @@ interface RoomState extends RoomSettings {
   lastVisionPhase: 'draft' | 'in_game' | 'menu_or_other';
   clients: Map<string, ClientConn>;
   metricsHistory: TurnMetrics[];
+  tactics: TacticalEngine;
+  lastTacticsBroadcastAt: number;
+  lastTacticsAnnouncedCamp: string | null;
 }
 
 function sessionCookie(req: http.IncomingMessage): string | undefined {
@@ -112,6 +125,7 @@ export function createCoachServer(
 ) {
   const rooms = new Map<string, RoomState>();
   const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+  const gsiCapture = new GsiCapture();
 
   function runtimeRoom(record: StoredRoom): RoomState {
     let room = rooms.get(record.roomId);
@@ -122,6 +136,7 @@ export function createCoachServer(
         matchHeroes: [], clients: new Map(), metricsHistory: [],
         lastVisionPhase: 'menu_or_other',
         gsiState: { matchId: null, gameState: null, lastHeartbeatAt: null, lastSourceMode: 'idle' },
+        tactics: new TacticalEngine(), lastTacticsBroadcastAt: 0, lastTacticsAnnouncedCamp: null,
       };
       rooms.set(record.roomId, room);
     }
@@ -235,6 +250,7 @@ export function createCoachServer(
 
     for (const client of room.clients.values()) {
       if (client.ws.readyState !== WebSocket.OPEN || !authorized(room, client)) continue;
+      if (client.inputKind === 'process') continue;
       const isIntendedListener = client.role === targetRole;
       const isSelfMonitor = client.id === sourceClientId && client.selfMonitor;
       if (isIntendedListener || isSelfMonitor) {
@@ -254,6 +270,15 @@ export function createCoachServer(
       const client = room.clients.get(sourceClientId);
       return client?.engineGeneration === generation && authorized(room, client);
     };
+    const emit = (payload: Record<string, unknown>) => {
+      const source = room.clients.get(sourceClientId);
+      if (!source) return;
+      const event = { ...payload, streamId: sourceClientId, sourceKind: source.inputKind,
+        ...(source.inputKind === 'process' ? { speaker: source.sourceLabel, private: true } : {}) };
+      // External application audio is private to its initiating connection, never room-wide.
+      if (source.inputKind === 'process') safeSend(source.ws, event);
+      else broadcastJson(room, event);
+    };
     return {
       onConnectionState: (state: EngineConnectionState) => {
         const client = room.clients.get(sourceClientId);
@@ -264,7 +289,7 @@ export function createCoachServer(
       },
       onSourcePartial: (text: string) => {
         if (!isCurrent()) return;
-        broadcastJson(room, {
+        emit({
           type: 'subtitle.source.partial',
           role,
           speaker: speakerName,
@@ -275,7 +300,7 @@ export function createCoachServer(
         if (!isCurrent()) return;
         const client = room.clients.get(sourceClientId);
         if (client) voiceDiagnostic(room, client, 'source_final');
-        broadcastJson(room, {
+        emit({
           type: 'subtitle.source.final',
           turnId,
           role,
@@ -285,7 +310,7 @@ export function createCoachServer(
       },
       onTargetPartial: (turnId: string, text: string) => {
         if (!isCurrent()) return;
-        broadcastJson(room, {
+        emit({
           type: 'subtitle.target.partial',
           turnId,
           role,
@@ -295,7 +320,7 @@ export function createCoachServer(
       },
       onTargetFinal: (turnId: string, text: string) => {
         if (!isCurrent()) return;
-        broadcastJson(room, {
+        emit({
           type: 'subtitle.target.final',
           turnId,
           role,
@@ -305,10 +330,12 @@ export function createCoachServer(
       },
       onTargetAudio: (_turnId: string, pcm24kMono: Buffer) => {
         if (!isCurrent()) return;
+        if (room.clients.get(sourceClientId)?.inputKind === 'process') return;
         routeTranslatedAudio(room, role, sourceClientId, pcm24kMono);
       },
       onTurnMetrics: (metrics: TurnMetrics) => {
         if (!isCurrent()) return;
+        if (room.clients.get(sourceClientId)?.inputKind === 'process') return;
         room.metricsHistory.push(metrics);
         if (room.metricsHistory.length > 50) {
           room.metricsHistory.shift();
@@ -321,7 +348,7 @@ export function createCoachServer(
       },
       onStatus: (status: string) => {
         if (!isCurrent()) return;
-        broadcastJson(room, {
+        emit({
           type: 'engine.status',
           role,
           speaker: speakerName,
@@ -332,7 +359,7 @@ export function createCoachServer(
         if (!isCurrent()) return;
         const client = room.clients.get(sourceClientId);
         if (client) voiceDiagnostic(room, client, 'engine_error', { code: voiceErrorCode(message) });
-        broadcastJson(room, {
+        emit({
           type: 'engine.error',
           role,
           speaker: speakerName,
@@ -356,6 +383,7 @@ export function createCoachServer(
     setEngineState(room, client, 'connecting');
     const generation = ++client.engineGeneration;
     const next = engineFactory(room.engineKind, {
+      inputKind: client.inputKind,
       role: client.role, englishOriginalVoiceRelay: room.englishOriginalVoiceRelay,
       matchHeroes: room.matchHeroes, ttsZhVoice: room.ttsZhVoice,
       ttsEnVoice: room.ttsEnVoice, ttsStreamMode: room.ttsStreamMode,
@@ -388,7 +416,7 @@ export function createCoachServer(
   }
 
   function broadcastRoomRoster(room: RoomState): void {
-    const participants = Array.from(room.clients.values()).map((c) => ({
+    const participants = Array.from(room.clients.values()).filter(c => c.inputKind !== 'process').map((c) => ({
       id: c.id,
       name: c.name,
       role: c.role,
@@ -407,6 +435,7 @@ export function createCoachServer(
       ttsStreamMode: room.ttsStreamMode,
       voiceLiveAsrModel: room.voiceLiveAsrModel,
       gsiState: room.gsiState,
+      tactics: room.tactics.state(),
       participants,
       recentMetrics: room.metricsHistory.slice(-15),
     });
@@ -531,6 +560,26 @@ export function createCoachServer(
           resetHeroes: gsi.resetHeroes,
           heroesUpdated: changed,
         });
+
+        // Isolated from draft/voice logic: optional tactics must never break GSI acknowledgements.
+        try {
+          const now = Date.now();
+          gsiCapture.record(roomId, parsed, now);
+          const updated = room.tactics.ingest(parsed, now, gsi.resetHeroes);
+          if ((updated || gsi.resetHeroes) && now - room.lastTacticsBroadcastAt >= 500) {
+            room.lastTacticsBroadcastAt = now;
+            const state = room.tactics.state();
+            broadcastJson(room, { type: 'tactics.state', state });
+            const nextCamp = state.route?.steps[0]?.campId ?? null;
+            if (state.route?.status === 'ready' &&
+                nextCamp !== room.lastTacticsAnnouncedCamp) {
+              broadcastJson(room, { type: 'tactics.alert', text: state.route.nextAction, createdAt: now });
+            }
+            room.lastTacticsAnnouncedCamp = nextCamp;
+          }
+        } catch {
+          console.warn('[tactics] GSI processing failed; draft state remains available');
+        }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
@@ -694,10 +743,29 @@ export function createCoachServer(
         throw new AppError(404, '接口不存在');
       }
 
+      // Only serve known local hero images, never arbitrary paths or remote URLs.
+      if (isRead && HERO_ASSET_PATHS.has(route)) {
+        let content: Buffer;
+        try {
+          content = await fs.readFile(path.join(ROOT, 'public', route.slice(1)));
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new AppError(404, 'Image not found');
+          throw error;
+        }
+        res.writeHead(200, {
+          'Content-Type': route.endsWith('.jpg') ? 'image/jpeg' : 'image/png',
+          'Cache-Control': 'public, max-age=86400',
+        });
+        res.end(req.method === 'HEAD' ? undefined : content);
+        return;
+      }
       const staticFiles: Record<string, [string, string]> = {
         '/': ['index.html', 'text/html'],
         '/index.html': ['index.html', 'text/html'],
         '/app.js': ['app.js', 'application/javascript'],
+        '/hero-picker.js': ['hero-picker.js', 'application/javascript'],
+        '/desktop-listener.js': ['desktop-listener.js', 'application/javascript'],
+        '/jungle-panel.js': ['jungle-panel.js', 'application/javascript'],
         '/styles.css': ['styles.css', 'text/css'],
       };
       if (!isRead || !staticFiles[route]) throw new AppError(404, 'Not Found');
@@ -723,18 +791,37 @@ export function createCoachServer(
       const record = store.requireRoom(auth.user, url.searchParams.get('room') || '', invitation);
       const role = url.searchParams.get('role');
       if (role !== 'coach' && role !== 'student') throw new AppError(400, '请选择身份');
+      const inputKind = url.searchParams.get('inputKind') || 'microphone';
+      if (inputKind !== 'microphone' && inputKind !== 'process') throw new AppError(400, '无效音频来源');
+      const sourceLabel = inputKind === 'process' ? (url.searchParams.get('sourceLabel') || '').trim() : '';
+      if (inputKind === 'process') {
+        if (role !== 'coach' || !sourceLabel || sourceLabel.length > 80 || /[\x00-\x1f\x7f]/.test(sourceLabel)) {
+          throw new AppError(400, '无效监听来源');
+        }
+        const room = runtimeRoom(record);
+        if ([...room.clients.values()].some(c => c.inputKind === 'process' && c.sessionToken === sessionCookie(req))) {
+          throw new AppError(409, '本会话已有监听连接，请先停止');
+        }
+      }
       wss.handleUpgrade(req, socket, head, ws => {
         const room = runtimeRoom(record);
         const client: ClientConn = {
-          id: crypto.randomUUID(), name: auth.user.username, role, ws,
+          id: crypto.randomUUID(), name: auth.user.username, role, ws, inputKind, sourceLabel,
           sessionToken: sessionCookie(req)!, invitation,
           selfMonitor: url.searchParams.get('selfMonitor') === '1',
           engine: null, pendingEngine: null, startingEngine: null,
           engineState: 'connecting', engineGeneration: 0, startupRetries: 0, retryTimer: null,
           inputFrames: 0, forwardedFrames: 0, lastInputAckAt: 0, lastInputLogAt: 0,
           lastCaptureLogAt: 0,
+          lastTacticsAt: 0,
         };
         room.clients.set(client.id, client);
+        if (inputKind === 'process') {
+          // A stale server may ignore inputKind and treat this as a public coach microphone.
+          // The desktop must see this explicit privacy/protocol acknowledgment BEFORE capturing.
+          safeSend(ws, { type: 'listener.config', protocolVersion: 1,
+            privacy: 'connection', output: 'text', sampleRate: 24000, channels: 1 });
+        }
         broadcastRoomRoster(room);
         warmClientEngine(room, client);
         ws.on('error', () => disconnect(room, client, 1011, 'Connection error'));
@@ -748,6 +835,9 @@ export function createCoachServer(
           if (binary) {
             const pcm = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
             if (!pcm.length || pcm.length % 2 !== 0) return;
+            if (client.inputKind === 'process' && pcm.length > 28_800) {
+              disconnect(room, client, 1009, 'Audio packet too large'); return;
+            }
             client.inputFrames++;
             if (client.engine && client.engineState === 'ready') {
               client.engine.appendAudio(pcm);
@@ -771,7 +861,38 @@ export function createCoachServer(
           try { message = JSON.parse(data.toString()); } catch { return; }
           if (!message || typeof message !== 'object') return;
           const reject = (text: string) => safeSend(ws, { type: 'room.error', message: text });
+          if (client.inputKind === 'process' && !['client.audio.status', 'speech.end'].includes(message.type)) {
+            reject('监听连接只接受音频'); return;
+          }
           switch (message.type) {
+            case 'room.set_tactics':
+            case 'tactics.request_route':
+            case 'tactics.mark_cleared': {
+              if (client.role !== 'student' && client.name !== room.record.ownerUsername) {
+                reject('只有学员或房主可以控制刷野规划'); break;
+              }
+              const now = Date.now();
+              if (now - client.lastTacticsAt < 1000) { reject('规划操作过于频繁，请稍后重试'); break; }
+              client.lastTacticsAt = now;
+              try {
+                if (message.type === 'room.set_tactics') {
+                  if (typeof message.enabled !== 'boolean') { reject('无效战术开关'); break; }
+                  room.tactics.setEnabled(message.enabled);
+                  room.lastTacticsAnnouncedCamp = null;
+                } else if (message.type === 'tactics.mark_cleared') {
+                  if (typeof message.campId !== 'string' || message.campId.length > 80) { reject('无效营地'); break; }
+                  room.tactics.markCleared(message.campId, now);
+                } else room.tactics.requestRoute(now);
+                const state = room.tactics.state();
+                broadcastJson(room, { type: 'tactics.state', state });
+                if (message.type === 'tactics.request_route' && state.route) {
+                  safeSend(ws, { type: 'tactics.alert', text: state.route.nextAction, createdAt: now, requested: true });
+                }
+              } catch (error) {
+                reject(error instanceof Error ? error.message : '刷野规划失败');
+              }
+              break;
+            }
             case 'client.audio.status': {
               const allowed = ['capturing', 'stopped', 'capture_stalled', 'input_silent', 'upload_stalled', 'capture_error', 'context_suspended'];
               if (allowed.includes(message.status) && Date.now() - client.lastCaptureLogAt >= 250) {
@@ -829,8 +950,15 @@ export function createCoachServer(
   }
   const timer = setInterval(sweepConnections, 30_000);
   timer.unref();
+  const tacticsTimer = setInterval(() => {
+    for (const room of rooms.values()) {
+      if (room.tactics.expire(Date.now())) broadcastJson(room, { type: 'tactics.state', state: room.tactics.state() });
+    }
+  }, 1000);
+  tacticsTimer.unref();
   server.on('close', () => {
     clearInterval(timer);
+    clearInterval(tacticsTimer);
     for (const room of rooms.values()) for (const client of room.clients.values()) {
       disconnect(room, client, 1001, 'Server shutting down');
     }

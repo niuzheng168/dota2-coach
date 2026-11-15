@@ -2,6 +2,7 @@ import { CascadeEngine } from './cascade-engine.ts';
 import { GptLiveEngine } from './gpt-live-engine.ts';
 import { GptRealtimeEngine } from './gpt-realtime-engine.ts';
 import { VoiceLiveEngine } from './voice-live-engine.ts';
+import { ProcessListenEngine } from './process-listen-engine.ts';
 import type {
   EngineCallbacks,
   EngineKind,
@@ -24,6 +25,7 @@ export function createTranslationEngine(
   options: EngineOptions,
   callbacks: EngineCallbacks,
 ): TranslationEngine {
+  if (options.inputKind === 'process') return new ProcessListenEngine(options, callbacks);
   switch (kind) {
     case 'cascade':
       return new VoiceLiveEngine('cascade', options, callbacks);

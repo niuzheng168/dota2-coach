@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Dota Coach</title>
+  <link rel="stylesheet" href="desktop.css">
+  <script src="desktop.js" type="module"></script>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true"><defs>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></symbol>
+  <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M3 15v-3a9 9 0 0 1 18 0v3"/><rect x="3" y="12" width="5" height="9" rx="2"/><rect x="16" y="12" width="5" height="9" rx="2"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3Z"/><path d="M7 8h10M7 12h7"/></symbol>
+  <symbol id="i-captions" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 10h5m3 0h4M6 14h3m3 0h6"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><rect x="7" y="4" width="4" height="6" rx="1"/><rect x="14" y="14" width="4" height="6" rx="1"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 10a8 8 0 1 0-1 7M20 3v7h-7"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 3 6v6c0 6 9 10 9 10s9-4 9-10V6Z"/><path d="m8 12 3 3 5-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M12 17v4m-5 0h10"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 22v-2a8 8 0 0 1 16 0v2"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
+</defs></svg>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">D<span>↗</span></span><div>Dota Coach<small>听见战术 · 跨越语言</small></div></div>
+    <div class="nav-caption">你的工作空间</div>
+    <nav aria-label="主导航">
+      <button class="nav-item active" data-page="workspace" aria-current="page"><svg><use href="#i-grid"/></svg>工作台<span class="nav-dot"></span></button>
+      <button class="nav-item" data-page="history"><svg><use href="#i-chat"/></svg>实时对话<span id="historyCount" class="count">0</span></button>
+      <button class="nav-item" data-page="subtitles"><svg><use href="#i-captions"/></svg>悬浮字幕</button>
+      <button class="nav-item" data-page="settings"><svg><use href="#i-settings"/></svg>设置</button>
+    </nav>
+    <div class="sidebar-room">
+      <span class="nav-caption">当前语音室</span>
+      <button id="roomButton" class="room-button"><span class="room-symbol">#</span><span id="sidebarRoom">选择语音室</span><span>⌄</span></button>
+      <div class="room-state"><span id="roomDot" class="dot"></span><span id="roomConnection">尚未连接</span></div>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="local-note"><svg><use href="#i-shield"/></svg><div>本地采集，独立运行<small>界面切换不打断音频</small></div></div>
+      <button id="accountButton" class="account"><span class="avatar"><svg><use href="#i-user"/></svg></span><span><strong id="accountName">登录账号</strong><small id="accountMeta">连接你的教练与队友</small></span><span>↗</span></button>
+      <div class="version-row"><span id="appVersion">桌面版</span><span>WINDOWS</span></div>
+    </div>
+  </aside>
+  <div class="body-shell">
+    <header class="topbar">
+      <div class="breadcrumbs">工作空间 <span>/</span> <strong id="pageBreadcrumb">工作台</strong></div>
+      <div class="top-actions"><span class="service-state"><span class="dot green"></span><span id="serviceStatus">本地界面已就绪</span></span><button id="trayButton" class="subtle small-button" title="隐藏到托盘，采集继续运行">收起到托盘 <span>↙</span></button></div>
+    </header>
+    <main>
+      <section data-view="workspace" class="page">
+        <div class="page-heading"><div><p class="eyebrow">FOCUS ON YOUR NEXT PLAY</p><h1>专注对局，清晰沟通<span class="accent">。</span></h1><p class="description">连麦、听译与双语字幕，在一个安静的工作空间里。</p></div><button id="manageRoom" class="subtle"><svg><use href="#i-settings"/></svg>房间管理</button></div>
+        <div id="welcomeStrip" class="welcome-strip"><div><strong>准备好开始了吗？</strong><span>登录并选择语音室，即可连麦或监听游戏声音。字幕可随时离线预览。</span></div><button id="welcomeLogin" class="primary">登录账号 <svg><use href="#i-arrow"/></svg></button></div>
+        <div class="workspace-grid">
+          <div class="main-column">
+            <div class="source-grid">
+              <article class="source-card" id="micCard">
+                <div class="card-top"><span class="icon-tile"><svg><use href="#i-mic"/></svg></span><span class="tag" id="micBadge">未开启</span></div>
+                <h2>App 内连麦</h2><p class="muted">你的声音，传递给房间里的伙伴。</p>
+                <label class="field-label" for="micDevice">输入设备</label>
+                <div class="device-row"><select id="micDevice"><option value="">系统默认麦克风</option></select><button id="refreshMic" class="icon-button" aria-label="刷新麦克风"><svg><use href="#i-refresh"/></svg></button></div>
+                <div class="volume-line"><div class="meter"><i id="micLevel"></i></div><span id="micLevelText">0%</span></div>
+                <div class="source-actions"><button id="micToggle" class="primary grow" disabled><svg><use href="#i-mic"/></svg><span>开启麦克风</span></button><button id="pttButton" class="subtle" disabled title="按住按钮说话，松开关闭麦克风">按住说话</button></div>
+                <div class="source-foot"><span class="dot" id="micDot"></span><span id="micStatus">进入房间后即可开麦</span></div>
+              </article>
+              <article class="source-card" id="listenCard">
+                <div class="card-top"><span class="icon-tile violet"><svg><use href="#i-headphones"/></svg></span><span class="tag" id="listenBadge">仅自己可见</span></div>
+                <h2>外部声音听译</h2><p class="muted">教练照常说英语，你实时看中文。</p>
+                <label class="field-label" for="processSelect">监听程序及其子进程</label>
+                <div class="device-row"><select id="processSelect"><option value="">选择 Dota 2、YY 或其他程序</option></select><button id="refreshProcesses" class="icon-button" aria-label="刷新进程"><svg><use href="#i-refresh"/></svg></button></div>
+                <div class="volume-line"><div class="meter purple"><i id="listenLevel"></i></div><span id="listenLevelText">0%</span></div>
+                <button id="listenToggle" class="secondary full" disabled><svg><use href="#i-headphones"/></svg><span>开始监听</span></button>
+                <div class="source-foot"><span class="dot" id="listenDot"></span><span id="listenStatus">独立采音 · 不向房间广播</span></div>
+              </article>
+            </div>
+            <div class="pipeline"><span><i id="stageCapture"></i>声音采集</span><b>—</b><span><i id="stageUpload"></i>上传确认</span><b>—</b><span><i id="stageTranscript"></i>英语识别</span><b>—</b><span><i id="stageTranslation"></i>中文翻译</span></div>
+            <article class="conversation-panel">
+              <header class="section-title"><div><svg><use href="#i-chat"/></svg><h2>实时对话</h2><span class="tiny-label">本次会话</span></div><button class="text-button" data-page="history">查看全部 ↗</button></header>
+              <div id="conversationFeed" class="conversation-feed"><div class="empty-conversation"><span class="empty-orbit"><svg><use href="#i-chat"/></svg></span><h3>每一句战术，都值得听懂</h3><p>开启连麦或外部听译，原文与译文会出现在这里。<br>外部监听记录只在你的客户端显示。</p></div></div>
+              <div id="partialLine" class="partial-line" aria-live="polite"></div>
+              <form id="textForm" class="composer"><input id="textInput" maxlength="4000" placeholder="也可以输入一句话，翻译并发送…" aria-label="输入翻译文字" /><button type="submit" class="send-button" aria-label="翻译并发送"><svg><use href="#i-arrow"/></svg></button></form>
+            </article>
+          </div>
+          <aside class="right-column">
+            <article class="preview-card">
+              <header class="section-title"><div><svg><use href="#i-captions"/></svg><h2>游戏悬浮字幕</h2></div><label class="switch" title="显示悬浮字幕"><input id="overlayEnabled" type="checkbox" checked><span></span></label></header>
+              <div class="mini-scene"><div class="scene-grid"></div><div class="lane"></div><span class="scene-label">字幕样式预览</span><span class="scene-rune">✦</span><div class="mini-caption" id="miniCaption"><div id="previewEnglish">We should smoke and take Roshan.</div><strong id="previewChinese">我们开雾去打肉山。</strong></div></div>
+              <div class="preview-description"><span><i class="dot green"></i>鼠标穿透</span><span>不抢游戏焦点</span></div>
+              <div class="position-presets" aria-label="字幕位置"><button data-position="0">顶部</button><button data-position="50">居中</button><button data-position="100">底部</button></div>
+              <button id="previewButton" class="subtle full"><svg><use href="#i-monitor"/></svg>在屏幕上预览</button>
+              <button class="text-button centered" data-page="subtitles">调整颜色、字号与透明度 ↗</button>
+            </article>
+            <article class="draft-card"><header class="section-title"><div><span class="draft-symbol">✦</span><h2>本局英雄</h2></div><button id="editHeroes" class="icon-button" aria-label="选择本局英雄"><svg><use href="#i-plus"/></svg></button></header><div id="heroLineup" class="hero-lineup"></div><p class="muted">锁定阵容，让英雄外号和技能翻译更准确。</p><button id="gsiButton" class="text-button">下载自动识阵配置 ↗</button></article>
+            <div class="quiet-tip"><svg><use href="#i-shield"/></svg><p>外部听译不保存录音。声音会上传云端处理，请先告知对方。游戏台词也可能被识别。</p></div>
+          </aside>
+        </div>
+      </section>
+      <section data-view="history" class="page" hidden>
+        <div class="page-heading"><div><p class="eyebrow">CONVERSATION</p><h1>每次交流，都有上下文。</h1><p class="description">本次房间的双语记录。离开房间即清空，不在云端持久保存。</p></div><span class="tag">最多保留 300 条</span></div>
+        <div id="historyFeed" class="history-panel"></div>
+      </section>
+      <section data-view="subtitles" class="page" hidden>
+        <div class="page-heading"><div><p class="eyebrow">YOUR WORDS, YOUR STYLE</p><h1>字幕，放在你习惯的位置。</h1><p class="description">离线也能调整。选择底部后，字号和换行变化时仍保持贴底。</p></div><button id="largePreviewButton" class="primary"><svg><use href="#i-monitor"/></svg>屏幕预览</button></div>
+        <div class="settings-layout"><article class="settings-card"><h2>位置与显示</h2><label class="setting-row"><span>显示器<small>跟随所选显示器的分辨率与缩放</small></span><select id="overlayMonitor"></select></label><div class="range-setting"><label for="overlayTop">垂直位置 <output id="overlayTopValue">100%</output></label><input id="overlayTop" type="range" min="0" max="100" step="1" value="100"><div class="range-labels"><span>顶部</span><span>居中</span><span>底部</span></div></div><div class="position-presets"><button data-position="0">顶部</button><button data-position="50">居中</button><button data-position="100">底部</button></div><label class="setting-row"><span>字幕停留时间<small>最后一次更新后自动淡出</small></span><select id="overlaySeconds"><option value="5">5 秒</option><option value="8">8 秒</option><option value="12">12 秒</option><option value="20">20 秒</option><option value="30">30 秒</option></select></label><p class="helper">游戏建议使用无边框窗口。独占全屏不保证可以覆盖。</p></article>
+        <article class="settings-card"><h2>颜色与阅读</h2><div class="color-grid"><label>英文原文<input id="overlaySourceColor" type="color" value="#eef3ef"></label><label>中文译文<input id="overlayTargetColor" type="color" value="#b8f3cc"></label></div><div class="range-setting"><label for="overlayFontSize">字幕字号 <output id="overlayFontSizeValue">28 px</output></label><input id="overlayFontSize" type="range" min="16" max="48" value="28"></div><div class="range-setting"><label for="overlayOpacity">文字不透明度 <output id="overlayOpacityValue">95%</output></label><input id="overlayOpacity" type="range" min="0.15" max="1" step="0.05" value="0.95"></div><div class="range-setting"><label for="overlayBackground">背景不透明度 <output id="overlayBackgroundValue">35%</output></label><input id="overlayBackground" type="range" min="0" max="0.9" step="0.05" value="0.35"></div></article></div>
+        <div class="shortcut-banner"><span><svg><use href="#i-captions"/></svg>不用切出游戏</span><span>显示 / 隐藏字幕 <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>H</kbd></span><span>暂停听译 <kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>L</kbd></span></div>
+      </section>
+      <section data-view="settings" class="page" hidden>
+        <div class="page-heading"><div><p class="eyebrow">PREFERENCES</p><h1>只设置必要的事。</h1><p class="description">音频、服务与高级选项。主要操作留在工作台。</p></div></div>
+        <div class="settings-layout">
+          <article class="settings-card"><h2>连麦偏好</h2><label class="setting-row"><span>我的身份<small>决定 App 连麦的翻译方向</small></span><select id="roleSelect"><option value="student">学员 · 中文 → 英文</option><option value="coach">教练 · 英文 → 中文</option></select></label><label class="setting-row"><span>听自己的翻译<small>仅影响 App 内连麦，不影响外部听译</small></span><input id="selfMonitor" type="checkbox"></label><button id="savePreferences" class="subtle full">保存连麦偏好</button><p class="helper">麦克风使用 Windows 原生采集；建议佩戴耳机，避免扬声器译音再次进入麦克风。暂无软件回声消除。</p><hr><h2>快捷控制</h2><div class="key-row">显示 / 隐藏字幕<kbd>Ctrl + Shift + H</kbd></div><div class="key-row">停止外部监听<kbd>Ctrl + Shift + L</kbd></div><div class="key-row">关闭麦克风<kbd>Ctrl + Shift + M</kbd></div><p id="shortcutStatus" class="helper"></p></article>
+          <article class="settings-card"><h2>高级设置</h2><label class="field-label" for="serverAddress">同传服务地址</label><input id="serverAddress" type="url" value="https://dota2.largeniu.com/" autocomplete="off"><p class="helper">普通使用无需更改。更换服务前须退出登录；外网仅允许 HTTPS，本地开发可用 localhost。</p><button id="saveServer" class="subtle full">更改服务地址</button><hr><h2>诊断与其他工具</h2><p class="helper">诊断文件仅含版本、连接状态和音频帧数，不含录音、聊天、账号凭据或房间邀请。</p><button id="exportDiagnostics" class="subtle full"><svg><use href="#i-download"/></svg>导出诊断信息</button><button id="openWeb" class="text-button">打开网页版高级工具（含窗口视觉识阵） ↗</button><p class="helper">网页登录独立。桌面端支持本地英雄选择与 GSI，窗口视觉识阵暂保留在网页版。</p><hr><button id="logoutButton" class="text-button danger">退出登录并停止采集</button></article>
+        </div>
+      </section>
+    </main>
+    <footer class="statusbar"><span><i class="dot green"></i>本地音频引擎</span><span id="footerRoom">未连接语音室</span><span id="footerActivity">没有正在采集的声音</span><span class="statusbar-end">C# + WebView2 <span class="separator">·</span> 私密协作</span></footer>
+  </div>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+<dialog id="loginDialog"><form id="loginForm"><div class="dialog-title"><span class="eyebrow">WELCOME BACK</span><button type="button" data-close class="close-button" aria-label="关闭">×</button></div><h2>回到你的工作空间。</h2><p class="description">使用已有的同传账号登录，无需重新注册。</p><label class="field-label" for="username">账号</label><input id="username" autocomplete="username" required maxlength="32" placeholder="你的账号"><label class="field-label" for="password">密码</label><input id="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="输入密码"><p id="loginError" class="error" role="alert"></p><button class="primary full" id="loginSubmit">登录 <svg><use href="#i-arrow"/></svg></button><p class="helper">凭据仅交给本地后台与所选服务。关闭应用后需重新登录。</p></form></dialog>
+<dialog id="roomsDialog"><div class="dialog-title"><h2>选择语音室</h2><button data-close class="close-button" aria-label="关闭">×</button></div><div id="roomsList" class="rooms-list"></div><form id="joinForm"><label class="field-label" for="inviteInput">或粘贴邀请链接</label><div class="inline-form"><input id="inviteInput" type="text" placeholder="https://…/?room=…#invite=…" required><button class="primary">加入</button></div></form><button id="newRoom" class="subtle full"><svg><use href="#i-plus"/></svg>创建语音室</button><p class="helper">受邀成员仍需房主授权。不会显示其他人的私人房间。</p></dialog>
+<dialog id="roomDialog" class="wide-dialog"><form id="roomForm"><div class="dialog-title"><h2 id="roomDialogTitle">房间管理</h2><button type="button" data-close class="close-button" aria-label="关闭">×</button></div><label class="field-label" for="roomName">房间名称</label><input id="roomName" maxlength="80" required placeholder="例如：今晚的对线训练"><div id="roomInviteActions" class="source-actions"><button id="copyInvite" type="button" class="subtle grow">复制邀请链接</button><button id="reconnectRoom" type="button" class="subtle">重新连接</button><button id="leaveRoom" type="button" class="subtle danger">离开</button></div><label class="field-label">允许加入的账号</label><div id="allowedUsers" class="user-list"></div><details><summary>高级同传设置</summary><div class="form-grid"><label>引擎<select id="engineSelect"><option value="cascade">Voice Live · Cascaded</option><option value="gpt-realtime">Voice Live · Realtime</option><option value="gpt-live">GPT-Live</option></select></label><label>语音识别<select id="asrSelect"><option value="azure-speech">Azure Speech</option><option value="mai-transcribe-2-streaming">MAI Streaming</option><option value="mai-transcribe-2">MAI Transcribe</option></select></label><label>中文音色<select id="zhVoice"></select></label><label>英文音色<select id="enVoice"></select></label></div><p class="helper">修改会重置房间语音连接，采集需手动重新开启。GPT-Live 使用内置语音；外部听译始终为文字模式。</p></details><p id="roomError" class="error"></p><button id="saveRoom" class="primary full">保存房间设置</button></form></dialog>
+<dialog id="heroesDialog" class="wide-dialog"><div class="dialog-title"><h2>本局英雄 <span id="heroCount">0 / 10</span></h2><button data-close class="close-button" aria-label="关闭">×</button></div><input id="heroSearch" placeholder="搜索中文名、英文名或外号…" aria-label="搜索英雄"><div id="heroGrid" class="hero-grid"></div><div class="source-actions"><button id="clearHeroes" class="subtle">清空</button><button id="saveHeroes" class="primary grow">应用本局阵容</button></div></dialog>
+</body>
+</html>

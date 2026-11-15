@@ -9,10 +9,59 @@ import WebSocket from 'ws';
 import { AccessStore } from '../src/access-store.ts';
 import { createCoachServer } from '../src/app-server.ts';
 import { DEFAULT_ROOM_SETTINGS } from '../src/room-settings.ts';
-import type { EngineOptions } from '../src/engines/types.ts';
+import type { EngineCallbacks, EngineOptions } from '../src/engines/types.ts';
+import { MAP } from '../src/tactics/combat-data.ts';
 
 const password = 'only-a-test-password';
 type Login = { cookie: string; csrfToken: string };
+
+test('jungle controls are authorized, room-isolated, default off, and do not restart voice engines', async t => {
+  const f = await fixture(t);
+  const owner = await f.login('largeniu'), guest = await f.login('coach1');
+  const room = await f.create(owner), other = await f.create(owner);
+  const student = f.socket(owner, `room=${room.roomId}&role=student`);
+  const coach = f.socket(guest, `room=${room.roomId}&role=coach&invite=${room.inviteToken}`);
+  const otherSocket = f.socket(owner, `room=${other.roomId}&role=student`);
+  const events = [student, coach, otherSocket].map(recordMessages);
+  await waitUntil(() => events.every(e => e.some(m => m.type === 'room.state')));
+  assert.equal(events[0].find(m => m.type === 'room.state').tactics.enabled, false);
+  coach.send(JSON.stringify({ type: 'room.set_tactics', enabled: true }));
+  await waitUntil(() => events[1].some(m => m.type === 'room.error'));
+  assert.match(events[1].find(m => m.type === 'room.error').message, /学员或房主/);
+  const enginesBefore = f.started.length;
+  student.send(JSON.stringify({ type: 'room.set_tactics', enabled: true }));
+  await waitUntil(() => events[0].some(m => m.type === 'tactics.state' && m.state.enabled));
+  const camp = MAP.camps.find(c => c.id === 'neutralcamp_good_5')!;
+  const gsi = {
+    auth: { token: f.store.getRoom(room.roomId)!.gsiToken },
+    map: { matchid: 'tactics-integration', clock_time: 600, game_state: 'DOTA_GAMERULES_STATE_GAME_IN_PROGRESS' },
+    hero: { name: 'npc_dota_hero_sven', xpos: camp.x, ypos: camp.y, health: 3000, max_health: 3000,
+      mana: 600, max_mana: 600, level: 15, alive: true },
+    player: { team_name: 'radiant', last_hits: 100 },
+    abilities: { ability0: { name: 'sven_great_cleave', level: 4, cooldown: 0 },
+      ability1: { name: 'sven_storm_bolt', level: 4, cooldown: 0 } },
+    items: { slot0: { name: 'item_broadsword' } },
+  };
+  const result = await f.request(`/api/gsi?room=${room.roomId}`, 'POST', gsi);
+  assert.equal(result.status, 200);
+  await waitUntil(() => events[0].some(m => m.type === 'tactics.state' && m.state.route));
+  assert.ok(events[1].some(m => m.type === 'tactics.state' && m.state.route), 'coach sees read-only route');
+  assert.ok(!events[2].some(m => m.type === 'tactics.state'), 'other room gets no tactical state');
+  assert.equal(f.started.length, enginesBefore);
+  assert.equal(student.readyState, WebSocket.OPEN);
+  const cfg = await (await f.request(`/api/gsi-config?room=${room.roomId}`, 'GET', undefined, owner)).text();
+  assert.match(cfg, /"abilities"\s+"1"/);
+  assert.match(cfg, /"items"\s+"1"/);
+  assert.match(cfg, /"throttle"\s+"0.5"/);
+  // Invalid/spectator payload never becomes a route, and still does not break existing GSI.
+  await new Promise(resolve => setTimeout(resolve, 520));
+  const spectator = await f.request(`/api/gsi?room=${room.roomId}`, 'POST', { ...gsi, hero: { team2: {} } });
+  assert.equal(spectator.status, 200);
+  await waitUntil(() => events[0].some(m => m.type === 'tactics.state' && /观战/.test(m.state.status)));
+  assert.equal(events[0].findLast(m => m.type === 'tactics.state').state.route, null);
+  const state = (await (await f.request(`/api/rooms/${room.roomId}`, 'GET', undefined, owner)).json()).room;
+  assert.ok(!('tactics' in state.settings), 'runtime toggle is not durable room settings');
+});
 
 async function fixture(t: TestContext, factory?: Parameters<typeof createCoachServer>[1]) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'dota2-access-'));
@@ -539,4 +588,106 @@ test('a transient initial startup failure recovers without requiring a typed mes
   assert.ok(states.includes('reconnecting'));
   assert.ok(states.includes('ready'));
   assert.equal(attempts, 2);
+});
+
+test('external listening is authenticated, private, text-only and independent from room microphone audio', async t => {
+  const engines: { options: EngineOptions; callbacks: EngineCallbacks; stopped: boolean; frames: number }[] = [];
+  const f = await fixture(t, (kind, options, callbacks) => {
+    const state = { options, callbacks, stopped: false, frames: 0 };
+    engines.push(state);
+    return {
+      kind, role: options.role,
+      async start() {}, async stop() { state.stopped = true; },
+      appendAudio() { state.frames++; }, markSpeechEnd() {},
+    };
+  });
+  const owner = await f.login('largeniu'), guest = await f.login('coach1'), outsider = await f.login('outsider');
+  const room = await f.create(owner);
+  const query = `room=${room.roomId}&role=coach&inputKind=process&sourceLabel=dota2.exe`;
+  await f.deniedSocket(401, undefined, query);
+  await f.deniedSocket(403, outsider, `${query}&invite=${room.inviteToken}`);
+  await f.deniedSocket(403, owner, query, 'https://evil.test');
+  await f.deniedSocket(400, owner, query.replace('role=coach', 'role=student'));
+  await f.deniedSocket(400, owner, query.replace('dota2.exe', '%00'));
+  await f.deniedSocket(400, owner, query.replace('inputKind=process', 'inputKind=system'));
+  const student = f.socket(owner, `room=${room.roomId}&role=student`);
+  const coach = f.socket(guest, `room=${room.roomId}&role=coach&invite=${room.inviteToken}`);
+  const listener = f.socket(owner, query);
+  const collected = new Map<WebSocket, any[]>();
+  for (const socket of [student, coach, listener]) {
+    const events: any[] = [];
+    collected.set(socket, events);
+    socket.on('message', (raw, binary) => events.push(binary ? { type: 'binary' } : JSON.parse(raw.toString())));
+  }
+  for (let i = 0; i < 100 && ![...collected.values()].every(events =>
+    events.some(event => event.type === 'engine.state' && event.state === 'ready')); i++) {
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  assert.equal(engines.length, 3);
+  await f.deniedSocket(409, owner, query);
+  const processEngine = engines.find(engine => engine.options.inputKind === 'process')!;
+  const coachEngine = engines.find(engine => engine.options.inputKind === 'microphone' && engine.options.role === 'coach')!;
+  processEngine.callbacks.onSourceFinal('private-turn', 'Go Roshan');
+  processEngine.callbacks.onTargetFinal('private-turn', '打肉山');
+  processEngine.callbacks.onStatus('listener-only-status');
+  processEngine.callbacks.onTargetAudio('private-turn', Buffer.alloc(240));
+  listener.send(Buffer.alloc(2880));
+  listener.send(JSON.stringify({ type: 'text.send', text: 'not allowed' }));
+  await new Promise(resolve => setTimeout(resolve, 40));
+  const privateEvents = collected.get(listener)!;
+  assert.ok(privateEvents.some(event => event.type === 'listener.config' && event.protocolVersion === 1 &&
+    event.privacy === 'connection' && event.output === 'text' && event.sampleRate === 24000 && event.channels === 1));
+  assert.ok(privateEvents.findIndex(event => event.type === 'listener.config') <
+    privateEvents.findIndex(event => event.type === 'engine.state' && event.state === 'ready'));
+  assert.equal(privateEvents.filter(event => event.turnId === 'private-turn').length, 2);
+  assert.ok(privateEvents.some(event => event.private === true && event.sourceKind === 'process' && event.speaker === 'dota2.exe'));
+  assert.ok(privateEvents.some(event => event.type === 'room.error' && /只接受音频/.test(event.message)));
+  for (const socket of [student, coach]) {
+    assert.ok(!collected.get(socket)!.some(event => event.turnId === 'private-turn' || event.type === 'binary' || event.status === 'listener-only-status'));
+  }
+  assert.equal(processEngine.frames, 1);
+  const roster = collected.get(student)!.filter(event => event.type === 'room.state').at(-1);
+  assert.equal(roster.participants.length, 2);
+  assert.ok(!roster.participants.some((person: any) => person.name === 'dota2.exe'));
+  coachEngine.callbacks.onTargetAudio('normal-turn', Buffer.alloc(240));
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.ok(collected.get(student)!.some(event => event.type === 'binary'));
+  assert.ok(!privateEvents.some(event => event.type === 'binary'));
+  const closed = once(listener, 'close');
+  listener.close();
+  await closed;
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(processEngine.stopped, true);
+  assert.equal(coachEngine.stopped, false);
+  assert.equal(student.readyState, WebSocket.OPEN);
+});
+
+test('revoking a listener or changing room settings stops capture engines and rejects stale callbacks', async t => {
+  const engines: { callbacks: EngineCallbacks; stopped: boolean }[] = [];
+  const f = await fixture(t, (kind, options, callbacks) => {
+    const engine = { callbacks, stopped: false };
+    engines.push(engine);
+    return { kind, role: options.role, async start() {}, async stop() { engine.stopped = true; },
+      appendAudio() {}, markSpeechEnd() {} };
+  });
+  const owner = await f.login('largeniu'), guest = await f.login('coach1');
+  const room = await f.create(owner);
+  const query = `room=${room.roomId}&role=coach&inputKind=process&sourceLabel=YY.exe`;
+  const listener = f.socket(guest, `${query}&invite=${room.inviteToken}`);
+  await once(listener, 'open');
+  const closed = once(listener, 'close');
+  const revoke = await f.request(`/api/rooms/${room.roomId}/access`, 'PATCH', { allowedUsernames: [] }, owner);
+  assert.equal(revoke.status, 200);
+  assert.equal((await closed)[0], 4003);
+  assert.equal(engines[0]!.stopped, true);
+  engines[0]!.callbacks.onSourceFinal('late', 'must not leak');
+  const next = f.socket(owner, query);
+  await once(next, 'open');
+  const reset = once(next, 'close');
+  const response = await f.request(`/api/rooms/${room.roomId}/settings`, 'PATCH', {
+    settings: { ...room.settings, engineKind: 'cascade' },
+  }, owner);
+  assert.equal(response.status, 200);
+  assert.equal((await reset)[0], 4000);
+  assert.equal(engines.at(-1)!.stopped, true);
 });

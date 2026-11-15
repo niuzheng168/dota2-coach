@@ -75,6 +75,7 @@ export interface TtsOptionsUpdate {
 
 export interface EngineOptions {
   role: ParticipantRole;
+  inputKind?: 'microphone' | 'process';
   englishOriginalVoiceRelay?: boolean;
   matchHeroes?: string[];
   ttsZhVoice?: string;

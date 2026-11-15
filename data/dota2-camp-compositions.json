@@ -1,0 +1,27 @@
+{
+  "patch": "7.41f",
+  "quality": "provisional-archetypes",
+  "note": "Representative camp compositions, not a live spawn table or verified spawn probabilities. Equal-weight scenarios; conservative HP/time envelope. Water variants, neutral spell summons and auras need in-game verification. Mud golem fragments spawn only on parent death.",
+  "camps": [
+    { "id": "kobolds", "kind": "small", "units": { "kobold": 3, "kobold_tunneler": 1, "kobold_taskmaster": 1 } },
+    { "id": "trolls", "kind": "small", "units": { "forest_troll_berserker": 2, "forest_troll_high_priest": 1 } },
+    { "id": "vhouls", "kind": "small", "units": { "gnoll_assassin": 3 } },
+    { "id": "ghosts", "kind": "small", "units": { "ghost": 1, "fel_beast": 2 } },
+    { "id": "harpies", "kind": "small", "units": { "harpy_storm": 1, "harpy_scout": 2 } },
+    { "id": "medium-centaurs", "kind": "medium", "units": { "centaur_khan": 1, "centaur_outrunner": 1 } },
+    { "id": "wolves", "kind": "medium", "units": { "alpha_wolf": 1, "giant_wolf": 2 } },
+    { "id": "satyrs", "kind": "medium", "units": { "satyr_soulstealer": 2, "satyr_trickster": 2 } },
+    { "id": "ogres", "kind": "medium", "units": { "ogre_magi": 1, "ogre_mauler": 2 } },
+    { "id": "mud-golems", "kind": "medium", "units": { "mud_golem": 2 } },
+    { "id": "large-centaurs", "kind": "large", "units": { "centaur_khan": 1, "centaur_outrunner": 2 } },
+    { "id": "hellbears", "kind": "large", "units": { "polar_furbolg_ursa_warrior": 1, "polar_furbolg_champion": 1 } },
+    { "id": "large-satyrs", "kind": "large", "units": { "satyr_hellcaller": 1, "satyr_soulstealer": 1, "satyr_trickster": 1 } },
+    { "id": "wildwings", "kind": "large", "units": { "enraged_wildkin": 1, "wildkin": 2 } },
+    { "id": "dark-trolls", "kind": "large", "units": { "dark_troll_warlord": 1, "dark_troll": 2 } },
+    { "id": "warpine", "kind": "large", "units": { "warpine_raider": 3 } },
+    { "id": "dragons", "kind": "ancient", "units": { "black_dragon": 1, "black_drake": 2 } },
+    { "id": "granite", "kind": "ancient", "units": { "granite_golem": 1, "rock_golem": 2 } },
+    { "id": "thunderhides", "kind": "ancient", "units": { "big_thunder_lizard": 1, "small_thunder_lizard": 2 } },
+    { "id": "ice", "kind": "ancient", "units": { "ice_shaman": 1, "frostbitten_golem": 2 } }
+  ]
+}

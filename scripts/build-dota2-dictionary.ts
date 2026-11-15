@@ -725,6 +725,7 @@ async function main() {
 
   const rawHeroes: any[] = heroListZhRes.result.data.heroes;
   rawHeroes.sort((a, b) => a.name_english_loc.localeCompare(b.name_english_loc));
+  const portraitFiles = new Set(await fs.readdir(path.join(ROOT_DIR, 'public/heroes')).catch(() => []));
 
   console.log(`Fetching detailed ability rosters for all ${rawHeroes.length} heroes...`);
   const heroes = await mapConcurrent(rawHeroes, 14, async (h) => {
@@ -762,6 +763,8 @@ async function main() {
     }
 
     const slang = HERO_SLANG[h.name] || {};
+    const portraitName = h.name.replace(/^npc_dota_hero_/, '');
+    const portrait = [`${portraitName}.jpg`, `${portraitName}.png`].find(name => portraitFiles.has(name));
     return {
       id: h.id,
       key: h.name,
@@ -770,6 +773,8 @@ async function main() {
       enAliases: slang.enAliases || [],
       zhSlang: slang.zhSlang || [],
       abilities,
+      primaryAttr: h.primary_attr,
+      ...(portrait ? { portrait: `/heroes/${portrait}` } : {}),
     };
   });
 

@@ -8,6 +8,9 @@
 !public/**
 !data/
 !data/dota2-dictionary.json
+!data/dota2-combat.json
+!data/dota2-map.json
+!data/dota2-camp-compositions.json
 !docs/
 !docs/dota2-bilingual-dictionary.md
 !scripts/

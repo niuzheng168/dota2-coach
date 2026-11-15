@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../DotaCoach.Desktop/AudioPacketizer.cs" Link="AudioPacketizer.cs" />
+    <Compile Include="../DotaCoach.Desktop/DesktopPolicy.cs" Link="DesktopPolicy.cs" />
+    <Compile Include="../DotaCoach.Desktop/AudioInterop.cs" Link="AudioInterop.cs" />
+    <Compile Include="../DotaCoach.Desktop/OverlayPlacement.cs" Link="OverlayPlacement.cs" />
+    <Compile Include="../DotaCoach.Desktop/ServiceClient.cs" Link="ServiceClient.cs" />
+    <Compile Include="../DotaCoach.Desktop/NativeVoiceChannel.cs" Link="NativeVoiceChannel.cs" />
+    <Compile Include="../DotaCoach.Desktop/ConversationStore.cs" Link="ConversationStore.cs" />
+    <Compile Include="../DotaCoach.Desktop/OverlayPreferences.cs" Link="OverlayPreferences.cs" />
+  </ItemGroup>
+</Project>

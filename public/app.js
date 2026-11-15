@@ -1,3 +1,7 @@
+import { HeroPicker } from './hero-picker.js';
+import { DesktopListener } from './desktop-listener.js';
+import { JunglePanel } from './jungle-panel.js';
+
 const $ = id => document.getElementById(id);
 const roleSelect = $('roleSelect');
 const joinBtn = $('joinBtn');
@@ -35,6 +39,30 @@ let heroCatalog = [];
 let matchHeroes = [];
 const turnCards = new Map();
 const ENGINE_LABELS = { cascade: 'Voice Live · Cascaded', 'gpt-realtime': 'Voice Live · Realtime 2.1', 'gpt-live': 'GPT-Live 1' };
+const desktopListener = new DesktopListener({
+  room: () => activeRoom && ws?.readyState === WebSocket.OPEN
+    ? { roomId: activeRoom.roomId, invite: activeInvite } : null,
+  onSubtitle: message => handleServerMessage(message),
+});
+const heroPicker = new HeroPicker(next => {
+  if (!activeRoom?.isOwner || ws?.readyState !== WebSocket.OPEN) return false;
+  try {
+    ws.send(JSON.stringify({ type: 'room.set_match_heroes', matchHeroes: next }));
+    matchHeroes = next;
+    return true;
+  } catch {
+    return false;
+  }
+});
+const junglePanel = new JunglePanel({
+  send: message => {
+    if (!activeRoom || ws?.readyState !== WebSocket.OPEN) return false;
+    ws.send(JSON.stringify(message)); return true;
+  },
+  canControl: () => !!activeRoom && ws?.readyState === WebSocket.OPEN &&
+    (activeRoom.isOwner || roleSelect.value === 'student'),
+  isStudent: () => roleSelect.value === 'student',
+});
 
 function notice(message) {
   $('appNotice').textContent = message;
@@ -64,6 +92,8 @@ async function api(url, options = {}) {
 }
 
 function stopRoomMedia() {
+  junglePanel.reset();
+  desktopListener.reset();
   openMicActive = false;
   pttPressed = false;
   pttRequested = false;
@@ -285,10 +315,7 @@ async function initializeUser(session) {
   for (const [select, language] of [[ttsZhVoiceSelect, 'zh'], [ttsEnVoiceSelect, 'en']]) {
     select.replaceChildren(...cfg.ttsVoiceCatalog[language].map(voice => new Option(voice.label, voice.id)));
   }
-  $('heroPickerDatalist').replaceChildren(...heroCatalog.map(hero => {
-    const option = new Option(`${hero.zh} ${(hero.zhSlang || []).join('/')} ${(hero.enAliases || []).join('/')}`, hero.en);
-    return option;
-  }));
+  heroPicker.setCatalog(heroCatalog);
   const requestedRole = initialUrl.searchParams.get('role');
   roleSelect.value = ['coach', 'student'].includes(requestedRole) ? requestedRole : (user.canCreateRooms ? 'student' : 'coach');
   await showLobby();
@@ -625,6 +652,7 @@ async function ensureMicPipeline() {
 
 function connectRoom() {
   if (!user || !activeRoom) return;
+  desktopListener.stop();
   clearTimeout(roomReconnectTimer);
   roomReconnectTimer = null;
   const previous = ws;
@@ -637,6 +665,7 @@ function connectRoom() {
   if (activeInvite) query.set('invite', activeInvite);
   const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws?${query}`);
   ws = socket;
+  renderSelectedMatchHeroes();
   socket.binaryType = 'arraybuffer';
   connBadge.textContent = 'Connecting...';
   connBadge.className = 'badge gold';
@@ -647,10 +676,12 @@ function connectRoom() {
     settingsReconnectAttempts = 0;
     connBadge.textContent = 'Connected';
     connBadge.className = 'badge green';
+    renderSelectedMatchHeroes();
   };
   socket.onclose = event => {
     if (ws !== socket) return;
     ws = null;
+    renderSelectedMatchHeroes();
     stopRoomMedia();
     connBadge.textContent = 'Disconnected';
     connBadge.className = 'badge';
@@ -692,7 +723,7 @@ function connectRoom() {
   };
 }
 
-function getOrCreateTurnCard(turnId, role, speaker) {
+function getOrCreateTurnCard(turnId, role, speaker, sourceKind) {
   let entry = turnCards.get(turnId);
   if (!entry) {
     const card = document.createElement('div');
@@ -703,7 +734,7 @@ function getOrCreateTurnCard(turnId, role, speaker) {
     const who = document.createElement('span');
     who.innerHTML = `<strong>${escapeHtml(speaker)}</strong> · ${
       role === 'coach' ? 'EN → ZH' : 'ZH/EN → EN'
-    }`;
+    }${sourceKind === 'process' ? ' · 外部监听（仅自己可见）' : ''}`;
     const badges = document.createElement('span');
     meta.append(who, badges);
 
@@ -719,11 +750,18 @@ function getOrCreateTurnCard(turnId, role, speaker) {
 
     entry = { card, badges, srcDiv, tgtDiv };
     turnCards.set(turnId, entry);
+    while (turnCards.size > 300) {
+      const oldest = turnCards.keys().next().value;
+      turnCards.get(oldest).card.remove();
+      turnCards.delete(oldest);
+    }
   }
   return entry;
 }
 
 function handleServerMessage(msg) {
+  junglePanel.accept(msg);
+  desktopListener.captions.accept(msg);
   switch (msg.type) {
     case 'room.state': {
       if (activeRoom && msg.roomId === activeRoom.roomId) {
@@ -827,14 +865,14 @@ function handleServerMessage(msg) {
 
     case 'subtitle.source.final': {
       livePartialBanner.innerHTML = `🎙️ <strong>${escapeHtml(msg.speaker)}:</strong> ${escapeHtml(msg.text)}`;
-      const entry = getOrCreateTurnCard(msg.turnId, msg.role, msg.speaker);
+      const entry = getOrCreateTurnCard(msg.turnId, msg.role, msg.speaker, msg.sourceKind);
       entry.srcDiv.textContent = `原话: ${msg.text}`;
       break;
     }
 
     case 'subtitle.target.partial':
     case 'subtitle.target.final': {
-      const entry = getOrCreateTurnCard(msg.turnId, msg.role, msg.speaker);
+      const entry = getOrCreateTurnCard(msg.turnId, msg.role, msg.speaker, msg.sourceKind);
       entry.tgtDiv.textContent = msg.text;
       transcriptFeed.scrollTop = transcriptFeed.scrollHeight;
       break;
@@ -1000,102 +1038,7 @@ textSendForm.addEventListener('submit', (e) => {
 });
 
 function renderSelectedMatchHeroes() {
-  const countEl = document.getElementById('matchHeroesCount');
-  const clearBtn = document.getElementById('clearHeroesBtn');
-  const container = document.getElementById('selectedHeroTags');
-  if (!countEl || !container) return;
-  countEl.textContent = `${matchHeroes.length} / 10`;
-  if (clearBtn) {
-    clearBtn.style.display = activeRoom?.isOwner && matchHeroes.length > 0 ? 'inline-block' : 'none';
-  }
-  if (!matchHeroes.length) {
-    container.innerHTML = `<span style="font-size:11px;color:var(--text-muted)">未限定（已内置全部 127 英雄名与黑话；BP 选出英雄后点选可动态追加全技能）</span>`;
-    return;
-  }
-  container.innerHTML = matchHeroes
-    .map((keyOrName) => {
-      const hero =
-        heroCatalog.find(
-          (h) =>
-            h.en.toLowerCase() === keyOrName.toLowerCase() ||
-            h.zh === keyOrName ||
-            h.key === keyOrName,
-        ) || { en: keyOrName, zh: '' };
-      const label = hero.zh ? `${hero.zh} (${hero.en})` : hero.en;
-      return `<span class="hero-tag">${escapeHtml(label)} ${activeRoom?.isOwner ? `<button type="button" data-remove-hero="${escapeHtml(keyOrName)}">×</button>` : ''}</span>`;
-    })
-    .join('');
-
-  container.querySelectorAll('[data-remove-hero]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const target = btn.getAttribute('data-remove-hero');
-      matchHeroes = matchHeroes.filter((h) => h !== target);
-      renderSelectedMatchHeroes();
-      syncMatchHeroesToRoom();
-    });
-  });
-}
-
-function syncMatchHeroesToRoom() {
-  if (!activeRoom?.isOwner) return;
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'room.set_match_heroes', matchHeroes }));
-  }
-}
-
-const clearHeroesBtn = document.getElementById('clearHeroesBtn');
-if (clearHeroesBtn) {
-  clearHeroesBtn.addEventListener('click', () => {
-    if (!activeRoom?.isOwner || !matchHeroes.length) return;
-    matchHeroes = [];
-    renderSelectedMatchHeroes();
-    syncMatchHeroesToRoom();
-  });
-}
-
-const heroPickerInput = document.getElementById('heroPickerInput');
-const addHeroBtn = document.getElementById('addHeroBtn');
-if (addHeroBtn && heroPickerInput) {
-  const tryAddHero = () => {
-    if (!activeRoom?.isOwner) return;
-    const raw = heroPickerInput.value.trim();
-    if (!raw || matchHeroes.length >= 10) return;
-    const q = raw.toLowerCase();
-    const matched = heroCatalog.find(
-      (h) =>
-        h.en.toLowerCase() === q ||
-        h.zh === raw ||
-        `${h.zh} (${h.en})`.toLowerCase() === q ||
-        (h.enAliases || []).some((a) => a.toLowerCase() === q) ||
-        (h.zhSlang || []).some((s) => s.toLowerCase() === q),
-    ) || heroCatalog.find(
-      (h) =>
-        h.en.toLowerCase().includes(q) ||
-        h.zh.includes(raw) ||
-        (h.zhSlang || []).some((s) => s.includes(raw)),
-    );
-    const canonical = matched ? matched.en : raw;
-    if (!matchHeroes.some((h) => h.toLowerCase() === canonical.toLowerCase())) {
-      matchHeroes.push(canonical);
-      renderSelectedMatchHeroes();
-      syncMatchHeroesToRoom();
-    }
-    heroPickerInput.value = '';
-  };
-  addHeroBtn.addEventListener('click', tryAddHero);
-  heroPickerInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      tryAddHero();
-    }
-  });
-  // Auto-lock immediately when clicking an item from the <datalist> dropdown
-  heroPickerInput.addEventListener('input', () => {
-    const val = heroPickerInput.value.trim();
-    if (heroCatalog.some((h) => `${h.zh} (${h.en})` === val)) {
-      tryAddHero();
-    }
-  });
+  heroPicker.renderSelection(matchHeroes, !!activeRoom?.isOwner, ws?.readyState === WebSocket.OPEN);
 }
 
 // ============================================================================
@@ -1193,7 +1136,9 @@ function extractTopBarFrameAndDiff(videoEl) {
 
 async function runVisionTick(force = false) {
   if (!activeRoom?.isOwner || visionBusy || !visionVideo) return;
-  const snap = extractTopBarFrameAndDiff(visionVideo);
+  const sourceVideo = visionVideo;
+  const roomId = activeRoom.roomId;
+  const snap = extractTopBarFrameAndDiff(sourceVideo);
   if (!snap) return;
 
   if (!force) {
@@ -1206,9 +1151,8 @@ async function runVisionTick(force = false) {
   }
 
   visionBusy = true;
-  lastTopBarThumb = snap.luma;
   if (visionStatusLine) {
-    visionStatusLine.textContent = '🔍 正在由 gpt-6-luna 识别顶部 10 英雄头像栏...';
+    visionStatusLine.textContent = '🔍 正在识别顶部 10 英雄头像栏...';
   }
 
   try {
@@ -1216,17 +1160,25 @@ async function runVisionTick(force = false) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
       body: JSON.stringify({
-        roomId: activeRoom.roomId,
+        roomId,
         imageDataUrl: snap.dataUrl,
       }),
+      signal: AbortSignal.timeout(35_000),
     });
     const resJson = await resp.json();
+    if (activeRoom?.roomId !== roomId || visionVideo !== sourceVideo) return;
     if (!resp.ok || !resJson.ok) {
+      // Failed frames must remain eligible for retry even if the screen is static.
+      lastTopBarThumb = null;
       if (visionStatusLine) {
         visionStatusLine.textContent = `⚠️ 视觉识阵异常: ${resJson.error || resp.status}`;
       }
+    } else {
+      lastTopBarThumb = snap.luma;
     }
   } catch (err) {
+    if (activeRoom?.roomId !== roomId || visionVideo !== sourceVideo) return;
+    lastTopBarThumb = null;
     if (visionStatusLine) {
       visionStatusLine.textContent = `⚠️ 视觉请求失败: ${err.message || err}`;
     }
