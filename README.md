@@ -164,3 +164,7 @@ npm run build:jungle
 npm run replay:gsi -- /private/path/to/capture.jsonl
 node tests/jungle.browser.mjs
 ```
+
+## 双机客户端原型
+
+2026-11-16：两个独立 Windows 程序——游戏机运行 `DotaCoach.GameClient`，后台机运行 `DotaCoach.CoachClient`。本地 Luna 机器人局已连续3次跑通真实画面/GSI → Foundry模型 → 游戏字幕与校准地图目标 → 过期清除；有实际屏幕像素证据。普通实战自动路线仍关闭，低延迟、双物理机器和GPM效果未验收。见 [双机原型](docs/twopc-prototype.md)、[真实模型E2E报告](docs/twopc-model-e2e.md)。
