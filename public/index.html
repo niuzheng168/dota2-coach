@@ -103,9 +103,14 @@
         <p class="muted small">仅供研究/自定义局验证。实时辅助存在政策风险；默认关闭，不读取敌方隐藏信息。</p>
         <label class="toggle-row"><span>开启刷野规划</span><input id="jungleEnabled" type="checkbox" disabled /></label>
         <p id="jungleStatus" class="jungle-status" role="status">刷野规划默认关闭。</p>
+        <p id="junglePlanner" class="muted small">由独立大模型推理；未配置时不使用规则回退。开启后可能产生模型费用，最多每 30 秒一次推理任务。</p>
         <div id="jungleBody" hidden>
           <p id="jungleStats" class="jungle-stats"></p>
+          <label class="field">确认当前动力鞋属性（切鞋后重选）
+            <select id="jungleTreads"><option value="unknown">未知，不加属性</option><option value="agi">敏捷</option><option value="str">力量</option><option value="int">智力</option></select>
+          </label>
           <p id="jungleVersion" class="muted small"></p>
+          <p id="jungleReasoning" class="jungle-status"></p>
           <svg id="jungleMap" viewBox="0 0 360 360" role="img" aria-label="营地与步行路线坐标示意图"></svg>
           <p class="muted small">真实坐标示意，非地形贴图。绿：天辉 · 红：夜魇 · 白：你 · 黄：路径 · 紫：框外等待。编号如 1/8 表示刷新后回访。</p>
           <button id="jungleRequest" type="button" class="btn-radiant" disabled>规划未来 3 分钟 · Alt+J</button>

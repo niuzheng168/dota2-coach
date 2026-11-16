@@ -1,0 +1,36 @@
+{
+  "label": "synthetic-fixed-level-luna-10-not-game-validated",
+  "assumptions": [
+    "固定 10 级、固定装备、满初始血蓝，天辉 good_5 起点，游戏 10:00，180 秒纯野目标",
+    "3 级月光、1 级环月、4 级月刃、1 级月蚀、月刃衰减天赋；环月和月蚀仍未建模",
+    "敏捷假腿已手动确认；疯脸冷却 0 且未在主动状态",
+    "无预先堆野，无其他玩家清野/封野；水生出生与升级顺序按模型假设",
+    "这是明确可复跑的合成输入，不是实机面板、职业录像或实际收益"
+  ],
+  "player": {
+    "hero": "npc_dota_hero_luna",
+    "team": "radiant",
+    "position": { "x": -1454, "y": -3356 },
+    "clock": 600,
+    "level": 10,
+    "health": 1018,
+    "maxHealth": 1018,
+    "mana": 556,
+    "maxMana": 556,
+    "alive": true,
+    "canAct": true,
+    "silenced": false,
+    "abilities": [
+      { "name": "luna_lucent_beam", "level": 3, "cooldown": 0 },
+      { "name": "luna_lunar_orbit", "level": 1, "cooldown": 0 },
+      { "name": "luna_moon_glaive", "level": 4, "cooldown": 0 },
+      { "name": "luna_eclipse", "level": 1, "cooldown": 0 },
+      { "name": "special_bonus_unique_luna_7", "level": 1, "cooldown": 0 }
+    ],
+    "items": [
+      { "name": "item_power_treads", "passive": true, "attribute": "agi" },
+      { "name": "item_mask_of_madness", "passive": true, "cooldown": 0 }
+    ],
+    "lastHits": 100
+  }
+}

@@ -21,17 +21,17 @@ const luna: PlayerSnapshot = {
   ],
 };
 
-test('checkpoint preserves item active data without claiming active simulation exists', () => {
+test('reviewed mask data and talent are modeled while orbit still reports its missing geometry', () => {
   const mask = COMBAT.items.item_mask_of_madness;
   assert.deepEqual(mask.AbilityCooldown, [16]);
   assert.deepEqual(mask.AbilityManaCost, [25]);
   const stats = calculateSelfStats(luna)!;
   assert.equal(stats.lifesteal, 0.22);
-  assert.ok(stats.warnings.some(w => w.includes('吸血尚未接入清野模拟')));
+  assert.ok(stats.warnings.some(w => w.includes('主攻击吸血')));
   assert.ok(stats.warnings.some(w => w.includes('未建模技能：luna_lunar_orbit')));
-  assert.ok(stats.warnings.some(w => w.includes('未建模技能：special_bonus_unique_luna_7')));
+  assert.ok(stats.warnings.some(w => w.includes('每跳衰减减少 5')));
   assert.equal(isModeledAbility('luna_lunar_orbit'), false);
-  assert.equal(isModeledAbility('special_bonus_unique_luna_7'), false);
+  assert.equal(isModeledAbility('special_bonus_unique_luna_7'), true);
 });
 
 test('explicit treads attribute and Luna innate affect stats without guessing missing input', () => {

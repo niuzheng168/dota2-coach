@@ -11,6 +11,8 @@ import { createCoachServer } from '../src/app-server.ts';
 import { DEFAULT_ROOM_SETTINGS } from '../src/room-settings.ts';
 import type { EngineCallbacks, EngineOptions } from '../src/engines/types.ts';
 import { MAP } from '../src/tactics/combat-data.ts';
+import { TacticalEngine } from '../src/tactics/index.ts';
+import { planJungleRoute } from '../src/tactics/jungle.ts';
 
 const password = 'only-a-test-password';
 type Login = { cookie: string; csrfToken: string };
@@ -28,6 +30,12 @@ test('jungle controls are authorized, room-isolated, default off, and do not res
   coach.send(JSON.stringify({ type: 'room.set_tactics', enabled: true }));
   await waitUntil(() => events[1].some(m => m.type === 'room.error'));
   assert.match(events[1].find(m => m.type === 'room.error').message, /学员或房主/);
+  for (const type of ['tactics.set_options', 'tactics.observe']) {
+    const errors = events[1].filter(m => m.type === 'room.error').length;
+    coach.send(JSON.stringify({ type, options: { treadsAttribute: 'agi' }, observation: {} }));
+    await waitUntil(() => events[1].filter(m => m.type === 'room.error').length > errors);
+    assert.match(events[1].findLast(m => m.type === 'room.error').message, /学员或房主/);
+  }
   const enginesBefore = f.started.length;
   student.send(JSON.stringify({ type: 'room.set_tactics', enabled: true }));
   await waitUntil(() => events[0].some(m => m.type === 'tactics.state' && m.state.enabled));
@@ -40,7 +48,7 @@ test('jungle controls are authorized, room-isolated, default off, and do not res
     player: { team_name: 'radiant', last_hits: 100 },
     abilities: { ability0: { name: 'sven_great_cleave', level: 4, cooldown: 0 },
       ability1: { name: 'sven_storm_bolt', level: 4, cooldown: 0 } },
-    items: { slot0: { name: 'item_broadsword' } },
+    items: { slot0: { name: 'item_broadsword' }, slot1: { name: 'item_power_treads' } },
   };
   const result = await f.request(`/api/gsi?room=${room.roomId}`, 'POST', gsi);
   assert.equal(result.status, 200);
@@ -49,6 +57,13 @@ test('jungle controls are authorized, room-isolated, default off, and do not res
   assert.ok(!events[2].some(m => m.type === 'tactics.state'), 'other room gets no tactical state');
   assert.equal(f.started.length, enginesBefore);
   assert.equal(student.readyState, WebSocket.OPEN);
+  const originalDamage = events[0].findLast(m => m.type === 'tactics.state').state.stats.damage;
+  await new Promise(resolve => setTimeout(resolve, 1050));
+  student.send(JSON.stringify({ type: 'tactics.set_options', options: { treadsAttribute: 'str' } }));
+  await waitUntil(() => events[0].some(m => m.type === 'tactics.state' && m.state.options?.treadsAttribute === 'str'));
+  assert.equal(events[0].findLast(m => m.type === 'tactics.state').state.stats.damage, originalDamage + 10);
+  assert.ok(!events[2].some(m => m.type === 'tactics.state'), 'treads must be room-isolated too');
+  assert.equal(f.started.length, enginesBefore);
   const cfg = await (await f.request(`/api/gsi-config?room=${room.roomId}`, 'GET', undefined, owner)).text();
   assert.match(cfg, /"abilities"\s+"1"/);
   assert.match(cfg, /"items"\s+"1"/);
@@ -80,7 +95,7 @@ async function fixture(t: TestContext, factory?: Parameters<typeof createCoachSe
       callbacks.onTargetFinal('test-turn', `translated: ${text}`);
       callbacks.onTargetAudio('test-turn', Buffer.alloc(20));
     },
-  })));
+  })), () => new TacticalEngine({ benchmarkPlanner: planJungleRoute }));
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const address = server.address();
@@ -165,7 +180,9 @@ test('password hashing, session cookies, failed login, and durable account stora
   const raw = await fs.readFile(path.join(f.directory, 'access.json'), 'utf8');
   assert.ok(!raw.includes(password));
   assert.ok(!raw.includes(owner.cookie.split('=')[1]));
-  assert.equal((await fs.stat(path.join(f.directory, 'access.json'))).mode & 0o777, 0o600);
+  // NTFS permissions are ACLs, not POSIX mode bits (Node reports 0666 on Windows).
+  // This does not claim to verify a Windows ACL.
+  if (process.platform !== 'win32') assert.equal((await fs.stat(path.join(f.directory, 'access.json'))).mode & 0o777, 0o600);
   const reopened = await AccessStore.open(f.directory);
   assert.equal((await reopened.verifyPassword('largeniu', password))?.canCreateRooms, true);
   assert.equal(reopened.getSession(owner.cookie.split('=')[1])?.user.username, 'largeniu');

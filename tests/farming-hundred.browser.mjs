@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {once} from 'node:events';
+import {createSandboxServer} from '../src/sandbox/server.ts';
+const corpus=JSON.parse(await fs.readFile('data/luna-hundred-index.json','utf8'));
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+const {server,token}=createSandboxServer();server.listen(0,'127.0.0.1');await once(server,'listening');
+const origin=`http://127.0.0.1:${server.address().port}`,headers={Authorization:`Bearer ${token}`};
+const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH});
+const state=async()=>await(await fetch(origin+'/api/sim/state',{headers})).json();
+try{
+  const before=await state(),page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[],writes=[];
+  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()!=='GET')writes.push(r.url());});
+  await page.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
+  assert.equal((await fetch(origin+'/api/farming-study')).status,401);
+  assert.equal((await fetch(origin+'/api/farming-study/12345',{headers})).status,404);
+  await page.goto(`${origin}/farming-replays?study=100#token=${token}`);
+  await page.waitForFunction(()=>document.querySelector('#replay-status').textContent.startsWith('已就绪'));
+  assert.equal(new URL(page.url()).search,'?study=100');assert.equal(new URL(page.url()).hash,'');
+  assert.equal(await page.locator('#replay-match option').count(),100);
+  assert.equal(await page.locator('.route-card canvas').count(),12);
+  assert.equal(await page.locator('#model-study').isVisible(),true);
+  for(const m of [corpus.matches[0],corpus.matches[50],corpus.matches[99]]){
+    await page.locator('#replay-match').selectOption(String(m.matchId));
+    await page.waitForFunction(id=>document.querySelector('#replay-meta').textContent.includes(String(id))&&document.querySelector('#replay-status').textContent.startsWith('已就绪'),m.matchId);
+    assert.equal(await page.locator('#study-summary').textContent(),m.review.summary);
+    const full=JSON.parse(await fs.readFile(`.tmp/replays/study/${m.matchId}.route.json`,'utf8'));
+    const a=full.frames.find(f=>f.time>=600),b=full.frames.find(f=>f.time>=1200)||full.frames.at(-1);
+    assert.equal(await page.locator('#replay-lane-gold').textContent(),String(b.gold[0]-a.gold[0]));
+    assert.equal(await page.locator('#replay-neutral-gold').textContent(),String(b.gold[1]-a.gold[1]));
+  }
+  for(let i=0;i<8;i++)await page.locator('#gallery-next').click();
+  assert.equal(await page.locator('.route-card').count(),4);assert.equal(await page.locator('#gallery-next').isDisabled(),true);
+  await page.locator('#replay-match').selectOption('9089477184');
+  await page.waitForFunction(()=>!document.querySelector('#stack-study').hidden);
+  await page.locator('#stack-proof button').first().click();
+  await page.waitForFunction(()=>document.querySelector('#replay-play').textContent.includes('暂停'));
+  await page.locator('#replay-play').click();
+  assert.equal(await page.locator('#replay-window').inputValue(),'all');
+  await page.locator('#study-observations button').first().click();
+  await page.waitForFunction(()=>document.querySelector('#replay-status').textContent.startsWith('已就绪'));
+  assert.equal(await page.locator('#replay-window').inputValue(),'all');
+  await page.locator('#replay-window').selectOption('600,1200');
+  assert.equal(await page.locator('#replay-farm-rate').textContent(),'827.5');
+  await page.screenshot({path:'.tmp/luna-hundred-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.waitForTimeout(150);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.screenshot({path:'.tmp/luna-hundred-mobile.png',fullPage:true});
+  assert.deepEqual(await state(),before);assert.deepEqual(writes,[]);assert.deepEqual(errors,[]);
+  console.log('PASS 100-case study: authenticated index/detail, 100 choices, lazy loading, 9 gallery pages, exact gold, model evidence anchors, double-stack replay, mobile, read-only isolation.');
+}finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

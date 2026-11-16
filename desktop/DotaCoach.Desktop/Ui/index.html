@@ -85,6 +85,45 @@
             </article>
           </div>
           <aside class="right-column">
+            <article class="preview-card" id="jungleCard">
+              <header class="section-title"><div><h2>刷野路线 · 实验</h2></div><label class="switch"><input id="tacticsEnabled" type="checkbox"><span></span></label></header>
+              <p id="tacticsStatus" class="helper">默认关闭。需要新版服务端、玩家 GSI 和自定义局验证。</p>
+              <p id="tacticsPlanner" class="helper">由独立大模型推理，无规则回退；开启可能产生模型费用。</p>
+              <p id="tacticsSummary" class="helper"></p>
+              <label class="field-label" for="tacticsTreads">当前假腿属性（切鞋后重选）</label>
+              <select id="tacticsTreads"><option value="unknown">未知，不加切换属性</option><option value="agi">敏捷</option><option value="str">力量</option><option value="int">智力</option></select>
+              <button id="tacticsRequest" class="subtle full">规划未来 180 秒 · Ctrl+Shift+J</button>
+              <ol id="tacticsSteps" class="helper"></ol>
+              <p id="tacticsReasoning" class="helper"></p>
+              <details><summary>小地图标定与悬浮标记</summary>
+                <p class="helper">下列为试标定示例值，不是已校准地图边界。先用白点预览在多个位置核对自己的图标，再启用路线。仅覆盖前台 Dota 2；分辨率改变会隐藏，必须重新标定。</p>
+                <div class="form-grid">
+                  <label>客户区宽(px)<input id="mapClientWidth" type="number" value="1920"></label>
+                  <label>客户区高(px)<input id="mapClientHeight" type="number" value="1080"></label>
+                  <label>小地图左(px)<input id="mapLeft" type="number" value="0"></label>
+                  <label>小地图上(px)<input id="mapTop" type="number" value="810"></label>
+                  <label>小地图宽(px)<input id="mapWidth" type="number" value="270"></label>
+                  <label>小地图高(px)<input id="mapHeight" type="number" value="270"></label>
+                  <label>世界最小 X<input id="mapMinX" type="number" value="-10000"></label>
+                  <label>世界最大 X<input id="mapMaxX" type="number" value="10000"></label>
+                  <label>世界最小 Y<input id="mapMinY" type="number" value="-10000"></label>
+                  <label>世界最大 Y<input id="mapMaxY" type="number" value="10000"></label>
+                </div>
+                <button id="tacticsMapPreview" class="subtle full">仅预览自己的白点（切回 Dota）</button>
+                <label class="setting-row"><span>已在多个位置核对对齐</span><input id="mapConfirmed" type="checkbox"></label>
+                <button id="tacticsMapStart" class="subtle full">启用鼠标穿透路线标记</button>
+                <button id="tacticsMapStop" class="text-button">隐藏地图标记</button>
+              </details>
+              <details><summary>本机视觉校验（可选）</summary>
+                <p class="helper">每 3 秒尝试截取前台 Dota 的时钟与自身 HUD，仅发往 127.0.0.1:11434。需自行启动本地 Ollama 视觉模型；不自动下载、不发云端、不保存画面。只提出假腿属性建议，不能代替完整 GSI。</p>
+                <label class="field-label" for="hudModel">本机已安装模型</label><input id="hudModel" value="qwen3-vl:4b" maxlength="100">
+                <button id="tacticsVisionStart" class="subtle full">开启本机 HUD 校验</button>
+                <button id="tacticsVisionStop" class="text-button">停止截图</button>
+                <p id="hudStatus" class="helper">未开启；本机模型尚未验证</p>
+                <p id="hudObservation" class="helper"></p>
+              </details>
+              <details><summary>建模边界</summary><ul id="tacticsWarnings" class="helper"></ul></details>
+            </article>
             <article class="preview-card">
               <header class="section-title"><div><svg><use href="#i-captions"/></svg><h2>游戏悬浮字幕</h2></div><label class="switch" title="显示悬浮字幕"><input id="overlayEnabled" type="checkbox" checked><span></span></label></header>
               <div class="mini-scene"><div class="scene-grid"></div><div class="lane"></div><span class="scene-label">字幕样式预览</span><span class="scene-rune">✦</span><div class="mini-caption" id="miniCaption"><div id="previewEnglish">We should smoke and take Roshan.</div><strong id="previewChinese">我们开雾去打肉山。</strong></div></div>

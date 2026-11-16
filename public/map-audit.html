@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>地图与回放核验</title><link rel="stylesheet" href="/map-audit.css"></head>
+<body>
+  <header><div><small>DOTA COACH / CLIENT & REPLAY EVIDENCE</small><h1>先核对地图，再谈路线</h1></div><span class="badge">本机引擎核验 · 不生成建议</span></header>
+  <p class="notice">这不是旧沙盒的模拟画面，也不是给你的路线建议。单位来自原始回放；底图、树林、塔与兵线路径来自固定版本数据。<strong>录像中的敌区行动不能直接照搬；全图信息只用于离线核验，不是你实战中的已知视野。</strong></p>
+  <div class="toolbar">
+    <label>对局 <select id="match"></select></label>
+    <button id="play">播放记录</button><strong id="clock">10:00</strong>
+    <label class="time">时间 <input id="time" type="range" min="0" max="36" value="0"></label>
+  </div>
+  <main>
+    <section>
+      <div class="layers">
+        <label><input type="checkbox" id="trees">静态树点</label>
+        <label><input type="checkbox" id="lanes" checked>地图兵线路径</label>
+        <label><input type="checkbox" id="route" checked>Luna 实际轨迹</label>
+        <label><input type="checkbox" id="old-lanes">对比旧错误兵线</label>
+        <label><input type="checkbox" id="grid-diff">旧通行网格差异</label>
+      </div>
+      <canvas id="map" aria-label="固定地图与实际回放单位；点击营地查看真实存活单位"></canvas>
+      <p class="legend">◆ 远古营地　○ 普通/水生营地　□ 防御塔　<span class="yellow">● 野怪</span>　<span class="green">● 天辉兵</span>　<span class="red">● 夜魇兵</span>　<span class="cyan">▲ Luna</span></p>
+      <p id="status" role="status">正在读取核验数据。</p>
+    </section>
+    <aside>
+      <section><h2>核验进度</h2><ul id="checks"></ul><small>引擎点查询与局部机制实测，不等于全动态物理已通过。</small></section>
+      <section><h2>本机机制实测</h2><p id="client-mechanics">未载入运行时证据。</p><small>独立专用测试进程；数据不是模型估计。河道加速只测了局部点，不外推为完整范围。</small></section>
+      <section><h2>选中营地</h2><select id="camp"></select><p id="camp-status"></p><ul id="units"></ul><small>数字是此时该出生器所属的活单位数，不是营地数量。堆野会增加单位；不会凭空增加营地。</small></section>
+      <section><h2>Luna 当前记录</h2><p id="hero"></p><p id="items"></p><p id="income"></p><small>统计来自回放队伍金币分账，可能包含幻象/控制单位；不是固定装备收益测试，也不是模型预测。</small></section>
+      <section><h2>仍未通过</h2><ul id="remaining"></ul><small>河道底图只作视觉参考，不是水流碰撞或加速区域。静态树点没有砍树/再生时间线。</small></section>
+    </aside>
+  </main>
+  <details><summary>数据来源与边界</summary><p id="provenance"></p><ul id="limits"></ul></details>
+  <script type="module" src="/map-audit.js"></script>
+</body></html>

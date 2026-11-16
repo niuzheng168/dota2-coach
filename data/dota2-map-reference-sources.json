@@ -1,0 +1,81 @@
+{
+  "patch": "7.41f",
+  "commit": "adbd856cd23bc8d4f3b974a04ef8855047d2b35a",
+  "repository": "https://github.com/Reino-Doce/dota-maps-data",
+  "warning": "Upstream manifest is stale for three files at this commit. Pins below are checked against Git blob IDs and raw bytes, not silently accepted from that manifest. Replay cross-checks are separate.",
+  "manifestSha256": "eb1fef13862e883c69c4044ec6b101e0256244057b7f57be6741280d042e8fc2",
+  "files": [
+    {
+      "name": "mapdata.json",
+      "path": "assets/data/741f/mapdata.json",
+      "sha256": "da4d95e516900868cbd3695a4be0eed2abc942d32fa6ed991a8659a1f0a02ba7",
+      "gitBlob": "d3b438ca463a3749cbfbe81c3b8d16637911c4a9",
+      "bytes": 116870,
+      "upstreamManifestSha256": "9bc8f793a85222410c2bf34a945bb25c18046c72055334ffb4b4ef26873346ff",
+      "upstreamManifestMatches": false
+    },
+    {
+      "name": "gridnav.gnv",
+      "path": "assets/data/741f/gridnav.gnv",
+      "sha256": "be66c5b5ff0d87d69b376622f1161e8f4a6f61433bf0f25f5ff986d70beac77c",
+      "gitBlob": "1218657736c71e56059f13d64ead876afef54f1f",
+      "bytes": 104992,
+      "upstreamManifestSha256": "be66c5b5ff0d87d69b376622f1161e8f4a6f61433bf0f25f5ff986d70beac77c",
+      "upstreamManifestMatches": true
+    },
+    {
+      "name": "terrain_grid.json",
+      "path": "assets/data/741f/terrain_grid.json",
+      "sha256": "bfb3eeac8797009ef5a8805b090664167bc4c88088f02f0c7ec2d169b378c0f3",
+      "gitBlob": "0e3833f08aef2e030a440920fdb6965b0a6f90a4",
+      "bytes": 738709,
+      "upstreamManifestSha256": "bfb3eeac8797009ef5a8805b090664167bc4c88088f02f0c7ec2d169b378c0f3",
+      "upstreamManifestMatches": true
+    },
+    {
+      "name": "path_corner.json",
+      "path": "assets/data/741f/path_corner.json",
+      "sha256": "07778dfe67f8ce11a29a439163004c378ad63d8809dc4cfadd413443d3da700a",
+      "gitBlob": "f3999a533f5631c7ee0d5c5c2d9135ec926bda62",
+      "bytes": 1618,
+      "upstreamManifestSha256": "07778dfe67f8ce11a29a439163004c378ad63d8809dc4cfadd413443d3da700a",
+      "upstreamManifestMatches": true
+    },
+    {
+      "name": "npc_dota_spawner.json",
+      "path": "assets/data/741f/npc_dota_spawner.json",
+      "sha256": "0f73e6569eb5d18f702fb06862a1bf2ffc172e8ae4c1e5914c736aeeef9bd442",
+      "gitBlob": "14743f046374571c18d7814cd6757e550553b96d",
+      "bytes": 776,
+      "upstreamManifestSha256": "0f73e6569eb5d18f702fb06862a1bf2ffc172e8ae4c1e5914c736aeeef9bd442",
+      "upstreamManifestMatches": true
+    },
+    {
+      "name": "building_vision.json",
+      "path": "assets/data/741f/building_vision.json",
+      "sha256": "d2b384c316538189e4a794782adf9bb6916f580af83ecea67ec225394b02d378",
+      "gitBlob": "55af7a8af8453fc4ff08491fe36557d1016e8049",
+      "bytes": 18559,
+      "upstreamManifestSha256": "0fb4bf5f4328da7b624025fe52974389cfdf177a0e7a34e80d515d26f6762e3c",
+      "upstreamManifestMatches": false
+    },
+    {
+      "name": "overview.json",
+      "path": "assets/data/741f/overview.json",
+      "sha256": "7a838ab7e586d99717eb0c233dddd02e8647fbbd3226d9268a04c54218da12f9",
+      "gitBlob": "fc076481739910bb319eb64ee598b9e12bd2d745",
+      "bytes": 385,
+      "upstreamManifestSha256": "0f63479c5ff860fd2942135350c0353a5ed9cc79d60250f3c38eee9493747253",
+      "upstreamManifestMatches": false
+    },
+    {
+      "name": "dota-map-741f.png",
+      "path": "assets/img/dota-map-741f.png",
+      "sha256": "54555b9d9a9533ab3d39b0719b941ff9ce4b37b9b2777718ef9d87fbc7a12914",
+      "gitBlob": "fbe8da9f51532469757e407e6bdbfa7ac0b20362",
+      "bytes": 508016,
+      "upstreamManifestSha256": "54555b9d9a9533ab3d39b0719b941ff9ce4b37b9b2777718ef9d87fbc7a12914",
+      "upstreamManifestMatches": true
+    }
+  ]
+}

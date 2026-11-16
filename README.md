@@ -37,7 +37,7 @@
 
 开局前打开网页与教练连麦后，进入 DOTA2 选人/对局无需切屏手动点选英雄：
 
-1. **官方 Valve `Game State Integration (GSI)`（零封号风险 · 自动感知开局/换局）**
+1. **官方 Valve `Game State Integration (GSI)`（自动感知开局/换局）**
    - 点击页面左侧 **⬇ GSI .cfg** 下载配置文件并放入 `steamapps/common/dota 2 beta/game/dota/cfg/gamestate_integration/`。
    - 自动检测新 `matchid` / `HERO_SELECTION` 清空上一局阵容；玩家位自动上报本机英雄，**Dota Plus 实时观战位 / 教练位**自动实时上报 10 人阵容并热更新同传会话。
 2. **浏览器窗口顶栏视觉识阵（`gpt-6.1-terra` Vision · 最多 10 英雄识别）**
@@ -134,6 +134,22 @@ node tests/hero-picker.browser.mjs
 - 排查步骤与诊断字段见 [`docs/voice-troubleshooting.md`](docs/voice-troubleshooting.md)。日志仅记录状态及帧计数，不记录录音、字幕或凭据。
 
 ### 刷野路线规划（实验版）
+
+**100 场离线研究：** 已完整解析 100 场 7.41f Luna（50 场带职业标识），并通过独立 Astra API 逐场复盘；`/farming-replays?study=100` 提供分页地图、装备技能、线野分项收益与模型证据定位。详见 [`docs/luna-hundred-study.md`](docs/luna-hundred-study.md)。这是观察性研究，不是已启用的实战最高收益规划器。
+
+**当前交互模拟台：** `npm run sandbox` 的默认首页现在是 200ms/帧的可操作地图。无英雄时兵塔自动交战；可加入 Luna、编辑六件装备和属性、攻击兵/野/塔、获取击杀金币，并拖动时间轴回退/分支。详见 [`docs/interactive-map-simulator.md`](docs/interactive-map-simulator.md)。原地图核验页仍在 `/map-audit`。这不是完整 Dota 物理或实战路线建议。
+
+**本机引擎交叉核验：** 已直接核对用户客户端，并实测全图 104960 点地形、2475 棵树和局部移动/砍树机制。`map:client-audit` 可复查源文件与报告；网页新增 18 格通行差异和实际移速。静态点查询不是完整动态物理，仍不恢复路线建议。详见 [`docs/installed-client-map-validation.md`](docs/installed-client-map-validation.md)。
+
+**地图核验入口：** 已实际下载/完整解析三场 V-Tune / Pure Luna 原始回放，核对固定 build、28 营地/刷新框和 22 塔坐标。带真实回放时间线的核验页保留在 `/map-audit`，旧示意机制页在 `/sandbox`。完整客户端级动态物理仍未全部通过；新的交互模拟不等于实战路线验收。复现与证据见 [`docs/map-replay-validation.md`](docs/map-replay-validation.md)。
+
+**路线撤回 / 区域未核验：** 线野示例第 13 步实际触及夜魇营地；只查营地编号和最低血量不能证明路线安全。两个对照均已撤下，`sandbox:reason` 在云调用前拒绝，路线加载返回 409。`npm run sandbox` 只保留手动机制测试；`npm run sandbox:audit -- --check` 无云复现问题。详见 [`docs/sandbox-own-area-audit.md`](docs/sandbox-own-area-audit.md)。
+
+**v2 线野目标：** 已增加兵线补刀、现存兵线、追逐归位、实际占框刷新、拉野/堆野；曾用真实模型比较提案。历史分数不能用来判定职业路线优劣或现实 GPM，等待允许活动区域与实机校验。保留的原始结果见 [`docs/dota-sandbox-economy.md`](docs/dota-sandbox-economy.md)。
+
+**规划方式更新：** 运行链路现默认由独立大模型提出营地顺序、施法时机和目标优先级；没有模型配置/调用失败时不回退到规则搜索。新增 watson、Pakazs 等录像案例、配置与验证边界见 [`docs/luna-multi-replay-reasoning.md`](docs/luna-multi-replay-reasoning.md)。下文保留数值原型背景，旧测试包不代表这条新链路已部署或已实机验收。
+
+2026-11-15 Windows 接续：新增本机 HUD 视觉校验接口、需标定的小地图鼠标穿透悬浮层、假腿属性确认、疯脸/主攻击吸血和逐单位死亡计钱。**这是可测试原型，不是完整技能建模或最高收益保证**；本地模型、真实游戏对齐与收益尚未验收。详见 [`docs/jungle-live-prototype.md`](docs/jungle-live-prototype.md) 和实际播放的 [`Ame Luna 录像记录`](docs/luna-pro-741f-observations.md)。
 
 - 房间中新增默认关闭的刷野面板；房主/学员可开启，不影响同传连接。请重新下载 GSI cfg，以启用技能、物品字段。
 - 使用固定 `7.41f` 快照中的营地坐标、刷新框、步行网格和战斗数据，模拟英雄攻击/部分技能、野怪护甲血量、蓝耗与承伤，按 **180 秒时间窗口**搜索连续路线，不限制为 3 个营地；支持整分刷新后多轮回访，已计入 Luna 月刃和 Sven 分裂。

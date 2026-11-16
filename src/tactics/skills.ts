@@ -3,6 +3,7 @@ import type { AbilityData, AbilityState, DamageType } from './types.ts';
 
 // Reviewed mechanics only. A field containing "damage" is NOT enough to infer an effect.
 const BURSTS: Record<string, { field?: string; targets: number }> = {
+  luna_lucent_beam: { field: 'beam_damage', targets: 1 },
   sven_storm_bolt: { targets: 3 },
   lina_dragon_slave: { field: 'dragon_slave_damage', targets: 5 },
   lina_light_strike_array: { field: 'light_strike_array_damage', targets: 3 },
@@ -14,7 +15,7 @@ const BURSTS: Record<string, { field?: string; targets: number }> = {
 };
 export function isModeledAbility(name: string): boolean {
   return Object.hasOwn(BURSTS, name) ||
-    ['sven_great_cleave', 'luna_moon_glaive', 'luna_lunar_blessing',
+    ['sven_great_cleave', 'luna_moon_glaive', 'luna_lunar_blessing', 'special_bonus_unique_luna_7',
       'ursa_fury_swipes', 'axe_counter_helix'].includes(name);
 }
 export function burstAbility(ability: AbilityState, data: AbilityData | undefined):

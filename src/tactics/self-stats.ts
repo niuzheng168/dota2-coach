@@ -71,8 +71,8 @@ export function calculateSelfStats(player: PlayerSnapshot, data: CombatData = CO
     if (item.name === 'item_power_treads') {
       if (item.attribute) {
         attrs[item.attribute === 'str' ? 0 : item.attribute === 'agi' ? 1 : 2] += v('bonus_stat');
-        warnings.push(`动力鞋采用输入中确认的属性 ${item.attribute}；血蓝上限仍以 GSI 为准，网页确认控件尚未接入。`);
-      } else warnings.push('动力鞋当前属性不可见：未加切换属性，网页确认控件尚未接入。');
+        warnings.push(`动力鞋采用确认的属性 ${item.attribute}；切鞋后需重新确认，血蓝上限仍以 GSI 为准。`);
+      } else warnings.push('动力鞋当前属性未知：未加切换属性，请确认当前鞋子属性。');
     }
     // Reviewed item lifesteal only; unrelated fields named lifesteal are not auto-interpreted.
     if (['item_mask_of_madness', 'item_lifesteal', 'item_satanic'].includes(item.name)) {
@@ -83,20 +83,23 @@ export function calculateSelfStats(player: PlayerSnapshot, data: CombatData = CO
       creepDamage = Math.max(creepDamage, v(h.melee ? 'quelling_bonus' : 'quelling_bonus_ranged'));
     }
     if (item.name === 'item_mask_of_madness') {
-      warnings.push('疯脸仅计静态攻击力；吸血比例和冷却字段已准备，主动攻速、减甲、沉默、蓝耗和吸血尚未接入清野模拟。');
+      warnings.push('疯脸已模拟主动攻速、减甲、沉默、蓝耗、持续/冷却和主攻击吸血；不计弹射吸血、移动加速或未知的初始主动剩余时间。');
       if (item.cooldown === undefined) warnings.push('未收到疯脸当前冷却，不假定主动已就绪。');
     } else if (item.name !== 'item_power_treads') {
       warnings.push(`物品 ${item.name} 仅计已适配属性；未适配主动、触发、光环及条件效果未计。`);
     }
     if (['item_lifesteal', 'item_satanic'].includes(item.name)) {
-      warnings.push(`物品 ${item.name} 的吸血比例已准备，但吸血尚未接入清野模拟。`);
+      warnings.push(`物品 ${item.name} 仅模拟已适配普攻吸血，不计主动增益。`);
     }
   }
   for (const ability of player.abilities) {
     if (ability.name === 'sven_great_cleave') {
       cleave += levelValue(h.abilities[ability.name]?.values.great_cleave_damage, ability.level) / 100;
     } else if (ability.name === 'luna_moon_glaive' && Object.hasOwn(h.abilities, ability.name)) {
-      warnings.push('月刃按营地内存活单位逐次弹射、递减伤害估算；假设在弹射距离内，未模拟弹道时间、衰减天赋、暴击或主动环绕刃。当前仍优先攻击低血量单位。');
+      warnings.push('月刃按营地内存活单位逐次弹射、递减伤害估算，已计明确学到的衰减天赋；假设在弹射距离内，未模拟弹道时间、暴击或主动环绕刃。当前仍优先攻击低血量单位。');
+    } else if (ability.name === 'special_bonus_unique_luna_7' && player.hero === 'npc_dota_hero_luna') {
+      // Reviewed pinned npc_dota_hero_luna.txt: damage_reduction_percent talent modifier -5.
+      warnings.push('已计明确学到的 10 级月刃天赋：每跳衰减减少 5 个百分点。');
     } else if (ability.name === 'luna_lunar_orbit') {
       warnings.push('未建模技能：luna_lunar_orbit；环月接触伤害、减伤和站位模型尚未接入。');
     } else if (!isModeledAbility(ability.name) || !Object.hasOwn(h.abilities, ability.name)) {
@@ -115,6 +118,8 @@ export function calculateSelfStats(player: PlayerSnapshot, data: CombatData = CO
     armor: h.armor + attrs[1] / RULES.agilityPerArmor + bonusArmor,
     magicResistance: 1 - (1 - clamp(h.magicResistance + attrs[2] * 0.001, 0, 1)) * magicFactor,
     attacksPerSecond: clamp(h.attackSpeed + attrs[1] + attackSpeed, RULES.minAttackSpeed, RULES.maxAttackSpeed) / (100 * h.attackTime),
+    attackSpeed: clamp(h.attackSpeed + attrs[1] + attackSpeed, RULES.minAttackSpeed, RULES.maxAttackSpeed),
+    attackTime: h.attackTime,
     moveSpeed: clamp((h.moveSpeed + boots + flatMove) * (1 + percentMove / 100), RULES.minMoveSpeed, RULES.maxMoveSpeed),
     healthRegen: h.healthRegen + attrs[0] * RULES.healthRegenPerStrength + healthRegen,
     manaRegen: h.manaRegen + attrs[2] * RULES.manaRegenPerInt + manaRegen,

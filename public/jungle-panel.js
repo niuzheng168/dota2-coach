@@ -15,6 +15,9 @@ export class JunglePanel {
       this.controlTimer = setTimeout(() => { if (this.state) this.render(this.state); }, sent ? 5000 : 0);
     });
     $('jungleRequest').addEventListener('click', () => this.request());
+    $('jungleTreads').addEventListener('change', () => {
+      send({ type: 'tactics.set_options', options: { treadsAttribute: $('jungleTreads').value } });
+    });
     $('jungleCamp').addEventListener('change', () => { this.selected = $('jungleCamp').value; this.draw(); });
     $('jungleCleared').addEventListener('click', () => {
       if (this.selected) send({ type: 'tactics.mark_cleared', campId: this.selected });
@@ -73,12 +76,16 @@ export class JunglePanel {
     $('jungleRequest').disabled = !this.canControl() || !this.state.enabled || !fresh;
     $('jungleCleared').disabled = !this.canControl() || !this.state.enabled || !fresh || !this.selected;
     $('junglePlan').hidden = !this.state.route || !fresh;
+    $('jungleReasoning').hidden = !this.state.route || !fresh;
     if (this.state.enabled && this.state.updatedAt && !fresh) {
       $('jungleStatus').textContent = 'GSI 已过期，路线已撤回；等待新的玩家数据。';
       this.stopVoice();
     }
   }
   render(state) {
+    if (state.route && !['llm', 'numeric-benchmark'].includes(state.planner?.kind)) {
+      state = { ...state, route: null, status: '服务端没有提供模型规划来源；已拒绝显示旧规则路线，请升级服务端。' };
+    }
     clearTimeout(this.controlTimer);
     this.state = state;
     $('jungleEnabled').checked = state.enabled;
@@ -86,6 +93,14 @@ export class JunglePanel {
     $('jungleVoice').disabled = !this.isStudent() || !window.speechSynthesis;
     $('jungleBody').hidden = !state.enabled;
     $('jungleStatus').textContent = state.status;
+    const planner = state.planner;
+    $('junglePlanner').textContent = planner?.kind === 'numeric-benchmark'
+      ? '离线数值基准（测试注入，不是大模型决策）'
+      : `大模型推理：${planner?.model || '未配置'}${planner?.pending ? ' · 正在推理' : ''} · 无规则回退 · 可能产生模型费用`;
+    $('jungleReasoning').textContent = state.route?.reasoning
+      ? `模型决策：${state.route.reasoning.summary}\n决策游戏时钟 ${clock(state.route.reasoning.decidedAt)}；路线已按新状态重放核算。` : '';
+    $('jungleTreads').value = state.options?.treadsAttribute || 'unknown';
+    $('jungleTreads').disabled = !state.enabled || !this.canControl();
     if (!state.enabled) this.stopVoice();
     const player = state.player, stats = state.stats;
     $('jungleStats').textContent = player && stats
@@ -123,6 +138,7 @@ export class JunglePanel {
         money.textContent = `预计 +${integer(step.gold)} 金 · 累计 ${integer(cumulativeGold)} 金`;
         const detail = document.createElement('span');
         detail.textContent = `路程 ${Math.ceil(step.travelSeconds)} 秒 · 清野 ${Math.ceil(step.clearRange[0])}–${Math.ceil(step.clearRange[1])} 秒` +
+          (step.complete === false ? '（截止时未清空，仅计已击杀）' : '') +
           ` · 剩 HP 约 ${integer(step.healthAfter)} / MP ${integer(step.manaAfter)}` +
           (step.waitSeconds ? ` · 框外等待 ${Math.ceil(step.waitSeconds)} 秒` : '');
         const spells = document.createElement('small');

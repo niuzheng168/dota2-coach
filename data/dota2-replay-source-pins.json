@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-15",
+  "steamInf": {
+    "url": "https://raw.githubusercontent.com/SteamDatabase/GameTracking-Dota2/b8fbea101ddaeaf069b32d3a86a3476969a207f4/game/dota/steam.inf",
+    "sha256": "8449d922afa2834abcd970b4cf32b148e2d60d90dda0bc1220a315e24bcab425",
+    "text": "ClientVersion=6975\nServerVersion=6975\nProductName=dota2_workshop\nappID=570\nServerAppID=373310\nCustomGameServerAppID=471280\nToolsAppID=316570\nSourceRevision=11236380\nVersionDate=Nov 12 2026\nVersionTime=17:19:35\n",
+    "gameCommit": "b8fbea101ddaeaf069b32d3a86a3476969a207f4",
+    "serverBuild": 6975
+  },
+  "patchWindow": {
+    "source": "https://www.dota2.com/datafeed/patchnoteslist?language=english",
+    "responseSha256": "9ec57bde0c37aee9b782bd7190cc0c18b68310d90b6cba0b9f9dd3b196bd29ea",
+    "patch": "7.41f",
+    "fromTimestamp": 1789455600,
+    "untilTimestamp": null,
+    "latestAtCheck": "7.41f"
+  }
+}

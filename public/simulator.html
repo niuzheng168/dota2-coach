@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dota 交互模拟台</title><link rel="stylesheet" href="/simulator.css"></head>
+<body>
+  <header><div><span class="eyebrow">DOTA COACH / SIMULATION LAB</span><h1>地图战斗模拟台</h1></div>
+    <div class="header-right"><span class="badge">200 ms / 帧</span><span class="build">7.41f · build 6975</span><a href="/farming-replays">职业刷钱路线 ↗</a><a href="/map-audit">地图核验证据 ↗</a></div></header>
+  <div class="notice"><span class="dot"></span><strong>实时模拟，不是录像播放</strong><span>已核验的地图坐标 · 简化战斗机制 · 不生成实战路线建议</span></div>
+  <section class="controlbar" aria-label="模拟控制">
+    <button id="play" class="primary">▶ 播放</button>
+    <button id="step" title="推进 200ms">单帧 +200ms</button><button id="advance">推进 10 秒</button>
+    <label>速度 <select id="speed"><option value="1">1×</option><option value="5" selected>5×</option><option value="20">20×</option></select></label>
+    <div class="split"></div><label>种子 <input id="seed" type="number" value="741" min="0" max="4294967295"></label>
+    <button id="reset">无英雄重置</button><strong id="clock">00:00.0</strong>
+  </section>
+  <main>
+    <section class="map-panel">
+      <div class="map-heading"><span>THE ANCIENT BATTLEFIELD</span><div class="layers">
+        <label><input id="show-paths" type="checkbox" checked>兵线路径</label><label><input id="show-trees" type="checkbox">树点</label><label><input id="show-camps" type="checkbox" checked>野点</label>
+        <button id="zoom-out" aria-label="缩小">−</button><button id="zoom-in" aria-label="放大">+</button><button id="home-view">全图</button><button id="focus-hero">跟到英雄</button>
+      </div></div>
+      <div class="map-viewport">
+        <canvas id="sim-map" tabindex="0" aria-label="Dota 战斗模拟地图；悬停野点查看详情，点击固定，Esc 关闭；右键移动或攻击，滚轮缩放，中键拖动；也可用选择野点菜单"></canvas>
+        <div id="camp-tooltip" role="tooltip" hidden>
+          <div class="camp-heading"><strong id="camp-title"></strong><span id="camp-pin-state"></span></div>
+          <dl class="camp-readout">
+            <div><dt>当前野怪</dt><dd id="camp-availability">—</dd></div>
+            <div><dt>下次刷新检查</dt><dd id="camp-refresh">—</dd></div>
+            <div><dt id="camp-gold-label">预计收益</dt><dd id="camp-gold">—</dd></div>
+          </dl>
+          <p id="camp-detail"></p>
+          <small>可得金币须全部补刀；≈ 为模拟组合估计，并非已赚收入。</small>
+          <div id="camp-interaction-hint"></div>
+        </div>
+      </div>
+      <div class="map-footer"><span><i class="radiant"></i>天辉　<i class="dire"></i>夜魇　<i class="neutral"></i>野怪　<i class="hero"></i>英雄</span><span>悬停野点看详情 · 点击固定 · Esc 关闭</span></div>
+      <div class="camp-toolbar">
+        <span id="camp-summary"></span><select id="camp-choice" aria-label="选择野点"><option value="">选择野点查看详情</option></select><button id="clear-camp" hidden>取消固定</button>
+      </div>
+      <small id="map-art-error" role="status" hidden></small>
+      <div class="timeline-card">
+        <div class="timeline-heading"><strong>时间轴</strong><span id="frame-label">帧 0 / 3000</span><span id="branch">分支 0</span></div>
+        <input id="timeline" type="range" min="0" max="3000" step="1" value="0" aria-label="模拟时间轴">
+        <div class="ticks"><span>0:00</span><span>2:00</span><span>4:00</span><span>6:00</span><span>8:00</span><span>10:00</span></div>
+        <small>可拖到过去或未来。回退不会重复获得金币；回退后下达新操作会建立新分支，舍弃原未来。</small>
+      </div>
+      <div class="metric-strip"><div><span>活兵 / 野怪</span><strong id="population">24 / 0</strong></div><div><span>小兵攻击</span><strong id="creep-attacks">0</strong></div><div><span>塔攻击</span><strong id="tower-attacks">0</strong></div><div><span>击杀事件</span><strong id="kills">0</strong></div></div>
+      <p id="sim-status" role="status">正在初始化地图模拟。</p>
+    </section>
+    <aside>
+      <section class="hero-card"><div class="section-title"><h2>英雄</h2><span id="hero-state" class="pill">未加入</span></div>
+        <div class="hero-config"><label>英雄 <select id="hero-type"></select></label><label>等级 <input id="hero-level" type="number" min="1" max="30" value="10"></label></div>
+        <label class="team-label">阵营 <select id="hero-team"><option value="radiant">天辉</option><option value="dire">夜魇</option></select></label>
+        <div class="button-row"><button id="add-hero" class="primary">添加 Luna</button><button id="place-hero">在地图放置</button><button id="remove-hero">移除</button></div>
+        <div id="hero-readout"><p class="empty">场景当前没有英雄。小兵与防御塔仍会独立战斗。</p></div>
+        <div class="resource"><span>生命</span><div><i id="hp-bar"></i></div><strong id="hp">—</strong></div>
+        <div class="resource mana"><span>魔法</span><div><i id="mp-bar"></i></div><strong id="mp">—</strong></div>
+        <dl class="attributes" id="attributes"></dl>
+        <div class="button-row"><button id="stop-hero">停止</button><button id="mask">开启疯脸</button></div>
+      </section>
+      <section><div class="section-title"><h2>装备</h2><small>场景编辑 · 六个栏位</small></div>
+        <div id="inventory" class="inventory"></div>
+        <div class="equip-row"><select id="item-choice" aria-label="选择装备"></select><button id="equip">装备</button></div>
+        <label class="team-label">假腿属性 <select id="treads"><option value="agi">敏捷</option><option value="str">力量</option><option value="int">智力</option></select></label>
+        <small>物品改变下方属性与实际战斗；点击栏位移除。装备编辑不扣钱，不冒充游戏购买。</small>
+      </section>
+      <section><div class="section-title"><h2>选中目标</h2><span id="selection-kind" class="pill">—</span></div>
+        <select id="target-choice" aria-label="场上单位"><option value="">点击地图选择单位</option></select>
+        <p id="target-detail">选择小兵、野怪或塔，查看属性及攻击。</p>
+        <div class="button-row"><button id="attack">攻击目标</button><button id="beam">月光 Q</button></div>
+      </section>
+      <section><div class="section-title"><h2>英雄击杀收益</h2><strong id="gold" class="gold">0 金</strong></div>
+        <div class="income"><span id="lane-income">兵线 0</span><span id="neutral-income">野怪 0</span><span id="last-hits">补刀 0</span></div>
+        <small>只计英雄击杀的小兵与野怪。塔/小兵之间的击杀不发给英雄；不含工资或团队收入。</small>
+      </section>
+      <section><h2>最近事件</h2><ul id="sim-events"></ul></section>
+    </aside>
+  </main>
+  <details><summary>机制范围与地图来源</summary><ul id="sim-limits"></ul></details>
+  <script type="module" src="/simulator.js"></script>
+</body></html>

@@ -11,7 +11,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const route = new URL(req.url, 'http://local').pathname;
     const filename = route.startsWith('/heroes/') ? path.resolve('public' + route) : path.resolve(root, '.' + (route === '/' ? '/index.html' : route));
-    assert.ok(filename.startsWith(root + '/') || filename.startsWith(path.resolve('public/heroes') + '/'));
+    assert.ok(filename.startsWith(root + path.sep) || filename.startsWith(path.resolve('public/heroes') + path.sep));
     const bytes = await fs.readFile(filename);
     res.setHeader('Content-Type', filename.endsWith('.js') ? 'application/javascript' : filename.endsWith('.css') ? 'text/css' :
       filename.endsWith('.json') ? 'application/json' : filename.endsWith('.jpg') ? 'image/jpeg' : filename.endsWith('.png') ? 'image/png' : 'text/html');
@@ -84,6 +84,14 @@ try {
               case 'overlay.settings': overlay = data; result = overlay; break;
               case 'overlay.preview': case 'window.tray': case 'room.copyInvite': case 'gsi.download': case 'diagnostics.export': case 'web.open': break;
               case 'text.send': break;
+              case 'tactics.enabled':
+                state.tactics = { enabled: data.enabled, planner: { kind: 'llm', model: 'test-only-model' },
+                  status: '等待 GSI', options: { treadsAttribute: 'unknown' } };
+                emit({ type: 'tactics.state', state: state.tactics }); break;
+              case 'tactics.options':
+                state.tactics.options = data; emit({ type: 'tactics.state', state: state.tactics }); break;
+              case 'tactics.request': case 'tactics.overlay.preview': case 'tactics.overlay.configure': case 'tactics.overlay.stop':
+              case 'tactics.vision.start': case 'tactics.vision.stop': break;
               default: throw new Error('Unexpected command ' + request.method);
             }
             emit({ type: 'response', id: request.id, ok: true, result });
@@ -148,6 +156,22 @@ try {
   assert.ok(!after.calls.some(c => ['mic.stop', 'listener.stop', 'room.leave'].includes(c.method)));
   assert.equal(after.calls.filter(c => c.method === 'overlay.settings').at(-1).data.top, 100);
   await page.locator('[data-page="workspace"]').first().click();
+  await page.locator('#tacticsEnabled').check();
+  await page.waitForFunction(() => window.nativeState.tactics?.enabled);
+  await page.locator('#tacticsTreads').selectOption('agi');
+  await page.waitForFunction(() => window.nativeState.tactics.options.treadsAttribute === 'agi');
+  await page.evaluate(() => {
+    const tactics = { ...window.nativeState.tactics, updatedAt: Date.now(), status: '下一个：测试营地',
+      player: { level: 10, health: 1018, maxHealth: 1018, mana: 556, position: { x: -1454, y: -3356 } },
+      route: { gold: 123, warnings: ['合成测试，不是收益验收'], steps: [{ label: '测试营地', gold: 123, complete: false }] } };
+    window.nativeState.tactics = tactics; window.emitNative({ type: 'tactics.state', state: tactics });
+  });
+  assert.match(await page.locator('#tacticsSummary').textContent(), /180 秒预计 123 金/);
+  assert.match(await page.locator('#tacticsSteps').textContent(), /仅计截止前击杀/);
+  await page.locator('#jungleCard').screenshot({ path: '.tmp/desktop-v020/jungle-panel.png' });
+  await page.evaluate(() => window.emitNative({ type: 'tactics.state', state: { ...window.nativeState.tactics, updatedAt: Date.now() - 9000 } }));
+  assert.equal(await page.locator('#tacticsSteps li').count(), 0);
+  await page.locator('#tacticsEnabled').uncheck();
   await page.locator('#editHeroes').click();
   await page.locator('#heroSearch').fill('猴子');
   assert.equal(await page.locator('.hero-tile').count(), 1);

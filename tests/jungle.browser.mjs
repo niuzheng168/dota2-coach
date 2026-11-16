@@ -8,6 +8,8 @@ import { AccessStore } from '../src/access-store.ts';
 import { createCoachServer } from '../src/app-server.ts';
 import { DEFAULT_ROOM_SETTINGS } from '../src/room-settings.ts';
 import { MAP } from '../src/tactics/combat-data.ts';
+import { TacticalEngine } from '../src/tactics/index.ts';
+import { planJungleRoute } from '../src/tactics/jungle.ts';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'jungle-browser-'));
@@ -20,7 +22,7 @@ let starts = 0;
 const server = createCoachServer(store, (kind, options) => ({
   kind, role: options.role, async start() { starts++; }, async stop() {},
   appendAudio() {}, markSpeechEnd() {}, async updateMatchHeroes() {},
-}));
+}), () => new TacticalEngine({ benchmarkPlanner: planJungleRoute }));
 server.listen(0, '127.0.0.1'); await once(server, 'listening');
 const base = `http://127.0.0.1:${server.address().port}`;
 let browser;
@@ -89,6 +91,11 @@ try {
   assert.ok(await page.locator('#jungleSteps').evaluate(element => element.scrollTop >= 119),
     'regular GSI updates must not reset the long route list scroll position');
   const initialStarts = starts;
+  await new Promise(resolve => setTimeout(resolve, 1050));
+  const beforeTreads = await page.locator('#jungleStats').textContent();
+  await page.locator('#jungleTreads').selectOption('agi');
+  await page.waitForFunction(before => document.getElementById('jungleStats').textContent !== before, beforeTreads);
+  assert.match(await page.locator('#jungleWarnings').textContent(), /确认的属性 agi/);
   await new Promise(resolve => setTimeout(resolve, 1050));
   await page.locator('#jungleRequest').click();
   await page.locator('.jungle-panel').screenshot({ path: '.tmp/jungle-panel.png' });

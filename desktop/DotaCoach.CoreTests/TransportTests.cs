@@ -24,13 +24,26 @@ internal static class TransportTests
         using var microphone = new NativeVoiceChannel(false);
         using var listener = new NativeVoiceChannel(true);
         int publicTurns = 0, privateTurns = 0, privateAudio = 0, ended = 0;
+        int tacticsEnabled = 0, treadsConfirmed = 0;
         microphone.Message += e => { if (NativeVoiceChannel.Text(e, "type").StartsWith("subtitle.")) Interlocked.Increment(ref publicTurns); };
+        microphone.Message += e => {
+            if (NativeVoiceChannel.Text(e, "type") != "tactics.state") return;
+            var state = e.GetProperty("state");
+            if (state.GetProperty("enabled").GetBoolean()) Interlocked.Exchange(ref tacticsEnabled, 1);
+            if (state.GetProperty("options").GetProperty("treadsAttribute").GetString() == "agi") Interlocked.Exchange(ref treadsConfirmed, 1);
+        };
         listener.Message += e => { if (NativeVoiceChannel.Text(e, "type").StartsWith("subtitle.")) Interlocked.Increment(ref privateTurns); };
         listener.AudioOutput += _ => Interlocked.Increment(ref privateAudio);
         listener.Ended += (code, _) => Interlocked.Exchange(ref ended, code);
         await microphone.Connect(owner, roomId, "student", "", "", false);
         await listener.Connect(guest, roomId, "coach", "dota2.exe", invite, false);
         if (!microphone.Ready || !listener.Ready) throw new Exception("Native channels not independently ready");
+        microphone.SendJson(new { type = "room.set_tactics", enabled = true });
+        await Until(() => Volatile.Read(ref tacticsEnabled) == 1);
+        await Task.Delay(1100);
+        microphone.SendJson(new { type = "tactics.set_options", options = new { treadsAttribute = "agi" } });
+        await Until(() => Volatile.Read(ref treadsConfirmed) == 1);
+        if (!microphone.Ready || !listener.Ready) throw new Exception("Tactics controls restarted native audio");
         listener.PushAudio(new byte[2880]);
         await Until(() => Volatile.Read(ref privateTurns) == 2);
         if (publicTurns != 0 || privateAudio != 0) throw new Exception("Private listener leaked to room/TTS");
@@ -52,6 +65,6 @@ internal static class TransportTests
         try { await old.Connect(owner, "outdated", "coach", "dota2.exe", "", false); throw new Exception("Old server accepted"); }
         catch (InvalidOperationException) { }
         catch (OperationCanceledException) { }
-        Console.WriteLine("PASS: native HTTP login/CSRF, dual WSS PCM, private captions/no TTS, revoke, cancellation and old-server guard.");
+        Console.WriteLine("PASS: native HTTP login/CSRF, tactics/treads roundtrip, dual WSS PCM, private captions/no TTS, revoke, cancellation and old-server guard.");
     }
 }

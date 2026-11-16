@@ -1,0 +1,7 @@
+{
+  "name": "ValveResourceFormat CLI",
+  "version": "21.1",
+  "url": "https://github.com/ValveResourceFormat/ValveResourceFormat/releases/download/21.1/cli-windows-x64.zip",
+  "sha256": "cd01665e4d31d70c1081546a697eb5654f30718000fef1a2bb0654ae044d659e",
+  "executableSha256": "50502077543856a3f760eecf53b073dcdea5073c193f0274c2088b5a2a8f4d13"
+}

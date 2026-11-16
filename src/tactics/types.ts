@@ -89,6 +89,8 @@ export interface SelfStats {
   armor: number;
   magicResistance: number;
   attacksPerSecond: number;
+  attackSpeed?: number;
+  attackTime?: number;
   moveSpeed: number;
   healthRegen: number;
   manaRegen: number;
@@ -106,10 +108,13 @@ export interface Resources {
 }
 export interface CombatOptions {
   camp?: Camp;
+  spawnAt?: number;
   limitSeconds?: number;
   policy?: 'auto' | 'attacks-only';
+  scheduledCasts?: { name: string; seconds: number }[];
+  targetPriority?: string[];
 }
-export interface KillEvent { seconds: number; unit: string; gold: number; xp: number }
+export interface KillEvent { seconds: number; unit: string; gold: number; xp: number; weight?: number }
 export interface ClearEstimate {
   seconds: number;
   healthAfter: number;
@@ -155,8 +160,10 @@ export interface JungleRoute {
   warnings: string[];
   status: 'ready' | 'recover' | 'unavailable';
   search?: { engine: string; expanded: number; evaluated: number; beamWidth: number; optimal: false };
+  reasoning?: { model: string; decisionId: string; decidedAt: number; summary: string; evidenceIds: string[] };
 }
 export interface JungleState {
+  contextId?: string;
   enabled: boolean;
   patch: string;
   status: string;
@@ -167,4 +174,6 @@ export interface JungleState {
   calibration: number;
   updatedAt: number | null;
   options?: { treadsAttribute: 'unknown' | 'str' | 'agi' | 'int' };
+  observation?: { status: string; capturedAt: number | null };
+  planner?: { kind: 'llm' | 'numeric-benchmark'; model: string | null; configured: boolean; pending: boolean };
 }

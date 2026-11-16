@@ -14,5 +14,6 @@
     <Compile Include="../DotaCoach.Desktop/NativeVoiceChannel.cs" Link="NativeVoiceChannel.cs" />
     <Compile Include="../DotaCoach.Desktop/ConversationStore.cs" Link="ConversationStore.cs" />
     <Compile Include="../DotaCoach.Desktop/OverlayPreferences.cs" Link="OverlayPreferences.cs" />
+    <Compile Include="../DotaCoach.Desktop/MinimapCalibration.cs" Link="MinimapCalibration.cs" />
   </ItemGroup>
 </Project>

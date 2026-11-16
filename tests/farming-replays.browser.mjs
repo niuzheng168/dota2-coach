@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { once } from 'node:events';
+import { createSandboxServer } from '../src/sandbox/server.ts';
+const corpus=JSON.parse(await fs.readFile('data/luna-farming-routes.json','utf8'));
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+const {server,token}=createSandboxServer();server.listen(0,'127.0.0.1');await once(server,'listening');
+const origin=`http://127.0.0.1:${server.address().port}`;
+const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_EXECUTABLE_PATH});
+const state=async()=>await(await fetch(origin+'/api/sim/state',{headers:{Authorization:`Bearer ${token}`}})).json();
+try{
+  const before=await state(),page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[],writes=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  page.on('request',r=>{if(r.method()!=='GET')writes.push(r.url());});
+  await page.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
+  assert.equal((await fetch(origin+'/api/farming-replays')).status,401);
+  await page.goto(`${origin}/farming-replays#token=${token}`);
+  await page.waitForFunction(()=>document.querySelector('#replay-status').textContent.startsWith('已就绪'));
+  assert.equal(new URL(page.url()).hash,'');
+  assert.equal(await page.locator('#replay-match option').count(),6);
+  assert.equal(await page.locator('.route-card canvas').count(),6);
+  for(const m of corpus.matches){
+    await page.locator('#replay-match').selectOption(String(m.matchId));
+    assert.equal(await page.locator('#replay-lane-gold').textContent(),String(m.windows[3].laneGold));
+    assert.equal(await page.locator('#replay-neutral-gold').textContent(),String(m.windows[3].neutralGold));
+    assert.ok((await page.locator('#replay-meta').textContent()).includes(String(m.matchId)));
+  }
+  await page.locator('.route-card[data-id="9089477184"]').click();
+  assert.equal(await page.locator('#replay-match').inputValue(),'9089477184');
+  assert.equal(await page.locator('#replay-farm-rate').textContent(),'827.5');
+  await fs.mkdir('.tmp',{recursive:true});
+  await page.locator('#route-gallery-section').screenshot({path:'.tmp/luna-farming-six-routes.png'});
+  await page.screenshot({path:'.tmp/luna-farming-viewer.png',fullPage:true});
+  await page.locator('#replay-window').selectOption('600,900');
+  assert.equal(await page.locator('#replay-neutral-gold').textContent(),'2684');
+  await page.locator('#replay-time').fill('700.8');await page.locator('#replay-time').dispatchEvent('input');
+  assert.equal(await page.locator('#replay-clock').textContent(),'11:40.8');
+  await page.locator('#replay-play').click();
+  await page.waitForFunction(()=>document.querySelector('#replay-clock').textContent!=='11:40.8');
+  await page.locator('#replay-play').click();
+  const paused=await page.locator('#replay-clock').textContent();await page.waitForTimeout(350);
+  assert.equal(await page.locator('#replay-clock').textContent(),paused);
+  await page.locator('#show-kills').check();await page.locator('#route-zoom-in').click();await page.locator('#route-home').click();
+  await page.locator('#replay-window').selectOption('all');
+  assert.ok(Number(await page.locator('#replay-neutral-gold').textContent())>4507);
+  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(100);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.screenshot({path:'.tmp/luna-farming-mobile.png',fullPage:true});
+  assert.deepEqual(await state(),before,'offline replay browsing must never mutate the simulator');
+  assert.deepEqual(writes,[]);assert.deepEqual(errors,[]);
+  console.log('PASS farming replays: six actual routes, exact gold windows, gallery selection, recorded timeline/play/pause, zoom, mobile, authenticated/read-only isolation.');
+}finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

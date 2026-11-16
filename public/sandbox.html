@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Luna 路线实验室</title><link rel="stylesheet" href="/sandbox.css">
+</head>
+<body>
+  <header><div><span class="eyebrow">DOTA COACH · 线野实验 V2</span><h1>Luna 路线实验室</h1></div>
+    <span class="badge">模拟环境 · 非实战 GPM</span></header>
+  <section id="scope-warning" role="note">
+    <strong>路线建议已撤下 · 己方可活动区域未核验</strong>
+    <p>旧线野示例触及夜魇营地，不能作为实战路线或 GPM 依据。当前仅保留手动机制测试；没有塔、敌方英雄和真实视野。</p>
+    <p><a href="/map-audit">打开地图与原始回放核验（真实单位记录，不是此页的模拟出兵）</a></p>
+  </section>
+  <section class="toolbar" aria-label="实验控制">
+    <label>随机种子 <input id="seed" type="number" min="0" max="4294967295" value="741"></label>
+    <button id="reset">重置同场景</button><button id="play" class="primary">播放</button>
+    <button id="step">推进 10 秒</button>
+    <label>速度 <select id="speed"><option value="1">1×</option><option value="5" selected>5×</option><option value="20">20×</option></select></label>
+    <strong id="clock">10:00.0</strong><span id="remaining">剩余 180 秒</span>
+  </section>
+  <section class="metrics">
+    <div><span>野怪模拟金币</span><strong id="neutral-gold">0</strong></div>
+    <div><span>兵线模拟金币</span><strong id="lane-gold">0</strong></div>
+    <div><span>线野合计 GPM · 固定 180 秒分母</span><strong id="gpm">0</strong><span id="total-gold">合计 0 金</span></div>
+    <div><span>Luna · 等级固定 10</span><strong id="resources">HP 1018 · MP 556</strong></div>
+  </section>
+  <main>
+    <section class="map-section">
+      <div class="map-head"><span>28 营地 · 三路兵线 · 全图可见</span><span id="mode">手动实验</span></div>
+      <canvas id="map" aria-label="简化 Dota 地图：点击选择营地，使用右侧按钮下达命令"></canvas>
+      <div class="legend"><span class="hero-key">◆ Luna</span><span class="neutral-key">● 野怪</span>
+        <span class="radiant-key">● 天辉兵</span><span class="dire-key">● 夜魇兵</span><span>兵线为示意；未画安全边界</span></div>
+      <p id="status" role="status">等待沙盒连接。</p>
+    </section>
+    <aside>
+      <section><h2>手动行动 / API 对照</h2>
+        <label>营地 <select id="camp"></select></label>
+        <div class="actions"><button id="farm">前往并清理</button><button id="stop">停止</button></div>
+        <p id="camp-detail"></p><div id="units" aria-label="选中营地的单位"></div>
+        <div class="actions"><button id="attack">攻击所选单位</button><button id="beam">月光 Q</button><button id="mask">疯狂面具</button></div>
+        <label class="subcontrol">出口 <select id="pull-exit"></select></label>
+        <div class="actions"><button id="pull">攻击一次并引向出口</button></div>
+        <small id="spawn-detail"></small>
+        <small>实际离开刷新框才可能堆野。引野本身不加钱，野怪被小兵击杀也不算英雄收入。</small>
+      </section>
+      <section><h2>兵线与补刀</h2>
+        <label>兵线 <select id="lane"><option value="bot">下路</option><option value="mid">中路</option><option value="top">上路</option></select></label>
+        <label class="subcontrol">位置 <select id="lane-anchor"></select></label>
+        <label class="subcontrol">方式 <select id="attack-mode"><option value="push">攻击推线</option><option value="last_hit">只补最后一刀</option></select></label>
+        <div class="actions"><button id="farm-lane">前往收线</button></div>
+        <small id="lane-detail"></small>
+        <small>手动机制测试：会追击锚点 1100 范围内的敌兵，月刃可能打到邻近野怪；锚点不是安全边界。</small>
+      </section>
+      <section><h2>大模型实验</h2>
+        <label>对照 <select id="experiment" disabled><option>历史对照已撤下</option></select></label>
+        <div class="actions"><button id="load-experiment" disabled>回放所选对照</button></div>
+        <small>历史数据保留用于离线复现，不再加载为路线建议。没有查到敌方野怪收入，也不等于路径安全。</small>
+        <p id="model-summary">己方可活动区域尚未核验，已暂停路线加载与付费规划。</p>
+        <ol id="plan"></ol><small>当前页面只做手动机制测试，不调用云端模型。</small></section>
+      <section><h2>最近事件</h2><ul id="events"></ul></section>
+    </aside>
+  </main>
+  <details><summary>机制与可信边界</summary><ul id="assumptions"></ul></details>
+  <script type="module" src="/sandbox.js"></script>
+</body>
+</html>

@@ -152,5 +152,30 @@ Check(preferences.GetProperty("top").GetDouble() == 100 && preferences.GetProper
     "Native subtitle preferences must clamp before reaching WPF");
 Check(preferences.GetProperty("targetColor").GetString() == "#b8f3cc" &&
     preferences.GetProperty("monitor").GetInt32() == 1, "Malformed color or fractional monitor must normalize");
-Console.WriteLine($"PASS: {count} core assertions (subtitle placement/DPI, startup/migration, origin security, PCM, Windows ABI).");
+var map = new MinimapCalibration(20, 800, 240, 240, -10000, 10000, -10000, 10000, 1920, 1080);
+var trial = System.Text.Json.JsonSerializer.SerializeToElement(new {
+    confirmed = false, left = 20, top = 800, width = 240, height = 240, minX = -10000, maxX = 10000, minY = -10000, maxY = 10000,
+});
+bool unconfirmedRejected = false;
+try { MinimapCalibration.Parse(trial, 1920, 1080); } catch (ArgumentException) { unconfirmedRejected = true; }
+Check(unconfirmedRejected, "An unconfirmed minimap must not show live route marks");
+Check(MinimapCalibration.Parse(trial, 1920, 1080, false) == map, "Preview may show only own marker before confirmation");
+Check(map.Project(-10000, 10000) == (20d, 800d), "Minimap upper-left projection");
+Check(map.Project(10000, -10000) == (260d, 1040d), "Minimap Y must be inverted");
+Check(map.Project(0, 0) == (140d, 920d), "Minimap center projection");
+Check(map.Project(double.NaN, 0) == null && map.Project(12000, 0) == null, "Out-of-bounds positions must not be pinned to an edge");
+var live = System.Text.Json.JsonSerializer.SerializeToElement(new {
+    planner = new { kind = "llm" },
+    enabled = true, updatedAt = 10000, player = new { alive = true, canAct = true, clock = 605 },
+    route = new { status = "ready", plannedAt = 600, validUntil = 780 },
+});
+Check(MinimapCalibration.Fresh(live, 10000, 11000), "Fresh route hidden");
+Check(!MinimapCalibration.Fresh(live, 10000, 19000), "Stale route shown");
+Check(!MinimapCalibration.Fresh(System.Text.Json.JsonSerializer.SerializeToElement(new { enabled = false }), 10000, 11000), "Disabled route shown");
+Check(!MinimapCalibration.Fresh(System.Text.Json.JsonSerializer.SerializeToElement(new { enabled = true, updatedAt = "bad" }), 10000, 11000), "Malformed route shown");
+Check(!MinimapCalibration.Fresh(System.Text.Json.JsonSerializer.SerializeToElement(new {
+    enabled = true, updatedAt = 10000, player = new { alive = true, canAct = true, clock = 605 },
+    route = new { status = "ready", plannedAt = 600, validUntil = 780 },
+}), 10000, 11000), "An old server route without model provenance must be hidden");
+Console.WriteLine($"PASS: {count} core assertions (minimap/freshness, subtitle placement/DPI, startup/migration, origin security, PCM, Windows ABI).");
 if (args.Length == 2 && args[0] == "--transport") await TransportTests.Run(args[1]);

@@ -19,6 +19,7 @@ internal sealed class DesktopSession : IDisposable
     private NativeMicrophone? microphone;
     private ProcessLoopback? capture;
     private JsonElement? user, room, config, roster;
+    private JsonElement? tactics;
     private string invitation = "", role = "student", micStatus = "未连接房间", listenStatus = "未开始监听", sourceName = "";
     private bool selfMonitor, disposed;
     private int sourcePid;
@@ -26,6 +27,8 @@ internal sealed class DesktopSession : IDisposable
     public event Action<ConversationTurn>? Caption;
     public event Action? ClearOverlay;
     public event Action<int>? AccessLost;
+    public event Action<JsonElement>? TacticsState;
+    public event Action? TacticsStopped;
     public string Server => service.Origin.AbsoluteUri;
     public string? RoomId => room is JsonElement r ? Text(r, "roomId") : null;
     public bool HasSession => user != null;
@@ -40,7 +43,7 @@ internal sealed class DesktopSession : IDisposable
     { service = new ServiceClient(address); this.dispatch = dispatch; this.emit = emit; }
 
     public object Snapshot() => new {
-        version = Version, server = Server, user, room, config, roster, role, selfMonitor,
+        version = Version, server = Server, user, room, config, roster, role, selfMonitor, tactics,
         microphone = new { ready = voice?.Ready == true, active = microphone != null, status = micStatus, frames = voice?.FramesSent ?? 0 },
         listener = new { ready = listener?.Ready == true, connecting = listener != null && !listener.Ready,
             active = capture != null, status = listenStatus, sourceName, pid = sourcePid, frames = listener?.FramesSent ?? 0 },
@@ -119,6 +122,12 @@ internal sealed class DesktopSession : IDisposable
                 RequireOwner();
                 return Server + "?room=" + RoomId + "&role=coach#invite=" + Uri.EscapeDataString(Text(room!.Value, "inviteToken"));
             case "gsi.config": RequireOwner(); return await service.GsiConfig(RoomId!);
+            case "tactics.enabled":
+                SendTactics(new { type = "room.set_tactics", enabled = data.GetProperty("enabled").GetBoolean() }); return null;
+            case "tactics.options":
+                SendTactics(new { type = "tactics.set_options", options = data }); return null;
+            case "tactics.request": SendTactics(new { type = "tactics.request_route" }); return null;
+            case "tactics.observation": SendTactics(new { type = "tactics.observe", observation = data }); return null;
             case "text.send":
                 var text = Text(data, "text").Trim();
                 if (text.Length is 0 or > 4000) throw new InvalidOperationException("请输入 1–4000 字");
@@ -198,10 +207,16 @@ internal sealed class DesktopSession : IDisposable
         channel.Message += message => dispatch(() => {
             if (!Current()) return;
             string type = Text(message, "type");
-            if (type == "room.state") { roster = message; Changed(); }
+            if (type == "room.state") {
+                roster = message;
+                if (!external && message.TryGetProperty("tactics", out var initialTactics)) AcceptTactics(initialTactics);
+                Changed();
+            }
+            else if (type == "tactics.state" && !external) AcceptTactics(message.GetProperty("state"));
             else if (type == "room.settings.changed")
             {
                 StopMic("房间设置已变更，请重新连接"); StopListener("房间设置已变更，请重新开始");
+                ClearTactics();
                 Notify("房间设置已更新。重新连接后，需手动开启采集。");
             }
             else if (type == "audio.input.status") emit(new { type = "receipt", source = external ? "listener" : "microphone", data = message });
@@ -221,7 +236,7 @@ internal sealed class DesktopSession : IDisposable
         channel.Ended += (code, reason) => dispatch(() => {
             if (!Current()) return;
             if (external) StopListener(reason);
-            else { StopMic(reason); voice = null; channel.Dispose(); playback.Dispose(); }
+            else { StopMic(reason); voice = null; channel.Dispose(); playback.Dispose(); ClearTactics(); }
             if (code is 4001 or 4003)
             {
                 _ = Leave();
@@ -258,13 +273,30 @@ internal sealed class DesktopSession : IDisposable
     }
     public Task Leave()
     {
+        ClearTactics();
         StopMic("未连接房间"); StopListener();
         var previous = voice; voice = null; previous?.Dispose(); playback.Dispose();
         room = roster = null; invitation = ""; conversation.Clear(); ClearOverlay?.Invoke(); Changed();
         return Task.CompletedTask;
     }
     private void RequireRoom() { if (room == null || user == null) throw new InvalidOperationException("请先登录并进入房间"); }
+    private void SendTactics(object message)
+    {
+        RequireRoom();
+        if (voice?.Ready != true) throw new InvalidOperationException("请先连接房间");
+        if (role != "student" && !Flag(room!.Value, "isOwner")) throw new InvalidOperationException("只有学员或房主可以控制规划");
+        voice.SendJson(message);
+    }
+    private void AcceptTactics(JsonElement value)
+    {
+        tactics = value.Clone(); TacticsState?.Invoke(value);
+        emit(new { type = "tactics.state", state = value });
+    }
+    private void ClearTactics()
+    {
+        tactics = null; TacticsStopped?.Invoke(); emit(new { type = "tactics.stopped" });
+    }
     private void RequireOwner() { RequireRoom(); if (!Flag(room!.Value, "isOwner")) throw new InvalidOperationException("只有房主可以执行此操作"); }
-    public void RendererFailed() { StopMic("界面中断，已暂停采集"); StopListener("界面中断，已暂停采集"); }
+    public void RendererFailed() { StopMic("界面中断，已暂停采集"); StopListener("界面中断，已暂停采集"); ClearTactics(); }
     public void Dispose() { disposed = true; _ = Leave(); service.Dispose(); }
 }

@@ -138,7 +138,7 @@ test('per-unit combat respects armor, HP, attack speed, unit deaths and remainin
     { ...resources, readyAt: { sven_storm_bolt: 700 } }, 1, dummyData);
   const noMana = simulateClear(caster, dummyStats, dummyComposition, 600, { ...resources, mana: 0 }, 1, dummyData);
   assert.ok(cast.seconds < base.seconds); assert.equal(cast.manaAfter, 490);
-  assert.equal(cast.readyAt.sven_storm_bolt, 612);
+  assert.equal(cast.readyAt.sven_storm_bolt, 612.2);
   assert.deepEqual(cooldown.casts, {}); assert.deepEqual(noMana.casts, {});
 });
 
@@ -485,7 +485,7 @@ test('camp clear inference requires in-camp kills plus departure, gold alone doe
 });
 
 test('engine defaults off, resets on match/hero/clock change, immediately withdraws unsafe and stale routes', () => {
-  const engine = new TacticalEngine();
+  const engine = new TacticalEngine({ benchmarkPlanner: planJungleRoute });
   assert.equal(engine.ingest(payload(), 10000), false); assert.equal(engine.state().route, null);
   engine.setEnabled(true); engine.ingest(payload(), 10000);
   assert.ok(engine.state().route?.steps.length);
@@ -513,7 +513,7 @@ test('capture removes credentials/player identity recursively but preserves hero
   const files = await fs.readdir(directory); assert.equal(files.length, 1);
   const content = await fs.readFile(path.join(directory, files[0]), 'utf8');
   assert.equal(content.trim().split('\n').length, 1);
-  const replay = new TacticalEngine(); replay.setEnabled(true);
+  const replay = new TacticalEngine({ benchmarkPlanner: planJungleRoute }); replay.setEnabled(true);
   const record = JSON.parse(content); replay.ingest(record.payload, record.receivedAt);
   assert.ok(replay.state().route);
 });

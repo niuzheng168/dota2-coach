@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 .env.*
+steam.env
 !.env.example
 *.local
 *.log
@@ -11,3 +12,5 @@ tmp/
 skills/
 benchmark-results/audio-cache/
 .DS_Store
+__pycache__/
+*.pyc

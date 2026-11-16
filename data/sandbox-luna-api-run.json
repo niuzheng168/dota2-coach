@@ -1,0 +1,1303 @@
+{
+  "date": "2026-11-15",
+  "timezone": "Asia/Hong_Kong",
+  "environment": "luna-sandbox-v1",
+  "sourcePatch": "7.41f",
+  "model": "gpt-6-astra",
+  "seed": 741,
+  "objective": "neutral death bounty over fixed 180 seconds",
+  "measuredInGame": false,
+  "notes": [
+    "Actual model-authored proposals evaluated through localhost API; no rule-based route generation.",
+    "Original six proposal rounds reached their limit without finish_plan; a separate model selection used re-evaluated candidates. The planner now reserves its last round for finish_plan.",
+    "The final selection was repeated with hero maximum health explicitly supplied; the checked-in summary is from that final response.",
+    "Toy mechanics and full-map information. Not a calibrated Dota 2 GPM estimate or global optimum."
+  ],
+  "proposalRunElapsedMs": 89549,
+  "trials": [
+    {
+      "trial": 1,
+      "visits": [
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_9",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_4",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_alpha_wolf"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_15",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_2",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_1",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_kobold_taskmaster"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_20",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_14",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_11",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": []
+        },
+        {
+          "campId": "neutralcamp_good_12",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_9",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_8",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            },
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 16
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_black_dragon"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_7",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        }
+      ],
+      "gold": 1191,
+      "neutralGpm": 397,
+      "laneGold": 0,
+      "minimumHealth": 813.0318851052224,
+      "status": "ready",
+      "rejectedCasts": [],
+      "elapsedGameSeconds": 180,
+      "routeSeconds": 174.70000000000005
+    },
+    {
+      "trial": 2,
+      "visits": [
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_8",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_black_dragon"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_7",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_13",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_16",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_8",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_black_dragon"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_7",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_9",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_4",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_alpha_wolf"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_15",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_2",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_1",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_kobold_taskmaster"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_15",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_4",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_alpha_wolf"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_9",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        }
+      ],
+      "gold": 1176,
+      "neutralGpm": 392,
+      "laneGold": 0,
+      "minimumHealth": 826.8601615318595,
+      "status": "ready",
+      "rejectedCasts": [],
+      "elapsedGameSeconds": 180,
+      "routeSeconds": 180
+    },
+    {
+      "trial": 3,
+      "visits": [
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_8",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_black_dragon"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_7",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_13",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_16",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_8",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_black_dragon"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_7",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_13",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_16",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_8",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_black_dragon"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_7",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_13",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_16",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_8",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_black_dragon"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_7",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        }
+      ],
+      "gold": 1191,
+      "neutralGpm": 397,
+      "laneGold": 0,
+      "minimumHealth": 734.5618497270766,
+      "status": "ready",
+      "rejectedCasts": [],
+      "elapsedGameSeconds": 180,
+      "routeSeconds": 180
+    },
+    {
+      "trial": 4,
+      "visits": [
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_9",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_12",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_11",
+          "casts": [],
+          "targetPriority": []
+        },
+        {
+          "campId": "neutralcamp_good_14",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_20",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_1",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_kobold_taskmaster"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_2",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_15",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_4",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_alpha_wolf"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_9",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_8",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_black_dragon"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_7",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_13",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_16",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        }
+      ],
+      "gold": 1191,
+      "neutralGpm": 397,
+      "laneGold": 0,
+      "minimumHealth": 847.1715841016205,
+      "status": "ready",
+      "rejectedCasts": [],
+      "elapsedGameSeconds": 180,
+      "routeSeconds": 180
+    },
+    {
+      "trial": 5,
+      "visits": [
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_9",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_12",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_11",
+          "casts": [],
+          "targetPriority": []
+        },
+        {
+          "campId": "neutralcamp_good_14",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_20",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_1",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_kobold_taskmaster"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_2",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_15",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_4",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_alpha_wolf"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_9",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_8",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_black_dragon"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_13",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_16",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_7",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        }
+      ],
+      "gold": 1208,
+      "neutralGpm": 402.6666666666667,
+      "laneGold": 0,
+      "minimumHealth": 847.1715841016205,
+      "status": "ready",
+      "rejectedCasts": [],
+      "elapsedGameSeconds": 180,
+      "routeSeconds": 180
+    },
+    {
+      "trial": 6,
+      "visits": [
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            },
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0.5
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_9",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_12",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            },
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0.5
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_11",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": []
+        },
+        {
+          "campId": "neutralcamp_good_14",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_20",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_1",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_kobold_taskmaster"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_2",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_15",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ogre_mauler"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_4",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_alpha_wolf"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_9",
+          "casts": [
+            {
+              "name": "luna_lucent_beam",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_5",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_centaur_khan"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_8",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_black_dragon"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_13",
+          "casts": [
+            {
+              "name": "item_mask_of_madness",
+              "seconds": 0
+            }
+          ],
+          "targetPriority": [
+            "npc_dota_neutral_enraged_wildkin"
+          ]
+        },
+        {
+          "campId": "neutralcamp_good_16",
+          "casts": [],
+          "targetPriority": [
+            "npc_dota_neutral_ghost"
+          ]
+        }
+      ],
+      "gold": 1225,
+      "neutralGpm": 408.3333333333333,
+      "laneGold": 0,
+      "minimumHealth": 835.5220307774279,
+      "status": "ready",
+      "rejectedCasts": [
+        {
+          "clock": 725.8,
+          "campId": "neutralcamp_good_5",
+          "name": "item_mask_of_madness",
+          "error": "魔法不足"
+        }
+      ],
+      "elapsedGameSeconds": 180,
+      "routeSeconds": 180
+    }
+  ],
+  "selected": {
+    "trial": "trial-6",
+    "gold": 1225,
+    "neutralGpmOver180Seconds": 408.3333333333333,
+    "visits": [
+      {
+        "campId": "neutralcamp_good_5",
+        "casts": [
+          {
+            "name": "luna_lucent_beam",
+            "seconds": 0
+          },
+          {
+            "name": "item_mask_of_madness",
+            "seconds": 0.5
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_centaur_khan"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_9",
+        "casts": [
+          {
+            "name": "luna_lucent_beam",
+            "seconds": 0
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_centaur_khan"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_12",
+        "casts": [
+          {
+            "name": "luna_lucent_beam",
+            "seconds": 0
+          },
+          {
+            "name": "item_mask_of_madness",
+            "seconds": 0.5
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_centaur_khan"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_11",
+        "casts": [
+          {
+            "name": "luna_lucent_beam",
+            "seconds": 0
+          }
+        ],
+        "targetPriority": []
+      },
+      {
+        "campId": "neutralcamp_good_14",
+        "casts": [
+          {
+            "name": "item_mask_of_madness",
+            "seconds": 0
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_ghost"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_20",
+        "casts": [
+          {
+            "name": "luna_lucent_beam",
+            "seconds": 0
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_centaur_khan"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_1",
+        "casts": [],
+        "targetPriority": [
+          "npc_dota_neutral_kobold_taskmaster"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_2",
+        "casts": [
+          {
+            "name": "item_mask_of_madness",
+            "seconds": 0
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_enraged_wildkin"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_15",
+        "casts": [],
+        "targetPriority": [
+          "npc_dota_neutral_ogre_mauler"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_4",
+        "casts": [
+          {
+            "name": "item_mask_of_madness",
+            "seconds": 0
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_alpha_wolf"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_9",
+        "casts": [
+          {
+            "name": "luna_lucent_beam",
+            "seconds": 0
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_centaur_khan"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_5",
+        "casts": [
+          {
+            "name": "item_mask_of_madness",
+            "seconds": 0
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_centaur_khan"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_8",
+        "casts": [
+          {
+            "name": "item_mask_of_madness",
+            "seconds": 0
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_black_dragon"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_13",
+        "casts": [
+          {
+            "name": "item_mask_of_madness",
+            "seconds": 0
+          }
+        ],
+        "targetPriority": [
+          "npc_dota_neutral_enraged_wildkin"
+        ]
+      },
+      {
+        "campId": "neutralcamp_good_16",
+        "casts": [],
+        "targetPriority": [
+          "npc_dota_neutral_ghost"
+        ]
+      }
+    ],
+    "summary": "选择 trial-6：复模拟中，180 秒获得野怪金币 1225，高于其余已验证候选（1176–1208）；最低血量 835.5/1018（约 82.1%），满足不低于 30% 的限制。虽有一次疯脸因魔法不足未施放，结果已计入该失败。此结论仅限所列沙盒结果，不代表实战收益。",
+    "rejectedCasts": [
+      {
+        "clock": 725.8,
+        "campId": "neutralcamp_good_5",
+        "name": "item_mask_of_madness",
+        "error": "魔法不足"
+      }
+    ]
+  },
+  "holdouts": [
+    {
+      "seed": 742,
+      "neutralGold": 1221,
+      "neutralGpm": 407,
+      "laneGold": 0,
+      "minimumHealth": 894.9395720803228,
+      "status": "ready",
+      "rejectedCasts": 1
+    },
+    {
+      "seed": 743,
+      "neutralGold": 1171,
+      "neutralGpm": 390.3333333333333,
+      "laneGold": 0,
+      "minimumHealth": 706.6385230586956,
+      "status": "ready",
+      "rejectedCasts": 1
+    },
+    {
+      "seed": 744,
+      "neutralGold": 1212,
+      "neutralGpm": 404,
+      "laneGold": 0,
+      "minimumHealth": 847.7744230474614,
+      "status": "ready",
+      "rejectedCasts": 1
+    },
+    {
+      "seed": 745,
+      "neutralGold": 1276,
+      "neutralGpm": 425.3333333333333,
+      "laneGold": 0,
+      "minimumHealth": 732.4710363784552,
+      "status": "ready",
+      "rejectedCasts": 0
+    },
+    {
+      "seed": 746,
+      "neutralGold": 1186,
+      "neutralGpm": 395.3333333333333,
+      "laneGold": 0,
+      "minimumHealth": 875.7959163908549,
+      "status": "ready",
+      "rejectedCasts": 1
+    }
+  ]
+}

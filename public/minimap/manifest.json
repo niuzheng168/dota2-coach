@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "patch": "7.41f",
+  "serverBuild": 6975,
+  "attribution": "Dota 2 minimap artwork belongs to Valve. Original client textures, unmodified; rendering uses the client sprite rectangles.",
+  "tool": {
+    "name": "ValveResourceFormat CLI",
+    "version": "21.1",
+    "executableSha256": "50502077543856a3f760eecf53b073dcdea5073c193f0274c2088b5a2a8f4d13"
+  },
+  "sources": [
+    {
+      "file": "scripts/mod_textures.txt",
+      "sha256": "b58ccdee0de180f01cf5998d520b60a3260cce72cd36d02ca66554e2f0d5e260"
+    },
+    {
+      "file": "scripts/minimap_icons.txt",
+      "sha256": "2a14f7863e426041906b4304a20934f6ed404f3a592c032eddfae3f029b527fa"
+    },
+    {
+      "file": "materials/vgui/hud/minimap_sheet.vmat_c",
+      "sha256": "7dc527a774e979a9262afeedf0ab6ecd633bd834acbc682251f0862f9b44c03d"
+    },
+    {
+      "file": "materials/vgui/hud/minimap_sheet_psd_b65d6dd9.vtex_c",
+      "sha256": "ed7d8a8cf5eed9716ad842473a9cfb0cc02ccb612dfb473f2aeaf852ab25d95a"
+    },
+    {
+      "file": "panorama/images/heroes/icons/npc_dota_hero_luna_png.vtex_c",
+      "sha256": "eba41c940ae898b1fd4c7e5de612cbefd19339f31fcc4403252a9c60b2d96491"
+    }
+  ],
+  "sheet": {
+    "url": "/minimap/minimap-sheet.png",
+    "width": 704,
+    "height": 704,
+    "sha256": "7ff198fb44b38a0da1d1eec9d9bfea4aa0ed03b777a7abc9f418704cc986b691"
+  },
+  "heroes": {
+    "npc_dota_hero_luna": {
+      "url": "/minimap/luna.png",
+      "width": 32,
+      "height": 32,
+      "sha256": "4c2de43085cea207d2e0e93744b55f37dc851a2ced4a2ba20558ce8b47a11c99",
+      "source": "panorama/images/heroes/icons/npc_dota_hero_luna_png.vtex_c"
+    }
+  },
+  "camps": {
+    "small": {
+      "name": "minimap_creepcamp",
+      "x": 0,
+      "y": 32,
+      "width": 32,
+      "height": 32
+    },
+    "medium": {
+      "name": "minimap_creepcamp_mid",
+      "x": 0,
+      "y": 416,
+      "width": 32,
+      "height": 32
+    },
+    "large": {
+      "name": "minimap_creepcamp_big",
+      "x": 32,
+      "y": 384,
+      "width": 32,
+      "height": 32
+    },
+    "ancient": {
+      "name": "minimap_creepcamp_ancient",
+      "x": 0,
+      "y": 384,
+      "width": 32,
+      "height": 32
+    }
+  },
+  "heroArrow": {
+    "name": "minimap_heroicon_arrow_large",
+    "x": 128,
+    "y": 576,
+    "width": 128,
+    "height": 128,
+    "pointsAtZero": "east",
+    "worldFacingUnit": "radians",
+    "canvasRotation": "-worldFacing"
+  }
+}

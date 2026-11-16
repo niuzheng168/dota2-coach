@@ -1,0 +1,136 @@
+{
+  "date": "2026-11-15",
+  "timezone": "Asia/Hong_Kong",
+  "environment": "luna-sandbox-v2-lane-pull",
+  "physicsRevision": "walkable-hero-chase-1",
+  "method": "Offline deterministic replay; hero position sampled every 0.1 seconds; all primary/spell/bounce damage and neutral proximity aggro audited by original camp affiliation.",
+  "limitations": "Camp affiliation detects counterexamples only. There is no verified allowed-area polygon, path safety, tower, enemy-hero or vision audit. No contact does NOT mean safe. Historical scores remain unchanged, not reduced by subtracting forbidden gold.",
+  "recommendationScope": {
+    "status": "blocked",
+    "code": "OWN_AREA_UNVERIFIED",
+    "allowedArea": null,
+    "realGameSafetyVerified": false,
+    "reason": "路线建议已撤下：己方可活动区域尚未核验。旧线野示例实际触及夜魇营地；仅有本方营地编号和最低血量不足以证明路线安全。",
+    "remaining": [
+      "连续复盘并核对职业录像中的位置、兵线、视野与撤回条件；现有材料只是抽看片段。",
+      "确认本场景允许活动的区域，再校验全部移动路径、追击、引野出口和伤害目标。",
+      "在该区域内重新进行模型提案与收益实验；历史分数不能充当实战建议。"
+    ]
+  },
+  "examples": [
+    {
+      "id": "mixed-stack-example",
+      "seed": 741,
+      "disposition": "withdrawn",
+      "planSha256": "840baeebcf473f04c2044fd9a5462d88da0398fbbf2c5876121c53f9fe58dd2d",
+      "allExplicitCampIdsOwnSide": true,
+      "experimentalStatus": "unavailable",
+      "recommendationStatus": "blocked",
+      "historicalScoreUnmodified": true,
+      "score": {
+        "neutralGold": 908.4,
+        "laneGold": 210,
+        "totalGold": 1118.4,
+        "neutralGpmOver180Seconds": 302.8,
+        "totalGpmOver180Seconds": 372.8,
+        "measuredInGame": false
+      },
+      "positionSampleCount": 1801,
+      "positionTraceSha256": "7443bc71029dd5398e76104b4ed1df923484d54a9e39b0bd362758108364f7b0",
+      "observedExtent": {
+        "minX": -1983,
+        "maxX": 5280,
+        "minY": -5216,
+        "maxY": -544
+      },
+      "territoryAudit": {
+        "status": "violated",
+        "realGameSafetyVerified": false,
+        "pathAreaVerified": false,
+        "opponentCampContacts": [
+          {
+            "clock": 711.5,
+            "kind": "proximity_aggro",
+            "campId": "neutralcamp_evil_9",
+            "unitId": "n138",
+            "heroPosition": {
+              "x": 2862.6697274679177,
+              "y": -1233.3302725320825
+            },
+            "targetPosition": {
+              "x": 3340.384189397082,
+              "y": -1360.7156675440615
+            },
+            "step": 13
+          },
+          {
+            "clock": 717.5,
+            "kind": "hero_damage",
+            "campId": "neutralcamp_evil_9",
+            "unitId": "n138",
+            "heroPosition": {
+              "x": 4576,
+              "y": -800
+            },
+            "targetPosition": {
+              "x": 4435.212957627031,
+              "y": -703.1358333710456
+            },
+            "step": 13
+          }
+        ],
+        "opponentCampRewards": [
+          {
+            "clock": 722.5,
+            "unitId": "n138",
+            "name": "npc_dota_neutral_centaur_outrunner",
+            "campId": "neutralcamp_evil_9",
+            "source": "neutral",
+            "gold": 13.600000000000001,
+            "xp": 25.6,
+            "step": 13,
+            "heroPosition": {
+              "x": 4064,
+              "y": -999.0381360400828
+            }
+          }
+        ],
+        "opponentCampGold": 13.600000000000001
+      }
+    },
+    {
+      "id": "selected-control",
+      "seed": 741,
+      "disposition": "withdrawn",
+      "planSha256": "6222cd0d8a0ca71901b34cf0bb1b509fce0eb2295c40b556b4eb20d506866f91",
+      "allExplicitCampIdsOwnSide": true,
+      "experimentalStatus": "ready",
+      "recommendationStatus": "blocked",
+      "historicalScoreUnmodified": true,
+      "score": {
+        "neutralGold": 1208,
+        "laneGold": 0,
+        "totalGold": 1208,
+        "neutralGpmOver180Seconds": 402.6666666666667,
+        "totalGpmOver180Seconds": 402.6666666666667,
+        "measuredInGame": false
+      },
+      "positionSampleCount": 1801,
+      "positionTraceSha256": "f2e374edf05c7cfe361c6e4b5bde08ce97d71b657b749de10e98ef2bf21cd9b0",
+      "observedExtent": {
+        "minX": -8313.31640625,
+        "maxX": 4649.26123046875,
+        "minY": -8432,
+        "maxY": -96
+      },
+      "territoryAudit": {
+        "status": "not-observed",
+        "realGameSafetyVerified": false,
+        "pathAreaVerified": false,
+        "opponentCampContacts": [],
+        "opponentCampRewards": [],
+        "opponentCampGold": 0
+      }
+    }
+  ]
+}

@@ -20,6 +20,9 @@ public sealed class MainWindow : Window
 {
     private readonly WebView2 browser = new();
     private readonly SubtitleWindow overlay = new();
+    private readonly JungleOverlayWindow jungleOverlay = new();
+    private LocalHudVision? hudVision;
+    private JsonElement? tacticsState;
     private readonly DesktopSession session;
     private readonly SemaphoreSlim commands = new(1, 1);
     private readonly string directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DotaCoach");
@@ -50,12 +53,17 @@ public sealed class MainWindow : Window
         Content = browser;
         session.Caption += turn => overlay.Caption(turn.speaker, turn.source, turn.target);
         session.ClearOverlay += () => overlay.Clear();
+        session.TacticsState += value => {
+            tacticsState = value.Clone(); jungleOverlay.Accept(value); hudVision?.Accept(value);
+            if (!value.TryGetProperty("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.True) StopVision();
+        };
+        session.TacticsStopped += () => { tacticsState = null; StopVision(); jungleOverlay.Clear(); };
         SourceInitialized += (_, _) => {
             var handle = new WindowInteropHelper(this).Handle;
             int dark = 1; DwmSetWindowAttribute(handle, 20, ref dark, sizeof(int));
             HwndSource.FromHwnd(handle)?.AddHook(WindowMessage);
-            for (int id = 1; id <= 3; id++)
-                if (RegisterHotKey(handle, id, 0x0002 | 0x0004 | 0x4000, id == 1 ? 0x48u : id == 2 ? 0x4Cu : 0x4Du)) hotkeys.Add(id);
+            for (int id = 1; id <= 4; id++)
+                if (RegisterHotKey(handle, id, 0x0002 | 0x0004 | 0x4000, id == 1 ? 0x48u : id == 2 ? 0x4Cu : id == 3 ? 0x4Du : 0x4Au)) hotkeys.Add(id);
         };
         Loaded += async (_, _) => {
             try
@@ -96,7 +104,7 @@ public sealed class MainWindow : Window
             }
         };
         Closed += (_, _) => {
-            closed = true; localReady = false; session.Dispose(); overlay.Close(); tray?.Dispose();
+            closed = true; localReady = false; StopVision(); session.Dispose(); overlay.Close(); jungleOverlay.Close(); tray?.Dispose();
             var hwnd = new WindowInteropHelper(this).Handle;
             foreach (int id in hotkeys) UnregisterHotKey(hwnd, id);
             browser.Dispose();
@@ -128,6 +136,8 @@ public sealed class MainWindow : Window
             // Stop controls interrupt startup/network waits, rather than queueing behind them.
             if (method == "mic.stop") session.StopMic();
             else if (method == "listener.stop") session.StopListener();
+            else if (method == "tactics.vision.stop") StopVision();
+            else if (method == "tactics.overlay.stop") jungleOverlay.Stop();
             else { await commands.WaitAsync(); held = true; }
             if (closed || rendererGeneration != generation) return;
             object? result;
@@ -136,7 +146,7 @@ public sealed class MainWindow : Window
                 case "bootstrap":
                     result = new { state = session.Snapshot(), overlay = overlayOptions,
                         monitors = Array.ConvertAll(Forms.Screen.AllScreens, s => s.DeviceName),
-                        shortcuts = new { overlay = hotkeys.Contains(1), listener = hotkeys.Contains(2), microphone = hotkeys.Contains(3) },
+                        shortcuts = new { overlay = hotkeys.Contains(1), listener = hotkeys.Contains(2), microphone = hotkeys.Contains(3), jungle = hotkeys.Contains(4) },
                         initialLink };
                     break;
                 case "listener.start":
@@ -155,6 +165,26 @@ public sealed class MainWindow : Window
                 case "overlay.preview":
                     overlay.Caption("字幕预览", "We should smoke and take Roshan.", "我们开雾去打肉山。");
                     result = null; break;
+                case "tactics.overlay.configure":
+                case "tactics.overlay.preview":
+                    jungleOverlay.Configure(data, (int)MinimapCalibration.Number(data, "clientWidth"), (int)MinimapCalibration.Number(data, "clientHeight"), method == "tactics.overlay.preview");
+                    result = null; break;
+                case "tactics.overlay.stop": jungleOverlay.Stop(); result = null; break;
+                case "tactics.vision.start":
+                    if (tacticsState is not JsonElement ts || !ts.GetProperty("enabled").GetBoolean())
+                        throw new InvalidOperationException("请先连接房间并开启刷野规划");
+                    StopVision();
+                    var watcher = new LocalHudVision(NativeVoiceChannel.Text(data, "model"));
+                    hudVision = watcher; watcher.Accept(ts);
+                    watcher.Status += text => { if (hudVision == watcher && !closed) Post(new { type = "tactics.vision.status", text }); };
+                    watcher.Observation += async observation => {
+                        if (hudVision != watcher || closed) return;
+                        try { await session.Command("tactics.observation", observation); }
+                        catch (Exception error) { if (!closed) Post(new { type = "tactics.vision.status", text = error.Message }); }
+                    };
+                    _ = watcher.Run();
+                    result = null; break;
+                case "tactics.vision.stop": StopVision(); result = null; break;
                 case "window.tray": Hide(); result = null; break;
                 case "room.copyInvite":
                     var invite = (string?)await session.Command("room.invite", data);
@@ -199,7 +229,7 @@ public sealed class MainWindow : Window
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("打开 Dota Coach", null, (_, _) => RestoreWindow());
-        menu.Items.Add("暂停所有采集", null, (_, _) => { session.StopMic(); session.StopListener(); });
+        menu.Items.Add("暂停所有采集", null, (_, _) => { session.StopMic(); session.StopListener(); StopVision(); jungleOverlay.Stop(); });
         menu.Items.Add("显示 / 隐藏字幕", null, (_, _) => ToggleOverlay());
         menu.Items.Add("退出（停止采集）", null, (_, _) => Close());
         tray = new Forms.NotifyIcon { Icon = System.Drawing.SystemIcons.Application, Text = "Dota Coach · 右键可暂停全部采集",
@@ -207,6 +237,11 @@ public sealed class MainWindow : Window
         tray.DoubleClick += (_, _) => RestoreWindow();
     }
     private void RestoreWindow() { Show(); WindowState = WindowState.Normal; Activate(); }
+    private void StopVision()
+    {
+        var previous = hudVision; hudVision = null; previous?.Dispose();
+        if (!closed) Post(new { type = "tactics.vision.status", text = "本地视觉已停止；没有截图上传或保存" });
+    }
     private void ToggleOverlay()
     {
         var options = System.Text.Json.Nodes.JsonNode.Parse(overlayOptions.GetRawText())!.AsObject();
@@ -224,9 +259,15 @@ public sealed class MainWindow : Window
                 case 1: ToggleOverlay(); break;
                 case 2: session.StopListener("快捷键已暂停监听"); break;
                 case 3: session.StopMic("快捷键已关闭麦克风"); break;
+                case 4: _ = RequestJungle(); break;
             }
         }
         return IntPtr.Zero;
+    }
+    private async Task RequestJungle()
+    {
+        try { await session.Command("tactics.request", JsonSerializer.SerializeToElement(new { })); }
+        catch (Exception e) { Post(new { type = "notice", message = e.Message }); }
     }
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hwnd, int id);

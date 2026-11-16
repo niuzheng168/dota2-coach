@@ -1,0 +1,15 @@
+# Isolated .tmp/replay-tools venv; parser and dependencies tested on Python 3.13.
+gem-dota==0.14.0
+cramjam==2.14.0
+markdown-it-py==4.3.0
+mdurl==0.1.2
+numpy==2.5.4
+pandas==3.1.1
+protobuf==7.36.2
+protoc-wheel-0==30.2
+Pygments==2.21.0
+python-dateutil==4.0.0
+python-snappy==0.7.3
+rich==15.0.0
+tzdata==2026.6
+zstandard==0.25.0

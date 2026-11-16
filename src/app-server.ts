@@ -122,6 +122,7 @@ export function roomView(room: StoredRoom, user: PublicUser) {
 export function createCoachServer(
   store: AccessStore,
   engineFactory: typeof createTranslationEngine = createTranslationEngine,
+  tacticsFactory: () => TacticalEngine = () => new TacticalEngine(),
 ) {
   const rooms = new Map<string, RoomState>();
   const loginAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -136,9 +137,12 @@ export function createCoachServer(
         matchHeroes: [], clients: new Map(), metricsHistory: [],
         lastVisionPhase: 'menu_or_other',
         gsiState: { matchId: null, gameState: null, lastHeartbeatAt: null, lastSourceMode: 'idle' },
-        tactics: new TacticalEngine(), lastTacticsBroadcastAt: 0, lastTacticsAnnouncedCamp: null,
+        tactics: tacticsFactory(), lastTacticsBroadcastAt: 0, lastTacticsAnnouncedCamp: null,
       };
       rooms.set(record.roomId, room);
+      room.tactics.onChange = () => {
+        if (room) broadcastJson(room, { type: 'tactics.state', state: room.tactics.state() });
+      };
     }
     return room;
   }
@@ -159,6 +163,11 @@ export function createCoachServer(
     if (!room.clients.has(client.id)) return;
     voiceDiagnostic(room, client, 'disconnected', { code });
     room.clients.delete(client.id);
+    if (room.tactics.enabled && ![...room.clients.values()].some(c => c.inputKind !== 'process' &&
+        (c.role === 'student' || c.name === room.record.ownerUsername))) {
+      room.tactics.setEnabled(false);
+      broadcastJson(room, { type: 'tactics.state', state: room.tactics.state() });
+    }
     client.engineGeneration++;
     if (client.retryTimer) clearTimeout(client.retryTimer);
     client.retryTimer = null;
@@ -867,6 +876,8 @@ export function createCoachServer(
           switch (message.type) {
             case 'room.set_tactics':
             case 'tactics.request_route':
+            case 'tactics.set_options':
+            case 'tactics.observe':
             case 'tactics.mark_cleared': {
               if (client.role !== 'student' && client.name !== room.record.ownerUsername) {
                 reject('只有学员或房主可以控制刷野规划'); break;
@@ -879,6 +890,10 @@ export function createCoachServer(
                   if (typeof message.enabled !== 'boolean') { reject('无效战术开关'); break; }
                   room.tactics.setEnabled(message.enabled);
                   room.lastTacticsAnnouncedCamp = null;
+                } else if (message.type === 'tactics.set_options') {
+                  room.tactics.setOptions(message.options, now);
+                } else if (message.type === 'tactics.observe') {
+                  room.tactics.observe(message.observation, now);
                 } else if (message.type === 'tactics.mark_cleared') {
                   if (typeof message.campId !== 'string' || message.campId.length > 80) { reject('无效营地'); break; }
                   room.tactics.markCleared(message.campId, now);
@@ -959,6 +974,7 @@ export function createCoachServer(
   server.on('close', () => {
     clearInterval(timer);
     clearInterval(tacticsTimer);
+    for (const room of rooms.values()) room.tactics.dispose();
     for (const room of rooms.values()) for (const client of room.clients.values()) {
       disconnect(room, client, 1001, 'Server shutting down');
     }

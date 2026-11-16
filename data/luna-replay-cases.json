@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Observed replay cases for model reasoning, NOT fixed policies or training-weight updates",
+  "cases": [
+    {
+      "id": "ame-water-1024",
+      "video": "BV1HUHs6AE18",
+      "playerLabel": "Ame",
+      "patchEvidence": "7.41f in uploader title only; match/replay ID not verified",
+      "observation": "Game 10:24: Luna level 7, LH72, Power Treads and Mask of Madness visible, attacking aquatic camp. Game 10:39: LH75, fighting another nearby aquatic camp. By 10:53 level 8/LH81. Not fixed level-10/two-item evidence."
+    },
+    {
+      "id": "ame-pull-1132",
+      "video": "BV1HUHs6AE18",
+      "playerLabel": "Ame",
+      "patchEvidence": "uploader title only",
+      "observation": "Game 11:32 and 11:38: an ogre survives while it and Luna move away from the spawn area toward the exit. At 11:52 Luna is near midlane creeps and another hero. Tower destruction occurred in this interval, so net-worth gain is not pure neutral gold."
+    },
+    {
+      "id": "watson-hud-selection-1110",
+      "video": "BV1gWWY6uE7V",
+      "playerLabel": "watson, uploader label and later kill-feed name",
+      "patchEvidence": "7.41f in uploader title only; match ID not obtained",
+      "observation": "Video 12:09/game 10:55 shows level-7 Luna attacking bears near a water edge, with Lunar Orbit cooling down. Video 12:25/game 11:10 switches selected HUD to Slark; those level-10 stats are not Luna's. Video 12:55/game 11:41 returns to level-7 Luna attacking aquatic units with mask silence. At game 12:11 a fight and watson double-kill feed are visible, Luna is level 10, not a fixed-level farming-only sequence."
+    },
+    {
+      "id": "pakazs-lane-water-1153",
+      "video": "BV1HwpK61EYw",
+      "playerLabel": "Pakazs per uploader; in-game nickname is an alias not independently authenticated",
+      "patchEvidence": "7.41f in uploader title and collection; match ID not obtained",
+      "observation": "Game 11:53: level-10 Luna moves through water, LH109. At 12:08 she attacks lane creeps, LH115. At 13:09 level 11/LH132 near a forward lane tower. At 13:39 she attacks an aquatic camp, LH138. Tower and bounty-rune team-reward notifications occur; this is mixed resource routing, not proof of a three-minute neutral-only bounty."
+    },
+    {
+      "id": "23savage-team-income-1032",
+      "video": "BV1tLJR6JEu1",
+      "playerLabel": "23savage as labeled and shown in nameplate",
+      "patchEvidence": "unknown; upload date alone does not establish 7.41f",
+      "observation": "At game 10:32, level-8 Luna and ally Oli are near midriver after a tower-related team reward. This snapshot cannot calibrate a solo, level-10, neutral-only route or attribute all money to jungle clears."
+    },
+    {
+      "id": "satanic-contested-1114",
+      "video": "BV1kUxB65EJ5",
+      "playerLabel": "Satanic, as labeled in commentary and replay player selection",
+      "patchEvidence": "unknown; not accepted as verified 7.41f numeric calibration",
+      "observation": "Review video about 22:09 shows game 11:14, level 9 Luna contesting a large camp against Pangolier. Eclipse has entered cooldown and mana is very low. This is a contested-resource decision, not an isolated jungle clear. At video about 12:00 the reviewer discusses a Hurricane Pike/Aegis power timing; that is commentary, not an observed farming reward."
+    }
+  ]
+}

@@ -1,0 +1,315 @@
+{
+  "version": 1,
+  "matchId": 9089477184,
+  "build": 6975,
+  "source": "https://dota2protracker.com/matches/9089477184",
+  "parser": {
+    "name": "gem-dota",
+    "version": "0.14.0"
+  },
+  "demSha256": "1e7f65f64b90bc43ab59d1a61a8df94c27248bc99982405e2642ef50533f7e4b",
+  "detailSha256": "648de1fde0e65df345ebde1b4ed77af8cf6fe81ca0719eafe118029aa18d38f2",
+  "informationScope": "omniscient-offline-replay-only",
+  "events": [
+    {
+      "minute": 780,
+      "beforeTime": 779.9333140055338,
+      "afterTime": 780.4666473388672,
+      "luna": {
+        "id": "448:550",
+        "position": {
+          "x": -3950.53125,
+          "y": 7427.625
+        }
+      },
+      "camps": [
+        {
+          "id": "neutralcamp_evil_11",
+          "label": "夜魇 上边缘水生营地 11",
+          "bounds": {
+            "min": {
+              "x": -3318.706298828125,
+              "y": 7060
+            },
+            "max": {
+              "x": -2609.043701171875,
+              "y": 7764
+            }
+          },
+          "oldAlive": 3,
+          "oldInside": 0,
+          "oldSurvivingAfter": 3,
+          "newAlive": 6,
+          "freshSpawns": [
+            {
+              "id": "1823:117",
+              "unit": "npc_dota_neutral_froglet",
+              "spawnedAt": 780.0666473388671
+            },
+            {
+              "id": "1852:284",
+              "unit": "npc_dota_neutral_froglet_mage",
+              "spawnedAt": 780.0666473388671
+            },
+            {
+              "id": "2556:75",
+              "unit": "npc_dota_neutral_tadpole",
+              "spawnedAt": 780.0666473388671
+            }
+          ],
+          "oldPositions": [
+            {
+              "id": "1929:798",
+              "x": -3584.46875,
+              "y": 7574.28125
+            },
+            {
+              "id": "2207:699",
+              "x": -3759.125,
+              "y": 7504.4375
+            },
+            {
+              "id": "2380:109",
+              "x": -3419,
+              "y": 7640.25
+            }
+          ]
+        },
+        {
+          "id": "neutralcamp_evil_20",
+          "label": "夜魇 上边缘中野 20",
+          "bounds": {
+            "min": {
+              "x": -4594.8310546875,
+              "y": 7904
+            },
+            "max": {
+              "x": -3885.168701171875,
+              "y": 8608
+            }
+          },
+          "oldAlive": 2,
+          "oldInside": 0,
+          "oldSurvivingAfter": 2,
+          "newAlive": 6,
+          "freshSpawns": [
+            {
+              "id": "714:814",
+              "unit": "npc_dota_neutral_satyr_soulstealer",
+              "spawnedAt": 780.0666473388671
+            },
+            {
+              "id": "1671:247",
+              "unit": "npc_dota_neutral_satyr_trickster",
+              "spawnedAt": 780.0666473388671
+            },
+            {
+              "id": "1780:93",
+              "unit": "npc_dota_neutral_satyr_soulstealer",
+              "spawnedAt": 780.0666473388671
+            },
+            {
+              "id": "2524:655",
+              "unit": "npc_dota_neutral_satyr_trickster",
+              "spawnedAt": 780.0666473388671
+            }
+          ],
+          "oldPositions": [
+            {
+              "id": "2089:117",
+              "x": -3981.96875,
+              "y": 7561.9375
+            },
+            {
+              "id": "2306:761",
+              "x": -4024.125,
+              "y": 7681.8125
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "minute": 840,
+      "beforeTime": 839.9333140055338,
+      "afterTime": 840.4666473388672,
+      "luna": {
+        "id": "448:550",
+        "position": {
+          "x": 527.53125,
+          "y": 3258.71875
+        }
+      },
+      "camps": [
+        {
+          "id": "neutralcamp_evil_4",
+          "label": "夜魇 上侧中野 4",
+          "bounds": {
+            "min": {
+              "x": 783.2499389648438,
+              "y": 3772
+            },
+            "max": {
+              "x": 1520.75,
+              "y": 4420
+            }
+          },
+          "oldAlive": 3,
+          "oldInside": 0,
+          "oldSurvivingAfter": 3,
+          "newAlive": 6,
+          "freshSpawns": [
+            {
+              "id": "1718:302",
+              "unit": "npc_dota_neutral_giant_wolf",
+              "spawnedAt": 840.0666473388671
+            },
+            {
+              "id": "1884:0",
+              "unit": "npc_dota_neutral_alpha_wolf",
+              "spawnedAt": 840.0666473388671
+            },
+            {
+              "id": "2030:518",
+              "unit": "npc_dota_neutral_giant_wolf",
+              "spawnedAt": 840.0666473388671
+            }
+          ],
+          "oldPositions": [
+            {
+              "id": "997:216",
+              "x": 816.59375,
+              "y": 3703.46875
+            },
+            {
+              "id": "1658:617",
+              "x": 1241.875,
+              "y": 3384.9375
+            },
+            {
+              "id": "2441:374",
+              "x": 774,
+              "y": 3590.03125
+            }
+          ]
+        },
+        {
+          "id": "neutralcamp_evil_5",
+          "label": "夜魇 上侧大野 5",
+          "bounds": {
+            "min": {
+              "x": 637,
+              "y": 2142
+            },
+            "max": {
+              "x": 1539,
+              "y": 2931
+            }
+          },
+          "oldAlive": 1,
+          "oldInside": 0,
+          "oldSurvivingAfter": 1,
+          "newAlive": 4,
+          "freshSpawns": [
+            {
+              "id": "228:676",
+              "unit": "npc_dota_neutral_satyr_hellcaller",
+              "spawnedAt": 840.0666473388671
+            },
+            {
+              "id": "1792:272",
+              "unit": "npc_dota_neutral_satyr_soulstealer",
+              "spawnedAt": 840.0666473388671
+            },
+            {
+              "id": "2277:538",
+              "unit": "npc_dota_neutral_satyr_trickster",
+              "spawnedAt": 840.0666473388671
+            }
+          ],
+          "oldPositions": [
+            {
+              "id": "1988:916",
+              "x": 714.8125,
+              "y": 2936.09375
+            }
+          ]
+        },
+        {
+          "id": "neutralcamp_good_13",
+          "label": "天辉 左边缘大野 13",
+          "bounds": {
+            "min": {
+              "x": -8645,
+              "y": -815.2498779296875
+            },
+            "max": {
+              "x": -7877,
+              "y": -47.2498779296875
+            }
+          },
+          "oldAlive": 3,
+          "oldInside": 0,
+          "oldSurvivingAfter": 3,
+          "newAlive": 5,
+          "freshSpawns": [
+            {
+              "id": "1626:616",
+              "unit": "npc_dota_neutral_polar_furbolg_champion",
+              "spawnedAt": 840.0666473388671
+            },
+            {
+              "id": "2028:145",
+              "unit": "npc_dota_neutral_polar_furbolg_ursa_warrior",
+              "spawnedAt": 840.0666473388671
+            }
+          ],
+          "oldPositions": [
+            {
+              "id": "1908:774",
+              "x": -8105.71875,
+              "y": 298.875
+            },
+            {
+              "id": "2192:867",
+              "x": -8096.4375,
+              "y": 123.3125
+            },
+            {
+              "id": "2373:548",
+              "x": -8125.71875,
+              "y": 364.53125
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "beams": [
+    {
+      "time": 777.1333140055339,
+      "target": "npc_dota_neutral_mud_golem",
+      "value": 210,
+      "illusion": false
+    },
+    {
+      "time": 835.1333140055339,
+      "target": "npc_dota_neutral_satyr_trickster",
+      "value": 300,
+      "illusion": false
+    }
+  ],
+  "observations": [
+    "12:59.933 与 13:00.467 之间，evil_11、evil_20 的旧怪均在各自刷新框外，并各出现一组有真实 spawnedGameTime 的新怪；旧怪仍存活。",
+    "13:59.933 与 14:00.467 之间，evil_4、evil_5 同样保留框外旧怪并刷出新组；Luna 自己的叠野计数在两个整分均 +2。",
+    "12:57.133 对泥土傀儡、13:55.133 对萨特欺诈者有本体月光伤害事件。结合轨迹和实际刷新，是研究双拉衔接的强证据，但不伪造客户端输入指令。",
+    "14:00 的 good_13 也出现新组；不能把全图同时发生的叠野都归因于 Luna。该营地不作为她的双拉证据。",
+    "实体创建可能提前几十秒预热；本例只用 waitingToSpawn 变为 false 对应的 spawnedGameTime，不把 createdGameTime 当刷新时间。"
+  ],
+  "limitations": [
+    "未提取仇恨目标/用户指令，不能严格还原每次拉动输入。",
+    "这是把野怪拉离刷新框叠野，不是已证实的拉兵线接野。",
+    "m_bSelectionRingVisible 不是玩家视野掩码，不能拿它放行实战信息。",
+    "不把本场施法秒数硬编码为所有营地的拉野规则。"
+  ]
+}

@@ -1,5 +1,6 @@
-import { COMPOSITIONS, MAP } from './combat-data.ts';
-import { estimateCamp } from './clear-model.ts';
+import { MAP } from './combat-data.ts';
+import { estimateCamp, initialResources } from './clear-model.ts';
+import { campCompositions } from './camp-compositions.ts';
 import { distance, insideCamp, NAVIGATION, nextSpawn } from './map-data.ts';
 import type { GridNavigation, WalkPath } from './map-data.ts';
 import { clamp, RULES } from './rules.ts';
@@ -39,7 +40,7 @@ export class CampTracker {
     if (this.visit && this.visit.camp.id !== camp?.id) {
       const visit = this.visit;
       // Conservative inference: require the largest initial pack count, not just gold income.
-      const threshold = Math.max(...COMPOSITIONS.filter(c => c.kind === visit.camp.kind)
+      const threshold = Math.max(...campCompositions(visit.camp.kind, visit.since, visit.camp)
         .map(c => Object.values(c.units).reduce((a, b) => a + b, 0)));
       if (visit.hits >= threshold && visit.lastKill > visit.since && player.clock - visit.since <= 90) {
         this.cleared.set(visit.camp.id, visit.lastKill); changed = true;
@@ -51,10 +52,7 @@ export class CampTracker {
       this.visit = null;
     }
     if (camp && !this.visit) {
-      const predicted = estimateCamp(player, stats, camp.kind, player.clock, {
-        health: player.health, mana: player.mana,
-        readyAt: Object.fromEntries(player.abilities.map(a => [a.name, player.clock + a.cooldown])),
-      });
+      const predicted = estimateCamp(player, stats, camp.kind, player.clock, initialResources(player), 1, { camp });
       this.visit = { camp, since: player.clock, hits: 0, lastKill: player.clock,
         predicted: predicted.feasible ? predicted.seconds : null };
     }
@@ -80,11 +78,11 @@ export function planJungleRoute(
   const warnings = [
     `数据快照 ${map.patch}，无法从 GSI 核实客户端补丁；不同版本请勿信任坐标和数值。`,
     '营地按假设有野处理，无法知道别人清野、封野、堆野或敌人位置。',
-    '水生营地已标识，但进化组合尚未接入清野模拟；仍按旧营地分类粗估，不能用于实际收益标定。',
+    '水生营地按推定出生时刻、无历史封野假设枚举进化组合；初始出生时刻、升级顺序及概率未知，不能用于实际收益标定。',
     '营地组合为待实机核验的代表样本，按等概率估算掉落金钱；经验仅展示；耗时、血蓝取样本保守包络，不是保证。',
     '地形使用静态寻路网格与树木；不计砍树、跳跃、传送、动态阻挡和引野走位。',
     '未模拟野怪技能、光环、召唤、攻击类型特殊修正；承伤另加 15% 余量，仍可能低估。',
-    '按固定时间窗口内预计总金钱选优，次数和经验不参与评分；限宽搜索不保证全局最优，未预估后续升级、购买装备或主动增益。',
+    '按窗口内单只死亡赏金选优，包含最后未清完营地；次数和经验不参与评分。限宽搜索不保证全局最优，窗口内固定等级装备。',
     ...stats.warnings,
   ];
   const base: JungleRoute = {
@@ -147,18 +145,19 @@ export function planJungleRoute(
     b.resources.mana - a.resources.mana || a.key.localeCompare(b.key);
   const buckets: SearchNode[][] = Array.from({ length: Math.ceil(RULES.horizon / RULES.routeBucketSeconds) }, () => []);
   buckets[0].push({
-    at: -1, clock: player.clock, resources: { health: player.health, mana: player.mana,
-      readyAt: Object.fromEntries(player.abilities.map(a => [a.name, player.clock + a.cooldown])) },
+    at: -1, clock: player.clock, resources: initialResources(player),
     availableAt: candidates.map(c => tracker.cleared.has(c.id) ? nextSpawn(tracker.cleared.get(c.id)!, map) : map.spawn.first),
     steps: [], gold: 0, xp: 0, key: '',
   });
   let bestNode: SearchNode | null = null;
+  let expandedNodes = 0, evaluated = 0;
   // Time bins keep slow and fast branches from competing at an arbitrary fixed
   // depth. Positive clear time + the horizon/beam bound terminate fast-hero loops.
   for (let bucket = 0; bucket < buckets.length; bucket++) {
     for (let expanded = 0; buckets[bucket].length && expanded < RULES.routeBeamWidth; expanded++) {
       buckets[bucket].sort(compare);
       const node = buckets[bucket].shift()!;
+      expandedNodes++;
       for (let i = 0; i < candidates.length; i++) {
         const c = candidates[i];
         let path = leg(node.at, i);
@@ -172,14 +171,18 @@ export function planJungleRoute(
           node.clock, stats.moveSpeed, deadline, map);
         if (!travel) continue;
         const elapsed = travel.arrival - node.clock;
+        evaluated++;
         const result = estimate(player, stats, c.kind, travel.arrival, {
           health: Math.min(player.maxHealth, node.resources.health + stats.healthRegen * elapsed),
           mana: Math.min(player.maxMana, node.resources.mana + stats.manaRegen * elapsed),
           readyAt: node.resources.readyAt,
-        }, tracker.calibration);
+          activeUntil: node.resources.activeUntil,
+        }, tracker.calibration, { camp: c, limitSeconds: deadline - travel.arrival,
+          spawnAt: tracker.cleared.has(c.id) || node.steps.some(s => s.campId === c.id)
+            ? travel.availableAt[i] : Math.max(map.spawn.first, Math.floor(travel.arrival / map.spawn.interval) * map.spawn.interval) });
         const finish = travel.arrival + result.seconds;
         if (!result.feasible || !(result.seconds > 0) || result.healthAfter < player.maxHealth * RULES.minHealthFraction ||
-            finish > deadline) continue;
+            finish > deadline + 1e-8 || result.gold <= 0) continue;
         const spawnAt = travel.availableAt[i];
         const availability = tracker.cleared.has(c.id) || node.steps.some(s => s.campId === c.id) || spawnAt > map.spawn.first
           ? 'respawn-assumed' : 'assumed';
@@ -193,12 +196,13 @@ export function planJungleRoute(
         const gold = node.gold + result.gold, xp = node.xp + result.xp;
         const child: SearchNode = {
           at: i, clock: finish, availableAt,
-          resources: { health: result.healthAfter, mana: result.manaAfter, readyAt: result.readyAt },
+          resources: { health: result.healthAfter, mana: result.manaAfter, readyAt: result.readyAt, activeUntil: result.activeUntil },
           steps: [...node.steps, step], gold, xp, key: `${node.key}/${c.id}`,
         };
         if (!bestNode || compare(child, bestNode) < 0) bestNode = child;
         const targetBucket = Math.floor((finish - player.clock) / RULES.routeBucketSeconds);
-        if (targetBucket < buckets.length) {
+        // A partial pack is terminal: no invented respawn, no second reward for its survivors.
+        if (result.complete !== false && targetBucket < buckets.length) {
           const queue = buckets[targetBucket];
           queue.push(child); queue.sort(compare);
           if (queue.length > RULES.routeBeamWidth) queue.length = RULES.routeBeamWidth;
@@ -211,6 +215,7 @@ export function planJungleRoute(
   const best: JungleRoute | null = bestNode ? {
     ...base, steps: bestNode.steps, seconds: bestNode.clock - player.clock,
     score: bestNode.gold, gold: bestNode.gold, xp: bestNode.xp, validUntil: bestNode.clock, status: 'ready',
+    search: { engine: 'time-bucket-beam', expanded: expandedNodes, evaluated, beamWidth: RULES.routeBeamWidth, optimal: false },
   } : null;
   if (!best) return {
     ...base, status: candidates.length ? 'recover' : 'unavailable',

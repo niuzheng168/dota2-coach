@@ -87,6 +87,10 @@ function renderControls() {
   $('textInput').disabled = !mic.ready;
   $('textForm').querySelector('button').disabled = !mic.ready;
   $('manageRoom').disabled = !joined;
+  const tacticsControl = mic.ready && (state.role === 'student' || state.room?.isOwner);
+  $('tacticsEnabled').disabled = !tacticsControl;
+  $('tacticsRequest').disabled = !tacticsControl || !state.tactics?.enabled;
+  $('tacticsTreads').disabled = !tacticsControl || !state.tactics?.enabled;
 }
 function renderState(next) {
   const changedRoom = state.room?.roomId !== next.room?.roomId;
@@ -108,7 +112,53 @@ function renderState(next) {
   turns.clear();
   for (const turn of state.history || []) turns.set(turn.id, turn);
   renderConversation(); renderHeroes(); renderControls();
+  renderTactics(state.tactics);
 }
+function renderTactics(tactics) {
+  state.tactics = tactics;
+  $('tacticsEnabled').checked = !!tactics?.enabled;
+  $('tacticsStatus').textContent = tactics?.status || '默认关闭。需要新版服务端与本机玩家 GSI。';
+  $('tacticsPlanner').textContent = tactics?.planner?.kind === 'numeric-benchmark' ? '离线数值基准，不是大模型'
+    : `大模型：${tactics?.planner?.model || '未配置'}${tactics?.planner?.pending ? ' · 正在推理' : ''} · 无规则回退 · 可能产生模型费用`;
+  $('tacticsTreads').value = tactics?.options?.treadsAttribute || 'unknown';
+  $('hudObservation').textContent = tactics?.observation?.capturedAt != null && Date.now() - tactics.observation.capturedAt > 8000
+    ? '视觉校验已过期；当前仍以 GSI 和手动确认属性为准。' : tactics?.observation?.status || '';
+  const p = tactics?.player;
+  $('tacticsSummary').textContent = p
+    ? `Lv.${p.level} · HP ${Math.round(p.health)}/${p.maxHealth} · MP ${Math.round(p.mana)} · 坐标 ${Math.round(p.position.x)}, ${Math.round(p.position.y)}` : '';
+  const fresh = tactics?.updatedAt != null && Math.abs(Date.now() - tactics.updatedAt) <= 8000;
+  const provenance = ['llm', 'numeric-benchmark'].includes(tactics?.planner?.kind);
+  const route = fresh && provenance ? tactics?.route : null;
+  if (fresh && tactics?.route && !provenance) $('tacticsStatus').textContent = '服务端没有提供模型规划来源；已隐藏旧规则路线，请升级服务端。';
+  $('tacticsReasoning').textContent = route?.reasoning?.summary || '';
+  if (route) $('tacticsSummary').textContent += `\n180 秒预计 ${Math.round(route.gold)} 金（非最优保证）`;
+  $('tacticsSteps').replaceChildren(...(route?.steps || []).slice(0, 6).map(step => {
+    const item = document.createElement('li'); item.textContent = `${step.label} · +${Math.round(step.gold)} 金${step.complete === false ? ' · 仅计截止前击杀' : ''}`; return item;
+  }));
+  $('tacticsWarnings').replaceChildren(...(route?.warnings || []).map(text => {
+    const item = document.createElement('li'); item.textContent = text; return item;
+  }));
+  renderControls();
+}
+function mapOptions() {
+  const result = { confirmed: $('mapConfirmed').checked };
+  for (const key of ['clientWidth', 'clientHeight', 'left', 'top', 'width', 'height', 'minX', 'maxX', 'minY', 'maxY'])
+    result[key] = Number($('map' + key[0].toUpperCase() + key.slice(1)).value);
+  return result;
+}
+$('tacticsEnabled').onchange = () => action(() => call('tactics.enabled', { enabled: $('tacticsEnabled').checked }), $('tacticsEnabled'))
+  .finally(() => renderTactics(state.tactics));
+$('tacticsTreads').onchange = () => action(() => call('tactics.options', { treadsAttribute: $('tacticsTreads').value }), $('tacticsTreads'))
+  .finally(() => renderTactics(state.tactics));
+$('tacticsRequest').onclick = () => action(() => call('tactics.request'), $('tacticsRequest'));
+$('tacticsMapPreview').onclick = () => action(() => call('tactics.overlay.preview', mapOptions()), $('tacticsMapPreview'));
+$('tacticsMapStart').onclick = () => action(() => call('tactics.overlay.configure', mapOptions()), $('tacticsMapStart'));
+$('tacticsMapStop').onclick = () => action(() => call('tactics.overlay.stop'));
+$('tacticsVisionStart').onclick = () => action(() => call('tactics.vision.start', { model: $('hudModel').value }), $('tacticsVisionStart'));
+$('tacticsVisionStop').onclick = () => action(() => call('tactics.vision.stop'));
+for (const input of document.querySelectorAll('#jungleCard input[type=number]'))
+  input.addEventListener('input', () => { $('mapConfirmed').checked = false; });
+setInterval(() => { if (state.tactics) renderTactics(state.tactics); }, 1000);
 function updateLevel(source, level) {
   const prefix = source === 'microphone' ? 'mic' : 'listen';
   const percent = Math.max(0, Math.min(100, Math.round(Number(level) * 100)));
@@ -147,6 +197,9 @@ bridge?.addEventListener('message', ({ data: message }) => {
     clearTimeout(waiter.timer); pending.delete(message.id);
     if (message.ok) waiter.resolve(message.result); else waiter.reject(new Error(message.error || '操作失败'));
   } else if (message.type === 'state') renderState(message.state);
+  else if (message.type === 'tactics.state') renderTactics(message.state);
+  else if (message.type === 'tactics.stopped') renderTactics(null);
+  else if (message.type === 'tactics.vision.status') $('hudStatus').textContent = message.text;
   else if (message.type === 'notice') toast(message.message, true);
   else if (message.type === 'level') updateLevel(message.source, message.level);
   else if (message.type === 'receipt' && message.source === 'listener') $('stageUpload').classList.add('on');
