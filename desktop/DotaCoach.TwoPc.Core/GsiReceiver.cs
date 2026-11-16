@@ -15,6 +15,22 @@ public sealed class GsiReceiver : IAsyncDisposable
     private readonly object gate = new();
     private (OwnState Value, long At)? latest;
     public int Port { get; private set; }
+    public Action<GsiDiagnostics>? Diagnostics { get; set; }
+    public GsiDiagnostics? LastDiagnostics { get; private set; }
+    private const int MaxBody = 1024 * 1024; // Own state is small; requested minimap data may not be.
+    private void Describe(JsonElement root, bool accepted)
+    {
+        string[] keys = ["provider", "map", "player", "hero", "items", "abilities", "allplayers", "buildings", "draft", "minimap"];
+        string[] present = keys.Where(k => root.TryGetProperty(k, out _)).ToArray();
+        bool teams = root.TryGetProperty("player", out var p) && p.ValueKind == JsonValueKind.Object &&
+            (p.TryGetProperty("team2", out _) || p.TryGetProperty("team3", out _));
+        bool all = root.TryGetProperty("allplayers", out _);
+        // Count only: whether player mode sends a minimap at all is still an open question.
+        int minimap = root.TryGetProperty("minimap", out var m) && m.ValueKind == JsonValueKind.Object ? m.EnumerateObject().Count() : 0;
+        LastDiagnostics = new(accepted ? "flat-player" : teams || all ? "observer-shaped" : "missing-own-state",
+            present, teams, all, accepted, minimap);
+        try { Diagnostics?.Invoke(LastDiagnostics); } catch { /* Diagnostics must never change GSI acceptance. */ }
+    }
     private GsiReceiver(int port, string? resumeToken)
     {
         if (resumeToken != null && (resumeToken.Length != 64 || !resumeToken.All(Uri.IsHexDigit)))
@@ -22,7 +38,7 @@ public sealed class GsiReceiver : IAsyncDisposable
         token = resumeToken ?? Wire.Secret();
         var builder = WebApplication.CreateSlimBuilder(); builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(o => {
-            o.Limits.MaxRequestBodySize = 65536;
+            o.Limits.MaxRequestBodySize = MaxBody;
             o.Listen(IPAddress.Loopback, port);
         });
         app = builder.Build();
@@ -30,15 +46,18 @@ public sealed class GsiReceiver : IAsyncDisposable
             if (c.Request.Headers.ContainsKey("Origin")) return Results.Unauthorized();
             try
             {
-                using var doc = JsonDocument.Parse(await Bodies.Read(c.Request, 65536, c.RequestAborted),
+                using var doc = JsonDocument.Parse(await Bodies.Read(c.Request, MaxBody, c.RequestAborted),
                     new JsonDocumentOptions { MaxDepth = 16 });
                 var root = doc.RootElement;
                 if (!Wire.EqualSecret(root.GetProperty("auth").GetProperty("token").GetString(), token))
                     return Results.Unauthorized();
                 // An authenticated menu/observer/invalid payload invalidates old own-player state.
                 lock (gate) latest = null;
-                var own = GsiState.Parse(root);
+                OwnState own;
+                try { own = GsiState.Parse(root); }
+                catch { Describe(root, false); throw; }
                 lock (gate) latest = (own, Environment.TickCount64);
+                Describe(root, true);
                 return Results.Ok();
             }
             catch (Exception e) when (e is JsonException or ArgumentException or InvalidOperationException or KeyNotFoundException)
@@ -58,8 +77,8 @@ public sealed class GsiReceiver : IAsyncDisposable
         {
           "uri" "http://127.0.0.1:{{Port}}/gsi"
           "timeout" "2.0"
-          "buffer" "0.1"
-          "throttle" "0.5"
+          "buffer" "0.0"
+          "throttle" "0.2"
           "heartbeat" "1.0"
           "auth" { "token" "{{token}}" }
           "data"
@@ -70,6 +89,7 @@ public sealed class GsiReceiver : IAsyncDisposable
             "hero" "1"
             "abilities" "1"
             "items" "1"
+            "minimap" "1"
           }
         }
         """;

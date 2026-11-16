@@ -28,14 +28,19 @@ public sealed class CalibratedMap
     }
     public static bool Supports(FrameView frame) => frame.Meta.SourceWidth == 1280 && frame.Meta.SourceHeight == 720;
     public MapLandmark[] Candidates(string team) => Landmarks.Where(p => p.Team == team).ToArray();
-    public ScreenMark Project(string team, string id, FrameView frame)
+    public ScreenMark Project(string team, string id, FrameView frame, MinimapLayout? layout = null)
     {
-        if (!Supports(frame)) throw new ArgumentException("This minimap layout has not been calibrated");
+        if (layout == null) {
+            if (!Supports(frame)) throw new ArgumentException("This minimap layout has not been calibrated");
+            layout = new(1280, 720, 0, 560, 160); // Retained ONLY for the explicitly selected legacy bot E2E.
+        }
+        if (!layout.IsValidFor(frame.Meta.SourceWidth, frame.Meta.SourceHeight))
+            throw new ArgumentException("Minimap calibration does not match the game client");
         var target = Candidates(team).SingleOrDefault(p => p.Id == id) ??
             throw new ArgumentException("Target is not an allowed own-side static landmark");
         // Default left minimap measured in the actual 1280x720 acceptance capture.
         // Own Luna (-900,-6250) projects to (72.4,692.8) pixels, checked against its visible icon.
-        return new((target.X - left) / span * 160 / 1280,
-            (560 + (top - target.Y) / span * 160) / 720);
+        return new((layout.Left + (target.X - left) / span * layout.Size) / layout.SourceWidth,
+            (layout.Top + (top - target.Y) / span * layout.Size) / layout.SourceHeight);
     }
 }

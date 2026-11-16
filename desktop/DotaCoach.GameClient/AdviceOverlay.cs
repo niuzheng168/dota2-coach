@@ -20,9 +20,11 @@ internal sealed class AdviceOverlay : Window
     private readonly E2ERun? e2e;
     private bool localBot;
     private string? renderedId;
-    public AdviceOverlay(E2ERun? run = null)
+    private readonly Func<DebugRecorder?>? debug;
+    private DebugOverlay? debugReceipt;
+    public AdviceOverlay(E2ERun? run = null, Func<DebugRecorder?>? debugSink = null)
     {
-        e2e = run;
+        e2e = run; debug = debugSink;
         Title = "双机教练 · 实验提醒";
         WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
         ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false; ShowActivated = false; Topmost = true;
@@ -56,6 +58,8 @@ internal sealed class AdviceOverlay : Window
     public void Clear()
     {
         if (renderedId != null) e2e?.Trace("game", "overlay-cleared", new { id = renderedId });
+        if (debugReceipt != null) debug?.Invoke()?.Overlay("overlay-cleared", debugReceipt);
+        debugReceipt = null;
         renderedId = null; reminder = null; canvas.Children.Clear(); Hide();
     }
     private void Draw()
@@ -67,25 +71,31 @@ internal sealed class AdviceOverlay : Window
         { Clear(); return; }
         if (!IsVisible) Show();
         double scale = Math.Max(96, GetDpiForWindow(handle)) / 96.0;
+        double unit = DisplayGeometry.OverlayUnit(game.Height, scale);
         if (!SetWindowPos(handle, new IntPtr(-1), game.Left, game.Top, game.Width, game.Height, 0x0010))
-        { e2e?.Trace("game", "overlay-position-failed", new { error = Marshal.GetLastWin32Error() }); Clear(); return; }
+        {
+            int error = Marshal.GetLastWin32Error();
+            e2e?.Trace("game", "overlay-position-failed", new { error });
+            debug?.Invoke()?.Error("overlay-position", new System.ComponentModel.Win32Exception(error));
+            Clear(); return;
+        }
         canvas.Width = game.Width / scale; canvas.Height = game.Height / scale; canvas.Children.Clear();
         var caption = new TextBlock {
             Text = (r.Kind == "manual-link-test" ? "人工联调 · 非AI路线\n" :
-                r.Kind == "experimental-bot-advice" ? "AI实验建议 · 非最优保证\n" : "视觉观察 · 未经核验\n") + r.Message,
+                r.Kind is "experimental-bot-advice" or "visible-farming-advice" ? "AI打钱建议 · 非最优保证\n" : "视觉观察 · 未经核验\n") + r.Message,
             Foreground = Brushes.Gold, Background = new SolidColorBrush(Color.FromArgb(210, 8, 16, 24)),
-            FontSize = 28 / scale, Padding = new Thickness(12 / scale), TextWrapping = TextWrapping.Wrap,
-            TextAlignment = TextAlignment.Center, Width = Math.Min(900 / scale, canvas.Width * .75),
+            FontSize = 28 * unit, Padding = new Thickness(12 * unit), TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Center, Width = Math.Min(900 * unit, canvas.Width * .75),
         };
         Canvas.SetLeft(caption, (canvas.Width - caption.Width) / 2); Canvas.SetTop(caption, canvas.Height * .1);
-        canvas.Children.Add(caption);
+        if (r.ShowSubtitle) canvas.Children.Add(caption);
         if (r.Marker is { } mark)
         {
             double x = mark.X * canvas.Width, y = mark.Y * canvas.Height;
-            var ring = new Ellipse { Width = 26 / scale, Height = 26 / scale, Stroke = Brushes.Gold, StrokeThickness = 3 / scale };
-            Canvas.SetLeft(ring, x - 13 / scale); Canvas.SetTop(ring, y - 13 / scale); canvas.Children.Add(ring);
+            var ring = new Ellipse { Width = 26 * unit, Height = 26 * unit, Stroke = Brushes.Gold, StrokeThickness = 3 * unit };
+            Canvas.SetLeft(ring, x - 13 * unit); Canvas.SetTop(ring, y - 13 * unit); canvas.Children.Add(ring);
             var arrow = new Polygon { Fill = Brushes.Gold, Points = new PointCollection {
-                new(x, y - 15 / scale), new(x - 8 / scale, y - 30 / scale), new(x + 8 / scale, y - 30 / scale) } };
+                new(x, y - 15 * unit), new(x - 8 * unit, y - 30 * unit), new(x + 8 * unit, y - 30 * unit) } };
             canvas.Children.Add(arrow);
         }
         if (renderedId != r.Id)
@@ -94,6 +104,9 @@ internal sealed class AdviceOverlay : Window
             _ = Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => {
                 if (renderedId != r.Id || !IsVisible || reminder?.Id != r.Id) return;
                 GetWindowRect(handle, out var rect);
+                debugReceipt = new(r.Id, r.FrameSequence, rect.Right - rect.Left, rect.Bottom - rect.Top,
+                    scale, canvas.Children.Count, r.Marker?.X * game.Width, r.Marker?.Y * game.Height);
+                debug?.Invoke()?.Overlay("overlay-rendered", debugReceipt);
                 e2e?.Trace("game", "overlay-rendered", new { r.Id, r.FrameSequence, r.Kind, r.Message, r.Marker,
                     actualBounds = new { rect.Left, rect.Top, rect.Right, rect.Bottom },
                     canvasWidth = canvas.ActualWidth, canvasHeight = canvas.ActualHeight,

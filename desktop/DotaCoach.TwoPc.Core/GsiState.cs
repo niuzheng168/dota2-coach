@@ -23,7 +23,8 @@ public static class GsiState
     public static OwnState Parse(JsonElement root)
     {
         var p = root.GetProperty("player"); var h = root.GetProperty("hero"); var m = root.GetProperty("map");
-        // Flat own-player GSI only. Observer allplayers/team/playerN payloads are not accepted.
+        // Extract flat player fields only; nested observer groups are not parsed.
+        // Shape alone cannot certify ownership or fog semantics for every spectator mode.
         string hero = Text(h, "name");
         string team = Text(p, "team_name") switch {
             "radiant" or "DOTA_TEAM_GOODGUYS" => "radiant",

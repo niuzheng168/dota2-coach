@@ -18,6 +18,7 @@ public sealed class CoachHost : IAsyncDisposable
     public CoachMailbox Mailbox { get; } = new();
     public string Fingerprint { get; }
     public int Port { get; private set; }
+    public IPAddress ListeningAddress { get; private set; } = IPAddress.None;
 
     private CoachHost(IPAddress bind, int port)
     {
@@ -42,6 +43,7 @@ public sealed class CoachHost : IAsyncDisposable
             options.Listen(bind, port, listen => listen.UseHttps(certificate));
         });
         app = builder.Build();
+        app.UseWebSockets(new() { KeepAliveInterval = TimeSpan.FromSeconds(10) });
         app.Use(async (context, next) => {
             context.Response.Headers.CacheControl = "no-store";
             if (context.Request.Headers.ContainsKey("Origin") ||
@@ -56,6 +58,18 @@ public sealed class CoachHost : IAsyncDisposable
         app.MapDelete("/v1/session", (HttpContext c) => { Mailbox.End(Session(c)); return Results.NoContent(); });
         app.MapGet("/v1/ticket", (HttpContext c) => Results.Json(Mailbox.Issue(Session(c)), Wire.Json));
         app.MapGet("/v1/reminder", (HttpContext c) => Results.Json(new { reminder = Mailbox.Poll(Session(c)) }, Wire.Json));
+        app.MapGet("/v2/video-ticket", (HttpContext c) => Results.Json(Mailbox.IssueVideoLease(Session(c)), Wire.Json));
+        app.Map("/v2/video", async (HttpContext c) => {
+            if (!c.WebSockets.IsWebSocketRequest || !c.WebSockets.WebSocketRequestedProtocols.Contains(VideoWire.Subprotocol) ||
+                Mailbox.VideoJpegEncoder == null || Mailbox.Snapshot().SessionId != Session(c))
+            { c.Response.StatusCode = 409; return; }
+            using var socket = await c.WebSockets.AcceptWebSocketAsync(VideoWire.Subprotocol);
+            try { await VideoWire.ReceiveStream(socket, Mailbox, Session(c), c.RequestAborted); }
+            catch (Exception error) {
+                try { Mailbox.DebugSink?.Invoke()?.Error("video-receiver", error); } catch { }
+                socket.Abort();
+            }
+        });
         app.MapPost("/v1/frame", async (HttpContext c) => {
             if (c.Request.ContentType != "image/jpeg") return Results.StatusCode(415);
             string header = c.Request.Headers["X-Frame-Meta"].ToString();
@@ -77,7 +91,9 @@ public sealed class CoachHost : IAsyncDisposable
         try
         {
             await host.app.StartAsync(cancellation);
-            host.Port = new Uri(host.app.Urls.Single()).Port;
+            var actual = new Uri(host.app.Urls.Single());
+            host.Port = actual.Port;
+            host.ListeningAddress = IPAddress.Parse(actual.Host.Trim('[', ']'));
             return host;
         }
         catch { await host.DisposeAsync(); throw; }

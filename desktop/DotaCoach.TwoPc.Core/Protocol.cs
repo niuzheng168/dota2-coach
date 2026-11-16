@@ -12,6 +12,8 @@ public static class Wire
     public const int FrameLifetimeMs = 12_000;
     public const int TicketLifetimeMs = 3_000;
     public const int PresenceLifetimeMs = 4_000;
+    // Video runs at 30fps. Retain the full advice lifetime, not the old 32-image (~1s) cap.
+    public const int HistoryLimit = 512;
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 16 };
     public static string Secret() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     public static bool EqualSecret(string? a, string b) => a != null && a.Length == b.Length &&
@@ -55,11 +57,32 @@ public sealed record OwnState(string MatchId, string Hero, string Team, double C
 public sealed record FrameMeta(string SessionId, string Ticket, long Sequence, string Source,
     int SourceWidth, int SourceHeight, OwnState? Player, int? GsiAgeMs);
 public sealed record Ticket(string SessionId, string Id);
-public sealed record SessionHello(string SessionId, int Version);
+public sealed record SessionHello(string SessionId, int Version, string? VideoProtocol = null);
 public sealed record ScreenMark(double X, double Y);
 public sealed record Reminder(string Id, string SessionId, long FrameSequence, string Kind, string Message,
-    ScreenMark? Marker, int SourceWidth, int SourceHeight, int RemainingMs);
-public sealed record FrameView(FrameMeta Meta, byte[] Jpeg, long CapturedNoEarlierThan, long ReceivedAt);
+    ScreenMark? Marker, int SourceWidth, int SourceHeight, int RemainingMs, MinimapLayout? Minimap = null,
+    bool ShowSubtitle = true);
+public sealed record FrameView
+{
+    private Lazy<byte[]> jpeg = null!;
+    public FrameMeta Meta { get; init; }
+    public byte[] Jpeg { get => jpeg.Value; init => jpeg = new(() => value); }
+    public long CapturedNoEarlierThan { get; init; }
+    public long ReceivedAt { get; init; }
+    public VideoPixels? Video { get; init; }
+    public FrameView(FrameMeta Meta, byte[] Jpeg, long CapturedNoEarlierThan, long ReceivedAt)
+    { this.Meta = Meta; this.Jpeg = Jpeg; this.CapturedNoEarlierThan = CapturedNoEarlierThan; this.ReceivedAt = ReceivedAt; }
+    internal FrameView(FrameMeta meta, VideoPixels pixels, Func<VideoPixels, byte[]> encode, long at, long received)
+    {
+        Meta = meta; Video = pixels; CapturedNoEarlierThan = at; ReceivedAt = received;
+        jpeg = new(() => encode(pixels), LazyThreadSafetyMode.ExecutionAndPublication);
+    }
+    internal FrameView ReadCopy()
+    {
+        var original = this;
+        return this with { jpeg = new(() => original.Jpeg.ToArray(), LazyThreadSafetyMode.ExecutionAndPublication) };
+    }
+}
 public sealed record HostSnapshot(bool Connected, string? SessionId, long? Sequence, string? Source,
     int? SourceWidth, int? SourceHeight, long Frames, long Bytes, long? FrameAgeMs, OwnState? Player,
     string Status, bool HasReminder);
@@ -107,13 +130,18 @@ public sealed class CoachMailbox
     private (Reminder Value, long Until)? reminder;
     private readonly Dictionary<long, (FrameMeta Meta, long At)> history = new();
     private long sequence, frames, bytes;
+    private readonly Dictionary<string, long> videoLeases = new();
+    private string? videoOwner;
+    public Func<VideoPixels, byte[]>? VideoJpegEncoder { get; set; }
+    public Func<DebugRecorder?>? DebugSink { get; set; }
     public CoachMailbox(Func<long>? clock = null) { now = clock ?? (() => Environment.TickCount64); }
     public SessionHello Begin()
     {
         lock (gate)
         {
-            session = Guid.NewGuid().ToString("N"); ticket = null; frame = null; reminder = null; sequence = 0; history.Clear();
-            return new(session, Wire.Version);
+            Clear();
+            session = Guid.NewGuid().ToString("N");
+            return new(session, Wire.Version, VideoWire.Subprotocol);
         }
     }
     private void Check(string id)
@@ -121,7 +149,7 @@ public sealed class CoachMailbox
         if (session == null || id != session) throw new InvalidOperationException("Session expired");
     }
     public void End(string id) { lock (gate) { Check(id); Clear(); } }
-    public void Clear() { lock (gate) { session = null; frame = null; reminder = null; ticket = null; sequence = 0; history.Clear(); } }
+    public void Clear() { lock (gate) { session = null; frame = null; reminder = null; ticket = null; sequence = 0; history.Clear(); videoLeases.Clear(); videoOwner = null; } }
     public Ticket Issue(string id)
     {
         lock (gate) { Check(id); ticket = (Guid.NewGuid().ToString("N"), now()); return new(id, ticket.Value.Id); }
@@ -129,9 +157,23 @@ public sealed class CoachMailbox
     public void Accept(FrameMeta meta, byte[] jpeg)
     {
         var dimensions = Jpeg.Dimensions(jpeg);
+        ValidateMeta(meta, dimensions.Width, dimensions.Height);
+        lock (gate)
+        {
+            Check(meta.SessionId);
+            if (videoOwner != null) throw new InvalidOperationException("Session uses continuous video");
+            if (ticket is not { } t || meta.Ticket != t.Id || now() - t.At > Wire.TicketLifetimeMs || now() < t.At ||
+                meta.Sequence <= sequence) throw new InvalidOperationException("Stale capture ticket or sequence");
+            ticket = null;
+            Store(new(meta, jpeg.ToArray(), t.At, now()), jpeg.Length);
+        }
+        try { DebugSink?.Invoke()?.Frame("frame-received", meta, jpeg); } catch { /* Legacy diagnostic ingress. */ }
+    }
+    internal static void ValidateMeta(FrameMeta meta, int width, int height)
+    {
         if (meta.Source is not ("dota2" or "diagnostic") || meta.SourceWidth is < 640 or > 7680 ||
             meta.SourceHeight is < 480 or > 4320 || meta.Sequence < 1 ||
-            Math.Abs((double)dimensions.Width / dimensions.Height - (double)meta.SourceWidth / meta.SourceHeight) > .01)
+            Math.Abs((double)width / height - (double)meta.SourceWidth / meta.SourceHeight) > .01)
             throw new ArgumentException("Invalid capture metadata");
         if (meta.Player != null)
         {
@@ -139,24 +181,58 @@ public sealed class CoachMailbox
             if (meta.Source != "dota2" || meta.GsiAgeMs is null or < 0 or > 3000)
                 throw new ArgumentException("Stale or synthetic GSI");
         }
-        lock (gate)
-        {
-            Check(meta.SessionId);
-            if (ticket is not { } t || meta.Ticket != t.Id || now() - t.At > Wire.TicketLifetimeMs || now() < t.At ||
-                meta.Sequence <= sequence) throw new InvalidOperationException("Stale capture ticket or sequence");
-            ticket = null;
-            var previous = frame?.Meta;
-            if (previous != null && (previous.Source != meta.Source || previous.SourceWidth != meta.SourceWidth ||
-                previous.SourceHeight != meta.SourceHeight || previous.Player?.MatchId != meta.Player?.MatchId ||
-                previous.Player?.Hero != meta.Player?.Hero || previous.Player?.Team != meta.Player?.Team ||
-                (previous.Player != null && meta.Player != null && meta.Player.Clock < previous.Player.Clock) ||
-                meta.Player?.Alive == false)) { reminder = null; history.Clear(); }
-            frame = new(meta, jpeg.ToArray(), t.At, now());
-            history[meta.Sequence] = (meta, t.At);
-            foreach (long key in history.Where(h => now() - h.Value.At >= Wire.FrameLifetimeMs).Select(h => h.Key).ToArray()) history.Remove(key);
-            while (history.Count > 32) history.Remove(history.Keys.Min());
-            sequence = meta.Sequence; frames++; bytes += jpeg.Length;
+    }
+    public void AttachVideo(string id, string owner)
+    {
+        lock (gate) { Check(id); if (videoOwner != null) throw new InvalidOperationException("Video already attached"); videoOwner = owner; }
+    }
+    public void DetachVideo(string id, string owner)
+    {
+        lock (gate) { if (session == id && videoOwner == owner) Clear(); }
+    }
+    public Ticket IssueVideoLease(string id)
+    {
+        lock (gate) {
+            Check(id);
+            foreach (var key in videoLeases.Where(x => now() - x.Value > Wire.TicketLifetimeMs).Select(x => x.Key).ToArray()) videoLeases.Remove(key);
+            if (videoLeases.Count >= 8) throw new InvalidOperationException("Too many video leases");
+            var lease = new Ticket(id, Guid.NewGuid().ToString("N")); videoLeases[lease.Id] = now(); return lease;
         }
+    }
+    public long ValidateVideo(FrameMeta meta, string owner)
+    {
+        lock (gate) {
+            Check(meta.SessionId);
+            if (videoOwner != owner || !videoLeases.TryGetValue(meta.Ticket, out long at) ||
+                now() < at || now() - at > Wire.TicketLifetimeMs || meta.Sequence <= sequence)
+                throw new InvalidOperationException("Expired/replayed video or session");
+            return at;
+        }
+    }
+    public void AcceptVideo(FrameMeta meta, string owner, VideoPixels pixels, int encodedBytes)
+    {
+        ValidateMeta(meta, pixels.Width, pixels.Height);
+        var converter = VideoJpegEncoder ?? throw new InvalidOperationException("Coach image extractor unavailable");
+        lock (gate) {
+            long at = ValidateVideo(meta, owner);
+            Store(new(meta, pixels, converter, at, now()), encodedBytes);
+        }
+        // No JPEG encoding or disk I/O here. The coach samples independently of video ingress.
+    }
+    private void Store(FrameView incoming, int length)
+    {
+        var meta = incoming.Meta;
+        var previous = frame?.Meta;
+        if (previous != null && (previous.Source != meta.Source || previous.SourceWidth != meta.SourceWidth ||
+            previous.SourceHeight != meta.SourceHeight || previous.Player?.MatchId != meta.Player?.MatchId ||
+            previous.Player?.Hero != meta.Player?.Hero || previous.Player?.Team != meta.Player?.Team ||
+            (previous.Player != null && meta.Player != null && meta.Player.Clock < previous.Player.Clock) ||
+            meta.Player?.Alive == false)) { reminder = null; history.Clear(); }
+        frame = incoming;
+        history[meta.Sequence] = (meta, incoming.CapturedNoEarlierThan);
+        foreach (long key in history.Where(h => now() - h.Value.At >= Wire.FrameLifetimeMs).Select(h => h.Key).ToArray()) history.Remove(key);
+        while (history.Count > Wire.HistoryLimit) history.Remove(history.Keys.Min());
+        sequence = meta.Sequence; frames++; bytes += length;
     }
     public FrameView? Latest()
     {
@@ -164,12 +240,13 @@ public sealed class CoachMailbox
         {
             if (frame == null || now() - frame.ReceivedAt > Wire.PresenceLifetimeMs) return null;
             // Consumers must never mutate the mailbox-owned JPEG.
-            return frame with { Jpeg = frame.Jpeg.ToArray() };
+            return frame.ReadCopy();
         }
     }
-    public void SetReminder(string id, long basedOn, string kind, string text, ScreenMark? mark)
+    public void SetReminder(string id, long basedOn, string kind, string text, ScreenMark? mark, MinimapLayout? minimap = null,
+        bool showSubtitle = true)
     {
-        if (kind is not ("manual-link-test" or "local-vision-observation" or "experimental-bot-advice") || string.IsNullOrWhiteSpace(text) ||
+        if (kind is not ("manual-link-test" or "local-vision-observation" or "experimental-bot-advice" or "visible-farming-advice") || string.IsNullOrWhiteSpace(text) ||
             text.Length > 120 || (mark != null && (!Wire.Finite(mark.X, 0, 1) || !Wire.Finite(mark.Y, 0, 1))) ||
             (kind == "local-vision-observation" && mark != null)) throw new ArgumentException("Invalid reminder");
         lock (gate)
@@ -182,9 +259,15 @@ public sealed class CoachMailbox
                 (!CloudCoach.Eligible(frame) || source.Meta.Player is not { MatchId: "0", Alive: true } ||
                  source.Meta.Source != "dota2" || mark is { } p && (!Wire.Finite(p.X, 0, .20) || !Wire.Finite(p.Y, .65, 1))))
                 throw new InvalidOperationException("Experimental advice is restricted to local bot matches and the supported minimap");
+            if (kind == "visible-farming-advice" &&
+                (!CloudCoach.Eligible(frame, localBotOnly: false) || source.Meta.Source != "dota2" ||
+                 source.Meta.Player is not { Alive: true } || source.Meta.GsiAgeMs is null or < 0 or > 3000 ||
+                 mark != null && (minimap == null || !minimap.IsValidFor(source.Meta.SourceWidth, source.Meta.SourceHeight) ||
+                                  !minimap.Contains(mark))))
+                throw new InvalidOperationException("Live advice requires fresh own-player state and calibrated map markers");
             long until = Math.Min(source.At + Wire.FrameLifetimeMs, now() + 8000);
             reminder = (new(Guid.NewGuid().ToString("N"), id, basedOn, kind, text.Trim(), mark,
-                source.Meta.SourceWidth, source.Meta.SourceHeight, (int)(until - now())), until);
+                source.Meta.SourceWidth, source.Meta.SourceHeight, (int)(until - now()), minimap, showSubtitle), until);
         }
     }
     public void ClearReminder() { lock (gate) reminder = null; }
@@ -205,7 +288,7 @@ public sealed class CoachMailbox
             bool fresh = frame != null && now() - frame.ReceivedAt <= Wire.PresenceLifetimeMs;
             return new(fresh, session, frame?.Meta.Sequence, frame?.Meta.Source, frame?.Meta.SourceWidth,
                 frame?.Meta.SourceHeight, frames, bytes, frame == null ? null : now() - frame.ReceivedAt,
-                fresh ? frame?.Meta.Player : null, fresh ? "正在接收；AI 路线尚未启用" : "等待新画面；提醒已失效",
+                fresh ? frame?.Meta.Player : null, fresh ? "正在接收；自动教练状态见模型面板" : "等待新画面；提醒已失效",
                 fresh && reminder != null && now() < reminder.Value.Until);
         }
     }

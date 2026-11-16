@@ -7,6 +7,7 @@ using DotaCoach.TwoPc;
 
 int passed = 0;
 void Check(bool value, string name) { if (!value) throw new Exception(name); passed++; Console.WriteLine("PASS " + name); }
+if (args.Contains("--video-codec")) { VideoTests.Codec(Check); return; }
 void Reject(Action action, string name)
 {
     bool rejected = false; try { action(); } catch (ArgumentException) { rejected = true; } catch (InvalidOperationException) { rejected = true; }
@@ -20,6 +21,7 @@ async Task RejectAsync(Func<Task> action, string name)
 }
 // Header-only sample for mailbox/protocol tests. UI verification uses real encoded JPEGs.
 byte[] jpeg = [0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 2, 208, 5, 0, 3, 1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1, 0xff, 0xd9];
+if (OperatingSystem.IsWindows()) { VideoTests.Codec(Check); await VideoTests.Protocol(Check, jpeg); }
 FrameMeta Meta(string session, Ticket ticket, long sequence, OwnState? player = null) =>
     new(session, ticket.Id, sequence, player == null ? "diagnostic" : "dota2", 1280, 720, player, player == null ? null : 10);
 OwnState Own(string team = "radiant") => new("1234567890", "npc_dota_hero_luna", team, 700, true, 1200, 500, -2000, -3000,
@@ -201,7 +203,7 @@ var botAdvice = new ModelAdvice(botFrame.Meta.Player!.Hero, botFrame.Meta.Player
     ["观察可回收兵线，再比较附近已确认野怪"], "出现可见敌方威胁则取消", new(.05, .9), "左下基地附近");
 Check(CloudCoach.Eligible(botFrame), "model accepts real-source local-bot own state");
 Check(!CloudCoach.Eligible(botFrame with { Meta = botFrame.Meta with { Player = Own() with { MatchId = "123" } } }),
-    "model does not silently activate in human matchmaking");
+    "legacy bot-only entry remains restricted independently of normal live mode");
 Check(!CloudCoach.Eligible(botFrame with { Meta = botFrame.Meta with { Source = "diagnostic" } }),
     "model never treats diagnostic input as a real game");
 CloudCoach.Validate(botAdvice, botFrame);
@@ -221,7 +223,7 @@ Reject(() => botBox.SetReminder(botSession, 1, "experimental-bot-advice", botAdv
 botTicket = botBox.Issue(botSession);
 botBox.Accept(Meta(botSession, botTicket, 2, Own() with { MatchId = "123" }), jpeg);
 Reject(() => botBox.SetReminder(botSession, 2, "experimental-bot-advice", botAdvice.Message, botAdvice.Marker),
-    "server blocks experimental bot advice in real matches");
+    "server keeps legacy experimental-bot-advice separate from live advice");
 string fakeEnv = Path.GetTempFileName();
 try {
     File.WriteAllText(fakeEnv, "AOAI_ENDPOINT=https://unit-test.openai.azure.com/\nFOUNDRY_KEY=unit-test-only\n");
@@ -258,6 +260,164 @@ try {
     using var badCloud = new CloudCoach(mapEnv, "gpt-6-astra", "historical test lesson", badHandler, calibrated);
     await RejectAsync(() => badCloud.Decide(botFrame, default), "model response selecting opponent landmark is rejected before publication");
 } finally { File.Delete(mapEnv); }
+var defaults = new LiveCoachSettings();
+Check(defaults.AutomaticAdvice && defaults.Subtitles && defaults.MinimapMarkers, "normal coach features default on");
+var liveFrame = botFrame with { Meta = botFrame.Meta with {
+    SourceWidth = 3840, SourceHeight = 2160, Player = Own() } };
+Check(CloudCoach.Eligible(liveFrame, localBotOnly: false), "normal live path accepts real match IDs and 4K own-state frames");
+Check(!CloudCoach.Eligible(liveFrame with { Meta = liveFrame.Meta with { GsiAgeMs = 3001 } }, false),
+    "normal live mode still rejects stale GSI");
+Check(!CloudCoach.Eligible(liveFrame with { Meta = liveFrame.Meta with { Source = "diagnostic" } }, false),
+    "enabling live mode never enables inference on diagnostic frames");
+var left4k = new MinimapLayout(3840, 2160, 0, 1680, 480);
+var right4k = new MinimapLayout(3840, 2160, 3360, 1680, 480);
+var leftTarget = calibrated.Project("radiant", "npc_dota_goodguys_tower2_bot", liveFrame, left4k);
+Check(Math.Abs(leftTarget.X - ownTower.X) < .000001 && Math.Abs(leftTarget.Y - ownTower.Y) < .000001,
+    "confirmed 4K default-layout projection scales original physical pixels, not JPEG pixels");
+var rightTarget = calibrated.Project("radiant", "npc_dota_goodguys_tower2_bot", liveFrame, right4k);
+Check(right4k.Contains(rightTarget) && Math.Abs((rightTarget.X - leftTarget.X) * 3840 - 3360) < .000001,
+    "confirmed right-side 4K minimap is supported without mirroring world coordinates");
+var customized = new MinimapLayout(3840, 2160, 40, 1600, 520);
+Check(customized.Contains(calibrated.Project("dire", "neutralcamp_evil_11", liveFrame, customized)),
+    "custom 4K HUD uses its explicit pixel rectangle for Dire landmarks");
+Check(!left4k.IsValidFor(1920, 1080) && !new MinimapLayout(3840, 2160, double.NaN, 1680, 480).IsValidFor(3840, 2160) &&
+    !new MinimapLayout(3840, 2160, 0, 2000, 480).IsValidFor(3840, 2160),
+    "stale resolution, non-finite, and out-of-client calibrations are rejected");
+Reject(() => calibrated.Project("radiant", "npc_dota_goodguys_tower2_bot", liveFrame),
+    "4K projection never silently reuses the measured 720p layout");
+Check(DisplayGeometry.EncodedSize(3840, 2160) == (1600, 900) &&
+    DisplayGeometry.EncodedSize(4096, 2160) == (1600, 843), "4K transport is bounded while preserving source aspect");
+foreach (double dpi in new[] { 1.0, 1.5, 2.0, 2.5, 3.0 })
+    Check(Math.Abs(DisplayGeometry.OverlayUnit(2160, dpi) * dpi * 28 - 84) < .000001,
+        $"4K caption physical size remains readable at DPI scale {dpi}");
+var normalAdvice = botAdvice with { Marker = leftTarget, TargetId = "npc_dota_goodguys_tower2_bot" };
+CloudCoach.Validate(normalAdvice, liveFrame, false, left4k);
+Reject(() => CloudCoach.Validate(normalAdvice, liveFrame, false), "uncalibrated normal live mode cannot return a map point");
+Reject(() => CloudCoach.Validate(normalAdvice with { Marker = new(.8, .2) }, liveFrame, false, left4k),
+    "live marker outside confirmed minimap rejected");
+var preferencesFile = Path.Combine(Path.GetTempPath(), "coach-prefs-" + Guid.NewGuid().ToString("N") + ".json");
+try {
+    var pref = defaults with { Calibrations = [left4k] };
+    pref.Save(preferencesFile);
+    Check(LiveCoachSettings.Load(preferencesFile).LayoutFor(liveFrame) == left4k,
+        "confirmed layout persists by actual game resolution");
+    Reject(() => (pref with { RequestLimit = 0 }).Save(preferencesFile), "unbounded/invalid request limits rejected");
+    Reject(() => (pref with { IntervalSeconds = 1 }).Save(preferencesFile), "accidental per-frame paid requests rejected");
+    Check(!File.ReadAllText(preferencesFile).Contains("FOUNDRY_KEY"), "preferences do not serialize model credentials");
+} finally { File.Delete(preferencesFile); }
+string liveEnv = Path.GetTempFileName();
+try {
+    File.WriteAllText(liveEnv, "AOAI_ENDPOINT=https://unit-test.openai.azure.com/\nFOUNDRY_KEY=unit-test-only\n");
+    using var handler = new FakeCloudCoach(normalAdvice);
+    using var cloud = new CloudCoach(liveEnv, "gpt-6-astra", "historical test lesson", handler, calibrated, false, left4k);
+    var result = await cloud.Decide(liveFrame, default);
+    Check(result.Advice.Marker == leftTarget && handler.Body.Contains("player-visible-live-next-step"),
+        "normal live 4K inference traverses the actual Responses request/parse/projection path");
+    using var textHandler = new FakeCloudCoach(botAdvice with { Marker = null, TargetId = null });
+    using var textCloud = new CloudCoach(liveEnv, "gpt-6-astra", "", textHandler, calibrated, false);
+    Check((await textCloud.Decide(liveFrame, default)).Advice.Marker == null,
+        "uncalibrated live 4K still receives model subtitles without guessed markers");
+    using var badHandler = new FakeCloudCoach(normalAdvice);
+    using var badCloud = new CloudCoach(liveEnv, "gpt-6-astra", "", badHandler, calibrated, false);
+    await RejectAsync(() => badCloud.Decide(liveFrame, default), "model cannot invent a target when the map has no calibration");
+} finally { File.Delete(liveEnv); }
+await using (var liveHost = await CoachHost.Start(IPAddress.Loopback, 0)) {
+    using var link = new GameLink(liveHost.Pair(IPAddress.Loopback));
+    await link.Connect(default);
+    var liveTicket = await link.GetTicket(default);
+    var meta = liveFrame.Meta with { SessionId = link.SessionId!, Ticket = liveTicket.Id };
+    await link.Upload(meta, jpeg, Environment.TickCount64, default);
+    liveHost.Mailbox.SetReminder(link.SessionId!, 1, "visible-farming-advice", normalAdvice.Message, leftTarget, left4k);
+    Check((await link.Poll(default)) is { Kind: "visible-farming-advice", SourceWidth: 3840, SourceHeight: 2160 } delivered &&
+        delivered.Minimap == left4k && delivered.Marker == leftTarget,
+        "normal-match 4K advice crosses actual pinned TLS and game-side geometry validation");
+    Reject(() => liveHost.Mailbox.SetReminder(link.SessionId!, 1, "visible-farming-advice", "bad", leftTarget),
+        "server rejects normal map marks without source-size calibration");
+    liveHost.Mailbox.SetReminder(link.SessionId!, 1, "visible-farming-advice", "text only", null);
+    Check((await link.Poll(default))?.Marker == null, "normal uncalibrated text advice crosses TLS");
+    liveHost.Mailbox.SetReminder(link.SessionId!, 1, "visible-farming-advice", "map only", leftTarget, left4k, false);
+    Check((await link.Poll(default))?.ShowSubtitle == false, "subtitle off is preserved independently of map targets");
+}
+string debugRoot = Path.Combine(Path.GetTempPath(), "dota-coach-debug-tests-" + Guid.NewGuid().ToString("N"));
+var debugMeta = liveFrame.Meta with { SessionId = "../../outside", Ticket = "NEVER-SAVE-CAPTURE-TICKET" };
+var debugFrame = liveFrame with { Meta = debugMeta };
+var recorder = new DebugRecorder(debugRoot, "coach", "unit-test");
+recorder.Frame("frame-received", debugMeta, jpeg);
+recorder.ModelStarted(debugFrame, "test-model", left4k, 1);
+recorder.ModelFinished(debugFrame, new(botAdvice with {
+    Message = "Bearer super-private-token FOUNDRY_KEY=secret-value", Marker = null,
+    Unknowns = ["DCP1.privatepairing=="], TargetId = null,
+}, "resp-unit-test", "test-model", 11, 22, 33));
+recorder.Error("test-error", new InvalidOperationException("HTTP credential=NEVER-SAVE-EXCEPTION-MESSAGE"));
+recorder.Error("model-provider", new ModelProviderException(429), debugMeta, "upstream-status");
+recorder.State(new("connected", true, true, true, false, 1, 11, 22, 10, Own(), left4k));
+await recorder.DisposeAsync();
+string logText = File.ReadAllText(Path.Combine(recorder.DirectoryPath, "events.jsonl"));
+var debugRows = File.ReadAllLines(Path.Combine(recorder.DirectoryPath, "events.jsonl")).Select(x => JsonDocument.Parse(x)).ToArray();
+Check(debugRows.Any(d => d.RootElement.GetProperty("stage").GetString() == "model-result") &&
+    debugRows.Any(d => d.RootElement.GetProperty("stage").GetString() == "client-state"),
+    "debug saves correlated model decisions and client runtime state");
+Check(debugRows.Any(d => d.RootElement.GetProperty("stage").GetString() == "error" &&
+    d.RootElement.GetProperty("details").GetProperty("httpStatus").ValueKind == JsonValueKind.Number &&
+    d.RootElement.GetProperty("details").GetProperty("httpStatus").GetInt32() == 429),
+    "debug preserves actionable upstream HTTP status without response bodies");
+Check(!logText.Contains("NEVER-SAVE-CAPTURE-TICKET") && !logText.Contains("super-private-token") &&
+    !logText.Contains("secret-value") && !logText.Contains("privatepairing") &&
+    !logText.Contains("NEVER-SAVE-EXCEPTION-MESSAGE"),
+    "debug excludes transport tickets, pairing, credentials and raw exception bodies");
+var frameRow = debugRows.First(d => d.RootElement.GetProperty("stage").GetString() == "model-input");
+string relativeImage = frameRow.RootElement.GetProperty("details").GetProperty("image").GetString()!;
+string savedImage = Path.GetFullPath(Path.Combine(recorder.DirectoryPath, relativeImage));
+Check(savedImage.StartsWith(Path.GetFullPath(recorder.DirectoryPath) + Path.DirectorySeparatorChar) &&
+    File.ReadAllBytes(savedImage).SequenceEqual(jpeg),
+    "debug preserves exact model JPEG bytes and hashes untrusted session names for safe filenames");
+Check(Directory.GetFiles(Path.Combine(recorder.DirectoryPath, "frames")).Length == 1 &&
+    debugRows.Count(d => d.RootElement.GetProperty("stage").GetString() == "model-input") == 2,
+    "repeated model-input references reuse one immutable image without losing trace events");
+long stoppedSize = new FileInfo(Path.Combine(recorder.DirectoryPath, "events.jsonl")).Length;
+recorder.Frame("frame-captured", debugMeta, jpeg);
+Check(new FileInfo(Path.Combine(recorder.DirectoryPath, "events.jsonl")).Length == stoppedSize &&
+    File.Exists(Path.Combine(recorder.DirectoryPath, "summary.json")), "stopped debug cannot keep recording and produces a summary");
+foreach (var row in debugRows) row.Dispose();
+var byteLimited = new DebugRecorder(debugRoot, "game", "test", new(MaxBytes: 65536));
+var padded = jpeg[..^2].Concat(new byte[40000]).Concat(jpeg[^2..]).ToArray();
+byteLimited.Frame("frame-captured", debugMeta, padded);
+await byteLimited.DisposeAsync();
+Check(byteLimited.Status.Reason == "byte-limit" && Directory.GetFiles(Path.Combine(byteLimited.DirectoryPath, "frames")).Length == 0,
+    "debug disk budget includes queued images before writing");
+var frameLimited = new DebugRecorder(debugRoot, "game", "test", new(MaxFrameRecords: 1));
+frameLimited.Frame("frame-captured", debugMeta, jpeg); frameLimited.Frame("frame-captured", debugMeta with { Sequence = 2 }, jpeg);
+await frameLimited.DisposeAsync();
+Check(frameLimited.Status.Reason == "frame-limit" && frameLimited.Status.Images == 1, "debug stops at its image-record limit");
+long debugClock = 0;
+var timeLimited = new DebugRecorder(debugRoot, "game", "test", new(MaxMinutes: 1), () => debugClock);
+debugClock = 60001; timeLimited.Frame("frame-captured", debugMeta, jpeg); await timeLimited.DisposeAsync();
+Check(timeLimited.Status.Reason == "duration-limit" && timeLimited.Status.Images == 0, "debug time limit stops unattended recording");
+var brokenDisk = new DebugRecorder(debugRoot, "game", "test");
+Directory.Delete(Path.Combine(brokenDisk.DirectoryPath, "frames")); // Empty directory owned by this new test session only.
+brokenDisk.Frame("frame-captured", debugMeta, jpeg); await brokenDisk.DisposeAsync();
+Check(brokenDisk.Status.Reason == "disk-error", "debug disk failures are isolated instead of crashing capture");
+
+await using (var gsiProbe = await GsiReceiver.Start(0)) {
+    var gsiDebug = new DebugRecorder(debugRoot, "game", "test");
+    gsiProbe.Diagnostics = gsiDebug.Gsi;
+    using var http = new HttpClient { BaseAddress = new($"http://127.0.0.1:{gsiProbe.Port}") };
+    string secret = System.Text.RegularExpressions.Regex.Match(gsiProbe.Config, "\"token\" \"([A-F0-9]+)\"").Groups[1].Value;
+    string observer = JsonSerializer.Serialize(new { auth = new { token = secret },
+        player = new { team2 = new { player0 = new { steamid = "PRIVATE-OBSERVER-ID", name = "PRIVATE-NAME" } } },
+        hero = new { team2 = new { player0 = new { xpos = 9999 } } }, map = new { matchid = "123", clock_time = 700 },
+        allplayers = new { hidden = "NEVER-SAVE-HIDDEN-VALUES" },
+    });
+    var response = await http.PostAsync("/gsi", new StringContent(observer));
+    Check(response.StatusCode == HttpStatusCode.BadRequest && gsiProbe.Latest().Player == null &&
+        gsiProbe.LastDiagnostics is { Mode: "observer-shaped", HasTeamGroups: true, OwnStateAccepted: false },
+        "debug identifies nested observer GSI without routing it into own-player coaching");
+    await gsiDebug.DisposeAsync();
+    string diagnostics = File.ReadAllText(Path.Combine(gsiDebug.DirectoryPath, "events.jsonl"));
+    Check(!diagnostics.Contains(secret) && !diagnostics.Contains("PRIVATE-") && !diagnostics.Contains("NEVER-SAVE-HIDDEN-VALUES") &&
+        diagnostics.Contains("observer-shaped"), "GSI debug records structural presence, never auth, identities or hidden values");
+}
+await SpectatorTests.Run(Check);
 Console.WriteLine($"Two-PC protocol + real TLS + GSI + mocked model contracts: {passed} checks passed.");
 
 sealed class FakeCloudCoach(ModelAdvice advice) : HttpMessageHandler

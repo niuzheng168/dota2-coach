@@ -13,6 +13,39 @@ namespace DotaCoach.TwoPc;
 internal sealed record CaptureResult(byte[] Jpeg, int Width, int Height);
 internal static class Capture
 {
+    public static VideoPixels? GameVideo(GameSurface surface)
+    {
+        if (GameWindow.Foreground() != surface || surface.Width > 7680 || surface.Height > 4320) return null;
+        var size = VideoPixels.SizeFor(surface.Width, surface.Height);
+        using var scaled = new Bitmap(size.Width, size.Height, PixelFormat.Format32bppArgb);
+        using (var graphics = Graphics.FromImage(scaled)) {
+            nint screen = GetDC(0), target = graphics.GetHdc();
+            try {
+                // Scale on the GDI blit instead of allocating/copying a 4K bitmap 30 times/sec.
+                SetStretchBltMode(target, 4);
+                if (screen == 0 || !StretchBlt(target, 0, 0, size.Width, size.Height, screen,
+                    surface.Left, surface.Top, surface.Width, surface.Height, 0x00CC0020))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+            } finally { graphics.ReleaseHdc(target); if (screen != 0) ReleaseDC(0, screen); }
+        }
+        if (GameWindow.Foreground() != surface) return null;
+        return Pixels(scaled);
+    }
+    private static VideoPixels Pixels(Bitmap image)
+    {
+        var data = image.LockBits(new Rectangle(0, 0, image.Width, image.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        try {
+            var bgra = new byte[image.Width * image.Height * 4];
+            for (int y = 0; y < image.Height; y++)
+                Marshal.Copy(data.Scan0 + y * data.Stride, bgra, y * image.Width * 4, image.Width * 4);
+            return VideoPixels.FromBgra(image.Width, image.Height, bgra);
+        } finally { image.UnlockBits(data); }
+    }
+    public static VideoPixels DiagnosticVideo(long sequence)
+    {
+        using var image = DiagnosticBitmap(sequence);
+        return Pixels(image);
+    }
     public static CaptureResult? Game(GameSurface surface, bool includeLayeredEvidence = false)
     {
         if (GameWindow.Foreground() != surface || surface.Width > 7680 || surface.Height > 4320) return null;
@@ -43,9 +76,17 @@ internal static class Capture
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr window, IntPtr dc);
     [DllImport("gdi32.dll", SetLastError = true)] private static extern bool BitBlt(
         IntPtr target, int x, int y, int width, int height, IntPtr source, int sourceX, int sourceY, uint operation);
+    [DllImport("gdi32.dll", SetLastError = true)] private static extern bool StretchBlt(
+        nint target, int x, int y, int width, int height, nint source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, uint operation);
+    [DllImport("gdi32.dll")] private static extern int SetStretchBltMode(nint target, int mode);
     public static CaptureResult Diagnostic(long sequence)
     {
-        using var image = new Bitmap(1280, 720, PixelFormat.Format24bppRgb);
+        using var image = DiagnosticBitmap(sequence);
+        return new(Encode(image), 1280, 720);
+    }
+    private static Bitmap DiagnosticBitmap(long sequence)
+    {
+        var image = new Bitmap(1280, 720, PixelFormat.Format32bppArgb);
         using var g = Graphics.FromImage(image);
         g.Clear(Color.FromArgb(13, 23, 36)); g.SmoothingMode = SmoothingMode.AntiAlias;
         using var title = new Font("Microsoft YaHei UI", 28);
@@ -61,12 +102,12 @@ internal static class Capture
         g.FillEllipse(Brushes.Aquamarine, x1, y1, 24, 24);
         g.DrawString("请在教练端点击左下测试区，回传一条测试字幕。", text, Brushes.Aquamarine, 340, 390);
         g.DrawString("真正游戏采集：切换来源后重新连接，并切回 Dota 2。", text, Brushes.LightGray, 340, 440);
-        return new(Encode(image), 1280, 720);
+        return image;
     }
     private static byte[] Encode(Bitmap full)
     {
-        double scale = Math.Min(1, Math.Min(1280.0 / full.Width, 900.0 / full.Height));
-        using var reduced = new Bitmap((int)(full.Width * scale), (int)(full.Height * scale), PixelFormat.Format24bppRgb);
+        var size = DisplayGeometry.EncodedSize(full.Width, full.Height);
+        using var reduced = new Bitmap(size.Width, size.Height, PixelFormat.Format24bppRgb);
         using (var g = Graphics.FromImage(reduced)) {
             g.InterpolationMode = InterpolationMode.HighQualityBilinear;
             g.DrawImage(full, new Rectangle(0, 0, reduced.Width, reduced.Height));
