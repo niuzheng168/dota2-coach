@@ -31,6 +31,7 @@
     "replay:study:analyze": "node scripts/replays/analyze-hundred.ts",
     "replay:study:publish": "node scripts/replays/publish-hundred.ts",
     "eval:domain": "node scripts/eval-dota2-translation.ts",
+    "probe:compare": "node scripts/dual-gsi/compare.ts",
     "benchmark": "node src/benchmark.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts",
