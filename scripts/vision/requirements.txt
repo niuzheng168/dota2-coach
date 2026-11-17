@@ -1,0 +1,14 @@
+# Isolated .tmp/vision-tools venv for hud_recognizer.py / capture_replay.py, tested on Python 3.13
+# with an RTX 3090 Ti (driver 617). torch and onnxruntime-gpu must target the same CUDA (13 here).
+# Install this file, then `pip install --no-deps rapidocr-onnxruntime==1.2.3`: its metadata
+# pulls the CPU onnxruntime, which would shadow onnxruntime-gpu.
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.14.1+cu130
+onnxruntime-gpu==1.32.0
+numpy==2.5.5
+opencv-python-headless==5.0.0.93
+pillow==13.0.0
+pyclipper==1.4.0
+PyYAML==6.0.3
+shapely==2.2.0
+six==1.17.0
