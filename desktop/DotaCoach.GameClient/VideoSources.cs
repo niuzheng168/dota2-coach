@@ -30,7 +30,7 @@ internal sealed class WindowVideoSource : IVideoSource
     private readonly GpuNv12Scaler scaler;
     private readonly Rect32 client;
     private (int Width, int Height)? content;
-    public string Name => "窗口采集（GPU缩放）";
+    public string Name => capture.Unthrottled ? "窗口采集（GPU缩放）" : "窗口采集（GPU缩放；此Windows版本采集上限约60fps）";
     public int SourceWidth { get; }
     public int SourceHeight { get; }
     public int Width => scaler.Width;

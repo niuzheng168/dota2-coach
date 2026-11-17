@@ -67,6 +67,8 @@ public sealed unsafe class WindowCapture : IDisposable
     public int Width { get; }
     public int Height { get; }
     public bool BorderDisabled { get; }
+    /// <summary>False on Windows builds without MinUpdateInterval: capture stays capped near 60 fps.</summary>
+    public bool Unthrottled { get; }
     public WindowCapture(GpuDevice gpu, nint window)
     {
         try {
@@ -96,6 +98,13 @@ public sealed unsafe class WindowCapture : IDisposable
             if (third != 0) {
                 BorderDisabled = ((delegate* unmanaged[Stdcall]<nint, byte, int>)Slot(third, 7))(third, 0) >= 0;
                 Release(third);
+            }
+            // Windows otherwise delivers at most one frame per 16 ms (measured: 48 fps on a 144 Hz display).
+            // IGraphicsCaptureSession5.MinUpdateInterval (Windows 11 24H2+) lifts that to the display rate.
+            nint fifth = TryQuery(session, new("67c0ea62-1f85-5061-925a-239be0ac09cb"));
+            if (fifth != 0) {
+                Unthrottled = ((delegate* unmanaged[Stdcall]<nint, long, int>)Slot(fifth, 7))(fifth, 10_000 /* 1 ms */) >= 0;
+                Release(fifth);
             }
             Hr(((delegate* unmanaged[Stdcall]<nint, int>)Slot(session, 6))(session));
         } catch { Dispose(); throw; }
