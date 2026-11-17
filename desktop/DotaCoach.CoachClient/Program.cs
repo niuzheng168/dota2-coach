@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
@@ -67,6 +68,15 @@ internal sealed class CoachWindow : Window
     private readonly TextBox reasoningModel = Ui.Input();
     private readonly TextBox interval = Ui.Input();
     private readonly TextBox requestLimit = Ui.Input();
+    private readonly TextBox subtitleSeconds = Ui.Input();
+    private readonly TextBox modelTimeout = Ui.Input();
+    private readonly CheckBox autoMinimap = new() { Content = "未校准时使用默认左下小地图框（按HUD高度比例）", Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 7) };
+    // Preview runs at the stream rate (bounded by the WPF frame clock), converted off the UI thread.
+    private readonly DispatcherTimer previewTimer = new(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(1) };
+    private WriteableBitmap? previewBitmap;
+    private bool previewBusy;
+    private long viewGeneration, previewShown, previewRateAt;
+    private double previewFps;
     private readonly TextBlock autoStatus = Ui.Text("自动教练等待配置", 14, Ui.Accent);
     private readonly TextBox mapLeft = Ui.Input(), mapTop = Ui.Input(), mapSize = Ui.Input();
     private readonly TextBlock mapStatus = Ui.Text("等待实际游戏尺寸；未校准只发字幕，不猜地图点。", 12, Brushes.LightGray);
@@ -101,7 +111,7 @@ internal sealed class CoachWindow : Window
         settingsPath = preferencesFile ?? LiveCoachSettings.DefaultPath;
         try { preferences = LiveCoachSettings.Load(settingsPath); }
         catch { preferences = new(); notice.Text = "已保存的设置无效，请检查并重新应用；没有读取或输出密钥内容。"; }
-        Title = "Dota Coach · 教练端（3090 Ti）v0.3.1";
+        Title = "Dota Coach · 教练端（3090 Ti）v0.4.0";
         Width = Math.Min(1320, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(940, SystemParameters.WorkArea.Height - 40);
         MinWidth = 1000; MinHeight = 680; WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -192,6 +202,7 @@ internal sealed class CoachWindow : Window
         Content = root;
         preview.MouseLeftButtonDown += SelectMark; preview.SizeChanged += (_, _) => { DrawMark(); DrawCalibration(); };
         timer.Tick += (_, _) => Refresh(); timer.Start();
+        previewTimer.Tick += (_, _) => UpdatePreview(); previewTimer.Start();
         if (e2e == null && automaticStartup) Loaded += async (_, _) => {
             ConfigureModel(save: false);
             await Start();
@@ -213,7 +224,7 @@ internal sealed class CoachWindow : Window
         };
         Closing += async (_, e) => {
             if (closing) return;
-            e.Cancel = true; closing = true; stop.Cancel(); timer.Stop(); CancelDecision();
+            e.Cancel = true; closing = true; stop.Cancel(); timer.Stop(); previewTimer.Stop(); CancelDecision();
             await Stop();
             if (spectator != null) { await spectator.DisposeAsync(); spectator = null; }
             cloud?.Dispose();
@@ -336,7 +347,7 @@ internal sealed class CoachWindow : Window
             if (frame != null) recorder.SampleVideo(frame);
             recorder.State(new(status.Text, current?.Connected == true, preferences.AutomaticAdvice,
                 modelConfigured, deciding, modelCalls, inputTokens, outputTokens, current?.FrameAgeMs, current?.Player,
-                frame == null ? null : preferences.LayoutFor(frame), GsiAgeMs: frame?.Meta.GsiAgeMs,
+                frame == null ? null : preferences.EffectiveLayout(frame), GsiAgeMs: frame?.Meta.GsiAgeMs,
                 RequestLimit: e2e?.MaxModelCalls ?? preferences.RequestLimit, IntervalSeconds: preferences.IntervalSeconds,
                 Model: e2e?.Model ?? preferences.Model, SubtitlesEnabled: preferences.Subtitles, MapMarkersEnabled: preferences.MinimapMarkers));
             }
@@ -382,16 +393,49 @@ internal sealed class CoachWindow : Window
             previous.Meta.Player?.Hero != snapshot.Player?.Hero || previous.Meta.Player?.Team != snapshot.Player?.Team ||
             previous.Meta.Player is { } oldPlayer && snapshot.Player is { } newPlayer && newPlayer.Clock < oldPlayer.Clock))
             ClearView();
-        if (frozen.IsChecked == true) { previewTitle.Text = "预览已冻结 · 传输仍继续 · 提醒最多12秒有效"; return; }
-        var latest = host.Mailbox.Latest();
+        if (frozen.IsChecked == true) { previewTitle.Text = $"预览已冻结 · 传输仍继续 · 源画面超过{Wire.FrameLifetimeMs / 1000}秒后不能再回传"; return; }
+        if (displayed is { } shown)
+            previewTitle.Text = $"{(shown.Meta.Source == "diagnostic" ? "诊断画面 · 不是游戏" : "DOTA 2")} · " +
+                (shown.Video is { } v ? $"H.264 {v.Width}×{v.Height} · 预览 {previewFps:F0}fps" : "旧版JPEG") + $" / #{shown.Meta.Sequence}";
+    }
+    /// <summary>
+    /// Shows every new decoded frame (up to the WPF frame clock). The coach scales to the preview size on a worker
+    /// thread, so a native 4K stream costs the same on the UI thread as 1080p.
+    /// </summary>
+    private void UpdatePreview()
+    {
+        if (host is not { } owner || closing || previewBusy || frozen.IsChecked == true) return;
+        var latest = owner.Mailbox.Latest();
         if (latest == null || displayed?.Meta.SessionId == latest.Meta.SessionId && displayed?.Meta.Sequence == latest.Meta.Sequence) return;
-        try
-        {
-            image.Source = Ui.FrameImage(latest); displayed = latest; selected = null; marks.Children.Clear();
-            if (e2e == null) DrawCalibration();
-            previewTitle.Text = $"{(latest.Meta.Source == "diagnostic" ? "诊断画面 · 不是游戏" : "DOTA 2")} · {(latest.Video == null ? "旧版JPEG" : "H.264实时视频")} / #{latest.Meta.Sequence}";
+        long generation = viewGeneration;
+        if (latest.Video is not { } video) {
+            try { ShowPreview(latest, Ui.FrameImage(latest)); } catch { notice.Text = "图像解码失败；该帧未显示。"; }
+            return;
         }
-        catch { notice.Text = "图像解码失败；该帧未显示。"; }
+        double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        var size = Ui.Fit(video.Width, video.Height, Math.Max(320, preview.ActualWidth * dpi), Math.Max(180, preview.ActualHeight * dpi));
+        previewBusy = true;
+        Task.Run(() => video.ToBgra(size.Width, size.Height)).ContinueWith(t => {
+            previewBusy = false;
+            if (t.IsFaulted || host != owner || closing || generation != viewGeneration || frozen.IsChecked == true) return;
+            if (previewBitmap == null || previewBitmap.PixelWidth != size.Width || previewBitmap.PixelHeight != size.Height)
+                previewBitmap = new WriteableBitmap(size.Width, size.Height, 96, 96, PixelFormats.Bgra32, null);
+            previewBitmap.WritePixels(new Int32Rect(0, 0, size.Width, size.Height), t.Result, size.Width * 4, 0);
+            ShowPreview(latest, previewBitmap);
+        }, TaskScheduler.FromCurrentSynchronizationContext());
+    }
+    private void ShowPreview(FrameView latest, BitmapSource bitmap)
+    {
+        bool layoutChanged = displayed == null || displayed.Meta.SessionId != latest.Meta.SessionId ||
+            displayed.Meta.SourceWidth != latest.Meta.SourceWidth || displayed.Meta.SourceHeight != latest.Meta.SourceHeight;
+        if (image.Source != bitmap) image.Source = bitmap;
+        displayed = latest; selected = null; marks.Children.Clear();
+        if (e2e == null && layoutChanged) DrawCalibration();
+        previewShown++;
+        if (Environment.TickCount64 - previewRateAt >= 1000) {
+            previewFps = previewShown * 1000.0 / Math.Max(1, Environment.TickCount64 - previewRateAt);
+            previewShown = 0; previewRateAt = Environment.TickCount64;
+        }
     }
     private async Task Decide(FrameView frame, CoachHost target)
     {
@@ -400,14 +444,14 @@ internal sealed class CoachWindow : Window
         long generation = modelGeneration;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
         decisionStop = deadline;
-        deadline.CancelAfter(11000);
+        deadline.CancelAfter(e2e == null ? preferences.ModelTimeoutSeconds * 1000 : 11000);
         if (e2e != null)
             File.WriteAllBytes(System.IO.Path.Combine(e2e.Directory, $"model-frame-{frame.Meta.SessionId}-{frame.Meta.Sequence}.jpg"), frame.Jpeg);
         e2e?.Trace("coach", "model-start", new { frame.Meta.SessionId, frame = frame.Meta.Sequence, player = frame.Meta.Player, attempt = modelCalls });
         autoStatus.Text = visionText.Text = $"模型推理中 #{modelCalls} · 来源帧 {frame.Meta.Sequence}";
         try {
             if (e2e == null) {
-                var layout = preferences.MinimapMarkers ? preferences.LayoutFor(frame) : null;
+                var layout = preferences.MinimapMarkers ? preferences.EffectiveLayout(frame) : null;
                 if (activeLayout != layout) {
                     cloud?.Dispose(); activeLayout = layout;
                     cloud = CreateLiveModel(layout);
@@ -422,15 +466,21 @@ internal sealed class CoachWindow : Window
             if (host != target || stop.IsCancellationRequested || deadline.IsCancellationRequested ||
                 generation != modelGeneration || e2e == null && !preferences.AutomaticAdvice)
                 throw new InvalidOperationException("Context ended");
+            var advice = result.Advice;
+            var steps = advice.NextSteps.Where(s => !string.IsNullOrWhiteSpace(s)).Take(Wire.MaxRouteSteps)
+                .Select(s => s.Trim().Length <= Wire.MaxStepText ? s.Trim() : s.Trim()[..Wire.MaxStepText]).ToArray();
             target.Mailbox.SetReminder(frame.Meta.SessionId, frame.Meta.Sequence,
                 e2e == null ? "visible-farming-advice" : "experimental-bot-advice",
-                result.Advice.Message, result.Advice.Marker, e2e == null ? activeLayout : null,
-                e2e != null || preferences.Subtitles);
+                advice.Message, advice.Marker, e2e == null ? activeLayout : null,
+                e2e != null || preferences.Subtitles,
+                e2e == null ? preferences.SubtitleSeconds * 1000 : Wire.DefaultReminderMs,
+                advice.RouteMarks, steps.Length == 0 ? null : steps);
             var sent = target.Mailbox.Poll(frame.Meta.SessionId);
             if (sent != null) debug.Recorder?.Reminder("reminder-published", sent);
             e2e?.Trace("coach", "model-published", new { frame = frame.Meta.Sequence, reminder = sent });
-            visionText.Text = $"最近模型结果（游戏提醒到期撤回，非最优保证）：{result.Advice.Message}\n" +
-                $"后续意图：{string.Join(" → ", result.Advice.NextSteps)}\n取消条件：{result.Advice.CancelIf}\n" +
+            visionText.Text = $"最近模型结果（游戏提醒到期撤回，非最优保证）：{advice.Message}\n" +
+                $"路线：{(advice.Route is { Length: > 0 } ids ? string.Join(" → ", ids.Select(LandmarkName)) : "无（未给地标或小地图未知）")}\n" +
+                $"后续意图：{string.Join(" → ", advice.NextSteps)}\n取消条件：{advice.CancelIf}\n" +
                 $"{result.ElapsedMs}ms · tokens {result.InputTokens}+{result.OutputTokens}";
         }
         catch (Exception error) {
@@ -456,8 +506,11 @@ internal sealed class CoachWindow : Window
         foreach (var toggle in new[] { automatic, subtitles, mapMarkers }) {
             toggle.Checked += (_, _) => SaveFeatureToggles(); toggle.Unchecked += (_, _) => SaveFeatureToggles();
         }
+        autoMinimap.IsChecked = preferences.AutoMinimap;
+        autoMinimap.Checked += (_, _) => SaveFeatureToggles(); autoMinimap.Unchecked += (_, _) => SaveFeatureToggles();
         foundryFile.Text = preferences.FoundryEnvFile; reasoningModel.Text = preferences.Model;
         interval.Text = preferences.IntervalSeconds.ToString(); requestLimit.Text = preferences.RequestLimit.ToString();
+        subtitleSeconds.Text = preferences.SubtitleSeconds.ToString(); modelTimeout.Text = preferences.ModelTimeoutSeconds.ToString();
         panel.Children.Add(Ui.Text("Foundry 配置文件（仅教练机读取，不把密钥打包/传给游戏机）", 12));
         panel.Children.Add(foundryFile);
         panel.Children.Add(Ui.Button("选择模型配置文件", (_, _) => {
@@ -470,11 +523,17 @@ internal sealed class CoachWindow : Window
         limits.ColumnDefinitions.Add(new()); limits.ColumnDefinitions.Add(new());
         interval.Margin = new Thickness(0, 0, 8, 8); Grid.SetColumn(requestLimit, 1);
         limits.Children.Add(interval); limits.Children.Add(requestLimit); panel.Children.Add(limits);
+        panel.Children.Add(Ui.Text("游戏内字幕/路线显示（秒，1–15） / 模型超时（秒，8–20）", 12));
+        var timing = new Grid();
+        timing.ColumnDefinitions.Add(new()); timing.ColumnDefinitions.Add(new());
+        subtitleSeconds.Margin = new Thickness(0, 0, 8, 8); Grid.SetColumn(modelTimeout, 1);
+        timing.Children.Add(subtitleSeconds); timing.Children.Add(modelTimeout); panel.Children.Add(timing);
         panel.Children.Add(Ui.Button("应用模型设置", (_, _) => ConfigureModel(save: true)));
         panel.Children.Add(autoStatus);
-        panel.Children.Add(Ui.Text("画面会发送到指定云端并计费；默认20秒一次、每进程最多180次。暂停即取消待返回结果；不会自动控制英雄。", 12, Brushes.LightGray));
+        panel.Children.Add(Ui.Text("画面会发送到指定云端并计费；默认20秒一次、每进程最多180次。字幕从回传时起显示设定秒数；模型超时的结果直接丢弃。暂停即取消待返回结果；不会自动控制英雄。", 12, Brushes.LightGray));
         panel.Children.Add(Ui.Text("小地图校准 · 原始游戏像素", 18, Ui.Accent));
-        panel.Children.Add(Ui.Text("填小地图内部正方形的左/上/边长。可预览左/右侧默认框后调整；确认一次按游戏分辨率保存，换HUD需重校准。", 12));
+        panel.Children.Add(autoMinimap);
+        panel.Children.Add(Ui.Text("默认框适用于默认HUD（小地图在左下、未开超大小地图）。镜像HUD/超大小地图请填小地图内部正方形的左/上/边长并确认；确认后按游戏分辨率保存并优先使用。", 12));
         var fields = new Grid();
         for (int i = 0; i < 3; i++) fields.ColumnDefinitions.Add(new());
         var inputs = new[] { mapLeft, mapTop, mapSize };
@@ -495,23 +554,39 @@ internal sealed class CoachWindow : Window
     {
         CancelDecision(); host?.Mailbox.ClearReminder();
         preferences = preferences with { AutomaticAdvice = automatic.IsChecked == true,
-            Subtitles = subtitles.IsChecked == true, MinimapMarkers = mapMarkers.IsChecked == true };
+            Subtitles = subtitles.IsChecked == true, MinimapMarkers = mapMarkers.IsChecked == true,
+            AutoMinimap = autoMinimap.IsChecked == true };
         try { preferences.Save(settingsPath); }
         catch { notice.Text = "设置无法保存，当前开关仅本次有效。"; }
         if (!preferences.AutomaticAdvice) autoStatus.Text = "已暂停自动教练；旧结果不再回传。";
+        DrawCalibration();
     }
     private CloudCoach CreateLiveModel(MinimapLayout? layout) => new(preferences.FoundryEnvFile,
-        preferences.Model, liveLessons, map: liveMap, localBotOnly: false, layout: layout);
+        preferences.Model, liveLessons, map: liveMap, localBotOnly: false, layout: layout,
+        timeout: TimeSpan.FromSeconds(preferences.ModelTimeoutSeconds));
+    private string LandmarkName(string id)
+    {
+        // Camps carry Chinese labels; towers are unit names such as npc_dota_goodguys_tower2_bot.
+        var tower = System.Text.RegularExpressions.Regex.Match(id, @"^npc_dota_(goodguys|badguys)_tower([1-4])(?:_(top|mid|bot))?$");
+        if (tower.Success)
+            return (tower.Groups[1].Value == "goodguys" ? "天辉 " : "夜魇 ") +
+                tower.Groups[3].Value switch { "top" => "上路", "mid" => "中路", "bot" => "下路", _ => "基地" } +
+                "一二三四"[tower.Groups[2].Value[0] - '1'] + "塔";
+        return liveMap?.Landmarks.FirstOrDefault(l => l.Id == id)?.Label ?? id;
+    }
     private void ConfigureModel(bool save)
     {
         CancelDecision(); host?.Mailbox.ClearReminder(); modelConfigured = false;
         cloud?.Dispose(); cloud = null; activeLayout = null;
         try {
-            if (!int.TryParse(interval.Text, out int seconds) || !int.TryParse(requestLimit.Text, out int limit))
-                throw new ArgumentException("请输入整数调用间隔和请求上限。");
-            preferences = preferences with { FoundryEnvFile = foundryFile.Text.Trim(), Model = reasoningModel.Text.Trim(),
-                IntervalSeconds = seconds, RequestLimit = limit, BindAddress = (string)address.SelectedItem };
-            preferences.Validate();
+            if (!int.TryParse(interval.Text, out int seconds) || !int.TryParse(requestLimit.Text, out int limit) ||
+                !int.TryParse(subtitleSeconds.Text, out int display) || !int.TryParse(modelTimeout.Text, out int timeoutSeconds))
+                throw new ArgumentException("请输入整数调用间隔、请求上限、字幕秒数和模型超时。");
+            var candidate = preferences with { FoundryEnvFile = foundryFile.Text.Trim(), Model = reasoningModel.Text.Trim(),
+                IntervalSeconds = seconds, RequestLimit = limit, SubtitleSeconds = display, ModelTimeoutSeconds = timeoutSeconds,
+                BindAddress = (string)address.SelectedItem };
+            candidate.Validate(); // Invalid input never replaces the working settings.
+            preferences = candidate;
             if (save) preferences.Save(settingsPath);
             string data = System.IO.Path.Combine(AppContext.BaseDirectory, "data");
             liveMap = new CalibratedMap(System.IO.Path.Combine(data, "dota2-map-reference.json"));
@@ -520,7 +595,8 @@ internal sealed class CoachWindow : Window
             autoStatus.Text = "模型配置就绪；收到新鲜自身GSI＋真实游戏画面后自动推理。";
         } catch (Exception error) {
             debug.Recorder?.Error("model-configuration", error);
-            autoStatus.Text = "自动教练已选择，但模型未就绪：请选择有效Foundry文件，检查部署名和包内data文件。未发出请求。";
+            autoStatus.Text = error is ArgumentException && error.Message.Any(c => c > 127) ? error.Message + " 未发出请求。" :
+                "自动教练已选择，但模型未就绪：请选择有效Foundry文件，检查部署名和包内data文件。未发出请求。";
         }
     }
     private FrameView CalibrationFrame()
@@ -565,20 +641,25 @@ internal sealed class CoachWindow : Window
     {
         calibrationMarks.Children.Clear();
         if (displayed is not { Meta.Source: "dota2" } f) return;
-        var layout = draftLayout?.IsValidFor(f.Meta.SourceWidth, f.Meta.SourceHeight) == true
-            ? draftLayout : preferences.LayoutFor(f);
+        bool draft = draftLayout?.IsValidFor(f.Meta.SourceWidth, f.Meta.SourceHeight) == true;
+        var confirmed = preferences.LayoutFor(f);
+        var layout = draft ? draftLayout : preferences.EffectiveLayout(f);
         mapStatus.Text = $"游戏客户区 {f.Meta.SourceWidth}×{f.Meta.SourceHeight}（不是JPEG尺寸）\n" +
-            (draftLayout == layout && layout != null ? "蓝框仅预览，尚未确认。" : layout != null ? "已保存此分辨率校准；HUD位置/大小改变时请重新确认。" : "尚未校准：字幕自动运行，地图目标等待确认，绝不沿用720p坐标。");
+            (draft ? "蓝框仅预览，尚未确认。" : confirmed != null ? "已保存此分辨率校准；HUD位置/大小改变时请重新确认。" :
+             layout != null ? "自动默认框（虚线）：默认HUD左下小地图。若虚线框没对准小地图，请手动校准。" :
+             "未校准且未启用默认框：只发字幕，不画路线。");
         if (layout == null) return;
         var rect = Ui.ImageRect(preview.ActualWidth, preview.ActualHeight, f.Meta.SourceWidth, f.Meta.SourceHeight);
         var box = new Rectangle { Width = layout.Size / f.Meta.SourceWidth * rect.Width,
-            Height = layout.Size / f.Meta.SourceHeight * rect.Height, Stroke = Brushes.DeepSkyBlue, StrokeThickness = 2 };
+            Height = layout.Size / f.Meta.SourceHeight * rect.Height, Stroke = Brushes.DeepSkyBlue, StrokeThickness = 2,
+            StrokeDashArray = draft || confirmed != null ? null : new DoubleCollection { 4, 3 } };
         Canvas.SetLeft(box, rect.X + layout.Left / f.Meta.SourceWidth * rect.Width);
         Canvas.SetTop(box, rect.Y + layout.Top / f.Meta.SourceHeight * rect.Height);
         calibrationMarks.Children.Add(box);
     }
     private void ClearView()
     {
+        viewGeneration++;
         image.Source = null; displayed = null; selected = null; marks.Children.Clear(); frozen.IsChecked = false;
         calibrationMarks.Children.Clear();
         observation = null; visionFrame = null;

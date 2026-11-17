@@ -9,11 +9,16 @@ public static class Wire
 {
     public const int Version = 1;
     public const int MaxFrameBytes = 1_048_576;
-    public const int FrameLifetimeMs = 12_000;
+    /// <summary>Oldest source frame an answer may still be published for (model timeout ≤ 20 s plus capture lease slack).</summary>
+    public const int FrameLifetimeMs = 22_000;
+    /// <summary>Longest a published reminder stays on screen; the display time itself is a coach setting.</summary>
+    public const int MaxReminderMs = 15_000;
+    public const int DefaultReminderMs = 8_000;
     public const int TicketLifetimeMs = 3_000;
     public const int PresenceLifetimeMs = 4_000;
-    // Video runs at 30fps. Retain the full advice lifetime, not the old 32-image (~1s) cap.
-    public const int HistoryLimit = 512;
+    // Metadata for every frame of the advice window, even at 120 fps (not images).
+    public const int HistoryLimit = 8192;
+    public const int MaxRouteSteps = 3, MaxStepText = 60;
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 16 };
     public static string Secret() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     public static bool EqualSecret(string? a, string b) => a != null && a.Length == b.Length &&
@@ -26,6 +31,12 @@ public static class Wire
         return b[0] == 10 || b[0] == 192 && b[1] == 168 || b[0] == 172 && b[1] is >= 16 and <= 31;
     }
     public static bool Finite(double n, double min, double max) => double.IsFinite(n) && n >= min && n <= max;
+    /// <summary>Ordered minimap route: 1–3 normalized points, the first one being the primary marker.</summary>
+    public static bool ValidRoute(ScreenMark[]? route, ScreenMark? marker) => route == null ||
+        route.Length is >= 1 and <= MaxRouteSteps && marker != null && route[0] == marker &&
+        route.All(p => p != null && Finite(p.X, 0, 1) && Finite(p.Y, 0, 1));
+    public static bool ValidSteps(string[]? steps) => steps == null ||
+        steps.Length <= MaxRouteSteps && steps.All(s => !string.IsNullOrWhiteSpace(s) && s.Length <= MaxStepText);
 }
 
 // This bundle is a credential. Never log it, put it in a URL, or save it with diagnostics.
@@ -61,7 +72,9 @@ public sealed record SessionHello(string SessionId, int Version, string? VideoPr
 public sealed record ScreenMark(double X, double Y);
 public sealed record Reminder(string Id, string SessionId, long FrameSequence, string Kind, string Message,
     ScreenMark? Marker, int SourceWidth, int SourceHeight, int RemainingMs, MinimapLayout? Minimap = null,
-    bool ShowSubtitle = true);
+    bool ShowSubtitle = true, ScreenMark[]? Route = null, string[]? NextSteps = null,
+    // Set by the game machine from its own capture clock; ignored if a coach sends it.
+    int? SourceAgeMs = null);
 public sealed record FrameView
 {
     private Lazy<byte[]> jpeg = null!;
@@ -129,6 +142,7 @@ public sealed class CoachMailbox
     private FrameView? frame;
     private (Reminder Value, long Until)? reminder;
     private readonly Dictionary<long, (FrameMeta Meta, long At)> history = new();
+    private readonly Queue<long> historyOrder = new();
     private long sequence, frames, bytes;
     private readonly Dictionary<string, long> videoLeases = new();
     private string? videoOwner;
@@ -149,7 +163,7 @@ public sealed class CoachMailbox
         if (session == null || id != session) throw new InvalidOperationException("Session expired");
     }
     public void End(string id) { lock (gate) { Check(id); Clear(); } }
-    public void Clear() { lock (gate) { session = null; frame = null; reminder = null; ticket = null; sequence = 0; history.Clear(); videoLeases.Clear(); videoOwner = null; } }
+    public void Clear() { lock (gate) { session = null; frame = null; reminder = null; ticket = null; sequence = 0; history.Clear(); historyOrder.Clear(); videoLeases.Clear(); videoOwner = null; } }
     public Ticket Issue(string id)
     {
         lock (gate) { Check(id); ticket = (Guid.NewGuid().ToString("N"), now()); return new(id, ticket.Value.Id); }
@@ -227,11 +241,14 @@ public sealed class CoachMailbox
             previous.SourceHeight != meta.SourceHeight || previous.Player?.MatchId != meta.Player?.MatchId ||
             previous.Player?.Hero != meta.Player?.Hero || previous.Player?.Team != meta.Player?.Team ||
             (previous.Player != null && meta.Player != null && meta.Player.Clock < previous.Player.Clock) ||
-            meta.Player?.Alive == false)) { reminder = null; history.Clear(); }
+            meta.Player?.Alive == false)) { reminder = null; history.Clear(); historyOrder.Clear(); }
         frame = incoming;
-        history[meta.Sequence] = (meta, incoming.CapturedNoEarlierThan);
-        foreach (long key in history.Where(h => now() - h.Value.At >= Wire.FrameLifetimeMs).Select(h => h.Key).ToArray()) history.Remove(key);
-        while (history.Count > Wire.HistoryLimit) history.Remove(history.Keys.Min());
+        history[meta.Sequence] = (meta, incoming.CapturedNoEarlierThan); historyOrder.Enqueue(meta.Sequence);
+        // Sequences only increase: prune from the front in O(1) per frame, even at 120 fps.
+        while (historyOrder.TryPeek(out long oldest) && (history.Count > Wire.HistoryLimit ||
+               !history.TryGetValue(oldest, out var entry) || now() - entry.At >= Wire.FrameLifetimeMs)) {
+            historyOrder.Dequeue(); history.Remove(oldest);
+        }
         sequence = meta.Sequence; frames++; bytes += length;
     }
     public FrameView? Latest()
@@ -243,31 +260,41 @@ public sealed class CoachMailbox
             return frame.ReadCopy();
         }
     }
+    /// <summary>
+    /// Publishes advice derived from frame <paramref name="basedOn"/>. The source must still be younger than
+    /// <see cref="Wire.FrameLifetimeMs"/>; once published it stays visible for <paramref name="displayMs"/>
+    /// (unless death, a new match/team/resolution or disconnection withdraws it first).
+    /// </summary>
     public void SetReminder(string id, long basedOn, string kind, string text, ScreenMark? mark, MinimapLayout? minimap = null,
-        bool showSubtitle = true)
+        bool showSubtitle = true, int displayMs = Wire.DefaultReminderMs, ScreenMark[]? route = null, string[]? nextSteps = null)
     {
         if (kind is not ("manual-link-test" or "local-vision-observation" or "experimental-bot-advice" or "visible-farming-advice") || string.IsNullOrWhiteSpace(text) ||
             text.Length > 120 || (mark != null && (!Wire.Finite(mark.X, 0, 1) || !Wire.Finite(mark.Y, 0, 1))) ||
-            (kind == "local-vision-observation" && mark != null)) throw new ArgumentException("Invalid reminder");
+            (kind == "local-vision-observation" && mark != null) || displayMs is < 1000 or > Wire.MaxReminderMs ||
+            !Wire.ValidRoute(route, mark) || !Wire.ValidSteps(nextSteps) ||
+            (route != null && kind is not ("visible-farming-advice" or "experimental-bot-advice"))) throw new ArgumentException("Invalid reminder");
         lock (gate)
         {
             Check(id);
             if (frame == null || !history.TryGetValue(basedOn, out var source) || now() - frame.ReceivedAt > Wire.PresenceLifetimeMs ||
                 now() - source.At >= Wire.FrameLifetimeMs || frame.Meta.Player?.Alive == false)
                 throw new InvalidOperationException("Source frame expired; refresh the preview");
+            ScreenMark[] points = route ?? (mark == null ? Array.Empty<ScreenMark>() : new[] { mark });
             if (kind == "experimental-bot-advice" &&
                 (!CloudCoach.Eligible(frame) || source.Meta.Player is not { MatchId: "0", Alive: true } ||
-                 source.Meta.Source != "dota2" || mark is { } p && (!Wire.Finite(p.X, 0, .20) || !Wire.Finite(p.Y, .65, 1))))
+                 source.Meta.Source != "dota2" || points.Any(p => !Wire.Finite(p.X, 0, .20) || !Wire.Finite(p.Y, .65, 1))))
                 throw new InvalidOperationException("Experimental advice is restricted to local bot matches and the supported minimap");
             if (kind == "visible-farming-advice" &&
                 (!CloudCoach.Eligible(frame, localBotOnly: false) || source.Meta.Source != "dota2" ||
                  source.Meta.Player is not { Alive: true } || source.Meta.GsiAgeMs is null or < 0 or > 3000 ||
-                 mark != null && (minimap == null || !minimap.IsValidFor(source.Meta.SourceWidth, source.Meta.SourceHeight) ||
-                                  !minimap.Contains(mark))))
+                 points.Length > 0 && (minimap == null || !minimap.IsValidFor(source.Meta.SourceWidth, source.Meta.SourceHeight) ||
+                                       points.Any(p => !minimap.Contains(p)))))
                 throw new InvalidOperationException("Live advice requires fresh own-player state and calibrated map markers");
-            long until = Math.Min(source.At + Wire.FrameLifetimeMs, now() + 8000);
+            // Display time starts at publication; source freshness was enforced above.
+            long until = now() + displayMs;
             reminder = (new(Guid.NewGuid().ToString("N"), id, basedOn, kind, text.Trim(), mark,
-                source.Meta.SourceWidth, source.Meta.SourceHeight, (int)(until - now()), minimap, showSubtitle), until);
+                source.Meta.SourceWidth, source.Meta.SourceHeight, displayMs, minimap, showSubtitle,
+                route?.ToArray(), nextSteps?.Select(s => s.Trim()).ToArray()), until);
         }
     }
     public void ClearReminder() { lock (gate) reminder = null; }

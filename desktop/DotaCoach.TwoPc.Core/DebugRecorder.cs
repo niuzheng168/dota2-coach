@@ -19,6 +19,9 @@ public sealed record GsiDiagnostics(string Mode, string[] Sections, bool HasTeam
     int MinimapUnits = 0);
 public sealed record DebugOverlay(string ReminderId, long Sequence, int Width, int Height,
     double DpiScale, int Elements, double? MarkerPixelX, double? MarkerPixelY);
+public sealed record VideoStats(string Capture, string Encoder, int SourceWidth, int SourceHeight, int Width, int Height,
+    int TargetFps, double ActualFps, double Mbps, long Dropped, double CaptureMsAverage, double EncodeMsAverage,
+    bool Background, string? Note = null);
 
 /// <summary>Opt-in local debug trace. Typed allowlists only: never pass HTTP requests, credentials or raw GSI.</summary>
 public sealed class DebugRecorder : IAsyncDisposable
@@ -34,7 +37,7 @@ public sealed class DebugRecorder : IAsyncDisposable
     private bool accepting = true;
     private string reason = "recording";
     private long reserved, written, events, images, dropped, frameRecords, lastState = long.MinValue;
-    private long lastSample = long.MinValue, lastSpectator = long.MinValue, lastDelay = long.MinValue;
+    private long lastSample = long.MinValue, lastSpectator = long.MinValue, lastDelay = long.MinValue, lastVideo = long.MinValue;
     private const int ReserveBytes = 32768; // Metadata and final status always have a reserved budget.
     public string DirectoryPath { get; }
     public static string DefaultRoot => Path.Combine(
@@ -159,7 +162,8 @@ public sealed class DebugRecorder : IAsyncDisposable
                 message = Text(a.Message, 120), visibleFacts = a.VisibleFacts.Take(8).Select(x => Text(x, 180)),
                 unknowns = a.Unknowns.Take(8).Select(x => Text(x, 180)),
                 nextSteps = a.NextSteps.Take(3).Select(x => Text(x, 180)), cancelIf = Text(a.CancelIf, 200),
-                a.Marker, markerBasis = Text(a.MarkerBasis), targetId = Text(a.TargetId, 100) } });
+                a.Marker, markerBasis = Text(a.MarkerBasis),
+                route = (a.Route ?? []).Take(Wire.MaxRouteSteps).Select(x => Text(x, 100)), routeMarks = a.RouteMarks } });
     }
     public void Reminder(string stage, Reminder r)
     {
@@ -167,8 +171,11 @@ public sealed class DebugRecorder : IAsyncDisposable
             throw new ArgumentException("Unknown reminder stage");
         Enqueue(stage, new { id = Text(r.Id, 64), sessionId = Text(r.SessionId, 64), r.FrameSequence,
             kind = Text(r.Kind, 32), message = Text(r.Message, 120), r.Marker, r.SourceWidth, r.SourceHeight,
-            r.RemainingMs, r.Minimap, r.ShowSubtitle });
+            r.RemainingMs, r.Minimap, r.ShowSubtitle, route = r.Route?.Take(Wire.MaxRouteSteps),
+            nextSteps = r.NextSteps?.Take(Wire.MaxRouteSteps).Select(x => Text(x, Wire.MaxStepText)), r.SourceAgeMs });
     }
+    /// <summary>Game-side video pipeline summary (once per state tick): what actually ran, not what was requested.</summary>
+    public void Video(VideoStats v) { if (Every(ref lastVideo, 2000)) Enqueue("video-status", v); }
     public void Transfer(FrameMeta frame, long elapsedMs) => Enqueue("frame-uploaded", new { frame = Source(frame), elapsedMs });
     public void State(DebugClientState state)
     {

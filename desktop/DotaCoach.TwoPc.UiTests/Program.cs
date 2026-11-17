@@ -18,7 +18,11 @@ internal static class Program
         RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.Startup += async (_, _) => {
-            try { await Run(args.FirstOrDefault() ?? ".tmp/twopc-ui"); Console.WriteLine($"Two native WPF clients: {passed} UI checks passed."); app.Shutdown(0); }
+            try {
+                if (args.Contains("--real-dota")) { await RealDota(); Console.WriteLine($"Real Dota window pipeline: {passed} checks passed."); }
+                else { await Run(args.FirstOrDefault() ?? ".tmp/twopc-ui"); Console.WriteLine($"Two native WPF clients: {passed} UI checks passed."); }
+                app.Shutdown(0);
+            }
             catch (Exception e) { Console.Error.WriteLine(e); app.Shutdown(1); }
         };
         Environment.ExitCode = app.Run();
@@ -80,7 +84,8 @@ internal static class Program
         var gameType = Assembly.Load("DotaCoach.GameClient").GetType("DotaCoach.TwoPc.GameWindowUi")!;
         string debugRoot = Path.GetFullPath(Path.Combine(output, "debug"));
         var coach = (Window)Activator.CreateInstance(coachType, [null, false, Path.Combine(output, "coach-settings.json"), debugRoot])!;
-        var game = (Window)Activator.CreateInstance(gameType, [null, debugRoot])!;
+        string videoSettings = Path.GetFullPath(Path.Combine(output, "game-video.json"));
+        var game = (Window)Activator.CreateInstance(gameType, [null, debugRoot, videoSettings])!;
         // Exercise packaged UI handlers without desktop input, clipboard, real game capture or AI.
         coach.Show(); game.Show();
         await Wait(() => DebugSwitch(coach).IsChecked != true && DebugSwitch(game).IsChecked != true &&
@@ -129,9 +134,19 @@ internal static class Program
             "clear cancels a pending delayed probe");
         Field<PasswordBox>(game, "pairing").Password = host.Pair(IPAddress.Loopback).Encode();
         Field<ComboBox>(game, "source").SelectedIndex = 1;
+        await Wait(() => Field<ComboBox>(game, "fpsChoice").SelectedItem as string == "60 fps" &&
+            Field<ComboBox>(game, "resolutionChoice").SelectedIndex == 2 && Field<ComboBox>(game, "captureChoice").SelectedIndex == 0,
+            "game UI defaults to 60 fps, 1080p and background-capable window capture");
+        Field<TextBox>(game, "bitrateChoice").Text = "abc";
+        Click(game, "连接并开始");
+        await Wait(() => Field<TextBlock>(game, "status").Text.Contains("码率") && Field<CancellationTokenSource?>(game, "active") == null,
+            "invalid bitrate is rejected before any capture starts");
+        Field<TextBox>(game, "bitrateChoice").Text = "0";
         Click(game, "连接并开始");
         await Wait(() => host.Mailbox.Snapshot().Frames >= 3 && host.Mailbox.Latest()?.Video != null,
             "game client continuously sends real H264 diagnostic video through pinned WSS");
+        await Wait(() => File.Exists(videoSettings) && GameVideoSettings.Load(videoSettings).Fps == 60 && !Field<ComboBox>(game, "fpsChoice").IsEnabled,
+            "chosen video settings persist and lock while streaming");
         await Wait(() => Field<Image>(coach, "image").Source != null, "coach preview receives decoded bitmap");
         await Wait(() => Field<Image>(game, "image").Source != null, "game preview receives capture bitmap");
         await Wait(() => Recorder(coach)!.Status.Images >= 2 && Recorder(game)!.Status.Images == 0,
@@ -139,8 +154,10 @@ internal static class Program
         long videoBefore = host.Mailbox.Snapshot().Frames, measuredAt = Environment.TickCount64;
         await Task.Delay(2200);
         long receivedVideo = host.Mailbox.Snapshot().Frames - videoBefore;
-        Console.WriteLine($"VIDEO UI: {receivedVideo} received frames over {(Environment.TickCount64 - measuredAt) / 1000.0:F3}s (synthetic source, not game FPS).");
-        await Wait(() => receivedVideo >= 20, "continuous video is independent of one-second debug sampling");
+        double measuredSeconds = (Environment.TickCount64 - measuredAt) / 1000.0;
+        Console.WriteLine($"VIDEO UI: {receivedVideo} received frames over {measuredSeconds:F3}s = {receivedVideo / measuredSeconds:F1} fps " +
+            $"(synthetic 1280x720 source at a 60 fps target; not game FPS). {Field<TextBlock>(game, "metrics").Text.Replace("\n", " | ")}");
+        await Wait(() => receivedVideo / measuredSeconds > 40, "60 fps target delivers well above the old 30 fps cap end to end");
         long beforeFreeze = Recorder(coach)!.Status.Images;
         Field<CheckBox>(coach, "frozen").IsChecked = true;
         await Wait(() => Recorder(coach)!.Status.Images > beforeFreeze, "Debug records received frames even while the preview is frozen");
@@ -159,7 +176,7 @@ internal static class Program
         await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("双机测试成功"), "second reminder received");
         await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("无有效提醒"), "reminder expires without renewing on polls", 12000);
         Field<CheckBox>(coach, "frozen").IsChecked = true;
-        await Task.Delay(12500);
+        await Task.Delay(Wire.FrameLifetimeMs + 500);
         Click(coach, "回传测试字幕 / 标记");
         await Wait(() => Field<TextBlock>(coach, "notice").Text.StartsWith("未发送"), "expired frozen preview cannot publish a reminder");
         Click(coach, "撤销配对");
@@ -196,7 +213,106 @@ internal static class Program
         var emptyGame = (Window)Activator.CreateInstance(gameType)!;
         emptyCoach.Show(); emptyGame.Show(); emptyCoach.Close(); emptyGame.Close();
         await Wait(() => !emptyGame.IsVisible && !emptyCoach.IsVisible, "unused clients close without reentrant-close errors");
+        await OccludedWindowCapture();
         await LiveMode(output, coachType, gameType);
+    }
+
+    /// <summary>
+    /// Opt-in (--real-dota): the shipped game-side classes against the RUNNING Dota window, over real pinned TLS to a
+    /// loopback coach that decodes every frame. Phase 2 covers Dota with another window: frames must keep coming.
+    /// No GSI files are written, no model is called and no image is saved.
+    /// </summary>
+    private static async Task RealDota()
+    {
+        var surface = DotaCoach.Desktop.GameWindow.Find(out bool minimized) ??
+            throw new Exception(minimized ? "Dota is minimised" : "Dota window not found");
+        var settings = new GameVideoSettings();
+        bool gpuEncoder = HardwareH264.Available().Count > 0;
+        var size = settings.EncodedSize(surface.Width, surface.Height, gpuEncoder);
+        int fps = GameVideoSettings.EffectiveFps(size.Width, size.Height, settings.Fps);
+        await using var host = await CoachHost.Start(IPAddress.Loopback, 0);
+        host.Mailbox.VideoJpegEncoder = Ui.ExtractJpeg;
+        using var link = new GameLink(host.Pair(IPAddress.Loopback));
+        await link.Connect(default); await link.OpenVideo(default);
+        var sender = new VideoSender(await link.GetVideoTicket(default), fps);
+        using var stop = new CancellationTokenSource();
+        long sequence = 0;
+        var capture = sender.StartCapture(() => new WindowVideoSource(surface, size.Width, size.Height, fps), false,
+            () => Interlocked.Increment(ref sequence), () => (null, null), stop.Token);
+        var send = Task.Run(() => sender.SendLoop(link, gpuEncoder, settings.Bitrate(size.Width, size.Height, fps), stop.Token));
+        async Task<double> Measure(int ms)
+        {
+            long before = host.Mailbox.Snapshot().Frames, started = Environment.TickCount64;
+            while (Environment.TickCount64 - started < ms) {
+                await Task.Delay(750); // same renewal cadence as the game client
+                sender.Renew(await link.GetVideoTicket(default));
+                if (capture.IsFaulted || send.IsFaulted) throw (capture.Exception ?? send.Exception)!;
+            }
+            return (host.Mailbox.Snapshot().Frames - before) * 1000.0 / (Environment.TickCount64 - started);
+        }
+        await Measure(1500); // encoder start-up
+        double visible = await Measure(4000);
+        var cover = new Window { Title = "covering app", Left = surface.Left - 20, Top = surface.Top - 20, WindowStyle = WindowStyle.None,
+            ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false, Topmost = true, Background = Brushes.Magenta };
+        double dpi = VisualTreeHelper.GetDpi(cover).DpiScaleX;
+        cover.Left = (surface.Left - 20) / dpi; cover.Top = (surface.Top - 20) / dpi;
+        cover.Width = (surface.Width + 40) / dpi; cover.Height = (surface.Height + 40) / dpi;
+        cover.Show(); cover.Activate();
+        double covered = await Measure(4000);
+        var latest = host.Mailbox.Latest();
+        cover.Close();
+        stop.Cancel(); link.AbortVideo();
+        try { await Task.WhenAll(capture, send); } catch when (stop.IsCancellationRequested) { }
+        await link.End(default);
+        var picture = latest?.Video;
+        int bright = 0, magenta = 0;
+        if (picture != null) {
+            var bgra = picture.ToBgra(160, 90);
+            for (int i = 0; i < bgra.Length; i += 4) {
+                if (bgra[i] + bgra[i + 1] + bgra[i + 2] > 60) bright++;
+                if (bgra[i] > 200 && bgra[i + 1] < 60 && bgra[i + 2] > 200) magenta++;
+            }
+        }
+        Console.WriteLine($"REAL DOTA: client {surface.Width}x{surface.Height} → {size.Width}x{size.Height} @ target {fps}fps, {sender.SourceName} / {sender.EncoderName}; " +
+            $"coach decoded {visible:F1} fps visible, {covered:F1} fps while fully covered; capture {sender.CaptureMs:F2} ms, encode {sender.EncodeMs:F2} ms, dropped {sender.Dropped}; " +
+            $"last covered-phase frame: {bright}/{160 * 90} non-dark, {magenta} covering-window pixels");
+        await Wait(() => visible > 20 && covered > 20, "real Dota window streams continuously, also while another window covers it");
+        await Wait(() => picture != null && picture.Width == size.Width && bright > 160 * 90 / 4 && magenta == 0,
+            "frames decoded during the covered phase show Dota content, not black and not the covering window");
+    }
+
+    /// <summary>
+    /// The v0.3 "black screen when switching windows" case: a window completely covered by another one must
+    /// still be captured with ITS OWN pixels (never the covering window's) through the real GPU path.
+    /// </summary>
+    private static async Task OccludedWindowCapture()
+    {
+        var target = new Window { Title = "WGC target", Width = 640, Height = 400, Left = 80, Top = 80, WindowStyle = WindowStyle.None,
+            ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false, Background = new SolidColorBrush(Color.FromRgb(180, 100, 25)) };
+        var cover = new Window { Title = "covering app", Width = 900, Height = 700, Left = 20, Top = 20, WindowStyle = WindowStyle.None,
+            ResizeMode = ResizeMode.NoResize, ShowInTaskbar = false, Topmost = true, Background = Brushes.White };
+        target.Show(); cover.Show(); cover.Activate();
+        await Task.Delay(600);
+        nint handle = new System.Windows.Interop.WindowInteropHelper(target).Handle;
+        byte[]? pixels = null; string? failure = null;
+        await Task.Run(() => {
+            try {
+                using var gpu = new GpuDevice();
+                using var capture = new WindowCapture(gpu, handle);
+                using var scaler = new GpuNv12Scaler(gpu, capture.Width, capture.Height, 320, 200, 30);
+                for (int i = 0; i < 100 && pixels == null; i++) {
+                    using var frame = capture.Latest();
+                    if (frame != null) pixels = scaler.Convert(frame, new Rect32 { Right = frame.ContentWidth, Bottom = frame.ContentHeight }).ToBgra();
+                    else Thread.Sleep(30);
+                }
+            } catch (Exception e) { failure = e.GetType().Name + ": " + e.Message; }
+        });
+        cover.Close(); target.Close();
+        if (failure != null) throw new Exception("Window capture failed: " + failure);
+        int centre = (100 * 320 + 160) * 4;
+        await Wait(() => pixels != null && Math.Abs(pixels[centre] - 25) <= 12 && Math.Abs(pixels[centre + 1] - 100) <= 12 &&
+            Math.Abs(pixels[centre + 2] - 180) <= 12,
+            "window capture keeps the covered game window's own pixels (not the covering app) through the GPU scaler");
     }
 
     private static async Task LiveMode(string output, Type coachType, Type gameType)
@@ -211,8 +327,9 @@ internal static class Program
         await Wait(() => Field<CheckBox>(w, "automatic").IsChecked == true &&
             Field<CheckBox>(w, "subtitles").IsChecked == true && Field<CheckBox>(w, "mapMarkers").IsChecked == true,
             "normal UI defaults automatic model, subtitles and map features to enabled");
-        var preference = new LiveCoachSettings { FoundryEnvFile = Path.GetFullPath(env), RequestLimit = 1 };
+        var preference = new LiveCoachSettings { FoundryEnvFile = Path.GetFullPath(env), RequestLimit = 1, AutoMinimap = false };
         Set(w, "preferences", preference);
+        Field<CheckBox>(w, "autoMinimap").IsChecked = false;
         var map = new CalibratedMap("data/dota2-map-reference.json");
         Set(w, "liveMap", map);
         using var fake = new UiModel();
@@ -250,8 +367,8 @@ internal static class Program
         await Wait(() => LiveCoachSettings.Load(Path.Combine(output, "live-settings.json")).Calibrations.Length == 1,
             "actual calibration handler persists the confirmed 4K rectangle");
         var layout = new MinimapLayout(3840, 2160, 0, 1680, 480);
-        using var marked = new UiModel { Target = "neutralcamp_good_11" };
-        Set(w, "preferences", Field<LiveCoachSettings>(w, "preferences") with { RequestLimit = 3 });
+        using var marked = new UiModel { Route = ["neutralcamp_good_11", "npc_dota_goodguys_tower2_bot"] };
+        Set(w, "preferences", Field<LiveCoachSettings>(w, "preferences") with { RequestLimit = 4 });
         Set(w, "cloud", new CloudCoach(Path.GetFullPath(env), "gpt-6-astra", "", marked, map, false, layout));
         Set(w, "activeLayout", layout);
         Set(w, "nextDecision", 0L); Frame(); Field<CheckBox>(w, "automatic").IsChecked = true;
@@ -259,9 +376,14 @@ internal static class Program
             "normal automatic UI publishes a model-selected 4K landmark after calibration");
         var result = host.Mailbox.Poll(session)!;
         await Wait(() => result.Minimap == layout && layout.Contains(result.Marker!), "normal map advice carries checked source-resolution geometry");
+        await Wait(() => result.Route is { Length: 2 } route && route[0] == result.Marker && route.All(layout.Contains) &&
+            result.NextSteps is { Length: 2 }, "model route is published as numbered minimap stops with next steps");
+        await Wait(() => result.RemainingMs is > 2000 and <= 3000, "AI subtitles use the 3-second default display time");
+        await Wait(() => Field<TextBlock>(w, "visionText").Text.Contains("天辉") && Field<TextBlock>(w, "visionText").Text.Contains("→"),
+            "coach panel shows the route by landmark names");
         Render(w, Path.Combine(output, "coach-live-4k-controls.png"));
 
-        using var delayed = new UiModel { Delayed = true, Target = "neutralcamp_good_11" };
+        using var delayed = new UiModel { Delayed = true, Route = ["neutralcamp_good_11"] };
         Set(w, "cloud", new CloudCoach(Path.GetFullPath(env), "gpt-6-astra", "", delayed, map, false, layout));
         Set(w, "nextDecision", 0L); Frame();
         await Wait(() => delayed.Calls == 1 && Field<bool>(w, "deciding"), "normal inference is in flight before pause test");
@@ -269,6 +391,18 @@ internal static class Program
         delayed.Release.TrySetResult(true);
         await Wait(() => !Field<bool>(w, "deciding") && host.Mailbox.Poll(session) == null,
             "paused normal UI discards even a provider reply that ignores cancellation");
+
+        // No confirmed calibration: the automatic default box must be the layout the live model is built for.
+        var auto = MinimapLayout.Suggest(3840, 2160);
+        Set(w, "preferences", Field<LiveCoachSettings>(w, "preferences") with { Calibrations = [], AutoMinimap = true, RequestLimit = 10 });
+        Field<CheckBox>(w, "autoMinimap").IsChecked = true;
+        using var autoModel = new UiModel { Route = ["neutralcamp_good_11"] };
+        Set(w, "cloud", new CloudCoach(Path.GetFullPath(env), "gpt-6-astra", "", autoModel, map, false, auto));
+        Set(w, "activeLayout", auto);
+        Set(w, "nextDecision", 0L); Frame(); Field<CheckBox>(w, "automatic").IsChecked = true;
+        await Wait(() => autoModel.Calls == 1 && host.Mailbox.Poll(session) is { Marker: not null, Minimap: { } m } && m == auto,
+            "without calibration the automatic bottom-left box still yields a minimap route");
+        await Wait(() => Field<TextBlock>(w, "mapStatus").Text.Contains("自动默认框"), "coach explains the automatic minimap box");
         w.Close(); await Wait(() => !w.IsVisible, "live UI closes cleanly after model and calibration work");
         string modelTrace = File.ReadAllText(Path.Combine(debugDirectory, "events.jsonl"));
         await Wait(() => modelTrace.Contains("model-input") && modelTrace.Contains("model-result") &&
@@ -356,7 +490,7 @@ internal static class Program
     private sealed class UiModel : HttpMessageHandler
     {
         public int Calls;
-        public string? Target;
+        public string[]? Route;
         public bool Delayed;
         public readonly TaskCompletionSource<bool> Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
@@ -365,7 +499,8 @@ internal static class Program
             if (Delayed) await Release.Task; // Intentional hostile/late provider for cancellation regression.
             var advice = new ModelAdvice("npc_dota_hero_luna", "radiant", "合成UI测试画面，非实际游戏验收",
                 ["测试自身状态"], ["营地存量未知"], "先确认兵线和附近野点，未知不当安全。",
-                ["确认可见资源再决定"], "出现威胁或状态变化取消", null, Target == null ? "" : "用户确认的小地图框", Target);
+                Route is { Length: > 1 } ? ["确认11号营地有怪再清", "清完回二塔附近接线"] : ["确认可见资源再决定"],
+                "出现威胁或状态变化取消", null, Route == null ? "" : "小地图框内的己方地标", Route);
             return new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new {
                 id = "test-ui-response", status = "completed", usage = new { input_tokens = 100, output_tokens = 80 },
                 output = new[] { new { type = "message", content = new[] { new { type = "output_text", text = JsonSerializer.Serialize(advice, Wire.Json) } } } }

@@ -7,9 +7,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>0.3.1</Version>
+    <Version>0.4.0</Version>
     <ApplicationManifest>../DotaCoach.Desktop/app.manifest</ApplicationManifest>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DotaCoach.TwoPc.UiTests" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DotaCoach.TwoPc.Core/DotaCoach.TwoPc.Core.csproj" />
     <Compile Include="../TwoPc.SharedUi/Ui.cs" Link="Ui.cs" />

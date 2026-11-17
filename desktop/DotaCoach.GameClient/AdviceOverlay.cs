@@ -1,7 +1,9 @@
 using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -62,13 +64,21 @@ internal sealed class AdviceOverlay : Window
         debugReceipt = null;
         renderedId = null; reminder = null; canvas.Children.Clear(); Hide();
     }
+    /// <summary>Caption heading: what produced the text and how old the picture behind it is.</summary>
+    public static string Label(Reminder r) =>
+        r.Kind == "manual-link-test" ? "人工联调 · 非AI路线" :
+        r.Kind is "experimental-bot-advice" or "visible-farming-advice"
+            ? "AI打钱路线" + (r.SourceAgeMs is int age && age >= 1500 ? $" · 依据约{Math.Round(age / 1000.0)}秒前画面" : "") + " · 非最优保证"
+            : "视觉观察 · 未经核验";
     private void Draw()
     {
-        var game = GameWindow.Foreground();
+        var game = GameWindow.Find(out _);
         if (reminder is not { } r || Environment.TickCount64 >= until ||
             Environment.TickCount64 - lastFrame > Wire.PresenceLifetimeMs ||
             game == null || game.Width != r.SourceWidth || game.Height != r.SourceHeight)
         { Clear(); return; }
+        // Never float over other applications: hide while Dota is behind them, keep the reminder until it expires.
+        if (!GameWindow.IsForeground(game)) { if (IsVisible) Hide(); return; }
         if (!IsVisible) Show();
         double scale = Math.Max(96, GetDpiForWindow(handle)) / 96.0;
         double unit = DisplayGeometry.OverlayUnit(game.Height, scale);
@@ -81,21 +91,38 @@ internal sealed class AdviceOverlay : Window
         }
         canvas.Width = game.Width / scale; canvas.Height = game.Height / scale; canvas.Children.Clear();
         var caption = new TextBlock {
-            Text = (r.Kind == "manual-link-test" ? "人工联调 · 非AI路线\n" :
-                r.Kind is "experimental-bot-advice" or "visible-farming-advice" ? "AI打钱建议 · 非最优保证\n" : "视觉观察 · 未经核验\n") + r.Message,
             Foreground = Brushes.Gold, Background = new SolidColorBrush(Color.FromArgb(210, 8, 16, 24)),
             FontSize = 28 * unit, Padding = new Thickness(12 * unit), TextWrapping = TextWrapping.Wrap,
             TextAlignment = TextAlignment.Center, Width = Math.Min(900 * unit, canvas.Width * .75),
         };
+        caption.Inlines.Add(new Run(Label(r) + "\n") { FontSize = 20 * unit, Foreground = Brushes.Khaki });
+        caption.Inlines.Add(new Run(r.Message));
+        if (r.NextSteps is { Length: > 0 } steps)
+            caption.Inlines.Add(new Run("\n下一步：" + string.Join(" → ", steps.Select((s, i) => $"{"①②③"[i]}{s}"))) {
+                FontSize = 22 * unit, Foreground = Brushes.White });
         Canvas.SetLeft(caption, (canvas.Width - caption.Width) / 2); Canvas.SetTop(caption, canvas.Height * .1);
         if (r.ShowSubtitle) canvas.Children.Add(caption);
         if (r.Marker is { } mark)
         {
-            double x = mark.X * canvas.Width, y = mark.Y * canvas.Height;
-            var ring = new Ellipse { Width = 26 * unit, Height = 26 * unit, Stroke = Brushes.Gold, StrokeThickness = 3 * unit };
-            Canvas.SetLeft(ring, x - 13 * unit); Canvas.SetTop(ring, y - 13 * unit); canvas.Children.Add(ring);
+            var points = (r.Route ?? [mark]).Select(p => new Point(p.X * canvas.Width, p.Y * canvas.Height)).ToArray();
+            // Route legs first so the numbered stops stay readable on top of them.
+            for (int i = 1; i < points.Length; i++)
+                canvas.Children.Add(new Line { X1 = points[i - 1].X, Y1 = points[i - 1].Y, X2 = points[i].X, Y2 = points[i].Y,
+                    Stroke = Brushes.Gold, StrokeThickness = 2.5 * unit, StrokeDashArray = new DoubleCollection { 2, 1.5 } });
+            for (int i = 0; i < points.Length; i++) {
+                double x = points[i].X, y = points[i].Y, size = (i == 0 ? 26 : 20) * unit;
+                var ring = new Ellipse { Width = size, Height = size, Stroke = Brushes.Gold, StrokeThickness = 3 * unit,
+                    Fill = new SolidColorBrush(Color.FromArgb(150, 8, 16, 24)) };
+                Canvas.SetLeft(ring, x - size / 2); Canvas.SetTop(ring, y - size / 2); canvas.Children.Add(ring);
+                if (points.Length > 1) {
+                    var number = new TextBlock { Text = (i + 1).ToString(), Foreground = Brushes.Gold, FontWeight = FontWeights.Bold,
+                        FontSize = 14 * unit, Width = size, TextAlignment = TextAlignment.Center };
+                    Canvas.SetLeft(number, x - size / 2); Canvas.SetTop(number, y - 10 * unit); canvas.Children.Add(number);
+                }
+            }
+            var first = points[0];
             var arrow = new Polygon { Fill = Brushes.Gold, Points = new PointCollection {
-                new(x, y - 15 * unit), new(x - 8 * unit, y - 30 * unit), new(x + 8 * unit, y - 30 * unit) } };
+                new(first.X, first.Y - 15 * unit), new(first.X - 8 * unit, first.Y - 30 * unit), new(first.X + 8 * unit, first.Y - 30 * unit) } };
             canvas.Children.Add(arrow);
         }
         if (renderedId != r.Id)

@@ -4,9 +4,13 @@ using System.Text.RegularExpressions;
 
 namespace DotaCoach.TwoPc;
 
+/// <summary>
+/// Route holds the model's ordered landmark IDs; RouteMarks/Marker are ALWAYS overwritten by the program's
+/// own projection of those IDs (or by the legacy bot marker), never accepted as model coordinates.
+/// </summary>
 public sealed record ModelAdvice(string Hero, string Team, string Scene, string[] VisibleFacts,
     string[] Unknowns, string Message, string[] NextSteps, string CancelIf, ScreenMark? Marker,
-    string MarkerBasis, string? TargetId = null);
+    string MarkerBasis, string[]? Route = null, ScreenMark[]? RouteMarks = null);
 public sealed record ModelResult(ModelAdvice Advice, string ResponseId, string Model,
     int InputTokens, int OutputTokens, long ElapsedMs);
 public sealed class ModelProviderException(int statusCode) : InvalidOperationException($"Foundry HTTP {statusCode}; no rule fallback")
@@ -23,8 +27,9 @@ public sealed class CloudCoach : IDisposable
     private readonly CalibratedMap? map;
     private readonly bool localBotOnly;
     private readonly MinimapLayout? layout;
+    public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(15);
     public CloudCoach(string envFile, string model, string lessons, HttpMessageHandler? handler = null,
-        CalibratedMap? map = null, bool localBotOnly = true, MinimapLayout? layout = null)
+        CalibratedMap? map = null, bool localBotOnly = true, MinimapLayout? layout = null, TimeSpan? timeout = null)
     {
         var env = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (string line in File.ReadLines(envFile))
@@ -43,8 +48,10 @@ public sealed class CloudCoach : IDisposable
         this.model = model; this.lessons = lessons.Length <= 12000 ? lessons : throw new ArgumentException("Lessons too large");
         this.map = map;
         this.localBotOnly = localBotOnly; this.layout = layout;
+        var limit = timeout ?? DefaultTimeout;
+        if (limit < TimeSpan.FromSeconds(5) || limit > TimeSpan.FromSeconds(20)) throw new ArgumentException("Model timeout must be 5–20 s");
         http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false }) {
-            Timeout = TimeSpan.FromSeconds(11),
+            Timeout = limit,
         };
         http.DefaultRequestHeaders.Add("api-key", key);
     }
@@ -63,11 +70,14 @@ public sealed class CloudCoach : IDisposable
             a.MarkerBasis == null || a.MarkerBasis.Length > 240)
             throw new ArgumentException("Model advice is invalid or does not match the current own-player context");
         // Geometric sanity only, not a safety/territory classifier or a route selector.
-        // Initial acceptance scope: default bottom-left minimap. Other layouts abstain.
-        if (a.Marker is { } p && (string.IsNullOrWhiteSpace(a.MarkerBasis) ||
-            (layout != null ? !layout.IsValidFor(frame.Meta.SourceWidth, frame.Meta.SourceHeight) || !layout.Contains(p) :
-                !localBotOnly || !Wire.Finite(p.X, 0, .20) || !Wire.Finite(p.Y, .65, 1))))
+        // Without a minimap layout only the legacy bottom-left bot box is accepted; otherwise abstain.
+        bool Inside(ScreenMark p) => layout != null
+            ? layout.IsValidFor(frame.Meta.SourceWidth, frame.Meta.SourceHeight) && layout.Contains(p)
+            : localBotOnly && Wire.Finite(p.X, 0, .20) && Wire.Finite(p.Y, .65, 1);
+        if (a.Marker is { } p && (string.IsNullOrWhiteSpace(a.MarkerBasis) || !Inside(p)))
             throw new ArgumentException("Model marker is outside the supported minimap or lacks visual grounding");
+        if (a.RouteMarks != null && (!Wire.ValidRoute(a.RouteMarks, a.Marker) || !a.RouteMarks.All(Inside)))
+            throw new ArgumentException("Model route is outside the supported minimap");
     }
     public async Task<ModelResult> Decide(FrameView frame, CancellationToken cancellation)
     {
@@ -92,8 +102,10 @@ public sealed class CloudCoach : IDisposable
         if (map != null)
         {
             properties.Remove("marker");
-            properties["targetId"] = new { type = new[] { "string", "null" },
-                @enum = candidates.Select(c => (object?)c.Id).Append(null).ToArray() };
+            // An empty enum is not a valid schema: without a usable minimap the route field is simply absent.
+            if (candidates.Length > 0)
+                properties["route"] = new { type = "array", items = new { type = "string",
+                    @enum = candidates.Select(c => c.Id).ToArray() } };
         }
         var body = new {
             model, store = false, max_output_tokens = 700, reasoning = new { effort = "low" },
@@ -105,15 +117,17 @@ public sealed class CloudCoach : IDisposable
             不去敌方野区，不把己方前缀或没人图标当安全；证据不足就观察确认。
             不报金币/GPM/最优保证。历史案例不是当前事实。不要输出隐藏思维链。
             极简中文：scene一句，visibleFacts一条，unknowns一条，message不超过60字，
-            nextSteps最多两条、每条20字，cancelIf一句、markerBasis一句。
+            nextSteps最多三条、每条不超过20字，cancelIf一句、markerBasis一句。
             """ + (map == null ? """
             marker仅为旧本地验收图像左下小地图上的方向点：x/y是相对整张图的0到1比例，不是世界坐标。
             无法从可见地图特征定位就为null，有依据才标记并在markerBasis说明；不伪造世界路径或安全性。
-            """ : """
+            """ : candidates.Length > 0 ? """
             已提供未排序的己方静态地标目录。目录只说明位置，不说明当前有怪、有塔、可见或安全。
-            请从目录选择适合下一步的targetId，程序会用已校准的Valve地图坐标投影，勿生成marker坐标。
-            若目录为空（小地图尚未校准或布局变化），targetId必须为null，仍给有依据的简短字幕建议。
-            可把地标用于观察/接近的条件化方向，不得把未知资源说成确认收益。依据不足可以targetId=null。
+            route：按先后顺序给出接下来要去的1到3个地标targetId，组成短期刷钱路线，第一个是下一步；
+            nextSteps按同样顺序说明每一步做什么。程序用已校准的Valve地图坐标把route投影到小地图，勿生成坐标。
+            路线是条件化的观察/接近顺序，不得把未知资源说成确认收益；依据不足时route给空数组。
+            """ : """
+            小地图位置未知（未校准或布局变化），本次不输出路线，只给有依据的简短字幕建议。
             """),
             input = new[] { new { role = "user", content = new object[] {
                 new { type = "input_text", text = JsonSerializer.Serialize(new {
@@ -146,10 +160,14 @@ public sealed class CloudCoach : IDisposable
             .SelectMany(x => x.GetProperty("content").EnumerateArray())
             .Where(x => x.GetProperty("type").GetString() == "output_text").Select(x => x.GetProperty("text").GetString()));
         var advice = JsonSerializer.Deserialize<ModelAdvice>(text, Wire.Json) ?? throw new InvalidOperationException("Missing advice");
-        if (map != null)
-            advice = advice with { Marker = advice.TargetId == null ? null :
-                !supportsMap ? throw new ArgumentException("No calibrated minimap target is available") :
-                map.Project(frame.Meta.Player!.Team, advice.TargetId, frame, layout) };
+        advice = advice with { RouteMarks = null };
+        if (map != null) {
+            // Strict schemas cannot bound array length everywhere: keep the first three distinct choices.
+            var ids = (advice.Route ?? []).Where(id => !string.IsNullOrEmpty(id)).Distinct().Take(Wire.MaxRouteSteps).ToArray();
+            if (ids.Length > 0 && !supportsMap) throw new ArgumentException("No calibrated minimap target is available");
+            var marks = ids.Select(id => map.Project(frame.Meta.Player!.Team, id, frame, layout)).ToArray();
+            advice = advice with { Route = ids, Marker = marks.FirstOrDefault(), RouteMarks = marks.Length == 0 ? null : marks };
+        }
         Validate(advice, frame, localBotOnly, layout);
         var usage = root.GetProperty("usage");
         return new(advice, root.GetProperty("id").GetString()!, model,

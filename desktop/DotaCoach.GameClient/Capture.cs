@@ -13,10 +13,11 @@ namespace DotaCoach.TwoPc;
 internal sealed record CaptureResult(byte[] Jpeg, int Width, int Height);
 internal static class Capture
 {
-    public static VideoPixels? GameVideo(GameSurface surface)
+    /// <summary>Legacy foreground screen copy (CPU). Used only when window capture is unavailable or explicitly chosen.</summary>
+    public static VideoPixels? GameVideo(GameSurface surface, int width, int height)
     {
         if (GameWindow.Foreground() != surface || surface.Width > 7680 || surface.Height > 4320) return null;
-        var size = VideoPixels.SizeFor(surface.Width, surface.Height);
+        var size = (Width: width, Height: height);
         using var scaled = new Bitmap(size.Width, size.Height, PixelFormat.Format32bppArgb);
         using (var graphics = Graphics.FromImage(scaled)) {
             nint screen = GetDC(0), target = graphics.GetHdc();

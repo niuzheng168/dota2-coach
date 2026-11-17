@@ -217,7 +217,7 @@ var botTicket = botBox.Issue(botSession);
 botBox.Accept(Meta(botSession, botTicket, 1, Own() with { MatchId = "0" }), jpeg);
 botBox.SetReminder(botSession, 1, "experimental-bot-advice", botAdvice.Message, botAdvice.Marker);
 Check(botBox.Poll(botSession)?.Kind == "experimental-bot-advice", "valid bot model advice may be published");
-botTime = 13000;
+botTime = Wire.FrameLifetimeMs + 1000;
 Reject(() => botBox.SetReminder(botSession, 1, "experimental-bot-advice", botAdvice.Message, botAdvice.Marker),
     "late model result cannot be stamped onto a new frame");
 botTicket = botBox.Issue(botSession);
@@ -248,15 +248,16 @@ Check(calibrated.Candidates("dire").All(x => x.Team == "dire") &&
 string mapEnv = Path.GetTempFileName();
 try {
     File.WriteAllText(mapEnv, "AOAI_ENDPOINT=https://unit-test.openai.azure.com/\nFOUNDRY_KEY=unit-test-only\n");
-    using var handler = new FakeCloudCoach(botAdvice with { Marker = null, TargetId = "npc_dota_goodguys_tower2_bot" });
+    using var handler = new FakeCloudCoach(botAdvice with { Marker = null, Route = ["npc_dota_goodguys_tower2_bot"] });
     using var cloud = new CloudCoach(mapEnv, "gpt-6-astra", "historical test lesson", handler, calibrated);
     var result = await cloud.Decide(botFrame, default);
     Check(result.Advice.Marker == ownTower, "model chooses a landmark ID; server projects it rather than inventing screen coordinates");
     using var requestBody = JsonDocument.Parse(handler.Body);
     var props = requestBody.RootElement.GetProperty("text").GetProperty("format").GetProperty("schema").GetProperty("properties");
-    Check(props.TryGetProperty("targetId", out _) && !props.TryGetProperty("marker", out _),
-        "calibrated model schema requests target choice, not arbitrary coordinates");
-    using var badHandler = new FakeCloudCoach(botAdvice with { TargetId = "npc_dota_badguys_tower1_mid" });
+    Check(props.TryGetProperty("route", out var routeSchema) && !props.TryGetProperty("marker", out _) &&
+        routeSchema.GetProperty("type").GetString() == "array",
+        "calibrated model schema requests an ordered landmark route, not arbitrary coordinates");
+    using var badHandler = new FakeCloudCoach(botAdvice with { Route = ["npc_dota_badguys_tower1_mid"] });
     using var badCloud = new CloudCoach(mapEnv, "gpt-6-astra", "historical test lesson", badHandler, calibrated);
     await RejectAsync(() => badCloud.Decide(botFrame, default), "model response selecting opponent landmark is rejected before publication");
 } finally { File.Delete(mapEnv); }
@@ -290,7 +291,7 @@ Check(DisplayGeometry.EncodedSize(3840, 2160) == (1600, 900) &&
 foreach (double dpi in new[] { 1.0, 1.5, 2.0, 2.5, 3.0 })
     Check(Math.Abs(DisplayGeometry.OverlayUnit(2160, dpi) * dpi * 28 - 84) < .000001,
         $"4K caption physical size remains readable at DPI scale {dpi}");
-var normalAdvice = botAdvice with { Marker = leftTarget, TargetId = "npc_dota_goodguys_tower2_bot" };
+var normalAdvice = botAdvice with { Marker = leftTarget, Route = ["npc_dota_goodguys_tower2_bot"], RouteMarks = [leftTarget] };
 CloudCoach.Validate(normalAdvice, liveFrame, false, left4k);
 Reject(() => CloudCoach.Validate(normalAdvice, liveFrame, false), "uncalibrated normal live mode cannot return a map point");
 Reject(() => CloudCoach.Validate(normalAdvice with { Marker = new(.8, .2) }, liveFrame, false, left4k),
@@ -313,7 +314,7 @@ try {
     var result = await cloud.Decide(liveFrame, default);
     Check(result.Advice.Marker == leftTarget && handler.Body.Contains("player-visible-live-next-step"),
         "normal live 4K inference traverses the actual Responses request/parse/projection path");
-    using var textHandler = new FakeCloudCoach(botAdvice with { Marker = null, TargetId = null });
+    using var textHandler = new FakeCloudCoach(botAdvice with { Marker = null, Route = null });
     using var textCloud = new CloudCoach(liveEnv, "gpt-6-astra", "", textHandler, calibrated, false);
     Check((await textCloud.Decide(liveFrame, default)).Advice.Marker == null,
         "uncalibrated live 4K still receives model subtitles without guessed markers");
@@ -337,7 +338,110 @@ await using (var liveHost = await CoachHost.Start(IPAddress.Loopback, 0)) {
     Check((await link.Poll(default))?.Marker == null, "normal uncalibrated text advice crosses TLS");
     liveHost.Mailbox.SetReminder(link.SessionId!, 1, "visible-farming-advice", "map only", leftTarget, left4k, false);
     Check((await link.Poll(default))?.ShowSubtitle == false, "subtitle off is preserved independently of map targets");
+    var secondStop = calibrated.Project("radiant", "neutralcamp_good_11", liveFrame, left4k);
+    liveHost.Mailbox.SetReminder(link.SessionId!, 1, "visible-farming-advice", "route", leftTarget, left4k, true, 3000,
+        [leftTarget, secondStop], ["清理二塔附近野", "转去11号营地"]);
+    Check((await link.Poll(default)) is { Route.Length: 2, NextSteps.Length: 2, SourceAgeMs: >= 0, RemainingMs: > 2000 and <= 3000 } routed &&
+        routed.Route[1] == secondStop, "ordered route, next steps and game-clock source age cross pinned TLS");
 }
+
+// Subtitle display time is separate from source freshness: a slow model answer still gets the full display time.
+long lifeClock = 0;
+var lifeBox = new CoachMailbox(() => lifeClock);
+string lifeSession = lifeBox.Begin().SessionId;
+long lifeSequence = 0;
+void Feed() { var t = lifeBox.Issue(lifeSession); lifeBox.Accept(Meta(lifeSession, t, ++lifeSequence, Own()), jpeg); }
+Feed();
+for (int i = 0; i < 5; i++) { lifeClock += 3000; Feed(); } // a 15 s model call while video keeps arriving
+lifeBox.SetReminder(lifeSession, 1, "visible-farming-advice", "slow but valid", null, null, true, 3000);
+Check(lifeBox.Poll(lifeSession)?.RemainingMs == 3000, "a 15-second model answer is shown for the full configured 3 seconds");
+lifeClock += 2999; Feed();
+Check(lifeBox.Poll(lifeSession) != null, "subtitle stays for its display time");
+lifeClock += 2;
+Check(lifeBox.Poll(lifeSession) == null, "subtitle disappears when its display time ends");
+Reject(() => lifeBox.SetReminder(lifeSession, lifeSequence, "visible-farming-advice", "too short", null, null, true, 500), "display time below 1 s rejected");
+Reject(() => lifeBox.SetReminder(lifeSession, lifeSequence, "visible-farming-advice", "too long", null, null, true, Wire.MaxReminderMs + 1), "display time above 15 s rejected");
+for (int i = 0; i < 8; i++) { lifeClock += 3000; Feed(); }
+Reject(() => lifeBox.SetReminder(lifeSession, 1, "visible-farming-advice", "stale", null, null, true, 3000),
+    "a source frame older than the advice lifetime can never be published");
+var layout720 = new MinimapLayout(1280, 720, 0, 560, 160);
+ScreenMark stop1 = new(.05, .9), stop2 = new(.1, .85), stop3 = new(.11, .95);
+lifeBox.SetReminder(lifeSession, lifeSequence, "visible-farming-advice", "route", stop1, layout720, true, 3000, [stop1, stop2, stop3], ["清野", "接线", "回野"]);
+Check(lifeBox.Poll(lifeSession) is { Route.Length: 3, NextSteps.Length: 3 }, "three-stop route with matching next steps is published");
+Reject(() => lifeBox.SetReminder(lifeSession, lifeSequence, "visible-farming-advice", "route", stop2, layout720, true, 3000, [stop1, stop2]),
+    "route must start at the primary marker");
+Reject(() => lifeBox.SetReminder(lifeSession, lifeSequence, "visible-farming-advice", "route", stop1, layout720, true, 3000, [stop1, new(.8, .2)]),
+    "every route stop must lie inside the minimap");
+Reject(() => lifeBox.SetReminder(lifeSession, lifeSequence, "visible-farming-advice", "route", stop1, layout720, true, 3000, [stop1, stop2, stop3, stop2]),
+    "routes are limited to three stops");
+Reject(() => lifeBox.SetReminder(lifeSession, lifeSequence, "visible-farming-advice", "route", stop1, layout720, true, 3000, null, [new string('长', 61)]),
+    "next-step text is bounded");
+Reject(() => lifeBox.SetReminder(lifeSession, lifeSequence, "manual-link-test", "route", stop1, null, true, 3000, [stop1]),
+    "manual tests cannot impersonate an AI route");
+
+// Model route: up to three distinct own-side landmarks, projected by the program.
+string routeEnv = Path.GetTempFileName();
+try {
+    File.WriteAllText(routeEnv, "AOAI_ENDPOINT=https://unit-test.openai.azure.com/\nFOUNDRY_KEY=unit-test-only\n");
+    using var handler = new FakeCloudCoach(botAdvice with { Marker = new(.5, .5), Route = ["npc_dota_goodguys_tower2_bot",
+        "neutralcamp_good_11", "npc_dota_goodguys_tower2_bot", "neutralcamp_good_11", "npc_dota_goodguys_tower1_bot"] });
+    using var cloud = new CloudCoach(routeEnv, "gpt-6-astra", "", handler, calibrated, false, left4k);
+    var routed = (await cloud.Decide(liveFrame, default)).Advice;
+    Check(routed.RouteMarks is { Length: 3 } marks && marks[0] == routed.Marker && marks[0] == leftTarget &&
+        marks.All(left4k.Contains) && routed.Route!.Distinct().Count() == 3,
+        "model route keeps three distinct stops and ignores a model-supplied marker coordinate");
+    using (var sentRequest = JsonDocument.Parse(handler.Body))
+        Check(sentRequest.RootElement.GetProperty("instructions").GetString()!.Contains("短期刷钱路线"), "request asks for an ordered farming route");
+    using var enemyHandler = new FakeCloudCoach(botAdvice with { Route = ["neutralcamp_good_11", "npc_dota_badguys_tower1_mid"] });
+    using var enemyCloud = new CloudCoach(routeEnv, "gpt-6-astra", "", enemyHandler, calibrated, false, left4k);
+    await RejectAsync(() => enemyCloud.Decide(liveFrame, default), "a route through an opponent landmark is rejected");
+    Reject(() => new CloudCoach(routeEnv, "gpt-6-astra", "", null, calibrated, false, left4k, TimeSpan.FromSeconds(30)),
+        "model timeout cannot exceed the advice lifetime budget");
+} finally { File.Delete(routeEnv); }
+
+var liveDefaults = new LiveCoachSettings();
+Check(liveDefaults.SubtitleSeconds == 3 && liveDefaults.ModelTimeoutSeconds == 15 && liveDefaults.AutoMinimap,
+    "defaults: 3-second subtitles, 15-second model timeout, automatic minimap box");
+Check(liveDefaults.EffectiveLayout(liveFrame) == left4k && (liveDefaults with { AutoMinimap = false }).EffectiveLayout(liveFrame) == null,
+    "automatic 4K minimap box is the bottom-left default and can be switched off");
+Check((liveDefaults with { Calibrations = [right4k] }).EffectiveLayout(liveFrame) == right4k, "a confirmed calibration overrides the automatic box");
+Check(liveDefaults.EffectiveLayout(liveFrame with { Meta = liveFrame.Meta with { Source = "diagnostic" } }) == null, "no automatic map box for diagnostic video");
+foreach (var bad in new[] { liveDefaults with { SubtitleSeconds = 0 }, liveDefaults with { SubtitleSeconds = 16 },
+    liveDefaults with { ModelTimeoutSeconds = 7 }, liveDefaults with { ModelTimeoutSeconds = 21 } })
+    Reject(bad.Validate, $"coach timing bounds enforced ({bad.SubtitleSeconds}s / {bad.ModelTimeoutSeconds}s)");
+
+var video = new GameVideoSettings();
+Check(video.Fps == 60 && video.Resolution == "1080" && video.Encoder == "auto" && video.Capture == "window",
+    "game video defaults: 60 fps, 1080p, GPU encoder when present, window capture");
+Check(video.EncodedSize(3840, 2160, true) == (1920, 1080) && (video with { Resolution = "native" }).EncodedSize(3840, 2160, true) == (3840, 2160),
+    "1080p preset scales 4K on the game GPU; native leaves scaling to the coach");
+Check((video with { Resolution = "native" }).EncodedSize(3840, 2160, false) == (1920, 1080),
+    "CPU encoder is capped at 1080p to protect the game's frame rate");
+Check(video.EncodedSize(3440, 1440, true) == (2580, 1080) && video.EncodedSize(1280, 720, true) == (1280, 720),
+    "presets keep ultrawide aspect and never upscale");
+Check(GameVideoSettings.EffectiveFps(3840, 2160, 120) == 60 && GameVideoSettings.EffectiveFps(1920, 1080, 120) == 120 &&
+    GameVideoSettings.EffectiveFps(2560, 1440, 120) == 120, "frame rate is lowered only when H.264 level 5.2 cannot carry it");
+Check(video.Bitrate(1920, 1080, 60) is > 8_000_000 and < 9_000_000 && (video with { BitrateMbps = 25 }).Bitrate(1920, 1080, 60) == 25_000_000,
+    "automatic bitrate scales with pixels × fps; manual Mbps overrides it");
+foreach (var bad in new[] { video with { Fps = 45 }, video with { Resolution = "4k" }, video with { Encoder = "nvenc" }, video with { BitrateMbps = 101 } })
+    Reject(bad.Validate, "invalid game video setting rejected");
+string videoFile = Path.Combine(Path.GetTempPath(), "game-video-" + Guid.NewGuid().ToString("N") + ".json");
+try {
+    (video with { Fps = 120, Resolution = "native" }).Save(videoFile);
+    Check(GameVideoSettings.Load(videoFile) is { Fps: 120, Resolution: "native" }, "game video settings persist");
+    File.WriteAllText(videoFile, "{\"fps\": 7}");
+    Check(GameVideoSettings.Load(videoFile) == new GameVideoSettings(), "corrupt game video settings fall back to defaults");
+} finally { File.Delete(videoFile); }
+
+var halves = new byte[64 * 32 * 4];
+for (int i = 0; i < halves.Length; i += 4) {
+    bool left = i / 4 % 64 < 32;
+    halves[i] = (byte)(left ? 20 : 220); halves[i + 1] = 60; halves[i + 2] = (byte)(left ? 220 : 20); halves[i + 3] = 255;
+}
+var scaled = VideoPixels.FromBgra(64, 32, halves).ToBgra(32, 16);
+Check(scaled.Length == 32 * 16 * 4 && Math.Abs(scaled[(8 * 32 + 4) * 4 + 2] - 220) < 12 && Math.Abs(scaled[(8 * 32 + 28) * 4] - 220) < 12,
+    "coach-side downscale keeps colours and layout");
+Reject(() => VideoPixels.FromBgra(64, 32, halves).ToBgra(128, 64), "coach never upscales video pixels");
 string debugRoot = Path.Combine(Path.GetTempPath(), "dota-coach-debug-tests-" + Guid.NewGuid().ToString("N"));
 var debugMeta = liveFrame.Meta with { SessionId = "../../outside", Ticket = "NEVER-SAVE-CAPTURE-TICKET" };
 var debugFrame = liveFrame with { Meta = debugMeta };
@@ -346,7 +450,7 @@ recorder.Frame("frame-received", debugMeta, jpeg);
 recorder.ModelStarted(debugFrame, "test-model", left4k, 1);
 recorder.ModelFinished(debugFrame, new(botAdvice with {
     Message = "Bearer super-private-token FOUNDRY_KEY=secret-value", Marker = null,
-    Unknowns = ["DCP1.privatepairing=="], TargetId = null,
+    Unknowns = ["DCP1.privatepairing=="], Route = null,
 }, "resp-unit-test", "test-model", 11, 22, 33));
 recorder.Error("test-error", new InvalidOperationException("HTTP credential=NEVER-SAVE-EXCEPTION-MESSAGE"));
 recorder.Error("model-provider", new ModelProviderException(429), debugMeta, "upstream-status");

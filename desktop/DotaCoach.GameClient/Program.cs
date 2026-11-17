@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -27,7 +28,16 @@ internal sealed class GameWindowUi : Window
     private readonly PasswordBox pairing = new() { Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 8), FontSize = 14 };
     private readonly ComboBox source = new() { Margin = new Thickness(0, 0, 0, 10), Padding = new Thickness(6), FontSize = 14 };
     private readonly TextBlock status = Ui.Text("未连接 · 不采集画面", 16, Ui.Accent);
-    private readonly TextBlock metrics = Ui.Text("持续H.264 · 目标30fps / 6Mbps · 最大1600×900 · 保留4K原始坐标 · 无音频");
+    private readonly TextBlock metrics = Ui.Text("持续H.264 · 帧率/分辨率/编码器见下方设置 · 保留原始坐标 · 无音频");
+    private readonly ComboBox fpsChoice = Ui.Choice(), resolutionChoice = Ui.Choice(), encoderChoice = Ui.Choice(), captureChoice = Ui.Choice();
+    private readonly TextBox bitrateChoice = Ui.Input();
+    private readonly TextBlock videoNote = Ui.Text("", 12, Brushes.LightGray);
+    private string videoHint = "";
+    private readonly string videoSettingsPath;
+    private GameVideoSettings videoSettings;
+    private static readonly (string Value, string Label)[] ResolutionLabels = [
+        ("native", "原生分辨率（游戏机不缩放，交给教练机）"), ("1440", "最高 1440p"), ("1080", "最高 1080p（推荐）"),
+        ("900", "最高 900p"), ("720", "最高 720p")];
     private static readonly string GsiState = GsiSetup.StateDirectoryFor("Game");
     private readonly TextBox dotaInstall = Ui.Input(GsiSetup.FindInstall(GsiState));
     private readonly TextBlock caption = Ui.Text("回传字幕将在这里显示；真实游戏中另外显示私人悬浮层。", 18, Ui.Accent);
@@ -56,10 +66,13 @@ internal sealed class GameWindowUi : Window
 
     public GameWindowUi() : this(null) { }
     public GameWindowUi(E2ERun? run) : this(run, null) { }
-    public GameWindowUi(E2ERun? run, string? debugRoot)
+    public GameWindowUi(E2ERun? run, string? debugRoot) : this(run, debugRoot, null) { }
+    public GameWindowUi(E2ERun? run, string? debugRoot, string? videoSettingsFile)
     {
         e2e = run; debug = new DebugPanel("game", debugRoot); overlay = new AdviceOverlay(run, () => debug.Recorder);
-        Title = "Dota Coach · 游戏端 v0.3.1";
+        videoSettingsPath = videoSettingsFile ?? GameVideoSettings.DefaultPath;
+        videoSettings = GameVideoSettings.Load(videoSettingsPath);
+        Title = "Dota Coach · 游戏端 v0.4.0";
         Width = Math.Min(1120, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(900, SystemParameters.WorkArea.Height - 40);
         MinWidth = 860; MinHeight = 680; WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -74,8 +87,9 @@ internal sealed class GameWindowUi : Window
         top.Children.Add(Ui.Text("只采集、传输和显示 · 不运行模型 · 不读取游戏内存 · 不发送键鼠指令"));
         top.Children.Add(Ui.Text("1  粘贴教练端复制的配对码（含连接密钥，请勿分享截图或日志）"));
         top.Children.Add(pairing);
-        source.Items.Add("Dota 2 前台画面"); source.Items.Add("诊断画面（不采集桌面）"); source.SelectedIndex = 0;
+        source.Items.Add("Dota 2 游戏画面"); source.Items.Add("诊断画面（不采集桌面）"); source.SelectedIndex = 0;
         top.Children.Add(source);
+        top.Children.Add(BuildVideoSettings());
         var buttons = new WrapPanel();
         buttons.Children.Add(Ui.Button("连接并开始", async (_, _) => await Start()));
         buttons.Children.Add(Ui.Button("停止 / 断开", async (_, _) => await Stop()));
@@ -92,7 +106,7 @@ internal sealed class GameWindowUi : Window
         preview.Children.Add(image); preview.Children.Add(marks); Grid.SetRow(preview, 1); root.Children.Add(preview);
         var bottom = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
         bottom.Children.Add(caption);
-        bottom.Children.Add(Ui.Text("隐私与性能：持续发送前台游戏视频，可能含聊天/系统通知；切出Dota暂停。教练端按需抽帧。软件H.264有CPU开销；游戏端Debug只记运行状态，不重复存图。", 12, Brushes.LightGray));
+        bottom.Children.Add(Ui.Text("隐私与性能：持续发送 Dota 游戏视频（可能含游戏内聊天）；窗口采集只取 Dota 窗口自身画面，不含其他应用。缩放与编码在显卡上完成；教练端按需抽帧。游戏端Debug只记运行状态，不重复存图。", 12, Brushes.LightGray));
         bottom.Children.Add(new Expander { Header = "Debug / 抽帧与客户端状态", Content = debug.View, Foreground = Brushes.White });
         Grid.SetRow(bottom, 2); root.Children.Add(bottom); Content = root;
         preview.SizeChanged += (_, _) => DrawMark();
@@ -140,11 +154,18 @@ internal sealed class GameWindowUi : Window
         {
             var pair = Pairing.Decode(pairing.Password.Trim());
             bool diagnostic = source.SelectedIndex == 1;
+            var chosen = ReadVideoSettings();
             if (!diagnostic && e2e == null && MessageBox.Show(this,
-                "开始传送 Dota 2 前台客户区并启用自动教练？\n\n画面含主视图、小地图、HUD，也可能含聊天/系统通知。\n教练端默认将真实画面＋自身GSI发送到指定云模型，会计费。\n不会传音频、控制英雄或截取其他前台应用；可随时停止。\n约1fps，支持4K原始像素投影，仍有采集编码开销。",
+                "开始传送 Dota 2 游戏画面并启用自动教练？\n\n画面含主视图、小地图、HUD，也可能含游戏内聊天。\n" +
+                (chosen.Capture == "window"
+                    ? "窗口采集：切到其他窗口时仍持续传送 Dota 窗口自身的画面；其他应用的内容不会被采集。\n"
+                    : "前台模式：只在 Dota 位于前台时采集屏幕区域，可能含系统通知。\n") +
+                "教练端默认将真实画面＋自身GSI发送到指定云模型，会计费。\n不会传音频或控制英雄；可随时停止。",
                 "确认游戏画面传输", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+            try { chosen.Save(videoSettingsPath); } catch { /* Settings still apply to this run. */ }
+            videoSettings = chosen;
             starting = new CancellationTokenSource(); active = starting;
-            source.IsEnabled = false; pairing.IsEnabled = false;
+            source.IsEnabled = false; pairing.IsEnabled = false; SetVideoControls(false);
             if (!diagnostic && e2e == null && gsi != null && !persistentGsi) {
                 await gsi.DisposeAsync(); gsi = null;
             }
@@ -175,7 +196,7 @@ internal sealed class GameWindowUi : Window
             }
             starting.Token.ThrowIfCancellationRequested();
             var cancellation = starting.Token;
-            running = Run(pair, diagnostic, cancellation);
+            running = Run(pair, diagnostic, chosen, cancellation);
             _ = FinishRun(running);
         }
         catch (OperationCanceledException) { status.Text = "启动已取消 · 不采集画面"; }
@@ -184,7 +205,7 @@ internal sealed class GameWindowUi : Window
         {
             busy = false;
             if (running == null && starting != null && active == starting) {
-                active.Dispose(); active = null; source.IsEnabled = true; pairing.IsEnabled = true;
+                active.Dispose(); active = null; source.IsEnabled = true; pairing.IsEnabled = true; SetVideoControls(true);
             }
         }
     }
@@ -193,49 +214,145 @@ internal sealed class GameWindowUi : Window
         try { await task; } catch { }
         if (running != task) return;
         active?.Dispose(); active = null; running = null;
-        source.IsEnabled = true; pairing.IsEnabled = true; ClearReminder();
+        source.IsEnabled = true; pairing.IsEnabled = true; SetVideoControls(true); ClearReminder();
     }
-    private async Task Run(Pairing pair, bool diagnostic, CancellationToken cancellation)
+    private StackPanel BuildVideoSettings()
+    {
+        foreach (int rate in VideoWire.FrameRates) fpsChoice.Items.Add($"{rate} fps");
+        foreach (var (_, label) in ResolutionLabels) resolutionChoice.Items.Add(label);
+        encoderChoice.Items.Add("自动（优先显卡硬件编码）"); encoderChoice.Items.Add("CPU 软件编码");
+        captureChoice.Items.Add("窗口采集（切到其他窗口也继续传 Dota 画面）"); captureChoice.Items.Add("前台屏幕复制（旧版，切出即暂停）");
+        fpsChoice.SelectedIndex = Array.IndexOf(VideoWire.FrameRates, videoSettings.Fps);
+        resolutionChoice.SelectedIndex = Array.FindIndex(ResolutionLabels, r => r.Value == videoSettings.Resolution);
+        encoderChoice.SelectedIndex = videoSettings.Encoder == "software" ? 1 : 0;
+        captureChoice.SelectedIndex = videoSettings.Capture == "foreground" ? 1 : 0;
+        bitrateChoice.Text = videoSettings.BitrateMbps.ToString();
+        var grid = new Grid();
+        for (int i = 0; i < 4; i++) grid.ColumnDefinitions.Add(new() { Width = new GridLength(i == 1 ? 2 : 1, GridUnitType.Star) });
+        void Cell(int column, string label, Control control) {
+            var cell = new StackPanel { Margin = new Thickness(0, 0, 8, 0) };
+            cell.Children.Add(Ui.Text(label, 12, Brushes.LightGray)); cell.Children.Add(control);
+            Grid.SetColumn(cell, column); grid.Children.Add(cell);
+        }
+        Cell(0, "帧率", fpsChoice); Cell(1, "传输分辨率", resolutionChoice); Cell(2, "编码器", encoderChoice); Cell(3, "码率 Mbps（0=自动）", bitrateChoice);
+        var panel = new StackPanel();
+        panel.Children.Add(grid);
+        panel.Children.Add(Ui.Text("采集方式", 12, Brushes.LightGray)); panel.Children.Add(captureChoice);
+        var gpuEncoders = HardwareH264.Available();
+        videoHint = (gpuEncoders.Count > 0 ? "显卡编码器：" + string.Join(" / ", gpuEncoders.Distinct()) + "。" : "未发现显卡H.264编码器，将使用CPU软件编码（最高1080p）。") +
+            "缩放和转色在显卡上完成，编码用显卡独立的视频编码单元。“原生分辨率”把缩放留给教练机，但码流更大、教练机解码更重。" +
+            "\n建议 Dota 用“无边框窗口”：独占全屏切出时会最小化，没有画面可传。远程桌面会话里系统只按约30Hz合成桌面。";
+        videoNote.Text = videoHint;
+        panel.Children.Add(videoNote);
+        return panel;
+    }
+    private void SetVideoControls(bool enabled)
+    {
+        foreach (var control in new Control[] { fpsChoice, resolutionChoice, encoderChoice, captureChoice, bitrateChoice }) control.IsEnabled = enabled;
+    }
+    private GameVideoSettings ReadVideoSettings()
+    {
+        if (!int.TryParse(bitrateChoice.Text.Trim(), out int mbps)) throw new ArgumentException("码率请填整数 Mbps（0 = 自动）。");
+        var chosen = new GameVideoSettings {
+            Fps = VideoWire.FrameRates[Math.Max(0, fpsChoice.SelectedIndex)],
+            Resolution = ResolutionLabels[Math.Max(0, resolutionChoice.SelectedIndex)].Value,
+            Encoder = encoderChoice.SelectedIndex == 1 ? "software" : "auto",
+            Capture = captureChoice.SelectedIndex == 1 ? "foreground" : "window",
+            BitrateMbps = mbps,
+        };
+        chosen.Validate();
+        return chosen;
+    }
+    private IVideoSource OpenWindowSource(GameSurface surface, (int Width, int Height) size, int fps, Action<string> note)
+    {
+        try { return new WindowVideoSource(surface, size.Width, size.Height, fps); }
+        catch (Exception e) {
+            note("窗口采集不可用（" + e.GetType().Name + "），本次改用前台屏幕复制：切出 Dota 会暂停。");
+            return new ForegroundVideoSource(surface, size.Width, size.Height);
+        }
+    }
+    private async Task Run(Pairing pair, bool diagnostic, GameVideoSettings settings, CancellationToken cancellation)
     {
         // Preserve the explicitly opted-in historical bot/pixel-evidence harness, not as a live fallback.
         if (e2e != null) { await RunLegacyEvidence(pair, diagnostic, cancellation); return; }
         using var link = new GameLink(pair);
+        bool windowMode = settings.Capture == "window";
+        bool gpuEncoder = settings.Encoder == "auto" && HardwareH264.Available().Count > 0;
+        string? captureNote = null;
         try {
             while (!cancellation.IsCancellationRequested) {
-                var surface = diagnostic ? null : GameWindow.Foreground();
-                if (!diagnostic && surface == null) {
-                    status.Text = "已暂停视频：请切回 Dota 2（其他应用不采集）";
-                    await Task.Delay(250, cancellation); continue;
+                GameSurface? surface = null;
+                if (!diagnostic) {
+                    bool minimized = false;
+                    surface = windowMode ? GameWindow.Find(out minimized) : GameWindow.Foreground();
+                    if (surface == null) {
+                        status.Text = !windowMode ? "已暂停视频：请切回 Dota 2（前台模式不采集其他应用）" :
+                            minimized ? "Dota 已最小化，没有画面可传。独占全屏切出时会最小化：建议在 Dota 视频设置中改为“无边框窗口”。" :
+                            "等待 Dota 2 窗口…";
+                        await Task.Delay(250, cancellation); continue;
+                    }
                 }
+                var size = diagnostic ? (Width: 1280, Height: 720) : settings.EncodedSize(surface!.Width, surface.Height, gpuEncoder);
+                int fps = GameVideoSettings.EffectiveFps(size.Width, size.Height, settings.Fps);
+                int bitrate = settings.Bitrate(size.Width, size.Height, fps);
                 await link.Connect(cancellation);
                 await link.OpenVideo(cancellation);
                 var lease = await link.GetVideoTicket(cancellation);
                 transportConnected = true;
-                var stream = new VideoSender(lease);
+                var stream = new VideoSender(lease, fps);
                 using var streamStop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-                var captureTask = Task.Run(() => stream.CaptureLoop(diagnostic, surface,
-                    () => Interlocked.Increment(ref localSequence), () => gsi?.Latest() ?? (null, null), streamStop.Token));
-                var sendTask = Task.Run(() => stream.SendLoop(link, streamStop.Token));
-                long renewAt = Environment.TickCount64 + 750, previewAt = 0, started = Environment.TickCount64;
+                Func<IVideoSource> open = diagnostic ? () => new DiagnosticVideoSource() :
+                    windowMode ? () => OpenWindowSource(surface!, size, fps, n => captureNote = n) :
+                    () => new ForegroundVideoSource(surface!, size.Width, size.Height);
+                var captureTask = stream.StartCapture(open, diagnostic,
+                    () => Interlocked.Increment(ref localSequence), () => gsi?.Latest() ?? (null, null), streamStop.Token);
+                var sendTask = Task.Run(() => stream.SendLoop(link, gpuEncoder, bitrate, streamStop.Token));
+                long renewAt = Environment.TickCount64 + 750, previewAt = 0, rateAt = Environment.TickCount64, rateSent = 0, rateBytes = 0;
+                double actualFps = 0, actualMbps = 0;
+                bool background = false;
                 try {
                     while (!cancellation.IsCancellationRequested) {
                         if (captureTask.IsCompleted) { await captureTask; break; }
-                        if (sendTask.IsCompleted) { await sendTask; break; }
-                        if (!diagnostic && GameWindow.Foreground() != surface) break;
+                        if (sendTask.IsCompleted) {
+                            // A failing GPU encoder ends only this session; the next one uses the CPU encoder.
+                            try { await sendTask; } catch when (stream.HardwareFailed && !cancellation.IsCancellationRequested) { }
+                            break;
+                        }
+                        if (!diagnostic) {
+                            if (windowMode) {
+                                // Window capture keeps streaming behind other windows; only a new/resized/closed window restarts it.
+                                var current = GameWindow.Find(out _);
+                                if (current == null || current.Handle != surface!.Handle ||
+                                    current.Width != surface.Width || current.Height != surface.Height) break;
+                                background = !GameWindow.IsForeground(current);
+                            } else if (GameWindow.Foreground() != surface) break;
+                        }
                         if (Environment.TickCount64 >= renewAt) {
                             stream.Renew(await link.GetVideoTicket(cancellation));
                             renewAt = Environment.TickCount64 + 750;
                         }
                         if (stream.Latest is { } frame) {
+                            // Only a NEW picture proves the game is still being captured.
+                            if (lastCaptureAt != frame.CapturedAt) overlay.FrameArrived(frame.Meta.Player?.MatchId == "0");
                             lastCaptureAt = frame.CapturedAt;
-                            overlay.FrameArrived(frame.Meta.Player?.MatchId == "0");
                             if (Environment.TickCount64 >= previewAt) {
-                                image.Source = Ui.VideoImage(frame.Pixels); DrawMark();
-                                double seconds = Math.Max(.001, (Environment.TickCount64 - started) / 1000.0);
-                                metrics.Text = $"H.264 目标30fps / 6Mbps · 原始 {frame.Meta.SourceWidth}×{frame.Meta.SourceHeight} → {frame.Pixels.Width}×{frame.Pixels.Height}\n" +
-                                    $"实际平均发送 {stream.Sent / seconds:F1}fps / {stream.Bytes * 8 / seconds / 1_000_000:F2}Mbps · 未编码丢帧 {stream.Dropped}";
-                                status.Text = diagnostic ? "已连接 · 持续发送诊断视频（非游戏）" : "已连接 · 持续发送 Dota 2 前台视频";
+                                if (Environment.TickCount64 - rateAt >= 1000) {
+                                    double seconds = (Environment.TickCount64 - rateAt) / 1000.0;
+                                    actualFps = (stream.Sent - rateSent) / seconds; actualMbps = (stream.Bytes - rateBytes) * 8 / seconds / 1_000_000;
+                                    rateAt = Environment.TickCount64; rateSent = stream.Sent; rateBytes = stream.Bytes;
+                                }
+                                image.Source = Ui.PreviewImage(frame.Pixels, 640, 360); DrawMark();
+                                metrics.Text = $"{stream.SourceName} · {stream.EncoderName}\n" +
+                                    $"原始 {frame.Meta.SourceWidth}×{frame.Meta.SourceHeight} → 编码 {frame.Pixels.Width}×{frame.Pixels.Height} · 目标 {fps}fps / {bitrate / 1_000_000.0:F0}Mbps" +
+                                    (fps < settings.Fps ? $"（{settings.Fps}fps 超出H.264 5.2级上限，已降）" : "") + "\n" +
+                                    $"实际 {actualFps:F1}fps / {actualMbps:F1}Mbps · 采集 {stream.CaptureMs:F1}ms · 编码 {stream.EncodeMs:F1}ms · 丢帧 {stream.Dropped}";
+                                status.Text = diagnostic ? "已连接 · 持续发送诊断视频（非游戏）" :
+                                    background ? "已连接 · Dota 在后台，继续传送 Dota 窗口画面" : "已连接 · 持续发送 Dota 2 视频";
+                                videoNote.Text = string.Join("\n", new[] { captureNote, stream.EncoderNote, videoHint }.Where(n => n != null));
                                 gsiStatus.Text = frame.Meta.Player is { } p ? $"自身GSI：{p.Team} · {p.Hero} · {p.Clock:F1}s" : "无新鲜自身GSI；视频继续，AI不推测装备/阵营。";
+                                debug.Recorder?.Video(new(stream.SourceName, stream.EncoderName, frame.Meta.SourceWidth, frame.Meta.SourceHeight,
+                                    frame.Pixels.Width, frame.Pixels.Height, fps, Math.Round(actualFps, 1), Math.Round(actualMbps, 2), stream.Dropped,
+                                    Math.Round(stream.CaptureMs, 2), Math.Round(stream.EncodeMs, 2), background, captureNote ?? stream.EncoderNote));
                                 previewAt = Environment.TickCount64 + 250;
                             }
                         }
@@ -248,7 +365,9 @@ internal sealed class GameWindowUi : Window
                     ClearReminder(); image.Source = null; transportConnected = false; lastCaptureAt = null;
                     using var timeout = new CancellationTokenSource(1500);
                     try { await link.End(timeout.Token); } catch { }
+                    if (stream.HardwareFailed) gpuEncoder = false; // Later sessions use the CPU limits, not a retry loop.
                 }
+                if (stream.Starved) status.Text = "Dota 窗口暂时没有新画面（最小化或卡住）；恢复后自动继续。";
             }
         } catch (Exception error) {
             debug.Recorder?.Error("video-transport", error);
@@ -265,9 +384,9 @@ internal sealed class GameWindowUi : Window
         long deadline = Environment.TickCount64 + reminder.RemainingMs;
         reminderDeadline = shown?.Id == reminder.Id ? Math.Min(reminderDeadline, deadline) : deadline;
         shown = reminder;
-        caption.Text = !reminder.ShowSubtitle ? "地图目标提示（字幕已关闭）" :
-            (reminder.Kind == "manual-link-test" ? "人工联调（非 AI 路线）： " :
-            reminder.Kind is "experimental-bot-advice" or "visible-farming-advice" ? "AI打钱建议（非最优保证）： " : "视觉观察（未核验）： ") + reminder.Message;
+        caption.Text = !reminder.ShowSubtitle ? "地图路线提示（字幕已关闭）" :
+            AdviceOverlay.Label(reminder) + "： " + reminder.Message +
+            (reminder.NextSteps is { Length: > 0 } steps ? "\n下一步：" + string.Join(" → ", steps) : "");
         if (lastReceivedId != reminder.Id) {
             debug.Recorder?.Reminder("reminder-received", reminder); lastReceivedId = reminder.Id;
         }
@@ -372,9 +491,11 @@ internal sealed class GameWindowUi : Window
         marks.Children.Clear();
         if (shown?.Marker is not { } point || image.Source == null) return;
         var rect = Ui.ImageRect(preview.ActualWidth, preview.ActualHeight, shown.SourceWidth, shown.SourceHeight);
-        var ring = new Ellipse { Width = 24, Height = 24, Stroke = Brushes.Gold, StrokeThickness = 3 };
-        Canvas.SetLeft(ring, rect.Left + point.X * rect.Width - 12); Canvas.SetTop(ring, rect.Top + point.Y * rect.Height - 12);
-        marks.Children.Add(ring);
+        foreach (var p in shown.Route ?? [point]) {
+            var ring = new Ellipse { Width = 24, Height = 24, Stroke = Brushes.Gold, StrokeThickness = 3 };
+            Canvas.SetLeft(ring, rect.Left + p.X * rect.Width - 12); Canvas.SetTop(ring, rect.Top + p.Y * rect.Height - 12);
+            marks.Children.Add(ring);
+        }
     }
     private void ClearReminder()
     {

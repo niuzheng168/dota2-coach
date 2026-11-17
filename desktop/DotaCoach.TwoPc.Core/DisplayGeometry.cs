@@ -11,7 +11,8 @@ public sealed record MinimapLayout(int SourceWidth, int SourceHeight, double Lef
     public bool Contains(ScreenMark point) => IsValidFor(SourceWidth, SourceHeight) &&
         Wire.Finite(point.X, Left / SourceWidth, (Left + Size) / SourceWidth) &&
         Wire.Finite(point.Y, Top / SourceHeight, (Top + Size) / SourceHeight);
-    // A suggested box to preview, NEVER a confirmed calibration or a live map observation.
+    // Default-HUD box scaled from the height (bottom-left unless right). Used as the automatic layout when the
+    // coach enables it and nothing is confirmed; never a live map observation.
     public static MinimapLayout Suggest(int width, int height, bool right = false)
     {
         double size = height * (160.0 / 720);

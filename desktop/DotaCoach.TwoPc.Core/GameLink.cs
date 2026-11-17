@@ -12,10 +12,16 @@ public sealed class GameLink : IDisposable
     private readonly HttpClient http;
     private readonly Func<long> now;
     private readonly Dictionary<long, (long At, FrameMeta Meta)> captures = new();
+    private readonly Queue<long> captureOrder = new();
     private readonly object gate = new();
     private readonly Pairing pairing;
     private ClientWebSocket? video;
     private string? videoProtocol;
+    private SemaphoreSlim? window;
+    private readonly Queue<long> unacknowledged = new();
+    private Exception? ackFailure;
+    // A reminder may be shown until its source frame is FrameLifetime + MaxReminder old; keep that much metadata.
+    private const long CaptureRetentionMs = Wire.FrameLifetimeMs + Wire.MaxReminderMs;
     public string? SessionId { get; private set; }
     public GameLink(Pairing pairing, Func<long>? clock = null)
     {
@@ -56,8 +62,9 @@ public sealed class GameLink : IDisposable
         var hello = await Json<SessionHello>(response, cancellation);
         if (hello.Version != Wire.Version || !Guid.TryParseExact(hello.SessionId, "N", out _))
             throw new InvalidOperationException("Protocol version mismatch");
-        SessionId = hello.SessionId; videoProtocol = hello.VideoProtocol; lock (gate) captures.Clear();
+        SessionId = hello.SessionId; videoProtocol = hello.VideoProtocol; ClearCaptures();
     }
+    private void ClearCaptures() { lock (gate) { captures.Clear(); captureOrder.Clear(); } }
     // Ticket round-trip precedes capture: both sides can bound frame age without synchronised wall clocks.
     public async Task<Ticket> GetTicket(CancellationToken cancellation)
     {
@@ -86,27 +93,56 @@ public sealed class GameLink : IDisposable
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(4000);
         await video.ConnectAsync(address.Uri, timeout.Token);
+        var slots = new SemaphoreSlim(VideoWire.MaxInFlight);
+        lock (gate) { unacknowledged.Clear(); ackFailure = null; window = slots; }
+        _ = Acknowledgements(video, slots);
     }
+    /// <summary>
+    /// Sends one access unit. Up to <see cref="VideoWire.MaxInFlight"/> may await the coach's decode ACK, so
+    /// network round trips no longer cap the frame rate; a stalled coach still stops the stream within 1.5 s.
+    /// </summary>
     public async Task SendVideo(VideoHeader header, byte[] h264, long captureStarted, CancellationToken cancellation)
     {
-        if (video == null || header.Frame.SessionId != SessionId || now() - captureStarted > 1000)
+        var socket = video; var slots = window;
+        if (socket == null || slots == null || header.Frame.SessionId != SessionId || now() - captureStarted > 1000)
             throw new InvalidOperationException("Stalled video capture");
+        lock (gate) if (ackFailure != null) throw new InvalidOperationException("Video acknowledgement failed", ackFailure);
         var packet = VideoWire.Pack(header, h264);
+        if (!await slots.WaitAsync(VideoWire.AckTimeoutMs, cancellation))
+            throw new InvalidOperationException("Video acknowledgement timeout");
         Remember(header.Frame, captureStarted);
+        lock (gate) unacknowledged.Enqueue(header.Frame.Sequence);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-        timeout.CancelAfter(1500);
-        await video.SendAsync(packet.AsMemory(), WebSocketMessageType.Binary, true, timeout.Token);
-        byte[] ack = await VideoWire.Receive(video, 8, timeout.Token);
-        if (ack.Length != 8 || BinaryPrimitives.ReadInt64LittleEndian(ack) != header.Frame.Sequence)
-            throw new InvalidOperationException("Video acknowledgement mismatch");
+        timeout.CancelAfter(VideoWire.AckTimeoutMs);
+        await socket.SendAsync(packet.AsMemory(), WebSocketMessageType.Binary, true, timeout.Token);
+    }
+    private async Task Acknowledgements(ClientWebSocket socket, SemaphoreSlim slots)
+    {
+        try {
+            while (true) {
+                byte[] ack = await VideoWire.Receive(socket, 8, CancellationToken.None);
+                lock (gate) {
+                    if (ack.Length != 8 || !unacknowledged.TryDequeue(out long expected) ||
+                        BinaryPrimitives.ReadInt64LittleEndian(ack) != expected)
+                        throw new InvalidOperationException("Video acknowledgement mismatch");
+                }
+                slots.Release();
+            }
+        } catch (Exception e) {
+            lock (gate) if (window == slots) ackFailure = e;
+            socket.Abort(); // Any pending send fails promptly instead of waiting for its timeout.
+        }
     }
     public void AbortVideo() { video?.Abort(); }
     private void Remember(FrameMeta meta, long at)
     {
         lock (gate) {
-            captures[meta.Sequence] = (at, meta);
-            foreach (var key in captures.Where(x => now() - x.Value.At > Wire.FrameLifetimeMs).Select(x => x.Key).ToArray()) captures.Remove(key);
-            while (captures.Count > Wire.HistoryLimit) captures.Remove(captures.Keys.Min());
+            captures[meta.Sequence] = (at, meta); captureOrder.Enqueue(meta.Sequence);
+            // Sequences only increase, so the queue front is always the oldest capture.
+            while (captureOrder.TryPeek(out long oldest) && (captures.Count > Wire.HistoryLimit ||
+                   !captures.TryGetValue(oldest, out var entry) || now() - entry.At > CaptureRetentionMs)) {
+                captureOrder.Dequeue(); captures.Remove(oldest);
+            }
         }
     }
     public async Task Upload(FrameMeta meta, byte[] jpeg, long captureStarted, CancellationToken cancellation)
@@ -132,34 +168,43 @@ public sealed class GameLink : IDisposable
         lock (gate)
         {
             if (r.SessionId != SessionId || !captures.TryGetValue(r.FrameSequence, out var captured) ||
-                now() - captured.At >= Wire.FrameLifetimeMs || r.RemainingMs <= now() - started ||
-                r.RemainingMs > Wire.FrameLifetimeMs || r.Message.Length is < 1 or > 120 ||
+                now() - captured.At >= CaptureRetentionMs || r.RemainingMs <= now() - started ||
+                r.RemainingMs > Wire.MaxReminderMs || r.Message.Length is < 1 or > 120 ||
+                !Wire.ValidRoute(r.Route, r.Marker) || !Wire.ValidSteps(r.NextSteps) ||
+                (r.Route != null && r.Kind is not ("visible-farming-advice" or "experimental-bot-advice")) ||
+                (r.Kind == "visible-farming-advice" && r.Route != null && (r.Minimap == null || r.Route.Any(p => !r.Minimap.Contains(p)))) ||
                 r.SourceWidth != captured.Meta.SourceWidth || r.SourceHeight != captured.Meta.SourceHeight ||
                 r.Kind is not ("manual-link-test" or "local-vision-observation" or "experimental-bot-advice" or "visible-farming-advice") ||
                 (r.Kind == "experimental-bot-advice" && (captured.Meta.Source != "dota2" ||
                     captured.Meta.Player is not { MatchId: "0", Alive: true } ||
-                    r.Marker is { } p && (!Wire.Finite(p.X, 0, .20) || !Wire.Finite(p.Y, .65, 1)))) ||
+                    (r.Route ?? (r.Marker == null ? [] : [r.Marker])).Any(p => !Wire.Finite(p.X, 0, .20) || !Wire.Finite(p.Y, .65, 1)))) ||
                 (r.Kind == "visible-farming-advice" && (captured.Meta.Source != "dota2" ||
                     captured.Meta.Player is not { Alive: true } || captured.Meta.GsiAgeMs is null or < 0 or > 3000 ||
                     r.Marker != null && (r.Minimap == null || !r.Minimap.IsValidFor(r.SourceWidth, r.SourceHeight) ||
                                         !r.Minimap.Contains(r.Marker)))) ||
                 (r.Marker != null && (r.Kind == "local-vision-observation" ||
                     !Wire.Finite(r.Marker.X, 0, 1) || !Wire.Finite(r.Marker.Y, 0, 1)))) return null;
-            int remaining = (int)Math.Min(r.RemainingMs - (now() - started), Wire.FrameLifetimeMs - (now() - captured.At));
-            return r with { RemainingMs = remaining };
+            int remaining = (int)Math.Min(r.RemainingMs - (now() - started), CaptureRetentionMs - (now() - captured.At));
+            // Age measured on THIS machine's clock from the original capture; never taken from the coach.
+            return r with { RemainingMs = remaining, SourceAgeMs = (int)(now() - captured.At) };
         }
     }
     public async Task End(CancellationToken cancellation)
     {
-        video?.Abort(); video?.Dispose(); video = null;
+        CloseVideo();
         if (SessionId == null) return;
         try
         {
             using var request = Request(HttpMethod.Delete, "/v1/session");
             using var response = await http.SendAsync(request, cancellation);
         }
-        finally { SessionId = null; lock (gate) captures.Clear(); }
+        finally { SessionId = null; ClearCaptures(); }
     }
-    public void Dispose() { video?.Abort(); video?.Dispose(); http.Dispose(); lock (gate) captures.Clear(); }
+    private void CloseVideo()
+    {
+        lock (gate) { window = null; unacknowledged.Clear(); }
+        video?.Abort(); video?.Dispose(); video = null;
+    }
+    public void Dispose() { CloseVideo(); http.Dispose(); ClearCaptures(); }
     private sealed record ReminderEnvelope(Reminder? Reminder);
 }

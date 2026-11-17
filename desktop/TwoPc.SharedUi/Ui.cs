@@ -34,16 +34,31 @@ internal static class Ui
         var result = new BitmapImage(); result.BeginInit(); result.CacheOption = BitmapCacheOption.OnLoad;
         result.StreamSource = stream; result.EndInit(); result.Freeze(); return result;
     }
-    public static BitmapSource VideoImage(VideoPixels frame)
+    public static ComboBox Choice() => new() { FontSize = 13, Padding = new Thickness(5), Margin = new Thickness(0, 0, 0, 8) };
+    public static BitmapSource VideoImage(VideoPixels frame) => VideoImage(frame, frame.Width, frame.Height);
+    public static BitmapSource VideoImage(VideoPixels frame, int width, int height)
     {
-        var image = BitmapSource.Create(frame.Width, frame.Height, 96, 96, PixelFormats.Bgra32, null,
-            frame.ToBgra(), frame.Width * 4);
+        var image = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null,
+            frame.ToBgra(width, height), width * 4);
         image.Freeze(); return image;
     }
+    /// <summary>Largest size within the box that keeps the frame's aspect ratio; never upscales.</summary>
+    public static (int Width, int Height) Fit(int width, int height, double maxWidth, double maxHeight)
+    {
+        double scale = Math.Min(1, Math.Min(maxWidth / width, maxHeight / height));
+        return (Math.Max(16, (int)(width * scale)), Math.Max(16, (int)(height * scale)));
+    }
+    public static BitmapSource PreviewImage(VideoPixels frame, double maxWidth, double maxHeight)
+    {
+        var size = Fit(frame.Width, frame.Height, maxWidth, maxHeight);
+        return VideoImage(frame, size.Width, size.Height);
+    }
     public static BitmapSource FrameImage(FrameView frame) => frame.Video is { } video ? VideoImage(video) : Image(frame.Jpeg);
+    /// <summary>Model/Debug JPEG: scaled on the coach to at most 1600×900, whatever resolution the game machine sent.</summary>
     public static byte[] ExtractJpeg(VideoPixels frame)
     {
-        var image = BitmapFrame.Create(VideoImage(frame));
+        var size = Fit(frame.Width, frame.Height, 1600, 900);
+        var image = BitmapFrame.Create(VideoImage(frame, size.Width, size.Height));
         foreach (int quality in new[] { 85, 70, 55, 40 }) {
             var encoder = new JpegBitmapEncoder { QualityLevel = quality };
             encoder.Frames.Add(image);
