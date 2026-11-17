@@ -16,7 +16,7 @@ public sealed record DebugClientState(string State, bool Connected, bool Automat
     int? RequestLimit = null, int? IntervalSeconds = null, string? Model = null,
     bool? SubtitlesEnabled = null, bool? MapMarkersEnabled = null);
 public sealed record GsiDiagnostics(string Mode, string[] Sections, bool HasTeamGroups, bool HasAllPlayers, bool OwnStateAccepted,
-    int MinimapUnits = 0);
+    int MinimapUnits = 0, int EnemyHeroes = 0);
 public sealed record DebugOverlay(string ReminderId, long Sequence, int Width, int Height,
     double DpiScale, int Elements, double? MarkerPixelX, double? MarkerPixelY);
 public sealed record VideoStats(string Capture, string Encoder, int SourceWidth, int SourceHeight, int Width, int Height,
@@ -37,7 +37,8 @@ public sealed class DebugRecorder : IAsyncDisposable
     private bool accepting = true;
     private string reason = "recording";
     private long reserved, written, events, images, dropped, frameRecords, lastState = long.MinValue;
-    private long lastSample = long.MinValue, lastSpectator = long.MinValue, lastDelay = long.MinValue, lastVideo = long.MinValue;
+    private long lastSample = long.MinValue, lastSpectator = long.MinValue, lastDelay = long.MinValue, lastVideo = long.MinValue,
+        lastPlayerMinimap = long.MinValue;
     private const int ReserveBytes = 32768; // Metadata and final status always have a reserved budget.
     public string DirectoryPath { get; }
     public static string DefaultRoot => Path.Combine(
@@ -194,7 +195,7 @@ public sealed class DebugRecorder : IAsyncDisposable
     }
     public void Gsi(GsiDiagnostics d) => Enqueue("gsi-status", new {
         mode = Text(d.Mode, 32), sections = d.Sections.Take(12).Select(s => Text(s, 24)),
-        d.HasTeamGroups, d.HasAllPlayers, d.OwnStateAccepted, d.MinimapUnits,
+        d.HasTeamGroups, d.HasAllPlayers, d.OwnStateAccepted, d.MinimapUnits, d.EnemyHeroes,
         warning = "Structure summary only. Observer fields are not admitted to live inference; fog filtering is unverified.",
     });
     private bool Every(ref long last, int intervalMs)
@@ -204,16 +205,28 @@ public sealed class DebugRecorder : IAsyncDisposable
             last = now(); return true;
         }
     }
+    // [unitname, team, x, y, visionrange, icon]: no player names or IDs are parsed at all.
+    // 1200 units keeps one event under the 128 KiB record cap.
+    private static IEnumerable<object?[]> Units(SpectatorSnapshot s) =>
+        s.Minimap.Take(1200).Select(u => new object?[] { u.Name, u.Team, Math.Round(u.X), Math.Round(u.Y), u.Vision, u.Image });
     /// <summary>Coach-only, once per second: typed minimap units from this machine's own spectating Dota.</summary>
     public void Spectator(SpectatorSnapshot s)
     {
         if (role != "coach" || !Status.Recording || !Every(ref lastSpectator, 1000)) return;
         Enqueue("spectator-snapshot", new { mode = Text(s.Mode, 24), s.Clock, gameState = Text(s.GameState, 64), s.Paused,
             s.OwnTeam, s.GroupedPlayers, buildingTeams = s.BuildingTeams, eventTypes = s.EventTypes.Take(20).Select(e => Text(e, 40)),
-            // [unitname, team, x, y, visionrange, icon]: no player names or IDs are parsed at all.
-            // 1200 units keeps one event under the 128 KiB record cap.
-            units = s.Minimap.Take(1200).Select(u => new object?[] { u.Name, u.Team, Math.Round(u.X), Math.Round(u.Y), u.Vision, u.Image }),
+            units = Units(s),
             warning = "Dota Plus/spectator observation. Not admitted to the automatic coach; fog filtering is unverified.",
+        });
+    }
+    /// <summary>Game-only, once per second in a match: the same typed units from this machine's own player-mode GSI.</summary>
+    public void PlayerMinimap(SpectatorSnapshot s)
+    {
+        if (role != "game" || s.Mode == "menu" || !Status.Recording || !Every(ref lastPlayerMinimap, 1000)) return;
+        Enqueue("player-minimap", new { mode = Text(s.Mode, 24), s.Clock, gameState = Text(s.GameState, 64), s.Paused,
+            s.OwnTeam, buildingTeams = s.BuildingTeams, eventTypes = s.EventTypes.Take(20).Select(e => Text(e, 40)),
+            units = Units(s),
+            warning = "Own player-mode GSI. Not admitted to the automatic coach; fog filtering is unverified.",
         });
     }
     public void SpectatorDelay(DelayStats d)

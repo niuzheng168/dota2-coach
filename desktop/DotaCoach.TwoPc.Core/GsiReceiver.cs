@@ -16,6 +16,8 @@ public sealed class GsiReceiver : IAsyncDisposable
     private (OwnState Value, long At)? latest;
     public int Port { get; private set; }
     public Action<GsiDiagnostics>? Diagnostics { get; set; }
+    /// <summary>Typed minimap units of each authenticated packet, for the opt-in Debug log only.</summary>
+    public Action<SpectatorSnapshot>? Snapshot { get; set; }
     public GsiDiagnostics? LastDiagnostics { get; private set; }
     private const int MaxBody = 1024 * 1024; // Own state is small; requested minimap data may not be.
     private void Describe(JsonElement root, bool accepted)
@@ -25,11 +27,16 @@ public sealed class GsiReceiver : IAsyncDisposable
         bool teams = root.TryGetProperty("player", out var p) && p.ValueKind == JsonValueKind.Object &&
             (p.TryGetProperty("team2", out _) || p.TryGetProperty("team3", out _));
         bool all = root.TryGetProperty("allplayers", out _);
-        // Count only: whether player mode sends a minimap at all is still an open question.
         int minimap = root.TryGetProperty("minimap", out var m) && m.ValueKind == JsonValueKind.Object ? m.EnumerateObject().Count() : 0;
+        // Player mode does send a minimap (2026-11-17); which enemies it holds, i.e. fog filtering, is still unverified.
+        SpectatorSnapshot? snapshot = null;
+        try { snapshot = SpectatorGsi.Parse(root, Environment.TickCount64); } catch { /* Debug view only. */ }
+        int enemies = snapshot is { OwnTeam: int own } ? snapshot.Heroes.Where(u => u.Team is 2 or 3 && u.Team != own)
+            .Select(u => u.Name).Distinct().Count() : 0;
         LastDiagnostics = new(accepted ? "flat-player" : teams || all ? "observer-shaped" : "missing-own-state",
-            present, teams, all, accepted, minimap);
+            present, teams, all, accepted, minimap, enemies);
         try { Diagnostics?.Invoke(LastDiagnostics); } catch { /* Diagnostics must never change GSI acceptance. */ }
+        if (snapshot != null) try { Snapshot?.Invoke(snapshot); } catch { /* Same rule for the typed view. */ }
     }
     private GsiReceiver(int port, string? resumeToken)
     {

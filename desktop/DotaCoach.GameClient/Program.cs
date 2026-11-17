@@ -72,7 +72,7 @@ internal sealed class GameWindowUi : Window
         e2e = run; debug = new DebugPanel("game", debugRoot); overlay = new AdviceOverlay(run, () => debug.Recorder);
         videoSettingsPath = videoSettingsFile ?? GameVideoSettings.DefaultPath;
         videoSettings = GameVideoSettings.Load(videoSettingsPath);
-        Title = "Dota Coach · 游戏端 v0.4.0";
+        Title = "Dota Coach · 游戏端 v0.4.1";
         Width = Math.Min(1120, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(900, SystemParameters.WorkArea.Height - 40);
         MinWidth = 860; MinHeight = 680; WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -120,7 +120,7 @@ internal sealed class GameWindowUi : Window
             } catch { /* Debug must not affect the UI timer. */ }
             if (gsi?.LastDiagnostics is { OwnStateAccepted: true } d)
                 minimapStatus.Text = d.MinimapUnits > 0
-                    ? $"玩家模式小地图：有，{d.MinimapUnits} 个单位（只在本机统计，不上传）"
+                    ? $"玩家模式小地图：有，{d.MinimapUnits} 个单位，其中敌方英雄 {d.EnemyHeroes} 个（只在本机统计，不上传；开Debug按秒记录明细）"
                     : "玩家模式小地图：对局中没有收到";
         };
         reminderTimer.Start();
@@ -175,6 +175,7 @@ internal sealed class GameWindowUi : Window
                     string? identity = e2e?.ResumeGsiToken() ?? (diagnostic ? null : GsiSetup.Token(GsiState));
                     gsi = await GsiReceiver.Start(cancellation: starting.Token, resumeToken: identity);
                     gsi.Diagnostics = d => debug.Recorder?.Gsi(d);
+                    gsi.Snapshot = s => debug.Recorder?.PlayerMinimap(s);
                     persistentGsi = !diagnostic && e2e == null;
                     gsiStatus.Text = "GSI 本机端口 3219 已启动。";
                 }

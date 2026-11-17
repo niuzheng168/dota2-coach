@@ -130,17 +130,27 @@ internal static class SpectatorTests
             }
 
             // --- Game receiver now asks for minimap and tolerates its size.
+            SpectatorSnapshot? ownMap = null;
             await using (var gsi = await GsiReceiver.Start(0)) {
                 string secret = Regex.Match(gsi.Config, "\"token\" \"([A-F0-9]+)\"").Groups[1].Value;
                 check(gsi.Config.Contains("\"minimap\" \"1\"") && gsi.Config.Contains("\"throttle\" \"0.2\""), "game GSI config tests player-mode minimap");
+                gsi.Snapshot = s => ownMap = s;
                 using var http = new HttpClient { BaseAddress = new($"http://127.0.0.1:{gsi.Port}") };
+                var units = Enumerable.Range(0, 1200).ToDictionary(i => $"o{i}", i => Unit("npc_dota_creep_goodguys_melee", 2, i, i));
+                units["h0"] = Unit("npc_dota_hero_luna", 2, 1, 2, "minimap_herocircle_self");
+                units["h1"] = Unit("npc_dota_hero_razor", 3, 900, 900, "minimap_herocircle");
+                units["h2"] = Unit("npc_dota_hero_razor", 3, 950, 950, "minimap_herocircle", vision: 0); // Duplicate entry, one hero.
                 string own = JsonSerializer.Serialize(new { auth = new { token = secret },
-                    map = new { matchid = "8123456789", clock_time = 700 }, player = new { team_name = "radiant" },
+                    map = new { matchid = "8123456789", clock_time = 700, game_state = "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS" },
+                    player = new { team_name = "radiant" },
                     hero = new { name = "npc_dota_hero_luna", alive = true, health = 1000, mana = 300, xpos = 1, ypos = 2 },
-                    minimap = Enumerable.Range(0, 1200).ToDictionary(i => $"o{i}", i => Unit("npc_dota_creep_goodguys_melee", 2, i, i)) });
+                    minimap = units });
                 check(own.Length > 65536 && (await http.PostAsync("/gsi", new StringContent(own))).IsSuccessStatusCode &&
-                    gsi.Latest().Player?.Hero == "npc_dota_hero_luna" && gsi.LastDiagnostics is { MinimapUnits: 1200, OwnStateAccepted: true },
-                    "own state still parsed with a large minimap; only its unit count is kept");
+                    gsi.Latest().Player?.Hero == "npc_dota_hero_luna" &&
+                    gsi.LastDiagnostics is { MinimapUnits: 1203, EnemyHeroes: 1, OwnStateAccepted: true },
+                    "own state still parsed with a large minimap; distinct enemy heroes counted");
+                check(ownMap is { Mode: "player", OwnTeam: 2, Clock: 700 } && ownMap.Minimap.Length == 1203,
+                    "player-mode minimap handed over as typed units for Debug");
             }
 
             // --- Installer per role.
@@ -163,13 +173,22 @@ internal static class SpectatorTests
             // --- Debug: typed, rate-limited, coach only.
             var recorder = new DebugRecorder(Path.Combine(root, "debug"), "coach", "test");
             recorder.Spectator(team); recorder.Spectator(team); recorder.SpectatorDelay(live); recorder.SpectatorDelay(live);
+            if (ownMap != null) recorder.PlayerMinimap(ownMap);
             var gameRecorder = new DebugRecorder(Path.Combine(root, "debug"), "game", "test");
             gameRecorder.Spectator(team);
+            gameRecorder.PlayerMinimap(SpectatorGsi.Parse(JsonDocument.Parse(Payload(new { }, new { }, null)).RootElement, 0));
+            var inMatch = new SpectatorSnapshot(0, "player", 700, "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS", false, null, 2, 0,
+                [new("npc_dota_hero_razor", 3, 950.4, 950, null, 0, "minimap_herocircle")], ["radiant"], []);
+            gameRecorder.PlayerMinimap(inMatch); gameRecorder.PlayerMinimap(inMatch);
             await recorder.DisposeAsync(); await gameRecorder.DisposeAsync();
             string events = File.ReadAllText(Path.Combine(recorder.DirectoryPath, "events.jsonl"));
             check(Regex.Matches(events, "spectator-snapshot").Count == 1 && Regex.Matches(events, "spectator-delay").Count == 1 &&
                 events.Contains("npc_dota_hero_troll_warlord") && !events.Contains("auth"), "spectator debug is rate-limited and typed");
-            check(!File.ReadAllText(Path.Combine(gameRecorder.DirectoryPath, "events.jsonl")).Contains("spectator"), "game role never records spectator data");
+            check(!events.Contains("player-minimap"), "coach role never records player-mode minimap");
+            string gameEvents = File.ReadAllText(Path.Combine(gameRecorder.DirectoryPath, "events.jsonl"));
+            check(!gameEvents.Contains("spectator"), "game role never records spectator data");
+            check(Regex.Matches(gameEvents, "\"player-minimap\"").Count == 1 && gameEvents.Contains("[\"npc_dota_hero_razor\",3,950,950,0,\"minimap_herocircle\"]") &&
+                !gameEvents.Contains("\"menu\"") && !gameEvents.Contains("auth"), "player-mode minimap is typed, once per second, menus skipped");
         } finally {
             try { Directory.Delete(root, recursive: true); } catch { /* Best-effort temp cleanup. */ }
         }

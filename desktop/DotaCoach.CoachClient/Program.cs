@@ -111,7 +111,7 @@ internal sealed class CoachWindow : Window
         settingsPath = preferencesFile ?? LiveCoachSettings.DefaultPath;
         try { preferences = LiveCoachSettings.Load(settingsPath); }
         catch { preferences = new(); notice.Text = "已保存的设置无效，请检查并重新应用；没有读取或输出密钥内容。"; }
-        Title = "Dota Coach · 教练端（3090 Ti）v0.4.0";
+        Title = "Dota Coach · 教练端（3090 Ti）v0.4.1";
         Width = Math.Min(1320, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(940, SystemParameters.WorkArea.Height - 40);
         MinWidth = 1000; MinHeight = 680; WindowStartupLocation = WindowStartupLocation.CenterScreen;

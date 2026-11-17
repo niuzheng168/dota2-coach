@@ -34,6 +34,7 @@ foreach ($role in @("Game", "Coach")) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v021-debug.md") -Destination (Join-Path $destination "DEBUG-DETAILS.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v020.md") -Destination (Join-Path $destination "NORMAL-USE.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v031-plus.md") -Destination (Join-Path $destination "PLUS-SPECTATOR.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v041-minimap.md") -Destination (Join-Path $destination "PLAYER-MINIMAP.md")
     $unexpected = Get-ChildItem -LiteralPath $destination -Recurse -File | Where-Object {
         $_.Name -match '^\.env|\.env$|\.(dem|pfx|pem|key|cfg|secret|jsonl|dpapi)$|^(coach-settings|installed-gsi|session|summary)\.json$|^(model-frame|overlay-screen)-' -or
         $_.FullName -match '[\\/]frames[\\/]'
@@ -58,6 +59,7 @@ $manifest = [ordered]@{
     defaultSubtitleSeconds = 3; defaultModelTimeoutSeconds = 15; automaticMinimapLayout = $true; modelRouteMaxStops = 3
     debugRecordingOptIn = $true; debugMaximumBytes = 2L * 1024 * 1024 * 1024; debugMaximumMinutes = 120
     plusSpectatorObservationOnly = $true; plusSpectatorPort = 3220
+    playerMinimapDebugIntervalMs = 1000; playerMinimapObservationOnly = $true
     sourceCommit = (& git -C (Join-Path $PSScriptRoot "..") rev-parse HEAD)
     sourceDirty = [bool](& git -C (Join-Path $PSScriptRoot "..") status --porcelain)
 }
