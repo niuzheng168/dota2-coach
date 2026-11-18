@@ -31,29 +31,20 @@ internal sealed class CoachWindow : Window
 {
     private readonly ComboBox address = new() { FontSize = 14, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 8) };
     private readonly TextBox port = Ui.Input("38471");
-    private readonly TextBox message = Ui.Input("双机链路已连接。这是测试提醒，不是 AI 路线。");
-    private readonly TextBox model = Ui.Input();
-    private readonly TextBox markX = Ui.Input();
-    private readonly TextBox markY = Ui.Input();
+    private readonly Button listen;
     private readonly TextBlock status = Ui.Text("接收服务未启动", 17, Ui.Accent);
-    private readonly TextBlock stats = Ui.Text("没有接收或保存图像");
-    private readonly TextBlock player = Ui.Text("自身 GSI：未知");
-    private readonly TextBlock notice = Ui.Text("先启动接收，再复制配对码到游戏端。", 14, Ui.Accent);
-    private readonly TextBlock visionText = Ui.Text("自动教练等待模型配置、真实画面和新鲜自身GSI。");
-    private readonly TextBlock previewTitle = Ui.Text("LIVE VIEW  /  等待游戏端", 22, Ui.Accent);
+    private readonly TextBlock detail = Ui.Text("", 12, Brushes.LightGray);
+    private readonly TextBlock notice = Ui.Text("先启动接收，再复制配对码到游戏端。", 13, Ui.Accent);
+    private readonly TextBlock visionText = Ui.Text("");
+    private readonly TextBlock previewTitle = Ui.Text("等待游戏端画面", 20, Ui.Accent);
     private readonly Image image = new() { Stretch = Stretch.Uniform };
-    private readonly Canvas marks = new() { IsHitTestVisible = false };
     private readonly Grid preview = new() { Background = Brushes.Black };
-    private readonly CheckBox frozen = new() { Content = "冻结预览（不停止接收）", Foreground = Brushes.White, Margin = new Thickness(0, 8, 0, 8) };
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly CancellationTokenSource stop = new();
     private CoachHost? host;
     private CancellationTokenSource? starting;
-    private FrameView? displayed, visionFrame;
-    private VisionObservation? observation;
-    private ScreenMark? selected;
-    private DeferredLinkProbe? deferredProbe;
-    private bool closing, busy, observing;
+    private FrameView? displayed;
+    private bool closing, busy;
     private readonly E2ERun? e2e;
     private CloudCoach? cloud;
     private bool deciding;
@@ -61,16 +52,16 @@ internal sealed class CoachWindow : Window
     private long nextDecision;
     private readonly string settingsPath;
     private LiveCoachSettings preferences;
-    private readonly CheckBox automatic = new() { Content = "自动教练（普通对局＋机器人局）", Foreground = Brushes.White };
+    private readonly CheckBox automatic = new() { Content = "自动教练", Foreground = Brushes.White };
     private readonly CheckBox subtitles = new() { Content = "游戏字幕", Foreground = Brushes.White };
-    private readonly CheckBox mapMarkers = new() { Content = "小地图目标", Foreground = Brushes.White };
+    private readonly CheckBox mapMarkers = new() { Content = "小地图路线", Foreground = Brushes.White };
     private readonly TextBox foundryFile = Ui.Input();
     private readonly TextBox reasoningModel = Ui.Input();
     private readonly TextBox interval = Ui.Input();
     private readonly TextBox requestLimit = Ui.Input();
     private readonly TextBox subtitleSeconds = Ui.Input();
     private readonly TextBox modelTimeout = Ui.Input();
-    private readonly CheckBox autoMinimap = new() { Content = "未校准时使用默认左下小地图框（按HUD高度比例）", Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 7) };
+    private readonly CheckBox autoMinimap = new() { Content = "未校准时使用默认左下小地图框", Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 7) };
     // Preview runs at the stream rate (bounded by the WPF frame clock), converted off the UI thread.
     private readonly DispatcherTimer previewTimer = new(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(1) };
     private WriteableBitmap? previewBitmap;
@@ -92,7 +83,7 @@ internal sealed class CoachWindow : Window
     // Instance field so isolated UI tests never touch the real %LOCALAPPDATA% state.
     private string spectatorState = GsiSetup.StateDirectoryFor("Coach");
     private readonly TextBox spectatorInstall = Ui.Input(GsiSetup.FindInstall(GsiSetup.StateDirectoryFor("Coach")));
-    private readonly TextBlock spectatorSetup = Ui.Text("尚未配置。本机需用账号B登录Steam（有Dota Plus，并与游戏账号互为好友）。", 12, Brushes.LightGray);
+    private readonly TextBlock spectatorSetup = Ui.Text("尚未配置。", 12, Brushes.LightGray);
     private readonly TextBlock spectatorLive = Ui.Text("Plus 观战：未启动", 13);
     private readonly PlusDelayTracker plusDelay = new();
     private SpectatorReceiver? spectator;
@@ -111,19 +102,18 @@ internal sealed class CoachWindow : Window
         settingsPath = preferencesFile ?? LiveCoachSettings.DefaultPath;
         try { preferences = LiveCoachSettings.Load(settingsPath); }
         catch { preferences = new(); notice.Text = "已保存的设置无效，请检查并重新应用；没有读取或输出密钥内容。"; }
-        Title = "Dota Coach · 教练端（3090 Ti）v0.4.1";
+        Title = "Dota Coach · 教练端 v0.4.2";
         Width = Math.Min(1320, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(940, SystemParameters.WorkArea.Height - 40);
-        MinWidth = 1000; MinHeight = 680; WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        MinWidth = 1000; MinHeight = 640; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = Ui.Background; FontFamily = new FontFamily("Segoe UI, Microsoft YaHei UI");
         var root = new Grid { Margin = new Thickness(24) };
-        root.ColumnDefinitions.Add(new() { Width = new GridLength(330) });
+        root.ColumnDefinitions.Add(new() { Width = new GridLength(340) });
         root.ColumnDefinitions.Add(new() { Width = new GridLength(20) });
         root.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
         var left = new StackPanel();
-        left.Children.Add(Ui.Text("COACH CLIENT", 26, Ui.Accent));
-        left.Children.Add(Ui.Text("后台机器 · 接收 / 视觉 / 提醒回传"));
-        left.Children.Add(Ui.Text("配对码中的本机地址"));
+        left.Children.Add(Ui.Text("教练端", 26, Ui.Accent));
+        left.Children.Add(Ui.Text("接收游戏机的画面和自身GSI，调用模型，把提醒发回游戏机。", 12, Brushes.LightGray));
         var ips = NetworkInterface.GetAllNetworkInterfaces().Where(n => n.OperationalStatus == OperationalStatus.Up)
             .SelectMany(n => n.GetIPProperties().UnicastAddresses).Select(a => a.Address)
             .Where(a => Wire.IsLan(a) && !IPAddress.IsLoopback(a)).Select(a => a.ToString()).Distinct().Order().ToList();
@@ -141,38 +131,28 @@ internal sealed class CoachWindow : Window
                     .Where(a => Wire.IsLan(a) && !IPAddress.IsLoopback(a)).Select(a => a.ToString()).FirstOrDefault();
             if (preferred != null && ips.Contains(preferred)) address.SelectedItem = preferred;
         }
-        left.Children.Add(address);
-        left.Children.Add(Ui.Text("127.0.0.1 仅用于同机；跨机请选真实局域网地址，不要误选WSL虚拟网卡。", 12, Brushes.LightGray));
-        left.Children.Add(Ui.Text("HTTPS 接收端口（默认38471）")); left.Children.Add(port);
-        var controls = new WrapPanel();
-        controls.Children.Add(Ui.Button("启动局域网接收", async (_, _) => await Start()));
-        controls.Children.Add(Ui.Button("停止", async (_, _) => await Stop()));
-        left.Children.Add(controls);
-        var pairing = new WrapPanel();
-        pairing.Children.Add(Ui.Button("复制配对码", (_, _) => CopyPairing()));
-        pairing.Children.Add(Ui.Button("撤销配对", (_, _) => { CancelProbe(); host?.Revoke(); ClearView(); notice.Text = "旧配对已撤销；请重新复制配对码。"; }));
-        left.Children.Add(pairing); left.Children.Add(status); left.Children.Add(stats); left.Children.Add(player);
-        if (e2e == null) left.Children.Add(new Expander { Header = "Plus 实时观战 · 实验（不接入自动教练）", Content = BuildSpectatorPanel(),
-            Foreground = Brushes.White, IsExpanded = true, Margin = new Thickness(0, 0, 0, 8) });
-        left.Children.Add(new Expander { Header = "Debug / 抽帧、模型与客户端状态", Content = debug.View, Foreground = Brushes.White });
-        if (e2e == null) BuildAutomaticControls(left);
-        left.Children.Add(Ui.Text("人工联调（不是 AI 决策）", 19, Ui.Accent));
-        message.AcceptsReturn = true; message.Height = 70; message.MaxLength = 120; message.TextWrapping = TextWrapping.Wrap;
-        left.Children.Add(message);
-        left.Children.Add(Ui.Text("点击预览里的小地图可选一个画面坐标标记。点击会冻结预览；标记不是世界坐标路线。", 12, Brushes.LightGray));
-        left.Children.Add(frozen);
-        var send = new WrapPanel();
-        send.Children.Add(Ui.Button("回传测试字幕 / 标记", (_, _) => Send()));
-        send.Children.Add(Ui.Button("清除回传", (_, _) => { CancelProbe(); host?.Mailbox.ClearReminder(); selected = null; marks.Children.Clear(); frozen.IsChecked = false; }));
-        left.Children.Add(send);
-        left.Children.Add(Ui.Text("同机测试坐标 x / y（0–1，可留空；仅画面测试点，不是地图路线）", 12, Brushes.LightGray));
-        var coordinates = new Grid();
-        coordinates.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
-        coordinates.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
-        markX.Margin = new Thickness(0, 0, 8, 8); Grid.SetColumn(markY, 1);
-        coordinates.Children.Add(markX); coordinates.Children.Add(markY); left.Children.Add(coordinates);
-        left.Children.Add(Ui.Button("5秒后测试回传（请切回Dota）", (_, _) => ScheduleProbe()));
-        left.Children.Add(notice);
+        left.Children.Add(Ui.Label("本机地址 / 端口（跨机请选局域网IP，不要选WSL虚拟网卡；127.0.0.1 只用于同机）"));
+        port.Width = 90;
+        left.Children.Add(Ui.Row(address, port));
+        listen = Ui.Button("启动接收", async (_, _) => { if (busy || host != null) await Stop(); else await Start(); });
+        var connection = new WrapPanel();
+        connection.Children.Add(listen);
+        connection.Children.Add(Ui.Button("复制配对码", (_, _) => CopyPairing()));
+        connection.Children.Add(Ui.Button("撤销配对", (_, _) => { host?.Revoke(); ClearView(); notice.Text = "旧配对已撤销；请重新复制配对码。"; }));
+        left.Children.Add(connection);
+        left.Children.Add(status); left.Children.Add(detail); left.Children.Add(notice);
+        var switches = new StackPanel();
+        if (e2e == null) {
+            var modelSettings = new StackPanel(); BuildAutomaticControls(switches, modelSettings);
+            left.Children.Add(Ui.Section("模型设置", modelSettings));
+            var calibration = new StackPanel(); BuildCalibration(calibration);
+            left.Children.Add(Ui.Section("小地图校准", calibration));
+            left.Children.Add(Ui.Section("Plus 实时观战（实验，只记录）", BuildSpectatorPanel()));
+        }
+        var diagnostics = new StackPanel();
+        diagnostics.Children.Add(debug.View);
+        diagnostics.Children.Add(Ui.Button("发送测试提醒", (_, _) => SendTest()));
+        left.Children.Add(Ui.Section("Debug", diagnostics));
         var scroll = new ScrollViewer { Content = left, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         root.Children.Add(scroll);
 
@@ -181,26 +161,16 @@ internal sealed class CoachWindow : Window
         right.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
         right.RowDefinitions.Add(new() { Height = GridLength.Auto });
         right.Children.Add(previewTitle);
-        preview.Children.Add(image); preview.Children.Add(marks); preview.Children.Add(calibrationMarks);
+        preview.Children.Add(image); preview.Children.Add(calibrationMarks);
         Grid.SetRow(preview, 1); right.Children.Add(preview);
-        var vision = new StackPanel { Margin = new Thickness(0, 14, 0, 0) };
-        vision.Children.Add(Ui.Text(e2e == null ? "AI 自动教练 · 普通模式" : "AI 本地机器人局验收", 20, Ui.Accent));
+        var vision = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+        vision.Children.Add(Ui.Text(e2e == null ? "AI 自动教练" : "AI 本地机器人局验收", 20, Ui.Accent));
+        vision.Children.Add(switches);
         vision.Children.Add(visionText);
-        var localProbe = new StackPanel();
-        localProbe.Children.Add(Ui.Text("仅用于手动诊断，不是自动教练的前置步骤。Ollama 已安装视觉模型名称：", 12, Brushes.LightGray));
-        localProbe.Children.Add(model);
-        var actions = new WrapPanel();
-        actions.Children.Add(Ui.Button("识别最新游戏画面一次", async (_, _) => await Observe()));
-        actions.Children.Add(Ui.Button("回传本次观察字幕", (_, _) => SendObservation()));
-        localProbe.Children.Add(actions);
-        vision.Children.Add(new Expander { Header = "本地 Ollama 视觉诊断（可选）", Content = localProbe,
-            Foreground = Brushes.White, Margin = new Thickness(0, 8, 0, 8) });
-        vision.Children.Add(Ui.Text(e2e == null ?
-            "自动教练默认开启：真实画面＋自身GSI发送到指定Foundry并计费。只提醒，不控制英雄。默认不存图；开启Debug才落盘。" :
-            "LOCAL BOT E2E：已显式配置Foundry云模型；真实图像和自身GSI会送往该服务并计费。仅本地局，非最优路线保证。", 12, Brushes.LightGray));
+        if (e2e != null) vision.Children.Add(Ui.Text("LOCAL BOT E2E：已显式配置Foundry云模型；真实图像和自身GSI会送往该服务并计费。仅本地局，非最优路线保证。", 12, Brushes.LightGray));
         Grid.SetRow(vision, 2); right.Children.Add(vision); Grid.SetColumn(right, 2); root.Children.Add(right);
         Content = root;
-        preview.MouseLeftButtonDown += SelectMark; preview.SizeChanged += (_, _) => { DrawMark(); DrawCalibration(); };
+        preview.SizeChanged += (_, _) => DrawCalibration();
         timer.Tick += (_, _) => Refresh(); timer.Start();
         previewTimer.Tick += (_, _) => UpdatePreview(); previewTimer.Start();
         if (e2e == null && automaticStartup) Loaded += async (_, _) => {
@@ -235,7 +205,7 @@ internal sealed class CoachWindow : Window
     private async Task Start()
     {
         if (busy || host != null || closing) return;
-        busy = true;
+        busy = true; listen.Content = "停止接收";
         try
         {
             if (!int.TryParse(port.Text, out int number) || number is < 1024 or > 65535)
@@ -255,17 +225,21 @@ internal sealed class CoachWindow : Window
             status.Text = $"HTTPS 接收已开启 · {host.ListeningAddress}:{host.Port}";
             notice.Text = "复制配对码到游戏端。若跨机无法连接，请仅为此程序/端口允许 Windows 专用网络入站。";
         }
-        catch (Exception e) { debug.Recorder?.Error("coach-listen", e); notice.Text = e is ArgumentException ? e.Message : "无法启动接收：检查端口是否被占用。未修改防火墙。"; }
+        catch (Exception e) {
+            debug.Recorder?.Error("coach-listen", e); listen.Content = "启动接收";
+            notice.Text = e is ArgumentException ? e.Message : "无法启动接收：检查端口是否被占用。未修改防火墙。";
+        }
         finally { starting?.Dispose(); starting = null; busy = false; }
     }
     private async Task Stop()
     {
-        CancelProbe(); CancelDecision();
+        CancelDecision();
         starting?.Cancel();
         while (busy) await Task.Delay(25);
         var current = host; host = null;
         if (current != null) await current.DisposeAsync();
-        port.IsEnabled = true; address.IsEnabled = true; ClearView(); status.Text = "接收服务已停止";
+        port.IsEnabled = true; address.IsEnabled = true; ClearView();
+        status.Text = "接收服务已停止"; detail.Text = ""; listen.Content = "启动接收";
     }
     private void CopyPairing()
     {
@@ -276,9 +250,8 @@ internal sealed class CoachWindow : Window
     private StackPanel BuildSpectatorPanel()
     {
         var panel = new StackPanel();
-        panel.Children.Add(Ui.Text("本机Dota用账号B对游戏账号“实时观战”（Plus，队伍视野）。这里显示收到的小地图等数据，并测量它比游戏机慢多少；" +
-            "结果不送进自动教练。开Debug会把这些数据按秒存盘，供事后分析。", 12, Brushes.LightGray));
-        panel.Children.Add(Ui.Text("本机 Dota 安装目录", 12)); panel.Children.Add(spectatorInstall);
+        panel.Children.Add(Ui.Text("本机 Dota 用账号 B（有 Dota Plus，与游戏账号互为好友）对游戏账号“实时观战”时，这里显示收到的小地图并测量比游戏机慢多少。只显示和记录，不进自动教练。", 12, Brushes.LightGray));
+        panel.Children.Add(Ui.Label("本机 Dota 安装目录")); panel.Children.Add(spectatorInstall);
         var buttons = new WrapPanel();
         buttons.Children.Add(Ui.Button("一键配置观战 GSI", async (_, _) => await StartSpectator()));
         buttons.Children.Add(Ui.Button("复制启动参数", (_, _) => spectatorSetup.Text = Ui.CopyLaunchOptions(SteamLaunch.Inspect())));
@@ -354,15 +327,6 @@ internal sealed class CoachWindow : Window
         } catch { /* Debug must not affect live refresh. */ }
         UpdateSpectator();
         if (host == null) return;
-        if (deferredProbe is { } pending)
-        {
-            string result = pending.Tick(host.Mailbox);
-            if (result != "waiting") {
-                notice.Text = result == "sent" ? "已针对新的真实游戏画面回传一次测试提醒（非AI决策）。" :
-                    "延迟联调已取消/超时；没有新鲜真实画面及自身GSI，不会发送。";
-                deferredProbe = null;
-            }
-        }
         var snapshot = host.Mailbox.Snapshot();
         if (e2e != null && File.Exists(System.IO.Path.Combine(e2e.Directory, "enable-model")) &&
             cloud != null && !deciding && modelCalls < e2e.MaxModelCalls &&
@@ -379,8 +343,9 @@ internal sealed class CoachWindow : Window
                 $"自动教练已开启 · {modelCalls}/{preferences.RequestLimit}次 · 已记录tokens {inputTokens}+{outputTokens}\n" +
                 (snapshot.Player == null ? "等待新鲜自身GSI（不是旁观者全图）。" : "只使用玩家可见画面；过期/失败不回退规则。");
         status.Text = snapshot.Connected ? "正在接收 · 加密配对连接" : snapshot.Status;
-        stats.Text = $"累计 {snapshot.Frames} 帧 / {snapshot.Bytes / 1048576.0:F2} MiB\n最新画面年龄 {snapshot.FrameAgeMs?.ToString() ?? "—"} ms（教练机接收后）";
-        player.Text = snapshot.Player is { } p ? $"自身GSI：{(p.Team == "radiant" ? "天辉" : "夜魇")} · 对局 {p.MatchId}\n{p.Hero}\n游戏 {p.Clock:F1}s · 血 {p.Health:F0} · 蓝 {p.Mana:F0}" : "自身 GSI：未知 / 已过期（不从全图补全）";
+        detail.Text = $"累计 {snapshot.Frames} 帧 / {snapshot.Bytes / 1048576.0:F1} MiB · 最新画面 {snapshot.FrameAgeMs?.ToString() ?? "—"} ms 前\n" +
+            (snapshot.Player is { } p ? $"自身GSI：{(p.Team == "radiant" ? "天辉" : "夜魇")} · {p.Hero} · 游戏 {p.Clock:F0}s · 血 {p.Health:F0} · 蓝 {p.Mana:F0}"
+                : "自身GSI：未知或已过期");
         if (!snapshot.Connected)
         {
             ClearView(); CancelDecision();
@@ -393,7 +358,6 @@ internal sealed class CoachWindow : Window
             previous.Meta.Player?.Hero != snapshot.Player?.Hero || previous.Meta.Player?.Team != snapshot.Player?.Team ||
             previous.Meta.Player is { } oldPlayer && snapshot.Player is { } newPlayer && newPlayer.Clock < oldPlayer.Clock))
             ClearView();
-        if (frozen.IsChecked == true) { previewTitle.Text = $"预览已冻结 · 传输仍继续 · 源画面超过{Wire.FrameLifetimeMs / 1000}秒后不能再回传"; return; }
         if (displayed is { } shown)
             previewTitle.Text = $"{(shown.Meta.Source == "diagnostic" ? "诊断画面 · 不是游戏" : "DOTA 2")} · " +
                 (shown.Video is { } v ? $"H.264 {v.Width}×{v.Height} · 预览 {previewFps:F0}fps" : "旧版JPEG") + $" / #{shown.Meta.Sequence}";
@@ -404,7 +368,7 @@ internal sealed class CoachWindow : Window
     /// </summary>
     private void UpdatePreview()
     {
-        if (host is not { } owner || closing || previewBusy || frozen.IsChecked == true) return;
+        if (host is not { } owner || closing || previewBusy) return;
         var latest = owner.Mailbox.Latest();
         if (latest == null || displayed?.Meta.SessionId == latest.Meta.SessionId && displayed?.Meta.Sequence == latest.Meta.Sequence) return;
         long generation = viewGeneration;
@@ -417,7 +381,7 @@ internal sealed class CoachWindow : Window
         previewBusy = true;
         Task.Run(() => video.ToBgra(size.Width, size.Height)).ContinueWith(t => {
             previewBusy = false;
-            if (t.IsFaulted || host != owner || closing || generation != viewGeneration || frozen.IsChecked == true) return;
+            if (t.IsFaulted || host != owner || closing || generation != viewGeneration) return;
             if (previewBitmap == null || previewBitmap.PixelWidth != size.Width || previewBitmap.PixelHeight != size.Height)
                 previewBitmap = new WriteableBitmap(size.Width, size.Height, 96, 96, PixelFormats.Bgra32, null);
             previewBitmap.WritePixels(new Int32Rect(0, 0, size.Width, size.Height), t.Result, size.Width * 4, 0);
@@ -429,7 +393,7 @@ internal sealed class CoachWindow : Window
         bool layoutChanged = displayed == null || displayed.Meta.SessionId != latest.Meta.SessionId ||
             displayed.Meta.SourceWidth != latest.Meta.SourceWidth || displayed.Meta.SourceHeight != latest.Meta.SourceHeight;
         if (image.Source != bitmap) image.Source = bitmap;
-        displayed = latest; selected = null; marks.Children.Clear();
+        displayed = latest;
         if (e2e == null && layoutChanged) DrawCalibration();
         previewShown++;
         if (Environment.TickCount64 - previewRateAt >= 1000) {
@@ -495,56 +459,43 @@ internal sealed class CoachWindow : Window
         }
         finally { if (decisionStop == deadline) decisionStop = null; deciding = false; }
     }
-    private void BuildAutomaticControls(StackPanel panel)
+    /// <summary>On/off switches sit with the AI output; model and timing details live in a collapsed section.</summary>
+    private void BuildAutomaticControls(StackPanel switches, StackPanel settings)
     {
-        panel.Children.Add(Ui.Text("自动打钱教练 · 默认开启", 20, Ui.Accent));
         automatic.IsChecked = preferences.AutomaticAdvice; subtitles.IsChecked = preferences.Subtitles;
-        mapMarkers.IsChecked = preferences.MinimapMarkers;
-        automatic.Margin = subtitles.Margin = mapMarkers.Margin = new Thickness(0, 0, 10, 7);
-        panel.Children.Add(automatic);
-        var features = new WrapPanel(); features.Children.Add(subtitles); features.Children.Add(mapMarkers); panel.Children.Add(features);
-        foreach (var toggle in new[] { automatic, subtitles, mapMarkers }) {
+        mapMarkers.IsChecked = preferences.MinimapMarkers; autoMinimap.IsChecked = preferences.AutoMinimap;
+        var toggles = new WrapPanel();
+        foreach (var toggle in new[] { automatic, subtitles, mapMarkers }) { toggle.Margin = new Thickness(0, 0, 16, 4); toggles.Children.Add(toggle); }
+        foreach (var toggle in new[] { automatic, subtitles, mapMarkers, autoMinimap }) {
             toggle.Checked += (_, _) => SaveFeatureToggles(); toggle.Unchecked += (_, _) => SaveFeatureToggles();
         }
-        autoMinimap.IsChecked = preferences.AutoMinimap;
-        autoMinimap.Checked += (_, _) => SaveFeatureToggles(); autoMinimap.Unchecked += (_, _) => SaveFeatureToggles();
+        switches.Children.Add(toggles); switches.Children.Add(autoStatus);
+        switches.Children.Add(Ui.Text("开启后把画面和自身GSI发到云端模型并计费；只提醒，不控制英雄。", 12, Brushes.LightGray));
+
         foundryFile.Text = preferences.FoundryEnvFile; reasoningModel.Text = preferences.Model;
         interval.Text = preferences.IntervalSeconds.ToString(); requestLimit.Text = preferences.RequestLimit.ToString();
         subtitleSeconds.Text = preferences.SubtitleSeconds.ToString(); modelTimeout.Text = preferences.ModelTimeoutSeconds.ToString();
-        panel.Children.Add(Ui.Text("Foundry 配置文件（仅教练机读取，不把密钥打包/传给游戏机）", 12));
-        panel.Children.Add(foundryFile);
-        panel.Children.Add(Ui.Button("选择模型配置文件", (_, _) => {
+        var browse = Ui.Button("选择…", (_, _) => {
             var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "配置文件|*.env|所有文件|*.*" };
             if (dialog.ShowDialog(this) == true) { foundryFile.Text = dialog.FileName; ConfigureModel(save: true); }
-        }));
-        panel.Children.Add(Ui.Text("实际部署名")); panel.Children.Add(reasoningModel);
-        panel.Children.Add(Ui.Text("调用间隔（秒） / 本次进程请求上限（失败也计数）", 12));
-        var limits = new Grid();
-        limits.ColumnDefinitions.Add(new()); limits.ColumnDefinitions.Add(new());
-        interval.Margin = new Thickness(0, 0, 8, 8); Grid.SetColumn(requestLimit, 1);
-        limits.Children.Add(interval); limits.Children.Add(requestLimit); panel.Children.Add(limits);
-        panel.Children.Add(Ui.Text("游戏内字幕/路线显示（秒，1–15） / 模型超时（秒，8–20）", 12));
-        var timing = new Grid();
-        timing.ColumnDefinitions.Add(new()); timing.ColumnDefinitions.Add(new());
-        subtitleSeconds.Margin = new Thickness(0, 0, 8, 8); Grid.SetColumn(modelTimeout, 1);
-        timing.Children.Add(subtitleSeconds); timing.Children.Add(modelTimeout); panel.Children.Add(timing);
-        panel.Children.Add(Ui.Button("应用模型设置", (_, _) => ConfigureModel(save: true)));
-        panel.Children.Add(autoStatus);
-        panel.Children.Add(Ui.Text("画面会发送到指定云端并计费；默认20秒一次、每进程最多180次。字幕从回传时起显示设定秒数；模型超时的结果直接丢弃。暂停即取消待返回结果；不会自动控制英雄。", 12, Brushes.LightGray));
-        panel.Children.Add(Ui.Text("小地图校准 · 原始游戏像素", 18, Ui.Accent));
+        });
+        browse.Margin = new Thickness(0, 0, 0, 8);
+        settings.Children.Add(Ui.Label("Foundry 配置文件（密钥只在教练机读取）")); settings.Children.Add(Ui.Row(foundryFile, browse));
+        settings.Children.Add(Ui.Label("部署名")); settings.Children.Add(reasoningModel);
+        settings.Children.Add(Ui.Label("调用间隔（秒） / 每次启动的请求上限（失败也计数）")); settings.Children.Add(Ui.Columns(interval, requestLimit));
+        settings.Children.Add(Ui.Label("字幕显示（秒，1–15） / 模型超时（秒，8–20）")); settings.Children.Add(Ui.Columns(subtitleSeconds, modelTimeout));
+        settings.Children.Add(Ui.Button("保存模型设置", (_, _) => ConfigureModel(save: true)));
+    }
+    private void BuildCalibration(StackPanel panel)
+    {
         panel.Children.Add(autoMinimap);
-        panel.Children.Add(Ui.Text("默认框适用于默认HUD（小地图在左下、未开超大小地图）。镜像HUD/超大小地图请填小地图内部正方形的左/上/边长并确认；确认后按游戏分辨率保存并优先使用。", 12));
-        var fields = new Grid();
-        for (int i = 0; i < 3; i++) fields.ColumnDefinitions.Add(new());
-        var inputs = new[] { mapLeft, mapTop, mapSize };
-        for (int i = 0; i < inputs.Length; i++) { Grid.SetColumn(inputs[i], i); inputs[i].Margin = new Thickness(0, 0, 6, 8); fields.Children.Add(inputs[i]); }
-        panel.Children.Add(fields);
-        var presets = new WrapPanel();
-        presets.Children.Add(Ui.Button("预览左下框", (_, _) => PreviewCalibration(false)));
-        presets.Children.Add(Ui.Button("预览右下框", (_, _) => PreviewCalibration(true))); panel.Children.Add(presets);
-        panel.Children.Add(Ui.Button("预览输入框", (_, _) => PreviewCalibration(null)));
-        panel.Children.Add(Ui.Button("确认小地图框", (_, _) => ConfirmCalibration()));
-        panel.Children.Add(mapStatus);
+        panel.Children.Add(Ui.Text("默认 HUD 不用校准。镜像 HUD 或超大小地图：点预设或填小地图正方形的左、上、边长（原始游戏像素），再确认。", 12, Brushes.LightGray));
+        panel.Children.Add(Ui.Label("左 / 上 / 边长")); panel.Children.Add(Ui.Columns(mapLeft, mapTop, mapSize));
+        var buttons = new WrapPanel();
+        buttons.Children.Add(Ui.Button("预设：左下", (_, _) => PreviewCalibration(false)));
+        buttons.Children.Add(Ui.Button("预设：右下", (_, _) => PreviewCalibration(true)));
+        buttons.Children.Add(Ui.Button("确认校准", (_, _) => ConfirmCalibration()));
+        panel.Children.Add(buttons); panel.Children.Add(mapStatus);
     }
     private void CancelDecision()
     {
@@ -615,11 +566,11 @@ internal sealed class CoachWindow : Window
         if (!layout.IsValidFor(frame.Meta.SourceWidth, frame.Meta.SourceHeight)) throw new ArgumentException("小地图框需位于画面左下或右下，不可超出客户区。");
         return layout;
     }
-    private void PreviewCalibration(bool? right)
+    private void PreviewCalibration(bool right)
     {
         try {
             var frame = CalibrationFrame();
-            draftLayout = right is bool side ? MinimapLayout.Suggest(frame.Meta.SourceWidth, frame.Meta.SourceHeight, side) : InputCalibration(frame);
+            draftLayout = MinimapLayout.Suggest(frame.Meta.SourceWidth, frame.Meta.SourceHeight, right);
             mapLeft.Text = draftLayout.Left.ToString("0.##", CultureInfo.InvariantCulture);
             mapTop.Text = draftLayout.Top.ToString("0.##", CultureInfo.InvariantCulture);
             mapSize.Text = draftLayout.Size.ToString("0.##", CultureInfo.InvariantCulture);
@@ -644,9 +595,9 @@ internal sealed class CoachWindow : Window
         bool draft = draftLayout?.IsValidFor(f.Meta.SourceWidth, f.Meta.SourceHeight) == true;
         var confirmed = preferences.LayoutFor(f);
         var layout = draft ? draftLayout : preferences.EffectiveLayout(f);
-        mapStatus.Text = $"游戏客户区 {f.Meta.SourceWidth}×{f.Meta.SourceHeight}（不是JPEG尺寸）\n" +
-            (draft ? "蓝框仅预览，尚未确认。" : confirmed != null ? "已保存此分辨率校准；HUD位置/大小改变时请重新确认。" :
-             layout != null ? "自动默认框（虚线）：默认HUD左下小地图。若虚线框没对准小地图，请手动校准。" :
+        mapStatus.Text = $"游戏画面 {f.Meta.SourceWidth}×{f.Meta.SourceHeight}：" +
+            (draft ? "蓝框是预览，点“确认校准”保存。" : confirmed != null ? "已保存此分辨率的校准。" :
+             layout != null ? "使用自动默认框（虚线）。没对准小地图时请校准。" :
              "未校准且未启用默认框：只发字幕，不画路线。");
         if (layout == null) return;
         var rect = Ui.ImageRect(preview.ActualWidth, preview.ActualHeight, f.Meta.SourceWidth, f.Meta.SourceHeight);
@@ -660,86 +611,18 @@ internal sealed class CoachWindow : Window
     private void ClearView()
     {
         viewGeneration++;
-        image.Source = null; displayed = null; selected = null; marks.Children.Clear(); frozen.IsChecked = false;
+        image.Source = null; displayed = null;
         calibrationMarks.Children.Clear();
-        observation = null; visionFrame = null;
     }
-    private void SelectMark(object sender, MouseButtonEventArgs e)
+    /// <summary>Link check without the model: one fixed caption on the newest frame.</summary>
+    private void SendTest()
     {
-        if (displayed == null) return;
-        var rect = Ui.ImageRect(preview.ActualWidth, preview.ActualHeight, displayed.Meta.SourceWidth, displayed.Meta.SourceHeight);
-        var position = e.GetPosition(preview);
-        if (!rect.Contains(position)) return;
-        selected = new((position.X - rect.X) / rect.Width, (position.Y - rect.Y) / rect.Height);
-        frozen.IsChecked = true; DrawMark();
-        notice.Text = "已选择当前画面的测试标记；尽快发送，过期后会拒绝。";
-    }
-    private void DrawMark()
-    {
-        marks.Children.Clear();
-        if (selected is not { } m || displayed == null) return;
-        var rect = Ui.ImageRect(preview.ActualWidth, preview.ActualHeight, displayed.Meta.SourceWidth, displayed.Meta.SourceHeight);
-        var circle = new Ellipse { Width = 24, Height = 24, Stroke = Brushes.Gold, StrokeThickness = 3 };
-        Canvas.SetLeft(circle, rect.X + m.X * rect.Width - 12); Canvas.SetTop(circle, rect.Y + m.Y * rect.Height - 12);
-        marks.Children.Add(circle);
-    }
-    private void Send()
-    {
-        try
-        {
-            if (host == null || displayed == null) throw new InvalidOperationException("没有新鲜画面。");
-            host.Mailbox.SetReminder(displayed.Meta.SessionId, displayed.Meta.Sequence, "manual-link-test", message.Text, selected);
-            if (host.Mailbox.Poll(displayed.Meta.SessionId) is { } reminder) debug.Recorder?.Reminder("reminder-published", reminder);
-            notice.Text = "已回传人工测试提醒；不是模型决策。"; frozen.IsChecked = false; selected = null; marks.Children.Clear();
+        try {
+            if (host?.Mailbox.Latest() is not { } frame) throw new InvalidOperationException();
+            host.Mailbox.SetReminder(frame.Meta.SessionId, frame.Meta.Sequence, "manual-link-test", "双机链路测试：这不是 AI 建议。", null);
+            if (host.Mailbox.Poll(frame.Meta.SessionId) is { } reminder) debug.Recorder?.Reminder("reminder-published", reminder);
+            notice.Text = "已发送测试提醒，请在游戏机上确认字幕。";
         }
-        catch { notice.Text = "未发送：画面/会话过期、英雄死亡或文本无效。解除冻结，等待新画面后重试。"; }
-    }
-    private void CancelProbe() { deferredProbe?.Cancel(); deferredProbe = null; }
-    private void ScheduleProbe()
-    {
-        try
-        {
-            if (host == null) throw new InvalidOperationException("请先启动接收服务。");
-            ScreenMark? point = null;
-            if (markX.Text.Trim() != "" || markY.Text.Trim() != "")
-            {
-                if (!double.TryParse(markX.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double x) ||
-                    !double.TryParse(markY.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double y))
-                    throw new ArgumentException("坐标需要同时填写0–1之间的数字，或同时留空。");
-                point = new(x, y);
-            }
-            CancelProbe(); deferredProbe = new DeferredLinkProbe(message.Text, point);
-            notice.Text = "已安排一次人工联调：请切回Dota。5秒后等待新画面和存活英雄GSI；25秒内没有则取消。不是AI路线。";
-        }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException) { notice.Text = e.Message; }
-    }
-    private async Task Observe()
-    {
-        if (observing) return;
-        var targetHost = host; var frame = targetHost?.Mailbox.Latest();
-        if (frame == null) { visionText.Text = "先接收真实游戏画面。"; return; }
-        observing = true; observation = null; visionFrame = null; visionText.Text = "正在教练机本地识别；无云端回退…";
-        try
-        {
-            using var vision = new LocalVision();
-            var result = await vision.Observe(model.Text.Trim(), frame, stop.Token);
-            if (host != targetHost || targetHost!.Mailbox.Snapshot().SessionId != frame.Meta.SessionId) return;
-            observation = result; visionFrame = frame;
-            visionText.Text = $"帧 #{frame.Meta.Sequence} 的观察（非规划）：{result.Summary}\n英雄 {result.Hero} · 阵营 {result.Team} · 时钟 {result.Clock?.ToString() ?? "未知"}\n未知：{string.Join("；", result.Unknowns)}";
-        }
-        catch (Exception e) { visionText.Text = e is ArgumentException or InvalidOperationException ? e.Message : "本地视觉不可用/超时。没有付费请求，没有生成路线。"; }
-        finally { observing = false; }
-    }
-    private void SendObservation()
-    {
-        try
-        {
-            if (host == null || observation == null || visionFrame == null) throw new InvalidOperationException();
-            host.Mailbox.SetReminder(visionFrame.Meta.SessionId, visionFrame.Meta.Sequence,
-                "local-vision-observation", observation.Summary, null);
-            if (host.Mailbox.Poll(visionFrame.Meta.SessionId) is { } reminder) debug.Recorder?.Reminder("reminder-published", reminder);
-            notice.Text = "已回传带“视觉观察”标识的实验字幕。";
-        }
-        catch { notice.Text = "本次观察已过期/换局，或尚无结果；没有回传。"; }
+        catch { notice.Text = "未发送：还没有新鲜画面，或英雄已阵亡。"; }
     }
 }

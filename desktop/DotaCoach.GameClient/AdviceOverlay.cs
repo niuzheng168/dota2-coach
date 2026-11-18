@@ -66,7 +66,7 @@ internal sealed class AdviceOverlay : Window
     }
     /// <summary>Caption heading: what produced the text and how old the picture behind it is.</summary>
     public static string Label(Reminder r) =>
-        r.Kind == "manual-link-test" ? "人工联调 · 非AI路线" :
+        r.Kind == "manual-link-test" ? "链路测试 · 非AI" :
         r.Kind is "experimental-bot-advice" or "visible-farming-advice"
             ? "AI打钱路线" + (r.SourceAgeMs is int age && age >= 1500 ? $" · 依据约{Math.Round(age / 1000.0)}秒前画面" : "") + " · 非最优保证"
             : "视觉观察 · 未经核验";

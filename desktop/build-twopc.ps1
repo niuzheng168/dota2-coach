@@ -29,10 +29,9 @@ foreach ($role in @("Game", "Coach")) {
     & $dotnet publish (Join-Path $PSScriptRoot "$name/$name.csproj") -c Release -r win-x64 `
         --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o $destination
     if ($LASTEXITCODE -ne 0) { throw "Publish failed: $name" }
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v040.md") -Destination (Join-Path $destination "README.md")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v030-video.md") -Destination (Join-Path $destination "VIDEO-ARCHITECTURE-v030.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v042-ui.md") -Destination (Join-Path $destination "README.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v040.md") -Destination (Join-Path $destination "VIDEO-v040.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v021-debug.md") -Destination (Join-Path $destination "DEBUG-DETAILS.md")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v020.md") -Destination (Join-Path $destination "NORMAL-USE.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v031-plus.md") -Destination (Join-Path $destination "PLUS-SPECTATOR.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v041-minimap.md") -Destination (Join-Path $destination "PLAYER-MINIMAP.md")
     $unexpected = Get-ChildItem -LiteralPath $destination -Recurse -File | Where-Object {

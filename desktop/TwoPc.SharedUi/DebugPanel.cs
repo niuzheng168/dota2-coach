@@ -14,9 +14,9 @@ internal sealed class DebugPanel : IAsyncDisposable
 {
     private readonly string role, root;
     private readonly CheckBox enabled = new() {
-        Content = "Debug：保存抽帧图片与运行日志", Foreground = Brushes.White, Margin = new Thickness(0, 6, 0, 4),
+        Content = "开启 Debug 记录", Foreground = Brushes.White, Margin = new Thickness(0, 6, 0, 4),
     };
-    private readonly TextBlock status = Ui.Text("Debug未开启，不保存调试图片。", 12, Brushes.LightGray);
+    private readonly TextBlock status = Ui.Text("未开启，不保存任何记录。", 12, Brushes.LightGray);
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(1) };
     private bool changing;
     private DebugRecorder? current;
@@ -29,8 +29,8 @@ internal sealed class DebugPanel : IAsyncDisposable
         this.role = role; root = outputRoot ?? DebugRecorder.DefaultRoot;
         View.Children.Add(enabled);
         View.Children.Add(Ui.Text(role == "coach" ?
-            "从视频每秒取一帧供Debug，另存每次模型输入；可能含游戏聊天。不录整段视频、不自动上传；每次最多2GiB / 2小时。" :
-            "只记本机状态、错误和提醒回执，不重复保存视频图片；日常Debug只开教练端即可。旧机器人证据模式另行保留截图。", 11, Brushes.LightGray));
+            "每秒存一帧画面和每次模型输入（可能含游戏聊天），只存本机，最多 2 GiB / 2 小时。" :
+            "记录运行状态、提醒回执和每秒小地图明细，不存图片，只存本机。", 11, Brushes.LightGray));
         View.Children.Add(status);
         View.Children.Add(Ui.Button("打开 Debug 目录", (_, _) => {
             if (lastDirectory == null) { status.Text = "先开启一次Debug；不会创建空的录制。"; return; }

@@ -101,8 +101,8 @@ internal static class Capture
         g.DrawString("标记测试区", text, Brushes.White, 54, 446);
         float x1 = 70 + (sequence * 13 % 150), y1 = 535;
         g.FillEllipse(Brushes.Aquamarine, x1, y1, 24, 24);
-        g.DrawString("请在教练端点击左下测试区，回传一条测试字幕。", text, Brushes.Aquamarine, 340, 390);
-        g.DrawString("真正游戏采集：切换来源后重新连接，并切回 Dota 2。", text, Brushes.LightGray, 340, 440);
+        g.DrawString("教练端 Debug →“发送测试提醒”可检查字幕回传。", text, Brushes.Aquamarine, 340, 390);
+        g.DrawString("真实画面：在“设置”里把来源改回 Dota 2 再连接。", text, Brushes.LightGray, 340, 440);
         return image;
     }
     private static byte[] Encode(Bitmap full)

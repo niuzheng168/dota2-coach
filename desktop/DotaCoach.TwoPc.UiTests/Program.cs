@@ -38,7 +38,7 @@ internal static class Program
     private static void Click(Window w, string content) => Children(w).OfType<Button>()
         .Single(b => Equals(b.Content, content)).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     private static CheckBox DebugSwitch(Window w) => Children(w).OfType<CheckBox>()
-        .Single(c => Equals(c.Content, "Debug：保存抽帧图片与运行日志"));
+        .Single(c => Equals(c.Content, "开启 Debug 记录"));
     private static DebugRecorder? Recorder(Window w)
     {
         object panel = Field<object>(w, "debug");
@@ -88,6 +88,9 @@ internal static class Program
         var game = (Window)Activator.CreateInstance(gameType, [null, debugRoot, videoSettings])!;
         // Exercise packaged UI handlers without desktop input, clipboard, real game capture or AI.
         coach.Show(); game.Show();
+        await Wait(() => Children(coach).Concat(Children(game)).OfType<Expander>().All(e => !e.IsExpanded) &&
+            Children(coach).OfType<Expander>().Count() == 4 && Children(game).OfType<Expander>().Count() == 2,
+            "rarely used settings start collapsed (coach: model, minimap, Plus, Debug; game: settings, Debug)");
         await Wait(() => DebugSwitch(coach).IsChecked != true && DebugSwitch(game).IsChecked != true &&
             !Directory.Exists(debugRoot), "Debug is opt-in and creates no recording directory while off");
         DebugSwitch(coach).IsChecked = true; DebugSwitch(game).IsChecked = true;
@@ -96,7 +99,7 @@ internal static class Program
         await Wait(() => Equals(Field<ComboBox>(coach, "address").SelectedItem, "127.0.0.1"),
             "same-machine default is loopback, not a virtual or LAN adapter");
         Field<TextBox>(coach, "port").Text = "38479";
-        Click(coach, "启动局域网接收");
+        Click(coach, "启动接收");
         await Wait(() => Field<CoachHost?>(coach, "host") != null, "coach starts its own TLS listener");
         await Wait(() => !Field<bool>(coach, "busy") && !Field<ComboBox>(coach, "address").IsEnabled,
             "listening address is locked until receiver stops");
@@ -120,33 +123,23 @@ internal static class Program
             catch (OperationCanceledException) { rejected = true; }
             await Wait(() => rejected, "loopback-only listener rejects pinned-TLS access through the non-loopback adapter");
         }
-        Field<TextBox>(coach, "markX").Text = "invalid";
-        Click(coach, "5秒后测试回传（请切回Dota）");
-        await Wait(() => Field<DeferredLinkProbe?>(coach, "deferredProbe") == null &&
-            Field<TextBlock>(coach, "notice").Text.Contains("坐标"),
-            "invalid delayed-probe coordinates are rejected by actual UI handler");
-        Field<TextBox>(coach, "markX").Text = ".065"; Field<TextBox>(coach, "markY").Text = ".86";
-        Click(coach, "5秒后测试回传（请切回Dota）");
-        await Wait(() => Field<DeferredLinkProbe?>(coach, "deferredProbe") != null,
-            "explicit delayed-probe button schedules a single manual test");
-        Click(coach, "清除回传");
-        await Wait(() => Field<DeferredLinkProbe?>(coach, "deferredProbe") == null,
-            "clear cancels a pending delayed probe");
+        Click(coach, "发送测试提醒");
+        await Wait(() => Field<TextBlock>(coach, "notice").Text.StartsWith("未发送"), "test reminder is refused before any frame arrives");
         Field<PasswordBox>(game, "pairing").Password = host.Pair(IPAddress.Loopback).Encode();
         Field<ComboBox>(game, "source").SelectedIndex = 1;
         await Wait(() => Field<ComboBox>(game, "fpsChoice").SelectedItem as string == "60 fps" &&
             Field<ComboBox>(game, "resolutionChoice").SelectedIndex == 2 && Field<ComboBox>(game, "captureChoice").SelectedIndex == 0,
             "game UI defaults to 60 fps, 1080p and background-capable window capture");
         Field<TextBox>(game, "bitrateChoice").Text = "abc";
-        Click(game, "连接并开始");
+        Click(game, "连接");
         await Wait(() => Field<TextBlock>(game, "status").Text.Contains("码率") && Field<CancellationTokenSource?>(game, "active") == null,
             "invalid bitrate is rejected before any capture starts");
         Field<TextBox>(game, "bitrateChoice").Text = "0";
-        Click(game, "连接并开始");
+        Click(game, "连接");
         await Wait(() => host.Mailbox.Snapshot().Frames >= 3 && host.Mailbox.Latest()?.Video != null,
             "game client continuously sends real H264 diagnostic video through pinned WSS");
-        await Wait(() => File.Exists(videoSettings) && GameVideoSettings.Load(videoSettings).Fps == 60 && !Field<ComboBox>(game, "fpsChoice").IsEnabled,
-            "chosen video settings persist and lock while streaming");
+        await Wait(() => File.Exists(videoSettings) && GameVideoSettings.Load(videoSettings).Fps == 60 && !Field<ComboBox>(game, "fpsChoice").IsEnabled &&
+            Equals(Field<Button>(game, "connect").Content, "断开"), "chosen video settings persist and lock while streaming; connect turns into disconnect");
         await Wait(() => Field<Image>(coach, "image").Source != null, "coach preview receives decoded bitmap");
         await Wait(() => Field<Image>(game, "image").Source != null, "game preview receives capture bitmap");
         await Wait(() => Recorder(coach)!.Status.Images >= 2 && Recorder(game)!.Status.Images == 0,
@@ -158,27 +151,20 @@ internal static class Program
         Console.WriteLine($"VIDEO UI: {receivedVideo} received frames over {measuredSeconds:F3}s = {receivedVideo / measuredSeconds:F1} fps " +
             $"(synthetic 1280x720 source at a 60 fps target; not game FPS). {Field<TextBlock>(game, "metrics").Text.Replace("\n", " | ")}");
         await Wait(() => receivedVideo / measuredSeconds > 40, "60 fps target delivers well above the old 30 fps cap end to end");
-        long beforeFreeze = Recorder(coach)!.Status.Images;
-        Field<CheckBox>(coach, "frozen").IsChecked = true;
-        await Wait(() => Recorder(coach)!.Status.Images > beforeFreeze, "Debug records received frames even while the preview is frozen");
-        Field<CheckBox>(coach, "frozen").IsChecked = true;
-        Field<TextBox>(coach, "message").Text = "双机测试成功：字幕和小地图测试标记已回传。";
-        Set(coach, "selected", new ScreenMark(.12, .80));
-        Click(coach, "回传测试字幕 / 标记");
-        await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("双机测试成功"), "actual UI reminder handler returns caption");
+        var source = host.Mailbox.Latest()!;
+        host.Mailbox.SetReminder(source.Meta.SessionId, source.Meta.Sequence, "manual-link-test",
+            "双机测试成功：字幕和小地图测试标记已回传。", new ScreenMark(.12, .80));
+        await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("双机测试成功"), "game UI shows a returned caption");
         await Wait(() => Field<Canvas>(game, "marks").Children.Count == 1, "UI adds returned normalized marker element");
         Render(coach, Path.Combine(output, "coach.png")); Render(game, Path.Combine(output, "game.png"));
-        Click(coach, "清除回传");
+        host.Mailbox.ClearReminder();
         await Wait(() => Field<Canvas>(game, "marks").Children.Count == 0 &&
-            Field<TextBlock>(game, "caption").Text.Contains("无有效提醒"), "clear command clears game caption and marker");
+            Field<TextBlock>(game, "caption").Text.Contains("无有效提醒"), "a cleared reminder clears game caption and marker");
         await Task.Delay(500);
-        Click(coach, "回传测试字幕 / 标记");
-        await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("双机测试成功"), "second reminder received");
+        Click(coach, "发送测试提醒");
+        await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("双机链路测试") &&
+            Field<TextBlock>(coach, "notice").Text.StartsWith("已发送"), "coach Debug test button reaches the game caption");
         await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("无有效提醒"), "reminder expires without renewing on polls", 12000);
-        Field<CheckBox>(coach, "frozen").IsChecked = true;
-        await Task.Delay(Wire.FrameLifetimeMs + 500);
-        Click(coach, "回传测试字幕 / 标记");
-        await Wait(() => Field<TextBlock>(coach, "notice").Text.StartsWith("未发送"), "expired frozen preview cannot publish a reminder");
         Click(coach, "撤销配对");
         await Wait(() => Field<CancellationTokenSource?>(game, "active") == null &&
             !Field<bool>(game, "transportConnected") && Field<ComboBox>(game, "source").IsEnabled &&
@@ -186,18 +172,18 @@ internal static class Program
             "revocation stops both video workers, releases controls and clears the session");
         await Wait(() => Field<Canvas>(game, "marks").Children.Count == 0, "revocation leaves no stale marker");
         Field<PasswordBox>(game, "pairing").Password = host.Pair(IPAddress.Loopback).Encode();
-        Click(game, "连接并开始");
+        Click(game, "连接");
         await Wait(() => host.Mailbox.Snapshot().Connected, "new pairing reconnects with a fresh session");
-        Click(game, "停止 / 断开");
+        Click(game, "断开");
         await Wait(() => host.Mailbox.Snapshot().SessionId == null, "game stop ends capture session on coach");
         await Wait(() => Field<Image>(coach, "image").Source == null, "coach clears disconnected preview");
-        Click(game, "连接并开始"); Click(game, "停止 / 断开");
+        Click(game, "连接"); Click(game, "断开");
         await Wait(() => Field<CancellationTokenSource?>(game, "active") == null, "stop interrupts game connection startup");
-        Click(coach, "停止");
+        Click(coach, "停止接收");
         await Wait(() => Field<CoachHost?>(coach, "host") == null, "coach stop closes listener");
         await Wait(() => Field<ComboBox>(coach, "address").IsEnabled,
             "stopping receiver unlocks address selection");
-        Click(coach, "启动局域网接收"); Click(coach, "停止");
+        Click(coach, "启动接收"); Click(coach, "停止接收");
         await Wait(() => !Field<bool>(coach, "busy") && Field<CoachHost?>(coach, "host") == null, "stop interrupts coach listener startup");
         game.Close(); coach.Close();
         await Wait(() => !game.IsVisible && !coach.IsVisible, "both clients shut down cleanly");
@@ -335,7 +321,7 @@ internal static class Program
         using var fake = new UiModel();
         var cloud = new CloudCoach(Path.GetFullPath(env), "gpt-6-astra", "", fake, map, false);
         Set(w, "cloud", cloud); Set(w, "modelConfigured", true);
-        Field<TextBox>(w, "port").Text = "38480"; Click(w, "启动局域网接收");
+        Field<TextBox>(w, "port").Text = "38480"; Click(w, "启动接收");
         await Wait(() => Field<CoachHost?>(w, "host") != null && !Field<bool>(w, "busy"), "normal live UI starts paired service");
         var host = Field<CoachHost>(w, "host");
         string session = host.Mailbox.Begin().SessionId;
@@ -360,10 +346,10 @@ internal static class Program
         await Wait(() => host.Mailbox.Poll(session) == null, "normal pause clears the active model reminder");
 
         Frame(); await Wait(() => Field<FrameView?>(w, "displayed")?.Meta.SourceWidth == 3840, "4K source dimensions reach actual preview controls");
-        Click(w, "预览左下框");
+        Click(w, "预设：左下");
         await Wait(() => Field<TextBox>(w, "mapTop").Text == "1680" && Field<TextBox>(w, "mapSize").Text == "480",
             "4K calibration UI proposes source-pixel bounds, not 720p or JPEG bounds");
-        Click(w, "确认小地图框");
+        Click(w, "确认校准");
         await Wait(() => LiveCoachSettings.Load(Path.Combine(output, "live-settings.json")).Calibrations.Length == 1,
             "actual calibration handler persists the confirmed 4K rectangle");
         var layout = new MinimapLayout(3840, 2160, 0, 1680, 480);
@@ -460,7 +446,7 @@ internal static class Program
             t.Contains("夜魇") && t.Contains("视野内敌方英雄 1") && t.Contains("视野内野怪 1") && t.Contains("等待游戏机"),
             "panel shows the Plus view, its team, visible enemies/camps and waits for the game side");
         // Game side: own GSI clock riding on accepted frames; Plus side lags each second by ~150 ms.
-        Field<TextBox>(w, "port").Text = "38481"; Click(w, "启动局域网接收");
+        Field<TextBox>(w, "port").Text = "38481"; Click(w, "启动接收");
         await Wait(() => Field<CoachHost?>(w, "host") != null && !Field<bool>(w, "busy"), "coach listener for delay wiring test");
         var host = Field<CoachHost>(w, "host");
         string session = host.Mailbox.Begin().SessionId;

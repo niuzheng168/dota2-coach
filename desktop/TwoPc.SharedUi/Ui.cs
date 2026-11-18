@@ -16,6 +16,39 @@ internal static class Ui
         Text = text, FontSize = size, Foreground = color ?? Brushes.White, TextWrapping = TextWrapping.Wrap,
         Margin = new Thickness(0, 4, 0, 8),
     };
+    public static TextBlock Label(string text) => new() {
+        Text = text, FontSize = 12, Foreground = Brushes.LightGray, TextWrapping = TextWrapping.Wrap,
+        Margin = new Thickness(0, 6, 0, 3),
+    };
+    /// <summary>Collapsed-by-default group for settings that are rarely touched.</summary>
+    public static Expander Section(string header, UIElement content, bool expanded = false) => new() {
+        Header = header, Content = new Border { Child = content, Padding = new Thickness(14, 6, 0, 4) },
+        Foreground = Brushes.White, FontSize = 14, IsExpanded = expanded, Margin = new Thickness(0, 2, 0, 6),
+    };
+    /// <summary>One stretching element followed by fixed-width ones (e.g. input + button).</summary>
+    public static Grid Row(FrameworkElement fill, params FrameworkElement[] fixedItems)
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
+        foreach (var _ in fixedItems) grid.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        Place(grid, [fill, .. fixedItems]);
+        return grid;
+    }
+    /// <summary>Equal-width columns.</summary>
+    public static Grid Columns(params FrameworkElement[] items)
+    {
+        var grid = new Grid();
+        foreach (var _ in items) grid.ColumnDefinitions.Add(new());
+        Place(grid, items);
+        return grid;
+    }
+    private static void Place(Grid grid, FrameworkElement[] items)
+    {
+        for (int i = 0; i < items.Length; i++) {
+            if (i < items.Length - 1) items[i].Margin = new Thickness(items[i].Margin.Left, items[i].Margin.Top, 8, items[i].Margin.Bottom);
+            Grid.SetColumn(items[i], i); grid.Children.Add(items[i]);
+        }
+    }
     public static TextBox Input(string value = "") => new() {
         Text = value, FontSize = 14, Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 8),
         Background = Panel, Foreground = Brushes.White, BorderBrush = Brushes.SlateGray,
@@ -25,10 +58,6 @@ internal static class Ui
             FontSize = 14, Background = Panel, Foreground = Brushes.White, BorderBrush = Brushes.SlateGray };
         b.Click += click; return b;
     }
-    public static Border Card(UIElement content) => new() {
-        Child = content, Background = Panel, Padding = new Thickness(16), CornerRadius = new CornerRadius(10),
-        Margin = new Thickness(0, 0, 0, 12),
-    };
     public static BitmapImage Image(byte[] bytes) {
         using var stream = new MemoryStream(bytes);
         var result = new BitmapImage(); result.BeginInit(); result.CacheOption = BitmapCacheOption.OnLoad;
@@ -68,11 +97,10 @@ internal static class Ui
         }
         throw new InvalidOperationException("Selected video image exceeds the JPEG budget");
     }
-    public static string LaunchOptionsText(LaunchOptionsInfo info) => (!info.Found
-        ? "启动参数：没读到 Steam 里的 Dota 启动选项；请确认其中含 -gamestateintegration。"
-        : info.HasGsiFlag ? $"启动参数：已含 -gamestateintegration（{info.Options}）。"
-        : "启动参数：缺少 -gamestateintegration。点“复制启动参数”，粘贴到 Steam → Dota 2 → 属性 → 启动选项，再重启 Dota。") +
-        (info.Found && !info.ActiveAccount ? "\n（Steam 未登录，读的是最近使用的账号；Steam 可能稍后才写盘，以实际收到数据为准）" : "");
+    public static string LaunchOptionsText(LaunchOptionsInfo info) =>
+        !info.Found ? "启动参数：没读到 Steam 里的 Dota 启动选项，请确认含 -gamestateintegration。" :
+        info.HasGsiFlag ? "启动参数已含 -gamestateintegration" + (info.ActiveAccount ? "" : "（Steam 未登录，读的是最近使用的账号）") :
+        "启动参数缺少 -gamestateintegration：点“复制启动参数”，粘贴到 Steam → Dota 2 → 属性 → 启动选项，再重启 Dota。";
     /// <summary>Copies the user's own options plus the GSI flag; Steam's files are never edited.</summary>
     public static string CopyLaunchOptions(LaunchOptionsInfo info)
     {

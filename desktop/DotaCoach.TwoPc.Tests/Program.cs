@@ -103,37 +103,6 @@ Check(GsiState.Parse(Payload("dire")).Team == "dire", "Dire GSI is not mirrored 
 Reject(() => GsiState.Parse(JsonSerializer.SerializeToElement(new { player = new { team2 = new { } }, hero = new { }, map = new { } })), "observer nested GSI rejected");
 Reject(() => GsiState.Validate(Own() with { Health = double.NaN }), "invalid GSI number rejected");
 
-long probeClock = 0;
-var probeBox = new CoachMailbox(() => probeClock);
-string probeSession = probeBox.Begin().SessionId;
-var deferred = new DeferredLinkProbe("人工回传测试", new(.065, .86), () => probeClock);
-var probeTicket = probeBox.Issue(probeSession);
-probeBox.Accept(Meta(probeSession, probeTicket, 1, Own()), jpeg);
-Check(deferred.Tick(probeBox) == "waiting", "deferred probe never sends before five seconds");
-probeClock = 5001;
-Check(deferred.Tick(probeBox) == "waiting", "deferred probe cannot reuse old capture");
-probeTicket = probeBox.Issue(probeSession);
-probeBox.Accept(Meta(probeSession, probeTicket, 2), jpeg);
-Check(deferred.Tick(probeBox) == "waiting", "diagnostic frames do not satisfy real-game probe");
-probeTicket = probeBox.Issue(probeSession);
-probeBox.Accept(Meta(probeSession, probeTicket, 3) with { Source = "dota2" }, jpeg);
-Check(deferred.Tick(probeBox) == "waiting", "probe requires fresh own-player GSI");
-probeTicket = probeBox.Issue(probeSession);
-probeBox.Accept(Meta(probeSession, probeTicket, 4, Own() with { Alive = false }), jpeg);
-Check(deferred.Tick(probeBox) == "waiting", "deferred probe will not annotate a dead hero");
-probeTicket = probeBox.Issue(probeSession);
-probeBox.Accept(Meta(probeSession, probeTicket, 5, Own()), jpeg);
-Check(deferred.Tick(probeBox) == "sent" && probeBox.Poll(probeSession)?.Marker?.Y == .86, "fresh real-game frame permits one explicit manual probe");
-string probeReminderId = probeBox.Poll(probeSession)!.Id;
-deferred.Tick(probeBox);
-Check(probeBox.Poll(probeSession)!.Id == probeReminderId, "deferred probe is single-shot");
-var cancelledProbe = new DeferredLinkProbe("cancel", null, () => probeClock);
-cancelledProbe.Cancel();
-Check(cancelledProbe.Tick(probeBox) == "cancelled", "operator can cancel a pending probe");
-var expiredProbe = new DeferredLinkProbe("expire", null, () => probeClock);
-probeClock += 25000;
-Check(expiredProbe.Tick(probeBox) == "expired", "missing real input expires pending probe");
-Reject(() => new DeferredLinkProbe("bad", new(-.1, 2)), "invalid deferred coordinate rejected");
 Check(LinkErrors.Message(new TaskCanceledException(), false).Contains("超时"), "network timeout is not labelled user stop");
 Check(LinkErrors.Message(new TaskCanceledException(), true).StartsWith("已停止"), "explicit user cancellation remains distinct");
 
