@@ -36,6 +36,7 @@ def main():
     ap.add_argument("--assets", type=Path, default=Path(".tmp/vision-assets"))
     ap.add_argument("--calibration", type=Path, default=Path(".tmp/vision-assets/hud-1080.npz"))
     ap.add_argument("--report", type=Path)
+    ap.add_argument("--any-hero", action="store_true", help="identify the hero among all heroes, not the match's ten")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     hud = HudRecognizer(args.assets, args.calibration)
@@ -49,7 +50,10 @@ def main():
             if row["replay"] in args.exclude:
                 continue
             frames += 1
-            got = hud.read(cv2.imread(str(d / row["image"])))
+            # The match's heroes compete for the HUD's identity, as the scanner passes them from GSI.
+            match = None if args.any_hero else {h["name"] for players in row["gsi"]["hero"].values()
+                                                for h in players.values() if isinstance(h, dict) and h.get("name")}
+            got = hud.read(cv2.imread(str(d / row["image"])), match)
             hero = row["selected"]["hero"]
             items = row["gsi"]["items"][row["selected"]["team"]][f"player{row['selected']['playerId']}"]
 
@@ -66,6 +70,9 @@ def main():
             check("hud", row["gsi"]["map"].get("game_state") != "DOTA_GAMERULES_STATE_POST_GAME", got["hud"])
             if not got["hud"]:
                 continue
+            check("hero", hero["name"], got["hero"], got["heroMatch"])
+            # The name label alone; a dead hero's HUD shows the death summary there instead.
+            check("hero.name", hero["name"] if hero["alive"] else None, got["heroMatch"]["named"], got["ocr"]["name"])
             check("level", hero["level"], got["level"], got["ocr"]["level"])
             for bar, cur, mx in (("health", "health", "max_health"), ("mana", "mana", "max_mana")):
                 check(bar, {"current": hero[cur], "max": hero[mx]}, got[bar], got["ocr"][bar])
@@ -89,6 +96,9 @@ def main():
                 cd = (items.get(slot) or {}).get("cooldown", 0) > 0
                 score[field]["ok" if ok else "wrong"] += 1
                 score[field + (".cooldown" if cd else ".ready")]["ok" if ok else "wrong"] += 1
+                if g and len(g.get("sameIcon", [])) and want in [g["name"], *g["sameIcon"]]:
+                    # Icons alike in grey (observer and sentry wards): did the first name pick the item?
+                    score["items.sameIcon.first"]["ok" if g["name"] == want else "wrong"] += 1
                 if not ok:
                     errors.append({"image": row["image"], "field": slot, "expected": want, "cooldown": cd,
                                    "got": g and (g["name"] or f"?{g['best']}"), "score": g and g["score"]})

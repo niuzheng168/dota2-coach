@@ -9,6 +9,7 @@ import { SANDBOX_RECOMMENDATION_SCOPE } from './recommendation-scope.ts';
 import { SimulationTimeline } from '../simulation/timeline.ts';
 import { CLIENT_MAP, DEFINITIONS, FRAME_SECONDS, ITEM_LABELS, LIMITATIONS, REFERENCE, nearestWalkable } from '../simulation/data.ts';
 import { laneRoutes } from '../simulation/world.ts';
+import { listScanSessions, readScanTimeline, validSession } from './hero-scan.ts';
 
 export function createSandboxServer(seed = 741, sessionToken?: string) {
   if (sessionToken !== undefined && !/^[A-Za-z0-9_-]{43}$/.test(sessionToken)) throw new Error('无效本机会话 token');
@@ -48,14 +49,16 @@ export function createSandboxServer(seed = 741, sessionToken?: string) {
       '/farming-replays':'farming-replays.html','/farming-replays.js':'farming-replays.js','/farming-replays.css':'farming-replays.css',
       '/minimap/manifest.json':'minimap/manifest.json','/minimap/minimap-sheet.png':'minimap/minimap-sheet.png','/minimap/luna.png':'minimap/luna.png',
       '/sandbox': 'sandbox.html', '/sandbox.js': 'sandbox.js', '/sandbox.css': 'sandbox.css',
-      '/map-audit': 'map-audit.html', '/map-audit.js': 'map-audit.js', '/map-audit.css': 'map-audit.css' };
-    if (req.method === 'GET' && Object.hasOwn(files, url.pathname)) {
+      '/map-audit': 'map-audit.html', '/map-audit.js': 'map-audit.js', '/map-audit.css': 'map-audit.css',
+      '/hero-scan': 'hero-scan.html', '/hero-scan.js': 'hero-scan.js', '/hero-scan.css': 'hero-scan.css' };
+    const portrait = url.pathname.match(/^\/heroes\/([a-z0-9_]{1,40}\.(?:jpg|png))$/)?.[1];
+    if (req.method === 'GET' && (Object.hasOwn(files, url.pathname) || portrait)) {
       try {
-        const content = await fs.readFile(new URL(`../../public/${files[url.pathname]}`, import.meta.url));
-        const type = url.pathname.endsWith('.png')?'image/png':url.pathname.endsWith('.json')?'application/json':
+        const content = await fs.readFile(new URL(`../../public/${portrait ? `heroes/${portrait}` : files[url.pathname]}`, import.meta.url));
+        const type = url.pathname.endsWith('.png')?'image/png':url.pathname.endsWith('.jpg')?'image/jpeg':url.pathname.endsWith('.json')?'application/json':
           url.pathname.endsWith('.js') ? 'text/javascript' : url.pathname.endsWith('.css') ? 'text/css' : 'text/html';
-        res.writeHead(200, { 'Content-Type': type==='image/png'?type:`${type}; charset=utf-8` }); res.end(content);
-      } catch { json(500, { error: '沙盒页面不可用' }); }
+        res.writeHead(200, { 'Content-Type': type.startsWith('image/')?type:`${type}; charset=utf-8` }); res.end(content);
+      } catch { portrait ? json(404, { error: '没有这个头像' }) : json(500, { error: '沙盒页面不可用' }); }
       return;
     }
     const supplied = Buffer.from((req.headers.authorization || '').replace(/^Bearer /, ''));
@@ -101,6 +104,13 @@ export function createSandboxServer(seed = 741, sessionToken?: string) {
           .then(JSON.parse, () => null);
         return json(200, { reference, report, samples, clientAudit, oldSchematicLanes: LANES });
       } catch { return json(503, { error: '地图/回放核验资料尚未生成或本地缓存缺失；请先运行构建和解析命令' }); }
+    }
+    if (req.method === 'GET' && url.pathname === '/api/hero-scan') return json(200, { sessions: await listScanSessions() });
+    const scan = url.pathname.match(/^\/api\/hero-scan\/([^/]+)$/)?.[1];
+    if (req.method === 'GET' && scan !== undefined) {
+      if (!validSession(scan)) return json(400, { error: '无效的扫描会话名' });
+      try { return json(200, await readScanTimeline(scan, Number(url.searchParams.get('offset') || 0))); }
+      catch (error: any) { return json(error?.code === 'ENOENT' ? 404 : 400, { error: error?.code === 'ENOENT' ? '没有这个扫描会话' : error.message }); }
     }
     if (req.method === 'GET' && url.pathname === '/api/state') return json(200, snapshot());
     if (req.method === 'GET' && url.pathname === '/api/initial') return json(200, new SandboxWorld(world.seed).snapshot());

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>视觉扫描对局时间轴</title><link rel="stylesheet" href="/hero-scan.css"></head>
+<body>
+  <header><div><small>DOTA COACH / SPECTATOR HUD SCAN</small><h1>视觉扫描对局时间轴</h1></div><span class="badge">只读记录 · 不生成建议</span></header>
+  <p class="notice" id="mode-note">载入后显示这段记录的数据来源。</p>
+  <div class="toolbar">
+    <label>会话 <select id="session"></select></label>
+    <button id="play">▶ 播放</button>
+    <label>速度 <select id="speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label>
+    <label><input type="checkbox" id="follow">跟随实时</label>
+    <strong id="clock">--:--</strong>
+    <label class="time">时间 <input id="time" type="range" min="0" max="0" value="0"></label>
+  </div>
+  <main>
+    <section>
+      <div class="layers">
+        <label><input type="checkbox" id="trails" checked>近 20 秒轨迹</label>
+        <label><input type="checkbox" id="truth" checked>GSI 真值（仅完整观战/回放记录）</label>
+        <label><input type="checkbox" id="lanes">兵线路径</label>
+      </div>
+      <canvas id="map" aria-label="扫描到的英雄位置、血量与魔法"></canvas>
+      <p class="legend">实线圆环＝此刻可见　半透明虚线＝最后出现位置（标注多久前，推测而非实时）　灰色＋叉＝死亡　小空心圈＝同名单位（幻象/分身，小地图分不出真身）　头像下两条＝视觉读到的血量/魔法　<span class="truth-key">□</span>＝GSI 真值位置</p>
+      <p id="status" role="status">正在读取扫描会话。</p>
+    </section>
+    <aside>
+      <section><h2>扫描状态</h2><p id="meta"></p></section>
+      <section><h2>英雄</h2><div id="heroes"></div></section>
+      <section id="accept-section" hidden><h2>与 GSI 真值对照（整段记录）</h2><ul id="accept"></ul>
+        <small>快照里的真值是同一时刻最新的 GSI 包；只统计 1 秒内读到的状态和 5 秒内读到的装备，血量/魔法容差为上限的 5%。</small></section>
+    </aside>
+  </main>
+  <script type="module" src="/hero-scan.js"></script>
+</body></html>

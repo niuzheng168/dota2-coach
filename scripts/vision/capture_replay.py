@@ -36,8 +36,8 @@ user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))  # physical pixels
 class Console:
     """Line-oriented client for the game's -netconport console."""
 
-    def __init__(self, password: str):
-        self.sock = socket.create_connection(("127.0.0.1", CONSOLE_PORT), timeout=5)
+    def __init__(self, password: str, port: int = CONSOLE_PORT):
+        self.sock = socket.create_connection(("127.0.0.1", port), timeout=5)
         self.sock.settimeout(None)  # the console is often silent for longer than any read timeout
         self.lines: queue.Queue[str] = queue.Queue()
         threading.Thread(target=self._read, daemon=True).start()

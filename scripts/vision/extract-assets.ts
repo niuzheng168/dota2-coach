@@ -55,7 +55,8 @@ for (const [name, value] of Object.entries(kvObject(read('scripts/npc/items.txt'
   if (!file) { missing.push(name); continue; }
   byTexture.set(texture, [...byTexture.get(texture) ?? [], name]);
   items[name] = {
-    icon: file, altIcons: [], nameZh: text(`DOTA_Tooltip_ability_${name}`), cost: Number(def.ItemCost) || 0,
+    // Newer items (most neutral items) keep their display name under the ":n" key.
+    icon: file, altIcons: [], nameZh: text(`DOTA_Tooltip_ability_${name}`) ?? text(`DOTA_Tooltip_ability_${name}:n`), cost: Number(def.ItemCost) || 0,
     recipe: def.ItemRecipe === '1', purchasable: def.ItemPurchasable !== '0',
     neutral: def.ItemIsNeutralActiveDrop === '1' || def.ItemIsNeutralPassiveDrop === '1',
     // Flag present but "0" (grisgris, eldwurms_edda): seen both in the neutral slot and the inventory.

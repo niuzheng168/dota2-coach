@@ -13,6 +13,7 @@ checked against the drawn bar fill, so a misread slash yields null rather than a
 """
 from __future__ import annotations
 import argparse
+import difflib
 import json
 import re
 import sys
@@ -28,6 +29,7 @@ SEARCH = 160  # px either way; the widest observed shift is 56
 TREE = (716, 946, 770, 998)  # talent-tree button: left-block anchor
 PANEL = (1120, 930, 1410, 1080)  # item panel frame: right-block anchor
 LEVEL = (510, 1048, 532, 1065)  # inside the level ring, which otherwise reads as brackets
+NAME = (530, 912, 715, 937)  # unit name above the portrait, drawn over the game world; moves with the left block
 # Attribute values flow right to left from a fixed end, each followed by its coloured icon, so the
 # digits are found between the icons. Hue ranges (OpenCV 0-180) of the three icons:
 ATTRIBUTE_ROW = (1061, 1079)
@@ -55,7 +57,24 @@ KEEP = 0.75  # best share of patches that counts: digits and cooldown sweeps cov
 JITTER = 2
 SAME_ICON = 0.9  # references this alike cannot be told apart; they form one group
 MIN_SCORE = 0.3
+# Event-only items left out of the references: the offering envelope (cast on a friendly building,
+# 25 icon variants) was never in any recorded match's GSI, but its variants matched dim backpack
+# icons and recipe scrolls (Point Booster, Famango, recipes in replays and live games).
+EVENT_ITEMS = {"item_ofrenda"}
 EMPTY_MAD = 10.0
+# Whose HUD it is comes from the first ability icons: the name label is replaced by the death summary
+# while the hero is dead and depends on the client language. Four slots draw 49 px icons 65 px apart;
+# five or more draw 46 px icons 58 px apart. (icon size, first icon's left edge, pitch):
+ABILITY_LAYOUTS = ((49, 828, 65), (46, 826, 58))
+ABILITY_TOP = 948
+# Four icons, scored by the best two: cooldown numbers cover some, and with three a dead hero whose
+# abilities were mostly on cooldown went unnamed. Slots further right change with Scepter and Shard.
+HERO_SLOTS = 4
+HERO_SCORE = 0.5  # best-two-slot mean a hero needs to be named
+# Some cosmetic spell icons are still blank boxes in the first frames after a switch (seen live for
+# Juggernaut and Pudge): median interquartile range 6-17 there, at least 29.5 in every dataset frame.
+BLANK_SPREAD = 20
+HERO_MARGIN = 0.08  # over the next hero
 
 
 def text_reader(cuda: bool):
@@ -75,6 +94,13 @@ def kind(slot: str) -> str:
     if slot.startswith("slot"):
         return "main" if int(slot[4:]) < 6 else "backpack"
     return slot.rstrip("0123456789")
+
+
+def chroma(bgr: np.ndarray) -> np.ndarray:
+    """Mean colour of the central half of an icon, as shares of B, G and R."""
+    h, w = bgr.shape[:2]
+    mean = bgr[h // 4:h - h // 4, w // 4:w - w // 4].reshape(-1, 3).mean(0) + 1
+    return mean / mean.sum()
 
 
 def gradient(gray: np.ndarray) -> np.ndarray:
@@ -128,7 +154,7 @@ class ItemReferences:
         for k, ok in allowed.items():
             icons, owners = [], []
             for name, it in items.items():
-                if ok(name, it):
+                if ok(name, it) and name not in EVENT_ITEMS:
                     for path in [it["icon"], *it["altIcons"]]:
                         icons.append(cv2.imread(str(assets / path), cv2.IMREAD_GRAYSCALE))
                         owners.append(name)
@@ -161,6 +187,19 @@ class ItemReferences:
             order = lambda n: (not items[n]["purchasable"], items[n]["recipe"], n)
             label = {r: sorted(m, key=order) for r, m in members.items()}
             self.groups[k] = [label[root(i)] for i in range(len(owners))]
+        # Some icons differ only in colour (observer and sentry wards): the colour mix of each item's
+        # own icon, independent of brightness, picks within such a group.
+        self.tint = {name: chroma(cv2.imread(str(assets / it["icon"]))) for name, it in items.items()}
+        self.buyable = {name for name, it in items.items() if it["purchasable"]}
+
+    def by_tint(self, group: list[str], crop: np.ndarray) -> list[str]:
+        # Only among items as buyable as the group's label: never trade Blink Dagger for an internal variant.
+        pool = [n for n in group if (n in self.buyable) == (group[0] in self.buyable)]
+        if len(pool) < 2:
+            return group
+        seen = chroma(crop)
+        pool.sort(key=lambda n: float(np.abs(self.tint[n] - seen).sum()))
+        return pool + [n for n in group if n not in pool]
 
     def classify(self, gray: np.ndarray, edges: np.ndarray, slots: list[str], dx: int, dy: int) -> dict[str, tuple[list[str], float]]:
         """Best reference per slot: the best KEEP share of patch NCCs, best offset and view."""
@@ -189,15 +228,115 @@ class ItemReferences:
         return out
 
 
+class AbilityReferences:
+    """Every hero's ability icons, cosmetic variants included, to tell whose HUD a frame shows."""
+
+    def __init__(self, assets: Path, manifest: dict, device: torch.device):
+        self.device = device
+        root = assets / "decoded/panorama/images/spellicons"
+        heroes = manifest["heroes"]
+        short = {h.removeprefix("npc_dota_hero_"): h for h in heroes}
+        ability = {a["name"]: h for h, info in heroes.items() for a in info["abilities"]}
+        owners, icons = [], []
+        for path in sorted(root.rglob("*_png.png")):
+            stem, parts = path.name[:-len("_png.png")], path.relative_to(root).parts
+            # Listed ability, else a cosmetic set folder named after the hero, else the hero-name prefix
+            # that ability textures carry (mirana_leap_ti8, kez_switch_weapons_sai_off).
+            owner = ability.get(stem) or (short.get(parts[0]) if len(parts) > 1 else None)
+            if owner is None:
+                prefixes = [s for s in short if stem.startswith(s + "_")]
+                owner = short[max(prefixes, key=len)] if prefixes else None
+            if owner:
+                owners.append(owner)
+                icons.append(cv2.imread(str(path), cv2.IMREAD_GRAYSCALE))
+        self.heroes = sorted(set(owners))
+        index = {h: i for i, h in enumerate(self.heroes)}
+        self.owner = torch.tensor([index[o] for o in owners], device=device)
+        self.features = [patches(torch.from_numpy(np.stack([cv2.resize(i, (size, size), interpolation=cv2.INTER_AREA)
+                                                             for i in icons])).to(device), (4, 4)).permute(0, 2, 1).contiguous()
+                         for size, _, _ in ABILITY_LAYOUTS]
+
+    def identify(self, gray: np.ndarray, dl: int, candidates: set[str] | None = None) -> dict:
+        """Best hero for the first ability icons, trying both slot layouts. With `candidates` (the
+        heroes in this match) only those compete; a weak result falls back to every hero unless all
+        ten are known, when a hero outside them can only be a misreading."""
+        offsets = [(oy, ox) for oy in range(-JITTER, JITTER + 1) for ox in range(-JITTER, JITTER + 1)]
+        spread = max(float(np.median([np.subtract(*np.percentile(
+            gray[ABILITY_TOP + 4:ABILITY_TOP + size - 4, left + dl + pitch * i + 4:left + dl + pitch * i + size - 4], [75, 25]))
+            for i in range(HERO_SLOTS)])) for size, left, pitch in ABILITY_LAYOUTS)
+        if spread < BLANK_SPREAD:  # nothing to compare; near-flat crops would match some icon by chance
+            return {"hero": None, "best": None, "score": 0.0, "margin": 0.0, "blank": True}
+        best = None
+        for (size, left, pitch), refs in zip(ABILITY_LAYOUTS, self.features):
+            crops = [gray[ABILITY_TOP + oy:ABILITY_TOP + oy + size, left + dl + pitch * i + ox:left + dl + pitch * i + ox + size]
+                     for i in range(HERO_SLOTS) for oy, ox in offsets]
+            f = patches(torch.from_numpy(np.stack(crops)).to(self.device, non_blocking=True), (4, 4))
+            s = torch.bmm(f, refs)  # (patches, crops, references)
+            s = s.topk(max(1, round(KEEP * s.shape[0])), dim=0).values.mean(0).view(HERO_SLOTS, len(offsets), -1).amax(1)
+            per_hero = torch.full((HERO_SLOTS, len(self.heroes)), -1.0, device=self.device)
+            per_hero = per_hero.scatter_reduce(1, self.owner.expand(HERO_SLOTS, -1), s, "amax")
+            score = per_hero.topk(2, dim=0).values.mean(0)  # best two slots: one may be under a cooldown number
+            best = score if best is None else torch.maximum(best, score)
+        scores = best.tolist()
+
+        def pick(names):
+            ranked = sorted(((scores[i], h) for i, h in enumerate(self.heroes) if names is None or h in names), reverse=True)
+            (top, hero), runner = ranked[0], (ranked[1][0] if len(ranked) > 1 else -1.0)
+            return {"hero": hero if top >= HERO_SCORE and top - runner >= HERO_MARGIN else None,
+                    "best": hero, "score": round(top, 3), "margin": round(top - runner, 3), "blank": False}
+        out = pick(candidates) if candidates else None
+        if out is None or out["hero"] is None and len(candidates) < 10:
+            out = pick(None)
+        return out
+
+
+class HeroNames:
+    """Simplified-Chinese hero names (the client language the manifest was extracted for) -> npc names."""
+
+    def __init__(self, manifest: dict):
+        self.npc = {h["nameZh"]: name for name, h in manifest["heroes"].items() if h.get("nameZh")}
+
+    def match(self, text: str, candidates: set[str] | None = None) -> str | None:
+        """Hero named by an OCR'd label. With `candidates` (this match's heroes) a misread character is
+        tolerated: the one candidate sharing the most characters wins, if it shares at least half."""
+        clean = re.sub(r"[\W_]+", "", text or "")
+        if not clean:
+            return None
+        names = {n: h for n, h in self.npc.items() if candidates is None or h in candidates}
+        if whole := self.whole(text, candidates):
+            return whole
+        if candidates is None:
+            close = difflib.get_close_matches(clean, list(names), n=1, cutoff=0.75) if len(clean) >= 2 else []
+            return names[close[0]] if close else None
+        # Characters in common; a partial read shared alike by two names (幻影: PA and PL) names nobody.
+        shared = sorted(((sum(min(clean.count(c), n.count(c)) for c in set(n)), n) for n in names), reverse=True)
+        if shared and shared[0][0] >= len(shared[0][1]) / 2 and (len(shared) == 1 or shared[1][0] < shared[0][0]):
+            return names[shared[0][1]]
+        return None
+
+    def whole(self, text: str, candidates: set[str] | None = None) -> str | None:
+        """Hero whose whole name is in the label. The label sits on the game world, so OCR often adds
+        a stray mark around it; the longest name wins (沉默术士 over 术士)."""
+        clean = re.sub(r"[\W_]+", "", text or "")
+        inside = [n for n, h in self.npc.items() if (candidates is None or h in candidates) and n in clean]
+        return self.npc[max(inside, key=len)] if inside else None
+
+
 class HudRecognizer:
     def __init__(self, assets: Path, calibration: Path, device: str | None = None):
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.manifest = json.loads((assets / "manifest.json").read_text(encoding="utf-8"))
         cal = np.load(calibration)
         self.tree = gradient(cal["tree"])
-        self.panel, self.panel_mask = cal["panel"], cal["panel_mask"]
+        self.panel, self.panel_mask = cal["panel"], cal["panel_mask"].copy()
+        # Before the first neutral item the slot draws a large token-count ring ("0/6") over the panel
+        # frame; the calibration frames all had neutral items, so that area is left out of the anchor.
+        x, y = SLOTS["neutral0"]
+        cv2.circle(self.panel_mask, (x - PANEL[0], y - 12 - PANEL[1]), 44, 0, -1)
         self.empty = {k: cal[f"empty_{k}"] for k in VIEWS if f"empty_{k}" in cal}
         self.items = ItemReferences(assets, self.manifest, self.device)
+        self.abilities = AbilityReferences(assets, self.manifest, self.device)
+        self.names = HeroNames(self.manifest)
         self.text_reader = text_reader(self.device.type == "cuda")
 
     def ocr(self, crops: list[np.ndarray]) -> list[tuple[str, float]]:
@@ -218,7 +357,9 @@ class HudRecognizer:
                 "right": x + right[0] - SEARCH, "rightY": right[1] - 3,
                 "rightRms": round(float(np.sqrt(max(low, 0) / self.panel_mask.sum())), 2)}
 
-    def read(self, image: np.ndarray) -> dict:
+    def read(self, image: np.ndarray, heroes: set[str] | None = None, full: bool = True) -> dict:
+        """`heroes`: the heroes in this match, when known, for naming the HUD's hero. Without `full`
+        only whose HUD it is, level, health, mana and alive are read (items and attributes are None)."""
         frame, x = normalize(image)
         gray = np.zeros(frame.shape[:2], np.uint8)
         cv2.cvtColor(frame[HUD_TOP:], cv2.COLOR_BGR2GRAY, dst=gray[HUD_TOP:])  # only the HUD is read
@@ -227,37 +368,52 @@ class HudRecognizer:
             return {"hud": False, "anchors": a}
         dl, dr, dy = a["left"], a["right"], a["rightY"]
         items, filled = {}, []
-        for slot in SLOTS:
+        for slot in SLOTS if full else ():
             x0, y0, w, h = window(slot, dr, dy)
             empty = self.empty.get(kind(slot))
             if empty is not None and float(np.abs(gray[y0:y0 + h, x0:x0 + w].astype(np.float32) - empty).mean()) < EMPTY_MAD:
                 items[slot] = None
             else:
                 filled.append(slot)
-        edges = np.zeros(gray.shape, np.float32)
-        edges[HUD_TOP:] = gradient(gray[HUD_TOP:])
-        for slot, (group, score) in self.items.classify(gray, edges, filled, dr, dy).items():
+        classified = {}
+        if filled:
+            edges = np.zeros(gray.shape, np.float32)
+            edges[HUD_TOP:] = gradient(gray[HUD_TOP:])
+            classified = self.items.classify(gray, edges, filled, dr, dy)
+        for slot, (group, score) in classified.items():
+            if kind(slot) != "backpack":  # the backpack draws its icons grey
+                x0, y0, w, h = window(slot, dr, dy)
+                group = self.items.by_tint(group, frame[y0:y0 + h, x0:x0 + w])
             name = "item_recipe" if all(n.startswith("item_recipe_") for n in group) else group[0]
             info = self.manifest["items"].get(name, {})
             items[slot] = {"name": name if score >= MIN_SCORE else None, "nameZh": info.get("nameZh") if score >= MIN_SCORE else None,
                            "score": round(score, 3), **({"sameIcon": group[1:6]} if len(group) > 1 and name != "item_recipe" else {}),
                            **({"best": name} if score < MIN_SCORE else {})}
-        items = {slot: items[slot] for slot in SLOTS}
+        items = {slot: items[slot] for slot in SLOTS} if full else None
+        hero = self.abilities.identify(gray, dl, heroes)
         bars = self.bars(frame, dl, dr)
         # A dead hero's HUD covers the attributes with the buyback panel.
         dead = bars["health"][2] == 0
-        attributes = None if dead else self.attribute_spans(frame, dl)
+        attributes = None if dead or not full else self.attribute_spans(frame, dl)
         centre = ((BAR_ENDS[0] + dl) + (BAR_ENDS[1] + dr)) // 2
-        crops = {"level": frame[box(LEVEL, dl)]}
+        crops = {"level": frame[box(LEVEL, dl)], "name": frame[box(NAME, dl)]}
         crops |= {k: frame[ATTRIBUTE_ROW[0]:ATTRIBUTE_ROW[1], x0:x1] for k, (x0, x1) in (attributes or {}).items()
                   if x1 - x0 >= 5}
         crops |= {k: frame[y0:y1 + 1, centre - BAR_TEXT:centre + BAR_TEXT] for k, (y0, y1, _) in bars.items()}
         text = dict(zip(crops, self.ocr(list(crops.values()))))
         values = {k: ratio(text[k][0], fill) for k, (_, _, fill) in bars.items()}
+        # Abilities all on cooldown can leave the icons undecided; the name label then decides. A
+        # whole name in the label also overrules the icons, which can show another hero's spells
+        # (Rubick's stolen pair, such as Sharpshooter and its release).
+        named = self.names.match(text["name"][0], heroes)
+        hero["named"] = named
+        if named and (hero["hero"] is None or named == self.names.whole(text["name"][0], heroes)):
+            hero["hero"] = named
         return {
             "hud": True, "anchors": a, "alive": not dead,
+            "hero": hero["hero"], "heroMatch": hero,
             "level": number(text["level"][0], 1, 30),
-            "attributes": {k: number(text[k][0], 0, 999, last=True) if k in text else None for k in ATTRIBUTE_HUES},
+            "attributes": full and {k: number(text[k][0], 0, 999, last=True) if k in text else None for k in ATTRIBUTE_HUES} or None,
             **values,
             "fill": {k: round(fill, 4) for k, (_, _, fill) in bars.items()},
             "items": items,
@@ -310,8 +466,29 @@ class HudRecognizer:
             # Rows just under the top edge stay clear of the centred value and regeneration text.
             # Filled columns are bright; a dead hero's bars are dimmed.
             threshold = 70 if name == "mana" and out["health"][2] == 0 else 95
-            fill = float((bright[top + 2:top + 4].mean(0) > threshold).mean())
-            out[name] = (top, bottom, fill)
+            lit = bright[top + 2:top + 4].mean(0) > threshold
+            if layout == "barrier" and name == "health":
+                lit = HudRecognizer.under_text(frame[top + 2:top + 4, left:right], lit)
+            out[name] = (top, bottom, float(lit.mean()))
+        return out
+
+    @staticmethod
+    def under_text(rows: np.ndarray, lit: np.ndarray) -> np.ndarray:
+        """The barrier layout's shorter health bar has its white value text, with a dark outline, in
+        the measured rows. Health fills from the left, so the columns the text spans are all filled
+        when the bar is lit right of them, and otherwise up to the last coloured column among them:
+        text over the empty part of the bar must not add to the fill."""
+        colour = rows.astype(np.float32).mean(0)
+        value = colour.max(1)
+        coloured = value - colour.min(1) >= 0.25 * value
+        text = np.flatnonzero(lit & ~coloured)
+        if not len(text):
+            return lit
+        a, b = text[0], text[-1] + 1
+        out = lit.copy()
+        out[a:b] = lit[b:].any()
+        if not lit[b:].any() and len(inside := np.flatnonzero(lit[a:b] & coloured[a:b])):
+            out[a:a + inside[-1] + 1] = True
         return out
 
 
@@ -331,7 +508,7 @@ def number(text: str, low: int, high: int, last: bool = False) -> int | None:
 def ratio(text: str, fill: float) -> dict | None:
     """'650 / 962' -> current and max. The slash often comes back as 1 or goes missing, so every
     reading of the digits is tried and the one matching the drawn bar fill wins."""
-    t = text.replace("|", "/").replace("l", "/").replace("I", "/").replace("\\", "/")
+    t = re.sub(r"[|lI\\／⁄∕]", "/", text)  # the Chinese recognizer may return a full-width slash
     groups = re.findall(r"\d+|/", t)
     digits = "".join(groups)
     pairs = {}  # (current, max) -> rank; lower ranks are the more common misreadings
@@ -339,14 +516,26 @@ def ratio(text: str, fill: float) -> dict | None:
     def add(a, b, rank):
         if a and b and not (len(a) > 1 and a[0] == "0") and b[0] != "0" and int(a) <= int(b):
             pairs[(int(a), int(b))] = min(rank, pairs.get((int(a), int(b)), rank))
+    # With the slash read, only a digit right beside it can be the slash read twice ("2131/435"):
+    # regrouping further lets a bar that lags a changing value fit a wrong reading, such as
+    # 770/814 for "1770 / 1814" after a trim.
+    slash = digits.count("/") == 1
     for trim, extra in ((digits, 0), (digits[1:], 3), (digits[:-1], 3)):  # one stray mark at an end
         if trim.count("/") == 1:
             a, _, b = trim.partition("/")
             add(a, b, extra)
+        if slash:
+            continue
         plain = trim.replace("/", "")
         for i in range(1, len(plain) - 1):
             if plain[i] in "17":
                 add(plain[:i], plain[i + 1:], 1 + extra)  # slash read as a digit
+    if slash:
+        a, _, b = digits.partition("/")
+        if a[-1:] in ("1", "7"):
+            add(a[:-1], b, 1)
+        if b[:1] in ("1", "7"):
+            add(a, b[1:], 1)
     numbers = [g for g in groups if g != "/"]
     if len(numbers) == 2:
         add(numbers[0], numbers[1], 2)  # slash dropped
