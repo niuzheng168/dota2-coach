@@ -491,6 +491,7 @@ await using (var gsiProbe = await GsiReceiver.Start(0)) {
         diagnostics.Contains("observer-shaped"), "GSI debug records structural presence, never auth, identities or hidden values");
 }
 await SpectatorTests.Run(Check);
+LastHitTests.Run(Check);
 Console.WriteLine($"Two-PC protocol + real TLS + GSI + mocked model contracts: {passed} checks passed.");
 
 sealed class FakeCloudCoach(ModelAdvice advice) : HttpMessageHandler

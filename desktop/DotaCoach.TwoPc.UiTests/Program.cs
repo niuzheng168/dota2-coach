@@ -89,8 +89,12 @@ internal static class Program
         // Exercise packaged UI handlers without desktop input, clipboard, real game capture or AI.
         coach.Show(); game.Show();
         await Wait(() => Children(coach).Concat(Children(game)).OfType<Expander>().All(e => !e.IsExpanded) &&
-            Children(coach).OfType<Expander>().Count() == 4 && Children(game).OfType<Expander>().Count() == 2,
-            "rarely used settings start collapsed (coach: model, minimap, Plus, Debug; game: settings, Debug)");
+            Children(coach).OfType<Expander>().Count() == 4 && Children(game).OfType<Expander>().Count() == 4,
+            "rarely used settings start collapsed (game: practice, opening calculator, settings, Debug)");
+        Click(game, "试算");
+        await Wait(() => Children(game).OfType<TextBlock>().Any(t => t.Text.Contains("先垫 1 刀，塔累计打 1 下"))
+            && Field<CancellationTokenSource?>(game, "active") == null && Field<GsiReceiver?>(game, "gsi") == null,
+            "opening tower calculator works without pairing, GSI or live capture");
         await Wait(() => DebugSwitch(coach).IsChecked != true && DebugSwitch(game).IsChecked != true &&
             !Directory.Exists(debugRoot), "Debug is opt-in and creates no recording directory while off");
         DebugSwitch(coach).IsChecked = true; DebugSwitch(game).IsChecked = true;
@@ -139,7 +143,8 @@ internal static class Program
         await Wait(() => host.Mailbox.Snapshot().Frames >= 3 && host.Mailbox.Latest()?.Video != null,
             "game client continuously sends real H264 diagnostic video through pinned WSS");
         await Wait(() => File.Exists(videoSettings) && GameVideoSettings.Load(videoSettings).Fps == 60 && !Field<ComboBox>(game, "fpsChoice").IsEnabled &&
-            Equals(Field<Button>(game, "connect").Content, "断开"), "chosen video settings persist and lock while streaming; connect turns into disconnect");
+            Equals(Field<Button>(game, "connect").Content, "断开") && !Field<Button>(game, "practiceButton").IsEnabled,
+            "chosen video settings persist and lock while streaming; standalone practice cannot start a second capture");
         await Wait(() => Field<Image>(coach, "image").Source != null, "coach preview receives decoded bitmap");
         await Wait(() => Field<Image>(game, "image").Source != null, "game preview receives capture bitmap");
         await Wait(() => Recorder(coach)!.Status.Images >= 2 && Recorder(game)!.Status.Images == 0,

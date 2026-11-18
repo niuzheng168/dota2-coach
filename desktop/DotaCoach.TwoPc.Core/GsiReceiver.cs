@@ -14,6 +14,7 @@ public sealed class GsiReceiver : IAsyncDisposable
     private readonly string token;
     private readonly object gate = new();
     private (OwnState Value, long At)? latest;
+    private bool lunaDrill;
     public int Port { get; private set; }
     public Action<GsiDiagnostics>? Diagnostics { get; set; }
     /// <summary>Typed minimap units of each authenticated packet, for the opt-in Debug log only.</summary>
@@ -59,17 +60,36 @@ public sealed class GsiReceiver : IAsyncDisposable
                 if (!Wire.EqualSecret(root.GetProperty("auth").GetProperty("token").GetString(), token))
                     return Results.Unauthorized();
                 // An authenticated menu/observer/invalid payload invalidates old own-player state.
-                lock (gate) latest = null;
                 OwnState own;
                 try { own = GsiState.Parse(root); }
-                catch { Describe(root, false); throw; }
-                lock (gate) latest = (own, Environment.TickCount64);
+                catch { lock (gate) { latest = null; lunaDrill = false; } Describe(root, false); throw; }
+                bool drill = IsLunaDrill(root, own);
+                lock (gate) { latest = (own, Environment.TickCount64); lunaDrill = drill; }
                 Describe(root, true);
                 return Results.Ok();
             }
             catch (Exception e) when (e is JsonException or ArgumentException or InvalidOperationException or KeyNotFoundException)
             { return Results.BadRequest(); }
         });
+    }
+    // A local flag only; do not extend the transmitted OwnState or accept a spectator's heroes.
+    public static bool IsLunaDrill(JsonElement root, OwnState own)
+    {
+        var m = root.GetProperty("map"); var h = root.GetProperty("hero");
+        return own is { MatchId: "0", Hero: "npc_dota_hero_luna", Alive: true, Clock: >= 0 and < 450 }
+            && m.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String
+            && n.GetString()!.StartsWith("hero_demo_", StringComparison.Ordinal)
+            && m.TryGetProperty("game_state", out var s) && s.ValueKind == JsonValueKind.String
+            && s.GetString() == "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS"
+            && m.TryGetProperty("daytime", out var day) && day.ValueKind == JsonValueKind.True
+            && !(m.TryGetProperty("paused", out var paused) && paused.ValueKind == JsonValueKind.True)
+            && h.TryGetProperty("level", out var l) && l.ValueKind == JsonValueKind.Number && l.TryGetInt32(out int level) && level == 1
+            && !new[] { "stunned", "disarmed", "hexed", "break", "has_debuff" }.Any(k => h.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True)
+            && own.Items.All(i => i.Name == "item_tpscroll");
+    }
+    public bool CanPractice
+    {
+        get { lock (gate) return lunaDrill && latest is { } s && Environment.TickCount64 - s.At < 1500; }
     }
     public (OwnState? Player, int? AgeMs) Latest()
     {

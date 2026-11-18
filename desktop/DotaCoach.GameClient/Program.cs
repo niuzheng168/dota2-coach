@@ -64,6 +64,11 @@ internal sealed class GameWindowUi : Window
     private bool persistentGsi;
     private bool transportConnected;
     private long? lastCaptureAt;
+    private readonly TextBlock practiceStatus = Ui.Text("仅限官方露娜试玩，默认关闭。不用配对、不上传、不控制英雄。", 12);
+    private readonly ComboBox practiceDistance = Ui.Choice();
+    private readonly Button practiceButton;
+    private LastHitPractice? practice;
+    private bool practiceBusy, practiceOwnsGsi;
 
     public GameWindowUi() : this(null) { }
     public GameWindowUi(E2ERun? run) : this(run, null) { }
@@ -96,6 +101,16 @@ internal sealed class GameWindowUi : Window
         preview.Children.Add(image); preview.Children.Add(marks); Grid.SetRow(preview, 1); root.Children.Add(preview);
         var bottom = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
         bottom.Children.Add(caption);
+        practiceButton = Ui.Button("开始本机练习", async (_, _) => await TogglePractice());
+        practiceDistance.Items.Add("近身（约 0.37 秒命中）"); practiceDistance.Items.Add("中距离（约 0.53 秒命中）");
+        practiceDistance.Items.Add("接近最远射程（约 0.65 秒命中）"); practiceDistance.SelectedIndex = 1;
+        if (e2e == null) {
+            var panel = new StackPanel();
+            panel.Children.Add(Ui.Text("一级空装露娜、默认血条、普通兵 / 一塔；面向目标，站在所选距离内。塔刀仅用于单塔练习，混战不要按提示垫刀。首次会配置本机 GSI。", 12));
+            panel.Children.Add(Ui.Row(practiceDistance, practiceButton)); panel.Children.Add(practiceStatus);
+            panel.Children.Add(Ui.Section("塔还没开火？按当前血量试算", BuildPracticePreview()));
+            bottom.Children.Add(Ui.Section("本机练习：正补、反补、塔下垫刀", panel));
+        }
         bottom.Children.Add(Ui.Section("设置：画面来源、视频、Dota 目录", BuildSettings()));
         bottom.Children.Add(Ui.Section("Debug", debug.View));
         Grid.SetRow(bottom, 2); root.Children.Add(bottom); Content = root;
@@ -129,6 +144,8 @@ internal sealed class GameWindowUi : Window
             e.Cancel = true;
             if (closing) return;
             closing = true;
+            while (practiceBusy) await Task.Delay(25);
+            await StopPractice();
             await Stop();
             if (gsi != null) { await gsi.DisposeAsync(); gsi = null; }
             closed = true; reminderTimer.Stop(); overlay.Close();
@@ -136,9 +153,62 @@ internal sealed class GameWindowUi : Window
             _ = Dispatcher.BeginInvoke(new Action(Close));
         };
     }
+    private double PracticeImpact => practiceDistance.SelectedIndex switch { 0 => .37, 2 => .65, _ => .53 };
+    private StackPanel BuildPracticePreview()
+    {
+        var type = Ui.Choice(); type.Items.Add("近战兵"); type.Items.Add("远程兵"); type.SelectedIndex = 0;
+        var hp = Ui.Input("150"); var seconds = Ui.Input("1.4"); var answer = Ui.Text("", 13, Ui.Accent);
+        var calculate = Ui.Button("试算", (_, _) => {
+            bool ranged = type.SelectedIndex == 1;
+            if (!int.TryParse(hp.Text.Trim(), out int health) || health < 1 || health > (ranged ? 300 : 550) ||
+                !double.TryParse(seconds.Text.Trim(), out double t) || !double.IsFinite(t) || t <= 0 || t > 4) {
+                answer.Text = $"请填 1–{(ranged ? 300 : 550)} HP，首发塔弹命中时间须大于 0、至多 4 秒。"; return;
+            }
+            var p = new LaneDrill(PracticeImpact).Rehearse(ranged, health, t);
+            answer.Text = p == null ? "此时机没有稳妥方案：不要硬垫，换一个目标或更早准备。" :
+                $"先垫 {p.PrepHits} 刀，塔累计打 {p.TowerHits} 下后由你收尾。" +
+                (p.ClickIn > .07 ? $" 约 {p.ClickIn:F1} 秒后出手（已计弹道）。" : " 现在出手。");
+        });
+        var panel = new StackPanel();
+        panel.Children.Add(Ui.Text("依次选兵种、输入当前 HP、距第一发塔弹命中的秒数。假设只有塔和你输出，普攻现在可用。", 12));
+        panel.Children.Add(Ui.Columns(type, hp, seconds, calculate)); panel.Children.Add(answer);
+        return panel;
+    }
+    private async Task TogglePractice()
+    {
+        if (practiceBusy || busy || active != null || closing) return;
+        practiceBusy = true; connect.IsEnabled = false; practiceButton.IsEnabled = false;
+        try {
+            if (practice != null) { await StopPractice(); return; }
+            if (gsi != null && !persistentGsi) { await gsi.DisposeAsync(); gsi = null; }
+            if (gsi == null) {
+                gsi = await GsiReceiver.Start(resumeToken: GsiSetup.Token(GsiState));
+                practiceOwnsGsi = true;
+            }
+            bool changed = GsiSetup.Install(dotaInstall.Text.Trim(), gsi.Config, GsiState).Changed;
+            var receiver = gsi;
+            var message = changed ? "已写入自身GSI，请带 -gamestateintegration 完全重启 Dota 一次。" :
+                "请启用 -gamestateintegration，进入英雄 → 露娜 → 试玩。";
+            practice = new LastHitPractice(() => receiver.CanPractice, PracticeImpact,
+                text => practiceStatus.Text = message + "\n" + text);
+            practiceButton.Content = "停止本机练习"; practiceDistance.IsEnabled = false;
+        } catch (Exception ex) {
+            await StopPractice();
+            practiceStatus.Text = $"练习启动失败：请检查 Dota 目录及本机 3219 端口（{ex.GetType().Name}）。";
+        } finally {
+            practiceBusy = false; connect.IsEnabled = practice == null; practiceButton.IsEnabled = !closing;
+        }
+    }
+    private async Task StopPractice()
+    {
+        if (practice != null) { await practice.DisposeAsync(); practice = null; }
+        if (practiceOwnsGsi && gsi != null) { await gsi.DisposeAsync(); gsi = null; }
+        practiceOwnsGsi = false; practiceDistance.IsEnabled = true; practiceButton.Content = "开始本机练习";
+        practiceStatus.Text = "已停止本机练习。";
+    }
     private async Task Start()
     {
-        if (busy || active != null || closing) return;
+        if (busy || active != null || closing || practice != null || practiceBusy) return;
         busy = true;
         CancellationTokenSource? starting = null;
         try
@@ -255,6 +325,7 @@ internal sealed class GameWindowUi : Window
         foreach (var control in new Control[] { source, pairing, fpsChoice, resolutionChoice, encoderChoice, captureChoice, bitrateChoice })
             control.IsEnabled = idle;
         connect.Content = idle ? "连接" : "断开";
+        practiceButton.IsEnabled = idle;
     }
     private void ShowGsi(string? text = null)
     {
