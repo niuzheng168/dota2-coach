@@ -46,6 +46,8 @@ def main():
         alt = items.pop("alt", {})
         for slot, got in items.items():
             want = truth["items"].get(slot) or "empty"
+            if want.startswith("item_recipe_"):
+                continue  # recipes are not tracked: every recipe is the same scroll
             kind = "main" if slot < "slot6" and slot.startswith("slot") else "backpack" if slot.startswith("slot") else slot.rstrip("0123456789")
             check("items." + kind, item_ok(want, got and {"name": None if got == "?" else got, "sameIcon": alt.get(slot, [])}),
                   [row["hero"], slot, got, want])

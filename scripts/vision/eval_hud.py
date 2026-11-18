@@ -89,6 +89,8 @@ def main():
                     check("attributes", expected, shown, [k, v, got["ocr"].get(k)])
             for slot in SLOTS:
                 want = (items.get(slot) or {}).get("name", "empty")
+                if want.startswith("item_recipe_"):
+                    continue  # recipes are not tracked: every recipe is the same scroll
                 g = got["items"][slot]
                 field = "items." + ("main" if slot < "slot6" and slot.startswith("slot") else slot.rstrip("0123456789")
                                     if not slot.startswith("slot") else "backpack")

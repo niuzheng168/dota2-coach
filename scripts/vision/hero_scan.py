@@ -16,10 +16,12 @@ friend team's vision: enemies are scanned while that team sees them and otherwis
 observed state with its age. Delayed or replay spectating shows both teams in full; the state file
 says so in "mode", and live coaching must not use such data.
 
-Speed: heroes already matched to their player are selected one per captured frame, so the status of
-ten heroes takes about ten display refreshes; each cycle one hero also stays ~0.13 s for its items
-(item slots cross-fade after a switch). Recognition runs in parallel on the GPU, on a HUD band that
-Windows.Graphics.Capture (wgc.py) crops on the GPU.
+Speed: heroes already matched to their player are selected one per captured frame; Dota shows a new
+selection about every 20 ms, at 60 Hz and 144 Hz alike, so a sweep of ten heroes takes ~0.2 s. A hero
+whose items were read --items-every seconds ago (3 by default) stays ~0.13 s at the end of a sweep, as
+item slots cross-fade after a switch; sweeps without one follow each other without a pause.
+Recognition runs in parallel on the GPU, on a HUD band that Windows.Graphics.Capture (wgc.py) crops on
+the GPU.
 
 `setup` writes this tool's GSI config (read by Dota at start) and prints the launch options. Each run
 records a session folder: timeline.jsonl (a snapshot every --timeline-every seconds, shown by the
@@ -242,6 +244,9 @@ class Scanner:
         self.shown: str | None = None  # hero the HUD showed last
         self.match_id = None
         self.missed: set[int] = set()
+        # player -> when an item read of it was queued: the worker records it a little later, and the
+        # next cycle must not pick the same hero again meanwhile
+        self.items_queued: dict[int, float] = {}
         self.work: queue.Queue = queue.Queue()
         self.lock = threading.Lock()
         self.stats = collections.Counter()
@@ -267,6 +272,7 @@ class Scanner:
         with self.lock:
             if match_id != self.match_id:  # another match: nothing known carries over
                 self.match_id, self.player_hero, self.heroes, self.shown = match_id, {}, {}, None
+                self.items_queued = {}
             players = dict(self.player_hero)
             items_at = {h: (r.get("items") or {}).get("at", -1e9) for h, r in self.heroes.items()}
             status_at = {h: (r.get("status") or {}).get("at", -1e9) for h, r in self.heroes.items()}
@@ -279,7 +285,7 @@ class Scanner:
             elif mode != "team-view" or teams.get(hero) == own or hero in visible:
                 out.append(p)
         self.missed = {p for p in out if p in players and now - status_at.get(players[p], -1e9) > STREAM_MISSED}
-        stale = sorted((items_at.get(players[p], -1e9), p) for p in out if p in players)
+        stale = sorted((max(items_at.get(players[p], -1e9), self.items_queued.get(p, -1e9)), p) for p in out if p in players)
         slow = {p for at, p in stale[:self.args.item_visits] if now - at >= self.args.items_every}
         return [(p, p in slow) for p in out]
 
@@ -295,6 +301,7 @@ class Scanner:
         visit = None  # closed-loop visit: {"player", "items", "sent", "ref", "switched"}
         stream: collections.deque[int] = collections.deque()  # players selected one per captured frame
         tail = None  # after the last streamed selection: {"sent", "switched", "items"}
+        streamed = -1e9  # when the last streamed selection was sent
         visits: collections.deque[tuple[int, bool]] = collections.deque()
         last_print = last_drain = last_record = cycle_start = self.started
         end = self.started + duration
@@ -315,6 +322,7 @@ class Scanner:
                         tail["switched"] = now
                 if stream and self.work.qsize() < 4:
                     self.select(stream.popleft(), now)
+                    streamed = now
                     if not stream:
                         tail["sent"] = now
                 if visit and visit["switched"] is None and self.changed(frame[1], visit["ref"]) > SWITCH_MAD:
@@ -325,20 +333,22 @@ class Scanner:
                         visit = None
                 if visit and visit["switched"] is not None and now - visit["switched"] >= ITEM_SETTLE:
                     self.work.put((visit["player"], True, True, now, frame[1]))
+                    self.items_queued[visit["player"]] = now
                     visit = None
-            if tail and not stream and now - tail["sent"] > STREAM_TAIL:
+            if tail and not stream and tail["items"] is None:
+                tail = None  # no hero due for items: the next cycle streams on without a pause
+            elif tail and not stream and now - tail["sent"] > STREAM_TAIL and now - tail["switched"] >= ITEM_SETTLE:
                 # The last streamed selection has had time to show. Its hero is the one due for items:
                 # it stays on screen until the item slots have stopped fading.
-                if tail["items"] is None:
-                    tail = None
-                elif now - tail["switched"] >= ITEM_SETTLE:
-                    self.work.put((tail["items"], False, True, now, frame[1]))
-                    tail = None
+                self.work.put((tail["items"], False, True, now, frame[1]))
+                self.items_queued[tail["items"]] = now
+                tail = None
             if visit and visit["switched"] is None and now - visit["sent"] > SWITCH_TIMEOUT:
                 # Unchanged: the command had no effect, or the hero was already shown. The frame is
                 # still read (it has been still for the timeout, so items too); it tells whose HUD it is.
                 self.stats["unchanged"] += 1
                 self.work.put((visit["player"], False, True, now, frame[1]))
+                self.items_queued[visit["player"]] = now
                 visit = None
             if self.selecting and visit is None and tail is None and self.work.qsize() < 3:
                 if not visits and (targets := self.plan(now)):
@@ -358,9 +368,12 @@ class Scanner:
                     visits.extend(targets)
                 if stream:
                     self.select(stream.popleft(), now)
+                    streamed = now
                     if not stream:
                         tail["sent"] = now
-                elif visits:
+                elif visits and now - streamed > STREAM_TAIL:
+                    # A visit learns whose HUD its own switch shows, so it waits until the streamed
+                    # selections still in flight have shown.
                     p, items = visits.popleft()
                     if len(visits) and self.player_hero.get(p) == self.shown:
                         visits.append((p, items))  # already on screen: visit it after the others
@@ -573,7 +586,8 @@ def main():
     ap.add_argument("--item-visits", type=int, default=1, help="heroes per cycle that stay long enough for items")
     ap.add_argument("--save-misses", type=int, default=0, help="save this many HUD bands that could not be read")
     ap.add_argument("--no-stream", action="store_true", help="wait for every switch instead of one selection per frame")
-    ap.add_argument("--items-every", type=float, default=1.0, help="seconds before a hero's items are due again")
+    ap.add_argument("--items-every", type=float, default=3.0,
+                    help="seconds between item reads of the same hero; each read holds the HUD ~0.15 s")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     if args.command == "setup":

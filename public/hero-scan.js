@@ -123,6 +123,8 @@ function bar(x, y, width, v, color) {
 }
 
 function meter(cls, v) { const b = el('span', `bar ${cls}`), i = el('i'); i.style.width = `${v && v[1] ? Math.min(100, v[0] / v[1] * 100) : 0}%`; b.append(i); return b; }
+// Recipes are not tracked (every recipe is the same scroll), so a recipe in the truth is not compared.
+const sameItem = (got, want) => (want || 'empty').startsWith('item_recipe_') || (got || 'empty') === (want || 'empty');
 const near = (a, b) => a && b && b[1] && Math.abs(a[0] - b[0]) <= 0.05 * b[1] && a[1] === b[1];
 function renderHeroes(snap) {
   const rows = Object.entries(snap.heroes).sort(([a, x], [b, y]) => (x.team ?? 9) - (y.team ?? 9) || heroName(a).localeCompare(heroName(b), 'zh'));
@@ -144,7 +146,7 @@ function renderHeroes(snap) {
     if (it) {
       const named = range => range.filter(i => it.slots[i]).map(i => slotName(it, i));
       const names = named([0, 1, 2, 3, 4, 5]), extra = named([6, 7, 8]);
-      const wrong = t && it.slots.slice(0, 6).some((name, i) => (name || 'empty') !== (t.items[`slot${i}`] || 'empty'));
+      const wrong = t && it.slots.slice(0, 6).some((name, i) => !sameItem(name, t.items[`slot${i}`]));
       items.append(el('span', `vals${wrong ? ' bad' : ''}`, names.join('、') || '无装备'),
         el('span', null, `${extra.length ? ` · 背包 ${extra.join('、')}` : ''}${it.slots[9] ? ` · 中立 ${slotName(it, 9)}` : ''}${it.slots[10] ? ' · 有TP' : ''} · ${Math.round(it.age)}s前`));
     } else items.textContent = '装备未读';
@@ -182,7 +184,7 @@ function acceptance() {
       add('level', h.status.level === t.level); add('alive', h.status.alive === t.alive);
       add('health', near(h.status.health, t.health)); add('mana', near(h.status.mana, t.mana));
     }
-    if (h.items && h.items.age <= 5) for (let i = 0; i < 6; i++) add('items', (h.items.slots[i] || 'empty') === (t.items[`slot${i}`] || 'empty'));
+    if (h.items && h.items.age <= 5) for (let i = 0; i < 6; i++) if (!(t.items[`slot${i}`] || '').startsWith('item_recipe_')) add('items', sameItem(h.items.slots[i], t.items[`slot${i}`]));
     if (!h.seen?.visible || t.x == null) continue;
     if (h.seen.others) add('copies', [[h.seen.x, h.seen.y], ...h.seen.others].some(([x, y]) => close(x, y, t)));
     else add('position', close(h.seen.x, h.seen.y, t));
