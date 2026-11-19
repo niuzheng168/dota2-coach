@@ -60,6 +60,14 @@ internal static class GameWindow
         catch { return null; }
     }
     public static bool IsForeground(GameSurface game) => GetForegroundWindow() == game.Handle;
+    // We have already authenticated this game HWND. Recheck its coordinates without opening a
+    // Process handle or allocating a new GameSurface on each marker redraw.
+    public static bool HasForegroundBounds(GameSurface game)
+    {
+        var origin = new POINT();
+        return IsForeground(game) && GetClientRect(game.Handle, out var r) && r.Right == game.Width && r.Bottom == game.Height &&
+            ClientToScreen(game.Handle, ref origin) && origin.X == game.Left && origin.Y == game.Top;
+    }
     /// <summary>
     /// Client-area rectangle inside a Windows.Graphics.Capture image of the window, which covers the DWM
     /// frame bounds (title bar/borders in windowed mode; nothing extra in borderless/fullscreen).

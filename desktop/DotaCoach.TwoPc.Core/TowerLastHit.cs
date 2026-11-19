@@ -16,7 +16,7 @@ public static class TowerLastHit
     public const double TimingMargin = .10;
 
     public static HitPlan? Plan(HitRange hp, HitRange hero, double heroImpact, double attackInterval,
-        double readyIn, double regen, HitRange tower, double nextTower, double towerInterval)
+        double readyIn, double regen, HitRange tower, double nextTower, double towerInterval, bool immediateOnly = false)
     {
         if (!hp.Valid || !hero.Valid || !tower.Valid || !double.IsFinite(heroImpact) || heroImpact < 0 ||
             !double.IsFinite(attackInterval) || attackInterval <= 0 || !double.IsFinite(readyIn) || readyIn < 0 ||
@@ -25,7 +25,10 @@ public static class TowerLastHit
 
         // Prefer leaving the creep alone if tower shots alone create a safe window. For equal effort
         // take the first safe window. Include the following tower shot even if it would kill the creep.
-        for (int prep = 0; prep <= 4; prep++)
+        // The live overlay wants only an actionable release now. The manual calculator still
+        // searches future wait/setup sequences.
+        if (immediateOnly && readyIn > 1e-8) return null;
+        for (int prep = 0; prep <= (immediateOnly ? 0 : 4); prep++)
         for (int shots = 0; shots <= 6; shots++) {
             if (shots == 0 && prep != 0) continue;
             double lastTower = nextTower + (shots - 1) * towerInterval;
@@ -38,6 +41,7 @@ public static class TowerLastHit
             double most = hp.Max + regen * finish - prep * hero.Min - shots * tower.Min;
             if (least <= 0 || most > hero.Min) continue;
             double click = prep > 0 ? readyIn : Math.Max(0, finish - heroImpact);
+            if (immediateOnly && click > 1e-8) continue;
             return new(click > .07 ? HitAction.Wait : prep > 0 ? HitAction.Prepare : HitAction.Finish, prep, shots, click);
         }
         return null;

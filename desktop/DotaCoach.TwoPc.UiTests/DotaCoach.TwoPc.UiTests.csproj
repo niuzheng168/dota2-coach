@@ -7,6 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <None Update="Fixtures/lane-rims.json.gz" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../DotaCoach.GameClient/DotaCoach.GameClient.csproj" />
     <ProjectReference Include="../DotaCoach.CoachClient/DotaCoach.CoachClient.csproj" />
   </ItemGroup>

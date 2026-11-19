@@ -16,6 +16,17 @@ internal static class Program
     [STAThread] public static void Main(string[] args)
     {
         RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+        if (args is ["--game-controls"]) {
+            var game = new GameWindowUi(); // Inspect the logical tree without showing a window or connecting.
+            CheckGameControls(game);
+            if (Field<CancellationTokenSource?>(game,"active") != null || Field<GsiReceiver?>(game,"gsi") != null)
+                throw new Exception("Idle game client must not start a connection or GSI receiver");
+            Console.WriteLine("PASS idle client: normal controls present, lane controls and overlay worker absent");
+            return;
+        }
+        if (args is ["--offline-practice"]) { OfflinePractice(); return; }
+        if (args is ["--lane-vision-e2e"]) { LaneVisionE2E.Run(); return; }
+        if (args is ["--lane-window-e2e"]) { LaneWindowE2E.Run(); return; }
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.Startup += async (_, _) => {
             try {
@@ -27,6 +38,79 @@ internal static class Program
         };
         Environment.ExitCode = app.Run();
     }
+    // Software drawing into memory only. No Window, game client, WGC, input or desktop capture.
+    private static void OfflinePractice()
+    {
+        static void Check(bool ok, string name) { if (!ok) throw new Exception(name); Console.WriteLine("PASS " + name); }
+        static LaneDrill.Reading At(int x,int y,int fill,bool ally,LaneCreepType kind,long id) {
+            var bar=new CreepBar(x,y,80,8,fill,ally);
+            return new(bar,kind,LaneHealthProfile.Estimate(bar,kind==LaneCreepType.Ranged?300:550),id,1)
+                {RangedAlternative=kind==LaneCreepType.Unknown?LaneHealthProfile.Estimate(bar,300):null};
+        }
+        LaneDrill.Reading[] wave=[At(5,2,78,true,LaneCreepType.Melee,1), At(940,420,39,true,LaneCreepType.Ranged,2),
+            At(940,447,39,false,LaneCreepType.Unknown,3), At(1838,1070,5,false,LaneCreepType.Melee,4)];
+        var layout=new HealthLayout(); var ink=new HealthInk(); layout.Arrange(wave,1920,1080);
+        var tags=layout.Tiles.SelectMany(tile=>tile.Tags).ToList();
+        Check(tags.Count==4 && tags.Select(t=>t.Reading.Revision).Distinct().Count()==4 && wave.Select(HealthInk.Label)
+            .SequenceEqual(new[]{"近≈550 HP","远≈150 HP","近≈275 / 远≈150 HP","近≈35 HP"}),"all labels show HP, even before classification, and mark the correct type");
+        Check(tags.All(t=>t.Box.X>=0 && t.Box.X+t.Box.Width<=1920 && t.Box.Y>=0 && t.Box.Y+t.Box.Height<=1080) &&
+            tags.All(t=>wave.All(r=>!HealthLayout.Touches(t.Box,new(r.Bar.X,r.Bar.Y,r.Bar.Width,r.Bar.Height)))) &&
+            !tags.Where((t,i)=>tags.Skip(i+1).Any(u=>HealthLayout.Touches(t.Box,u.Box))).Any(),
+            "edge and crowded labels stay on-screen without covering a creep bar or another number");
+        var tiles=layout.Tiles.Where(t=>t.Tags.Count>0).ToArray();
+        Check(tiles.Length<tags.Count && tiles.All(t=>t.Bounds.Width<220 && t.Bounds.Height<90),
+            "adjacent numbers share tight tiles; distant numbers do not require a fullscreen surface");
+        var r0=tags[0].Box; var physical=HealthLayout.Screen(r0,1920,1080,-3840,24,3840,2160);
+        Check(physical==new Int32Rect(-3840+2*r0.X,24+2*r0.Y,2*r0.Width,2*r0.Height),
+            "tile coordinates scale correctly on an offset 4K monitor");
+        var visual=new DrawingVisual(); using(var dc=visual.RenderOpen()) ink.Draw(dc,tags,1920,1080,new Size(1920,1080),1);
+        var bitmap=new RenderTargetBitmap(1920,1080,96,96,PixelFormats.Pbgra32); bitmap.Render(visual);
+        byte[] pix=new byte[1920*1080*4]; bitmap.CopyPixels(pix,1920*4,0);
+        bool HasInk(Int32Rect box) {
+            int dark=0,light=0;
+            for(int y=box.Y;y<box.Y+box.Height;y++) for(int x=box.X;x<box.X+box.Width;x++) {
+                int p=4*(y*1920+x); if(pix[p+3]<200) continue;
+                if(pix[p]<20) dark++; if(pix[p]>200 && pix[p+1]>200 && pix[p+2]>200) light++;
+            }
+            return dark>30 && light>10;
+        }
+        Check(tags.All(t=>HasInk(t.Box)) && wave.All(r=>pix[4*(r.Bar.Y*1920+r.Bar.X+r.Bar.Width/2)+3]==0),
+            "software render: each number has white text on a dark backing; the underlying bar remains unobstructed");
+        var dual=wave[2]; var absolute=wave[1];
+        Check(ReferenceEquals(ink.Glyph(dual,1),ink.Glyph(dual with {Revision=99},1)) &&
+            !ReferenceEquals(ink.Glyph(dual,1),ink.Glyph(dual with {RangedAlternative=151},1)) &&
+            !ReferenceEquals(ink.Glyph(absolute,1),ink.Glyph(absolute with {Type=LaneCreepType.Melee},1)),
+            "glyph cache distinguishes identities and both conditional estimates");
+        var packed=Enumerable.Range(0,8).Select(i=>wave[1] with {Revision=i+10}).ToArray();
+        layout.Arrange(packed,1920,1080);
+        Check(layout.Placed<packed.Length,"unplaceable numbers are omitted instead of being assigned to a distant bar");
+        layout.Arrange([],1920,1080); Check(layout.Placed==0 && layout.Tiles.All(t=>t.Tags.Count==0),"empty frame removes every tile");
+        const long t0=TimeSpan.TicksPerSecond, ms=TimeSpan.TicksPerMillisecond;
+        var timing=new PracticeTimings(); timing.SkipStale();
+        timing.Readout(t0+20*ms,t0+50*ms,2); timing.Readout(t0+100*ms,t0+151*ms,1);
+        timing.Draw(t0+40*ms,t0+92*ms,[tags[0]]); timing.Draw(t0+100*ms,t0+105*ms,[tags[0]]);
+        var report=timing.Read();
+        Check(PracticeTimings.Fresh(t0,t0+50*ms) && !PracticeTimings.Fresh(t0,t0+50*ms+1) && !PracticeTimings.Fresh(t0,t0-1) &&
+            report.FrameToReadout is {Count:2, P95UpperMs:51, Over50:1} && report.FrameToWpfDraw is {Count:2, Over50:1} &&
+            report.ReadingChangeToFirstDraw is {Count:1, P95UpperMs:92, Over50:1} && report.ObservedReadingChanges==3 &&
+            report.StaleBeforeReadout==1 && report.StaleAfterReadout==1,
+            "coalesced draws retain first-change time; repeated paints, missed changes and stale frames are not successes");
+        Check(PracticeTimings.Observation(t0+4*ms,t0,t0+ms,150,out long anchor) && anchor==t0 &&
+            !PracticeTimings.Observation(t0,t0+60*ms,t0+61*ms,150,out _) &&
+            !PracticeTimings.Observation(t0+30*ms,t0,t0+ms,150,out _),
+            "slight source-clock lead uses actual dequeue; genuinely old or implausibly future frames stay rejected");
+        var lost=new PracticeTimings();
+        lost.Readout(t0,t0+ms,1,1); lost.Readout(t0+20*ms,t0+21*ms,1,1);
+        var afterCountdown=tags[0] with {Reading=tags[0].Reading with {Revision=55,ChangedAt=1.04,LossRevision=54,LossAt=1.02}};
+        lost.Draw(t0+40*ms,t0+60*ms,[afterCountdown]); lost.Draw(t0+50*ms,t0+65*ms,[afterCountdown]);
+        Check(lost.Read() is {ObservedHealthLosses:2,HealthLossToFirstWpfDraw:{Count:1,P95UpperMs:40}},
+            "a countdown redraw does not re-date a loss or hide a loss coalesced out of the UI");
+        foreach(int fps in new[]{LastHitPractice.EconomyFps,LastHitPractice.FastFps}) {
+            const long start=TimeSpan.TicksPerSecond*24L*3600*30; // Large QPC offset, many excess source frames.
+            int slots=Enumerable.Range(0,1000).Select(i=>WindowVideoSource.FrameSlot(start+i*10000,fps)).Distinct().Count();
+            Check(slots==fps, $"1000 synthetic timestamps allow only {fps} GPU submission slots in one second");
+        }
+    }
     private static T Field<T>(Window w, string name) => (T)w.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(w)!;
     private static void Set(Window w, string name, object value) => w.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(w, value);
     private static IEnumerable<DependencyObject> Children(DependencyObject parent)
@@ -37,6 +121,16 @@ internal static class Program
     }
     private static void Click(Window w, string content) => Children(w).OfType<Button>()
         .Single(b => Equals(b.Content, content)).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    private static void CheckGameControls(Window game)
+    {
+        var controls = Children(game).ToArray();
+        var sections = controls.OfType<Expander>().Select(e => e.Header as string).ToArray();
+        if (!sections.SequenceEqual(new[]{"设置：画面来源、视频、Dota 目录", "Debug"}) ||
+            !controls.OfType<Button>().Any(b => Equals(b.Content,"连接")) ||
+            controls.OfType<Button>().Any(b => b.Content is "显示小兵血量" or "停止显示血量" or "试算") ||
+            typeof(GameWindowUi).Assembly.GetType("DotaCoach.TwoPc.LastHitPractice") != null)
+            throw new Exception("Game client should ship only its normal controls, without the experimental lane overlay");
+    }
     private static CheckBox DebugSwitch(Window w) => Children(w).OfType<CheckBox>()
         .Single(c => Equals(c.Content, "开启 Debug 记录"));
     private static DebugRecorder? Recorder(Window w)
@@ -89,12 +183,9 @@ internal static class Program
         // Exercise packaged UI handlers without desktop input, clipboard, real game capture or AI.
         coach.Show(); game.Show();
         await Wait(() => Children(coach).Concat(Children(game)).OfType<Expander>().All(e => !e.IsExpanded) &&
-            Children(coach).OfType<Expander>().Count() == 4 && Children(game).OfType<Expander>().Count() == 4,
-            "rarely used settings start collapsed (game: practice, opening calculator, settings, Debug)");
-        Click(game, "试算");
-        await Wait(() => Children(game).OfType<TextBlock>().Any(t => t.Text.Contains("先垫 1 刀，塔累计打 1 下"))
-            && Field<CancellationTokenSource?>(game, "active") == null && Field<GsiReceiver?>(game, "gsi") == null,
-            "opening tower calculator works without pairing, GSI or live capture");
+            Children(coach).OfType<Expander>().Count() == 4 && Children(game).OfType<Expander>().Count() == 2,
+            "rarely used settings start collapsed (game: settings and Debug)");
+        CheckGameControls(game);
         await Wait(() => DebugSwitch(coach).IsChecked != true && DebugSwitch(game).IsChecked != true &&
             !Directory.Exists(debugRoot), "Debug is opt-in and creates no recording directory while off");
         DebugSwitch(coach).IsChecked = true; DebugSwitch(game).IsChecked = true;
@@ -143,8 +234,8 @@ internal static class Program
         await Wait(() => host.Mailbox.Snapshot().Frames >= 3 && host.Mailbox.Latest()?.Video != null,
             "game client continuously sends real H264 diagnostic video through pinned WSS");
         await Wait(() => File.Exists(videoSettings) && GameVideoSettings.Load(videoSettings).Fps == 60 && !Field<ComboBox>(game, "fpsChoice").IsEnabled &&
-            Equals(Field<Button>(game, "connect").Content, "断开") && !Field<Button>(game, "practiceButton").IsEnabled,
-            "chosen video settings persist and lock while streaming; standalone practice cannot start a second capture");
+            Equals(Field<Button>(game, "connect").Content, "断开"),
+            "chosen video settings persist and lock while streaming");
         await Wait(() => Field<Image>(coach, "image").Source != null, "coach preview receives decoded bitmap");
         await Wait(() => Field<Image>(game, "image").Source != null, "game preview receives capture bitmap");
         await Wait(() => Recorder(coach)!.Status.Images >= 2 && Recorder(game)!.Status.Images == 0,

@@ -1,0 +1,43 @@
+{
+  "synthetic": {
+    "frames": 2274,
+    "matched": 2274,
+    "maxErrorPx": 0,
+    "maxHpError": 4,
+    "recoveredRows": 210,
+    "heldOutThirdShots": 12,
+    "insidePredictedInterval": 12,
+    "maxDisplayedEtaErrorMs": 33.3,
+    "negativeScenarios": 10,
+    "trackedSinglePixelVerified": true,
+    "newBarDiscoveredMs": 35,
+    "rasterizedChanges": 252
+  },
+  "offlineMs": {
+    "scanAndTrackingP95": 0.025,
+    "frameReadyToSoftwareBitmapP95": 0.369,
+    "frameReadyToSoftwareBitmapMax": 178.838,
+    "over50": 1,
+    "forcedFullMean": 0.026,
+    "adaptiveMean": 0.015
+  },
+  "realCrops": {
+    "frames": 8,
+    "candidateRims": 30,
+    "matched": 28,
+    "additionalDetectionsOnBlankBackground": 0,
+    "labels": 28,
+    "note": "selected real 4K\u21921080p crops, not complete frames or absolute HP truth"
+  },
+  "pacedWorkerAndDispatcher": {
+    "inputHz": 60,
+    "expectedLosses": 12,
+    "rasterizedLosses": 12,
+    "scheduledLossToBitmapP95Ms": 16.494,
+    "maxMs": 16.494,
+    "over50": 0,
+    "firstVisibleMs": 3.722,
+    "stallCleared": true
+  },
+  "excludes": "WGC, desktop compositor, game rendering, monitor and player input; only pacedWorkerAndDispatcher runs on the real-time schedule"
+}

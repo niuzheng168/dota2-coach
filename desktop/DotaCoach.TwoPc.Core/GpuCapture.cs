@@ -63,14 +63,16 @@ public sealed unsafe class GpuDevice : IDisposable
 public sealed unsafe class WindowCapture : IDisposable
 {
     private nint item, pool, session;
+    private long lastFrameTime = long.MinValue;
     /// <summary>Captured window size (DWM frame bounds) when the session started.</summary>
     public int Width { get; }
     public int Height { get; }
     public bool BorderDisabled { get; }
-    /// <summary>False on Windows builds without MinUpdateInterval: capture stays capped near 60 fps.</summary>
+    /// <summary>True only if an unrestricted session successfully requested a high source cadence.</summary>
     public bool Unthrottled { get; }
-    public WindowCapture(GpuDevice gpu, nint window)
+    public WindowCapture(GpuDevice gpu, nint window, int maxFps = 0)
     {
+        if (maxFps is < 0 or > 240) throw new ArgumentOutOfRangeException(nameof(maxFps));
         try {
             nint interop = Factory("Windows.Graphics.Capture.GraphicsCaptureItem", new("3628e81b-3cac-4c60-b7f4-23ce0e0c3356"));
             try {
@@ -103,25 +105,32 @@ public sealed unsafe class WindowCapture : IDisposable
             // IGraphicsCaptureSession5.MinUpdateInterval (Windows 11 24H2+) lifts that to the display rate.
             nint fifth = TryQuery(session, new("67c0ea62-1f85-5061-925a-239be0ac09cb"));
             if (fifth != 0) {
-                Unthrottled = ((delegate* unmanaged[Stdcall]<nint, long, int>)Slot(fifth, 7))(fifth, 10_000 /* 1 ms */) >= 0;
+                long interval = maxFps == 0 ? 10_000 : (TimeSpan.TicksPerSecond + maxFps - 1) / maxFps;
+                Unthrottled = ((delegate* unmanaged[Stdcall]<nint, long, int>)Slot(fifth, 7))(fifth, interval) >= 0 && maxFps == 0;
                 Release(fifth);
             }
             Hr(((delegate* unmanaged[Stdcall]<nint, int>)Slot(session, 6))(session));
         } catch { Dispose(); throw; }
     }
     /// <summary>Newest frame since the last call; older queued frames are returned to the pool unused.</summary>
-    public CaptureFrame? Latest()
+    public CaptureFrame? Latest() => Latest(out _);
+    public CaptureFrame? Latest(out int freshFrames)
     {
-        nint newest = 0;
+        nint newest = 0; freshFrames = 0; long dequeuedAt = 0;
         try {
-            while (true) {
+            for (int i = 0; i < 3; i++) { // bound draining to one pool; don't starve recognition
                 nint frame = 0;
                 Hr(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Slot(pool, 7))(pool, &frame));
                 if (frame == 0) break;
+                long local = System.Diagnostics.Stopwatch.GetElapsedTime(0).Ticks;
+                long at;
+                int hr = ((delegate* unmanaged[Stdcall]<nint, long*, int>)Slot(frame, 7))(frame, &at);
+                if (hr < 0 || at <= lastFrameTime) { CaptureFrame.Close(frame); Hr(hr); continue; }
+                lastFrameTime = at; dequeuedAt = local; freshFrames++;
                 CaptureFrame.Close(newest); newest = frame;
             }
         } catch { CaptureFrame.Close(newest); throw; }
-        return newest == 0 ? null : new CaptureFrame(newest);
+        return newest == 0 ? null : new CaptureFrame(newest, lastFrameTime, dequeuedAt);
     }
     public void Dispose()
     {
@@ -136,9 +145,12 @@ public sealed unsafe class CaptureFrame : IDisposable
     internal nint Texture { get; private set; }
     public int ContentWidth { get; }
     public int ContentHeight { get; }
-    internal CaptureFrame(nint frame)
+    /// <summary>WGC SystemRelativeTime (QPC, 100 ns units), not time of polling.</summary>
+    public long SystemRelativeTime { get; }
+    public long DequeuedAt { get; }
+    internal CaptureFrame(nint frame, long at, long dequeuedAt)
     {
-        this.frame = frame;
+        this.frame = frame; SystemRelativeTime = at; DequeuedAt = dequeuedAt;
         try {
             SizeInt32 content;
             Hr(((delegate* unmanaged[Stdcall]<nint, SizeInt32*, int>)Slot(frame, 8))(frame, &content));
@@ -172,6 +184,12 @@ public sealed unsafe class GpuNv12Scaler : IDisposable
 {
     private readonly GpuDevice gpu;
     private nint enumerator, processor, target, output, staging;
+    // Practice only: at most two in-flight transfers. Delay releasing each WGC frame
+    // until its GPU copy has completed. The streaming/encoding path stays synchronous.
+    private nint secondStaging;
+    private readonly CaptureFrame?[] owners = new CaptureFrame?[2];
+    private readonly long[] stamps = new long[2], submittedAt = new long[2];
+    private int head, pending;
     private readonly PreciseTimer timer = new();
     public int Width { get; }
     public int Height { get; }
@@ -205,29 +223,80 @@ public sealed unsafe class GpuNv12Scaler : IDisposable
             ((delegate* unmanaged[Stdcall]<nint, nint, uint, int, Rect32*, void>)Slot(vc, 31))(vc, processor, 0, 1, &whole);
         } catch { Dispose(); throw; }
     }
-    /// <summary>Scales <paramref name="source"/> of a BGRA texture into a new packed NV12 picture.</summary>
-    public VideoPixels Convert(CaptureFrame frame, Rect32 source)
+    private void Submit(nint texture, Rect32 source, nint destination)
     {
         nint vc = gpu.VideoContext, context = gpu.Context, input = 0;
         ((delegate* unmanaged[Stdcall]<nint, nint, uint, int, Rect32*, void>)Slot(vc, 30))(vc, processor, 0, 1, &source);
         var inputDesc = new InputViewDesc { ViewDimension = 1 };
         Hr(((delegate* unmanaged[Stdcall]<nint, nint, nint, InputViewDesc*, nint*, int>)Slot(gpu.VideoDevice, 8))(
-            gpu.VideoDevice, frame.Texture, enumerator, &inputDesc, &input));
+            gpu.VideoDevice, texture, enumerator, &inputDesc, &input));
         try {
             var stream = new StreamDesc { Enable = 1, InputSurface = input };
             Hr(((delegate* unmanaged[Stdcall]<nint, nint, nint, uint, uint, StreamDesc*, int>)Slot(vc, 53))(vc, processor, output, 0, 1, &stream));
         } finally { Release(input); }
-        ((delegate* unmanaged[Stdcall]<nint, nint, nint, void>)Slot(context, 47))(context, staging, target);
+        ((delegate* unmanaged[Stdcall]<nint, nint, nint, void>)Slot(context, 47))(context, destination, target);
         ((delegate* unmanaged[Stdcall]<nint, void>)Slot(context, 111))(context);
-        Mapped mapped; int hr;
-        long started = Environment.TickCount64;
-        // Poll instead of a blocking Map: some drivers spin a CPU core while waiting for the GPU.
-        while ((hr = ((delegate* unmanaged[Stdcall]<nint, nint, uint, int, uint, Mapped*, int>)Slot(context, 14))(
-            context, staging, 0, 1, 0x100000, &mapped)) == unchecked((int)0x887A000A)) {
-            if (Environment.TickCount64 - started > 500) throw new TimeoutException("GPU scaler did not finish");
-            timer.Wait(5_000); // 0.5 ms
+    }
+
+    private bool TryMap(nint buffer, out Mapped mapped)
+    {
+        Mapped m = default;
+        int hr = ((delegate* unmanaged[Stdcall]<nint, nint, uint, int, uint, Mapped*, int>)Slot(gpu.Context, 14))(
+            gpu.Context, buffer, 0, 1, 0x100000 /* DO_NOT_WAIT */, &m);
+        mapped = m;
+        if (hr == unchecked((int)0x887A000A)) return false;
+        Hr(hr); return true;
+    }
+
+    private void Unmap(nint buffer) => ((delegate* unmanaged[Stdcall]<nint, nint, uint, void>)Slot(gpu.Context, 15))(gpu.Context, buffer, 0);
+
+    public bool CreepQueueFull => pending == 2;
+    private readonly LanePixelScanner laneScanner = new();
+    public bool CreepReadPending => pending != 0;
+    /// <summary>On success, transfers ownership of frame until the corresponding readback is retired.</summary>
+    public bool TryQueueCreepFrame(CaptureFrame frame, Rect32 source) =>
+        TryQueueCreepTexture(frame.Texture, source, frame.SystemRelativeTime, frame);
+
+    internal bool TryQueueCreepTexture(nint texture, Rect32 source, long at, CaptureFrame? owner)
+    {
+        if (pending == 2) return false;
+        int index = (head + pending) % 2;
+        if (index == 1 && secondStaging == 0) secondStaging = gpu.Texture(Width, Height, 103, 3, 0, 0x20000);
+        Submit(texture, source, index == 0 ? staging : secondStaging);
+        stamps[index] = at; submittedAt[index] = Environment.TickCount64; owners[index] = owner; pending++;
+        return true;
+    }
+
+    public bool TryReadCreepBars(List<CreepBar> destination, out long frameTime) => TryReadCreepBars(destination, out frameTime, out _);
+    public bool TryReadCreepBars(List<CreepBar> destination, out long frameTime, out long dequeuedAt)
+    {
+        frameTime = dequeuedAt = 0;
+        if (pending == 0) return false;
+        nint buffer = head == 0 ? staging : secondStaging;
+        if (!TryMap(buffer, out var m)) {
+            if (Environment.TickCount64 - submittedAt[head] > 500) throw new TimeoutException("GPU scaler did not finish");
+            return false;
         }
-        Hr(hr);
+        try {
+            int pitch = checked((int)m.RowPitch);
+            laneScanner.Read(new ReadOnlySpan<byte>((void*)m.Data, checked(pitch * (Height + Height / 2))),
+                Width, Height, pitch, stamps[head], destination);
+            frameTime = stamps[head]; dequeuedAt = owners[head]?.DequeuedAt ?? 0; return true;
+        } finally {
+            Unmap(buffer); owners[head]?.Dispose(); owners[head] = null; head = 1 - head; pending--;
+        }
+    }
+
+    /// <summary>Scales <paramref name="source"/> of a BGRA texture into a new packed NV12 picture.</summary>
+    public VideoPixels Convert(CaptureFrame frame, Rect32 source)
+    {
+        Submit(frame.Texture, source, staging);
+        Mapped mapped;
+        long start = Environment.TickCount64;
+        while (!TryMap(staging, out mapped)) {
+            if (Environment.TickCount64 - start > 500) throw new TimeoutException("GPU scaler did not finish");
+            timer.Wait(5_000);
+        }
         try {
             var nv12 = GC.AllocateUninitializedArray<byte>(Width * Height * 3 / 2);
             byte* bytes = (byte*)mapped.Data;
@@ -240,14 +309,13 @@ public sealed unsafe class GpuNv12Scaler : IDisposable
                     Buffer.MemoryCopy(chroma + (long)y * mapped.RowPitch, chromaOut + (long)y * Width, Width, Width);
             }
             return VideoPixels.Wrap(Width, Height, nv12);
-        } finally {
-            ((delegate* unmanaged[Stdcall]<nint, nint, uint, void>)Slot(context, 15))(context, staging, 0);
-        }
+        } finally { Unmap(staging); }
     }
     public void Dispose()
     {
-        Release(output); Release(staging); Release(target); Release(processor); Release(enumerator);
-        output = staging = target = processor = enumerator = 0;
+        for (int i = 0; i < owners.Length; i++) { owners[i]?.Dispose(); owners[i] = null; }
+        Release(output); Release(secondStaging); Release(staging); Release(target); Release(processor); Release(enumerator);
+        output = secondStaging = staging = target = processor = enumerator = 0;
         timer.Dispose();
     }
     [StructLayout(LayoutKind.Sequential)] private record struct Rational(uint Numerator, uint Denominator);

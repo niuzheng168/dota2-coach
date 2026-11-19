@@ -1,0 +1,128 @@
+{
+  "date": "2026-11-18",
+  "timezone": "Asia/Hong_Kong",
+  "units": "WGC counts distinct increasing SystemRelativeTime values, not engine Presents or UI repaints. All durations in seconds.",
+  "realDotaFirstMappedBuild": [
+    {
+      "seconds": 5.0777477,
+      "supplied": 796,
+      "detected": 794,
+      "eligible": 47,
+      "checks": 47
+    },
+    {
+      "seconds": 5.0827368,
+      "supplied": 791,
+      "detected": 787,
+      "eligible": 47,
+      "checks": 47
+    },
+    {
+      "seconds": 5.0893205,
+      "supplied": 779,
+      "detected": 777,
+      "eligible": 47,
+      "checks": 47
+    },
+    {
+      "seconds": 5.0114682,
+      "supplied": 170,
+      "detected": 169,
+      "eligible": 11,
+      "checks": 46
+    },
+    {
+      "seconds": 5.0212066,
+      "supplied": 0,
+      "detected": 0,
+      "eligible": 0,
+      "checks": 46
+    },
+    {
+      "seconds": 5.018198,
+      "supplied": 0,
+      "detected": 0,
+      "eligible": 0,
+      "checks": 46
+    }
+  ],
+  "cleanLive": {
+    "seconds": 15.249805,
+    "supplied": 2366,
+    "detected": 2358,
+    "detectionsPerSecond": 154.6249279908825
+  },
+  "rawWgcDotaNoRecognition": [
+    {
+      "seconds": 5.0005565,
+      "supplied": 769,
+      "hz": 153.7828839650147,
+      "p50SourceIntervalMs": 6.2499
+    },
+    {
+      "seconds": 5.000577,
+      "supplied": 780,
+      "hz": 155.98199967723724,
+      "p50SourceIntervalMs": 6.2499
+    },
+    {
+      "seconds": 5.0001148,
+      "supplied": 797,
+      "hz": 159.3963402600276,
+      "p50SourceIntervalMs": 6.2499
+    }
+  ],
+  "windowFixturePipelinedBuild": [
+    {
+      "screen": "{X=0,Y=0,Width=3840,Height=2160}",
+      "match": false,
+      "seconds": 6.0001221,
+      "sup": 959,
+      "n": 959,
+      "decoded": 959,
+      "changed": 954
+    },
+    {
+      "screen": "{X=0,Y=0,Width=3840,Height=2160}",
+      "match": true,
+      "seconds": 6.0012475,
+      "sup": 957,
+      "n": 956,
+      "decoded": 956,
+      "changed": 955
+    },
+    {
+      "screen": "{X=0,Y=0,Width=3840,Height=2160}",
+      "match": true,
+      "seconds": 6.0007767,
+      "sup": 957,
+      "n": 956,
+      "decoded": 956,
+      "changed": 955
+    },
+    {
+      "screen": "{X=0,Y=0,Width=3840,Height=2160}",
+      "match": false,
+      "seconds": 6.0000877,
+      "sup": 959,
+      "n": 960,
+      "decoded": 960,
+      "changed": 959
+    }
+  ],
+  "windowFixtureLegend": "320 Hz synthetic producer on game display; sup=observed WGC timestamps, n=completed detection, decoded=readable three-bar code, changed=strictly increasing decoded IDs. Boundary can retire a prefetched frame. match=true only in experimental adapter selection, not shipped.",
+  "syntheticGpuPipelinedBuild": {
+    "source": "synthetic 4K GPU texture (excludes WGC and game)",
+    "validated": 2400,
+    "seconds": 10.000176,
+    "fps": 239.9957760743411
+  },
+  "regressions": {
+    "lastHit": 22,
+    "twoPcCore": 249
+  },
+  "displayPathHz": [
+    240,
+    160
+  ]
+}

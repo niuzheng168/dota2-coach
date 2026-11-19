@@ -8,6 +8,10 @@ using DotaCoach.TwoPc;
 int passed = 0;
 void Check(bool value, string name) { if (!value) throw new Exception(name); passed++; Console.WriteLine("PASS " + name); }
 if (args.Contains("--video-codec")) { VideoTests.Codec(Check); return; }
+if (args.Contains("--last-hit")) { LastHitTests.Run(Check); return; }
+if (args is ["--lane-role-audit",var samplesFile]) { LaneRoleTests.Audit(samplesFile); return; }
+if (args.Contains("--last-hit-latency")) { LastHitLatencyReplay.Run(); return; }
+if (args.Contains("--last-hit-gpu-bench")) { LastHitGpuBenchmark.Run(); return; }
 void Reject(Action action, string name)
 {
     bool rejected = false; try { action(); } catch (ArgumentException) { rejected = true; } catch (InvalidOperationException) { rejected = true; }
