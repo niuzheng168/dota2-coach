@@ -248,16 +248,11 @@ class Scanner:
         """`selector(window)` makes the ConsoleSelect or KeySelect used to switch heroes."""
         self.args, self.hud, self.feed = args, hud, feed
         self.window = dota_window()
+        self.make_selector = selector
         self.selector = selector(self.window)
         self.selecting = True  # False while Dota ignores selections (keys: not in the foreground)
-        self.capture = wgc.WindowCapture(self.window, lambda w, h: (0, h * BAND_TOP // 1080, w, h - h * BAND_TOP // 1080))
-        cw, ch = self.capture.client
-        self.width1080 = round(cw * 1080 / ch)
+        self.open_capture()
         self.canvas = np.zeros((1080, self.width1080, 3), np.uint8)  # used by the worker thread only
-        s = self.capture.crop[3] / (1080 - BAND_TOP)
-        r0, r1, c0, c1 = CHANGE
-        self.change_rows = slice(round((r0 - BAND_TOP) * s), round((r1 - BAND_TOP) * s), 4)
-        self.change_cols = slice(cw // 2 + round(c0 * s), cw // 2 + round(c1 * s), 4)
         self.player_hero: dict[int, str] = {}
         self.tried: dict[int, float] = {}
         self.heroes: dict[str, dict] = {}  # hero -> {"status": newest reading, "items": newest settled reading}
@@ -286,6 +281,41 @@ class Scanner:
         self.run_id = secrets.token_hex(8)
 
     # ---- controller: capture and selection (main thread) ----
+    def open_capture(self):
+        self.capture = wgc.WindowCapture(self.window, lambda w, h: (0, h * BAND_TOP // 1080, w, h - h * BAND_TOP // 1080))
+        cw, ch = self.capture.client
+        self.width1080 = round(cw * 1080 / ch)
+        s = self.capture.crop[3] / (1080 - BAND_TOP)
+        r0, r1, c0, c1 = CHANGE
+        self.change_rows = slice(round((r0 - BAND_TOP) * s), round((r1 - BAND_TOP) * s), 4)
+        self.change_cols = slice(cw // 2 + round(c0 * s), cw // 2 + round(c1 * s), 4)
+
+    def reopen(self, end: float) -> bool:
+        """Dota's window changed size: minimized on alt-tab from fullscreen, resized, or a new display mode.
+        Keep publishing what is known, wait until the window is usable again and capture it afresh.
+        False when the run ended first."""
+        self.capture.close()
+        self.stats["reopened"] += 1
+        print("Dota window changed: waiting for it, then capturing again.", flush=True)
+        last = -1e9
+        while (now := time.perf_counter()) < end:
+            if now - last >= self.args.timeline_every:
+                snap = self.snapshot()
+                self.record(snap)
+                self.write_live(snap)
+                last = now
+            try:
+                window = dota_window()
+                if not ctypes.windll.user32.IsIconic(window) and min(wgc.client_rect(window)[2:]) > 0:
+                    if window != self.window:  # Dota was restarted
+                        self.window, self.selector = window, self.make_selector(window)
+                    self.open_capture()
+                    return True
+            except (RuntimeError, ValueError, OSError):
+                pass  # not there yet, or still changing
+            time.sleep(0.25)
+        return False
+
     def plan(self, now: float) -> list[tuple[int, bool]]:
         """One cycle: (player, item visit) for every hero that can be selected now. The heroes whose
         items were read longest ago (at most --item-visits) stay long enough for their items."""
@@ -299,6 +329,8 @@ class Scanner:
             players = dict(self.player_hero)
             items_at = {h: (r.get("items") or {}).get("at", -1e9) for h, r in self.heroes.items()}
             status_at = {h: (r.get("status") or {}).get("at", -1e9) for h, r in self.heroes.items()}
+        if mode not in ("team-view", "full-spectator"):
+            return []  # menus or playing: the hero hotkeys would land in whatever Dota shows
         out = []
         for p in range(10):
             hero = players.get(p)
@@ -316,20 +348,38 @@ class Scanner:
         a = band[self.change_rows, self.change_cols, :3].astype(np.int16)
         return float(np.abs(a - reference[self.change_rows, self.change_cols, :3]).mean())
 
-    def run(self, duration: float):
-        frame = None
-        while frame is None:
-            frame = self.capture.latest()
+    def first_frame(self, end: float):
+        while time.perf_counter() < end:
+            try:
+                if (frame := self.capture.latest()) is not None:
+                    return frame
+            except (wgc.WindowChanged, TimeoutError, OSError):  # window resized/minimized, or capture lost
+                if not self.reopen(end):
+                    return None
             time.sleep(0.001)
+        return None
+
+    def run(self, duration: float):
+        end = self.started + duration
+        if (frame := self.first_frame(end)) is None:
+            self.work.put(None)
+            return
         visit = None  # closed-loop visit: {"player", "items", "sent", "ref", "switched"}
         stream: collections.deque[int] = collections.deque()  # players selected one per captured frame
         tail = None  # after the last streamed selection: {"sent", "switched", "items"}
         streamed = -1e9  # when the last streamed selection was sent
         visits: collections.deque[tuple[int, bool]] = collections.deque()
         last_print = last_drain = last_record = cycle_start = self.started
-        end = self.started + duration
         while time.perf_counter() < end:
-            got = self.capture.latest()
+            try:
+                got = self.capture.latest()
+            except (wgc.WindowChanged, TimeoutError, OSError):  # window resized/minimized, or capture lost
+                # Frames of the old size cannot be compared with new ones: start the cycle afresh.
+                if not self.reopen(end) or (frame := self.first_frame(end)) is None:
+                    break
+                stream.clear(); visits.clear()
+                visit = tail = None
+                continue
             now = time.perf_counter()
             if self.selecting != (ready := self.selector.ready()):
                 self.selecting = ready
@@ -429,10 +479,12 @@ class Scanner:
         while (job := self.work.get()) is not None:
             player, changed, settled, at, band = job
             t0 = time.perf_counter()
-            rows = 1080 - BAND_TOP
+            rows, width = 1080 - BAND_TOP, self.width1080  # the width changes when Dota's window does
             bgr = band[:, :, :3]
-            if bgr.shape[0] != rows or bgr.shape[1] != self.width1080:
-                bgr = cv2.resize(bgr, (self.width1080, rows), interpolation=cv2.INTER_AREA)
+            if bgr.shape[0] != rows or bgr.shape[1] != width:
+                bgr = cv2.resize(bgr, (width, rows), interpolation=cv2.INTER_AREA)
+            if self.canvas.shape[1] != width:
+                self.canvas = np.zeros((1080, width, 3), np.uint8)
             self.canvas[BAND_TOP:] = bgr
             with self.feed.lock:
                 clock, mode, roster = self.feed.clock, self.feed.mode, set(self.feed.teams)
@@ -685,14 +737,26 @@ def main():
             if not keys.ready() and not keys.front():
                 print("Dota is not in the foreground: watching only until it is.", flush=True)
             return keys
+    announced = False
+    while True:  # may be started before Dota
+        try:
+            dota_window()
+            break
+        except RuntimeError:
+            if not announced:
+                print("Waiting for the Dota window...", flush=True)
+                announced = True
+            time.sleep(1)
     scanner = Scanner(args, hud, feed, selector)
     worker = threading.Thread(target=scanner.recognize)
     worker.start()
     try:
         scanner.run(args.duration)
     except KeyboardInterrupt:
-        scanner.work.put(None)
+        pass
     finally:
+        # Also on an error: the worker waits for this, and the run would otherwise hang half-stopped.
+        scanner.work.put(None)
         worker.join()
         snap = scanner.snapshot()
         scanner.record(snap)
