@@ -46,8 +46,8 @@ internal static class GameWindow
             {
                 foreach (var process in Process.GetProcessesByName("dota2"))
                     using (process)
-                        if (handle == IntPtr.Zero && process.MainWindowHandle != IntPtr.Zero)
-                        { handle = process.MainWindowHandle; cachedProcess = (uint)process.Id; }
+                        if (handle == IntPtr.Zero && GameHandle(process) is var found && found != IntPtr.Zero)
+                        { handle = found; cachedProcess = (uint)process.Id; }
                 cachedHandle = handle;
             }
             if (handle == IntPtr.Zero || !IsWindowVisible(handle)) return null;
@@ -58,6 +58,14 @@ internal static class GameWindow
             return new(handle, origin.X, origin.Y, r.Right, r.Bottom);
         }
         catch { return null; }
+    }
+    // MainWindowHandle can be Valve's visible 0×0 IME window (VALVEIME001); the game draws into its SDL_app window.
+    private static IntPtr GameHandle(Process process)
+    {
+        for (IntPtr h = FindWindowExW(IntPtr.Zero, IntPtr.Zero, "SDL_app", null); h != IntPtr.Zero;
+             h = FindWindowExW(IntPtr.Zero, h, "SDL_app", null))
+            if (GetWindowThreadProcessId(h, out uint pid) != 0 && pid == process.Id && IsWindowVisible(h)) return h;
+        return process.MainWindowHandle;
     }
     public static bool IsForeground(GameSurface game) => GetForegroundWindow() == game.Handle;
     // We have already authenticated this game HWND. Recheck its coordinates without opening a
@@ -108,5 +116,6 @@ internal static class GameWindow
     [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr h);
     [DllImport("user32.dll")] private static extern bool IsWindow(IntPtr h);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr FindWindowExW(IntPtr parent, IntPtr after, string? cls, string? title);
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr h, int attribute, out RECT value, int size);
 }

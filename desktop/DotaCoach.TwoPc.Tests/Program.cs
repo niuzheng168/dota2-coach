@@ -8,6 +8,9 @@ using DotaCoach.TwoPc;
 int passed = 0;
 void Check(bool value, string name) { if (!value) throw new Exception(name); passed++; Console.WriteLine("PASS " + name); }
 if (args.Contains("--video-codec")) { VideoTests.Codec(Check); return; }
+if (args is ["--creep-scan", .. var scanFiles]) { CreepHealthTests.Eval(scanFiles); return; }
+if (args is ["--creep-bars", var barsOut, var barsSeconds, var barsGsi]) { CreepHealthTests.RecordBars(barsOut, double.Parse(barsSeconds), barsGsi); return; }
+if (args is ["--overlay-test", var overlayDir]) { CreepHealthTests.OverlayTest(overlayDir); return; }
 if (args.Contains("--last-hit")) { LastHitTests.Run(Check); return; }
 if (args is ["--lane-role-audit",var samplesFile]) { LaneRoleTests.Audit(samplesFile); return; }
 if (args.Contains("--last-hit-latency")) { LastHitLatencyReplay.Run(); return; }
@@ -496,6 +499,7 @@ await using (var gsiProbe = await GsiReceiver.Start(0)) {
 }
 await SpectatorTests.Run(Check);
 LastHitTests.Run(Check);
+CreepHealthTests.Run(Check);
 Console.WriteLine($"Two-PC protocol + real TLS + GSI + mocked model contracts: {passed} checks passed.");
 
 sealed class FakeCloudCoach(ModelAdvice advice) : HttpMessageHandler

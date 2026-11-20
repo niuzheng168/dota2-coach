@@ -20,6 +20,7 @@ public sealed class GsiReceiver : IAsyncDisposable
     private readonly string token;
     private readonly object gate = new();
     private (OwnState Value, long At)? latest;
+    private (SpectatorSnapshot Value, long At)? units;
     public int Port { get; private set; }
     public Action<GsiDiagnostics>? Diagnostics { get; set; }
     /// <summary>Typed minimap units of each authenticated packet, for the opt-in Debug log only.</summary>
@@ -42,7 +43,10 @@ public sealed class GsiReceiver : IAsyncDisposable
         LastDiagnostics = new(accepted ? "flat-player" : teams || all ? "observer-shaped" : "missing-own-state",
             present, teams, all, accepted, minimap, enemies);
         try { Diagnostics?.Invoke(LastDiagnostics); } catch { /* Diagnostics must never change GSI acceptance. */ }
-        if (snapshot != null) try { Snapshot?.Invoke(snapshot); } catch { /* Same rule for the typed view. */ }
+        if (snapshot != null) {
+            lock (gate) units = (snapshot, Environment.TickCount64);
+            try { Snapshot?.Invoke(snapshot); } catch { /* Same rule for the typed view. */ }
+        }
     }
     private GsiReceiver(int port, string? resumeToken, bool diagnostics)
     {
@@ -106,6 +110,17 @@ public sealed class GsiReceiver : IAsyncDisposable
             return (s.Value, (int)(Environment.TickCount64 - s.At));
         }
     }
+    /// <summary>
+    /// The newest packet's minimap units (what the player's team sees) and own team; stays on this machine.
+    /// Parsed with the diagnostics, so receivers started with <c>diagnostics: false</c> have none.
+    /// </summary>
+    public (SpectatorSnapshot Snapshot, int AgeMs)? LatestMinimap()
+    {
+        lock (gate) {
+            if (units is not { } m || Environment.TickCount64 - m.At > 3000) return null;
+            return (m.Value, (int)(Environment.TickCount64 - m.At));
+        }
+    }
     public string Config => $$"""
         "Dota Coach Two PC"
         {
@@ -139,7 +154,7 @@ public sealed class GsiReceiver : IAsyncDisposable
     }
     public async ValueTask DisposeAsync()
     {
-        lock (gate) latest = null;
+        lock (gate) { latest = null; units = null; }
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         try { await app.StopAsync(deadline.Token); } catch (OperationCanceledException) { }
         await app.DisposeAsync();

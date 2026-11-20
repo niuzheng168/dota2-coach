@@ -21,7 +21,7 @@ internal static class Program
             CheckGameControls(game);
             if (Field<CancellationTokenSource?>(game,"active") != null || Field<GsiReceiver?>(game,"gsi") != null)
                 throw new Exception("Idle game client must not start a connection or GSI receiver");
-            Console.WriteLine("PASS idle client: normal controls present, lane controls and overlay worker absent");
+            Console.WriteLine("PASS idle client: normal controls and creep HP switch present, lane controls and overlay worker absent");
             return;
         }
         if (args is ["--offline-practice"]) { OfflinePractice(); return; }
@@ -125,11 +125,13 @@ internal static class Program
     {
         var controls = Children(game).ToArray();
         var sections = controls.OfType<Expander>().Select(e => e.Header as string).ToArray();
-        if (!sections.SequenceEqual(new[]{"设置：画面来源、视频、Dota 目录", "Debug"}) ||
+        // The creep HP numbers (CreepHpDisplay) are back as their own switch; the old lane overlay and its shortcuts are not.
+        if (!sections.SequenceEqual(new[]{"小兵血量：本机实时显示", "设置：画面来源、视频、Dota 目录", "Debug"}) ||
             !controls.OfType<Button>().Any(b => Equals(b.Content,"连接")) ||
-            controls.OfType<Button>().Any(b => b.Content is "显示小兵血量" or "停止显示血量" or "试算") ||
+            !controls.OfType<Button>().Any(b => Equals(b.Content,"显示小兵血量")) ||
+            controls.OfType<Button>().Any(b => b.Content is "停止显示血量" or "试算") ||
             typeof(GameWindowUi).Assembly.GetType("DotaCoach.TwoPc.LastHitPractice") != null)
-            throw new Exception("Game client should ship only its normal controls, without the experimental lane overlay");
+            throw new Exception("Game client should ship only its normal controls and the creep HP switch, without the experimental lane overlay");
     }
     private static CheckBox DebugSwitch(Window w) => Children(w).OfType<CheckBox>()
         .Single(c => Equals(c.Content, "开启 Debug 记录"));
@@ -183,8 +185,8 @@ internal static class Program
         // Exercise packaged UI handlers without desktop input, clipboard, real game capture or AI.
         coach.Show(); game.Show();
         await Wait(() => Children(coach).Concat(Children(game)).OfType<Expander>().All(e => !e.IsExpanded) &&
-            Children(coach).OfType<Expander>().Count() == 4 && Children(game).OfType<Expander>().Count() == 2,
-            "rarely used settings start collapsed (game: settings and Debug)");
+            Children(coach).OfType<Expander>().Count() == 4 && Children(game).OfType<Expander>().Count() == 3,
+            "rarely used settings start collapsed (game: creep HP, settings and Debug)");
         CheckGameControls(game);
         await Wait(() => DebugSwitch(coach).IsChecked != true && DebugSwitch(game).IsChecked != true &&
             !Directory.Exists(debugRoot), "Debug is opt-in and creates no recording directory while off");

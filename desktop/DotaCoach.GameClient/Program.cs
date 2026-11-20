@@ -19,6 +19,8 @@ internal static class Program
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)) {
             MessageBox.Show("双机游戏端首版需要 Windows 11 x64。"); return;
         }
+        // --creep-hp-log <file>: start the creep HP display at once and append its per-second rates (on-site measurement).
+        if (args is ["--creep-hp-log", var log]) { new Application().Run(new GameWindowUi(null) { CreepHpLog = log }); return; }
         // Unsupported switches (including old capture shortcuts) must never launch a window or a worker.
         if (args.Length != 0 && args is not ["--local-bot-e2e", _]) {
             Console.Error.WriteLine("不支持此游戏端启动参数。"); Environment.ExitCode = 2; return;
@@ -70,6 +72,10 @@ internal sealed class GameWindowUi : Window
     private bool persistentGsi;
     private bool transportConnected;
     private long? lastCaptureAt;
+    private readonly TextBlock creepHpStatus = Ui.Text("默认关闭。开启后由游戏机本地识别小兵血条、用显卡在 Dota 上画出血量数字；画面不编码、不上传、不经过教练机。", 12);
+    private readonly Button creepHpButton;
+    private CreepHpDisplay? creepHp;
+    public string? CreepHpLog { get; init; }
 
     public GameWindowUi() : this(null) { }
     public GameWindowUi(E2ERun? run) : this(run, null) { }
@@ -102,6 +108,14 @@ internal sealed class GameWindowUi : Window
         preview.Children.Add(image); preview.Children.Add(marks); Grid.SetRow(preview, 1); root.Children.Add(preview);
         var bottom = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
         bottom.Children.Add(caption);
+        creepHpButton = Ui.Button("显示小兵血量", async (_, _) => await ToggleCreepHp());
+        if (e2e == null) {
+            var panel = new StackPanel();
+            panel.Children.Add(Ui.Text("默认血条、无边框或窗口模式。Dota 画面只在本机显卡上识别，不传给教练端；显卡有空闲时每帧刷新，显卡被游戏占满时限 60 帧以免拖慢游戏；切出 Dota 时隐藏。", 12));
+            panel.Children.Add(creepHpButton); panel.Children.Add(creepHpStatus);
+            bottom.Children.Add(Ui.Section("小兵血量：本机实时显示", panel));
+            Loaded += async (_, _) => { if (CreepHpLog != null) await ToggleCreepHp(); };
+        }
         bottom.Children.Add(Ui.Section("设置：画面来源、视频、Dota 目录", BuildSettings()));
         bottom.Children.Add(Ui.Section("Debug", debug.View));
         Grid.SetRow(bottom, 2); root.Children.Add(bottom); Content = root;
@@ -135,12 +149,54 @@ internal sealed class GameWindowUi : Window
             e.Cancel = true;
             if (closing) return;
             closing = true;
+            if (creepHp != null) { await creepHp.DisposeAsync(); creepHp = null; }
             await Stop();
             if (gsi != null) { await gsi.DisposeAsync(); gsi = null; }
             closed = true; reminderTimer.Stop(); overlay.Close();
             await debug.DisposeAsync();
             _ = Dispatcher.BeginInvoke(new Action(Close));
         };
+    }
+    private async Task ToggleCreepHp()
+    {
+        creepHpButton.IsEnabled = false;
+        try {
+            if (creepHp != null) {
+                await creepHp.DisposeAsync(); creepHp = null;
+                creepHpButton.Content = "显示小兵血量"; creepHpStatus.Text = "已关闭。";
+                return;
+            }
+            // Unit kinds come from the player's own GSI minimap: keep a receiver for the rest of this session.
+            string gsiNote = "";
+            if (gsi == null) {
+                try {
+                    gsi = await GsiReceiver.Start(resumeToken: GsiSetup.Token(GsiState));
+                    gsi.Diagnostics = d => debug.Recorder?.Gsi(d);
+                    gsi.Snapshot = s => debug.Recorder?.PlayerMinimap(s);
+                    persistentGsi = true;
+                } catch { gsiNote = "自身GSI启动失败（3219端口被占用？），只能显示百分比。"; }
+            }
+            if (gsi != null) {
+                try {
+                    if (GsiSetup.Install(dotaInstall.Text.Trim(), gsi.Config, GsiState).Changed)
+                        gsiNote = "已写入自身GSI：带 -gamestateintegration 完全重启 Dota 一次后，才能区分近战/远程/攻城兵。";
+                } catch { gsiNote = "自动写入GSI配置失败（检查“设置”里的 Dota 目录），只能显示百分比。"; }
+            }
+            string? log = CreepHpLog;
+            CreepHpDisplay? started = null;
+            started = new CreepHpDisplay(s => {
+                if (log != null) try { File.AppendAllText(log, System.Text.Json.JsonSerializer.Serialize(new { at = DateTimeOffset.Now, s.Status,
+                    fps = Math.Round(s.Fps, 1), scanMs = Math.Round(s.ScanMs, 2), s.Bars, s.Known, s.GpuLoad, s.Limited }) + "\n"); } catch { }
+                Dispatcher.BeginInvoke(() => {
+                    if (creepHp != started) return;
+                    string rate = s.Fps > 0 ? $"\n{s.Fps:F0} 帧/秒{(s.Limited ? $"（显卡繁忙，限 {GpuPacing.LimitedFps} 以免拖慢游戏）" : "")} · 识别 {s.ScanMs:F1} ms · " +
+                        $"{s.Bars} 根血条，{s.Known} 根已认出兵种" : "";
+                    creepHpStatus.Text = s.Status + rate + (gsiNote.Length > 0 ? "\n" + gsiNote : "");
+                });
+            }, () => gsi?.LatestMinimap(), excludeFromCapture: log == null);
+            creepHp = started;
+            creepHpButton.Content = "关闭小兵血量";
+        } finally { creepHpButton.IsEnabled = !closing; }
     }
     private async Task Start()
     {
