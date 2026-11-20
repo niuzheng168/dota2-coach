@@ -54,7 +54,8 @@ foreach ($role in @("Game", "Coach")) {
         --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o $destination
     if ($LASTEXITCODE -ne 0) { throw "Publish failed: $name" }
     if ($role -eq "Game") { $panelIcons = Copy-PanelIcons $destination }
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v043.md") -Destination (Join-Path $destination "README.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v044.md") -Destination (Join-Path $destination "README.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v043.md") -Destination (Join-Path $destination "USAGE.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-status-only.md") -Destination (Join-Path $destination "NO-VIDEO.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/game-creep-hp.md") -Destination (Join-Path $destination "CREEP-HP.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-plus-alerts.md") -Destination (Join-Path $destination "PLUS-ALERTS.md")
