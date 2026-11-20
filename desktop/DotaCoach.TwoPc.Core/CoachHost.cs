@@ -73,6 +73,15 @@ public sealed class CoachHost : IAsyncDisposable
                 socket.Abort();
             }
         });
+        // Video off (Features.VideoUpload): own GSI and window size, no picture.
+        app.MapPost("/v1/status", async (HttpContext c) => {
+            if (!c.Request.HasJsonContentType()) return Results.StatusCode(415);
+            var meta = JsonSerializer.Deserialize<FrameMeta>(await Bodies.Read(c.Request, Wire.MaxStatusBytes, c.RequestAborted), Wire.Json)
+                ?? throw new ArgumentException();
+            if (meta.SessionId != Session(c)) return Results.BadRequest();
+            Mailbox.AcceptStatus(meta);
+            return Results.Json(new { sequence = meta.Sequence }, Wire.Json);
+        });
         app.MapPost("/v1/frame", async (HttpContext c) => {
             if (c.Request.ContentType != "image/jpeg") return Results.StatusCode(415);
             string header = c.Request.Headers["X-Frame-Meta"].ToString();

@@ -14,8 +14,8 @@ internal static partial class Program
     /// <summary>
     /// Opt-in (--panel-trial icons-dir out-dir): the enemy panel on the game machine's RUNNING Dota window. A loopback
     /// coach publishes a sample panel with the given icons (files named &lt;dota name&gt;.png, as the coach machine's scanner
-    /// writes them); the real game client window connects with its diagnostic picture (Dota's own picture is never
-    /// sent) and draws the panel over Dota. For this check only, the overlay is made capturable so that screenshots
+    /// writes them); the real game client window connects in its diagnostic mode (Dota's own picture is never sent)
+    /// and draws the panel over Dota. For this check only, the overlay is made capturable so that screenshots
     /// show it. Then: settings changes, the panel switched off and back, CPU while it stands still, disconnection.
     /// While it runs, Dota must stay in the foreground; the timeline lets FPS be compared with the panel on and off.
     /// </summary>

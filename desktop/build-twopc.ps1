@@ -55,6 +55,7 @@ foreach ($role in @("Game", "Coach")) {
     if ($LASTEXITCODE -ne 0) { throw "Publish failed: $name" }
     if ($role -eq "Game") { $panelIcons = Copy-PanelIcons $destination }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v042-ui.md") -Destination (Join-Path $destination "README.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-status-only.md") -Destination (Join-Path $destination "NO-VIDEO.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v040.md") -Destination (Join-Path $destination "VIDEO-v040.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v021-debug.md") -Destination (Join-Path $destination "DEBUG-DETAILS.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v031-plus.md") -Destination (Join-Path $destination "PLUS-SPECTATOR.md")
@@ -73,8 +74,9 @@ foreach ($role in @("Game", "Coach")) {
 }
 $manifest = [ordered]@{
     version = $version; builtAt = [DateTimeOffset]::UtcNow.ToString("o"); artifacts = $artifacts;
-    protocol = "paired-wss-h264-v3"; automaticFarmingEnabled = $true
-    ordinaryMatchAdvice = $true; mapMarkersRequireConfirmedCalibration = $false
+    # Video upload is off (Features.VideoUpload): the video fields below describe the kept, switched-off path.
+    protocol = "paired-https-gsi-status"; videoUpload = $false; automaticFarmingEnabled = $false
+    ordinaryMatchAdvice = $false; mapMarkersRequireConfirmedCalibration = $false
     maximumEncodedImage = "4096x2304"; defaultEncodedHeight = 1080; modelImageMaximum = "1600x900"; supports4kSource = $true
     videoFrameRates = @(30, 60, 90, 120); defaultVideoFps = 60; videoBitrate = "auto-or-manual"; videoCapture = "Windows.Graphics.Capture-window"
     videoScaling = "D3D11-video-processor"; videoEncoder = "GPU-MFT-with-Windows-software-fallback"; videoProtocol = "dota-h264-v3"

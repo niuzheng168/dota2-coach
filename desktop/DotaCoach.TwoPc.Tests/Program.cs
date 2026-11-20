@@ -94,6 +94,23 @@ Reject(() => box.Accept(Meta(session, ticket, 1) with { Player = Own(), GsiAgeMs
 Reject(() => box.Accept(Meta(session, ticket, 1, Own()) with { GsiAgeMs = 4000 }, jpeg), "old GSI rejected");
 Reject(() => box.Accept(Meta(session, ticket, 1) with { SourceWidth = 1920 }, jpeg), "aspect distortion rejected");
 
+// Video off: a status (own GSI and window size, no picture) keeps the game machine present for subtitles only.
+var statusBox = new CoachMailbox(() => clock);
+var statusSession = statusBox.Begin().SessionId;
+FrameMeta Status(long sequence, OwnState? player = null) => new(statusSession, "", sequence, "dota2", 3840, 2160, player, player == null ? null : 10);
+statusBox.AcceptStatus(Status(1, Own()));
+Check(statusBox.Latest() is { HasImage: false, Video: null, Jpeg.Length: 0 } latestStatus && !CloudCoach.Eligible(latestStatus, localBotOnly: false) &&
+    statusBox.Snapshot() is { Connected: true, Frames: 1, Bytes: 0, Player.Hero: "npc_dota_hero_luna" }, "a status keeps presence and GSI without a picture and is never model input");
+statusBox.SetReminder(statusSession, 1, "local-vision-observation", "剃刀 离开视野", null);
+Check(statusBox.Poll(statusSession) is { FrameSequence: 1, SourceWidth: 3840, SourceHeight: 2160 }, "a subtitle may be based on a status");
+Reject(() => statusBox.SetReminder(statusSession, 1, "visible-farming-advice", "model", null), "model advice cannot be based on a status");
+Reject(() => statusBox.AcceptStatus(Status(1)), "a status sequence cannot repeat");
+Reject(() => statusBox.AcceptStatus(Status(2, Own()) with { Source = "diagnostic" }), "a diagnostic status cannot carry GSI");
+Reject(() => statusBox.AcceptStatus(Status(2) with { SessionId = session }), "a status needs the current session");
+Reject(() => statusBox.AcceptStatus(Status(2) with { SourceWidth = 320 }), "a status needs a real game size");
+clock += 4001;
+Check(statusBox.Poll(statusSession) == null && !statusBox.Snapshot().Connected, "without statuses the game machine and its subtitle expire");
+
 JsonElement Payload(string team = "radiant") => JsonSerializer.SerializeToElement(new {
     auth = new { token = "must-not-leave-game-machine" },
     player = new { team_name = team, steamid = "PRIVATE", name = "PRIVATE", gold = 999 },
@@ -112,6 +129,7 @@ Reject(() => GsiState.Validate(Own() with { Health = double.NaN }), "invalid GSI
 
 Check(LinkErrors.Message(new TaskCanceledException(), false).Contains("超时"), "network timeout is not labelled user stop");
 Check(LinkErrors.Message(new TaskCanceledException(), true).StartsWith("已停止"), "explicit user cancellation remains distinct");
+Check(LinkErrors.Message(new CoachVersionException(), false).Contains("教练端版本过旧"), "a coach without status links is named as too old");
 
 await using (var host = await CoachHost.Start(IPAddress.Loopback, 0))
 {
@@ -144,6 +162,13 @@ await using (var host = await CoachHost.Start(IPAddress.Loopback, 0))
     Check(await link.Icon("item_blink", default) is { Length: 64 } && await link.Icon("item_missing", default) == null &&
           await link.Icon("item_huge", default) == null && await link.Icon("item_text", default) == null && await link.Icon("../secrets", default) == null,
         "icons are small PNGs by Dota name only; missing, oversized and non-PNG ones are not served");
+    await link.SendStatus(new(link.SessionId!, "", 2, "diagnostic", 1280, 720, null, null), default);
+    host.Mailbox.SetReminder(link.SessionId!, 2, "manual-link-test", "只传状态", null);
+    Check(host.Mailbox.Latest() is { HasImage: false, Meta.Sequence: 2 } && (await link.Poll(default)) is { Message: "只传状态", FrameSequence: 2 },
+        "video off: a status over pinned TLS carries a reminder back to the game client");
+    bool videoRefused = false;
+    try { await link.OpenVideo(default); } catch (System.Net.WebSockets.WebSocketException) { videoRefused = true; }
+    Check(videoRefused, "a coach without a video decoder (video off) refuses video streams");
     using var badPin = new GameLink(pairing with { Fingerprint = new string('0', 64) });
     await RejectAsync(() => badPin.Connect(default), "TLS certificate mismatch rejected");
     using var badToken = new GameLink(pairing with { Token = new string('0', 64) });
@@ -159,7 +184,7 @@ await using (var host = await CoachHost.Start(IPAddress.Loopback, 0))
     using var badFrame = new HttpRequestMessage(HttpMethod.Post, "/v1/frame") { Content = new ByteArrayContent(jpeg) };
     badFrame.Content.Headers.ContentType = new("image/jpeg"); badFrame.Headers.Add("X-Frame-Meta", "bad-base64");
     Check((await client.SendAsync(badFrame)).StatusCode == HttpStatusCode.BadRequest, "malformed frame header handled without crashing host");
-    Check(host.Mailbox.Snapshot().Frames == 1, "malformed payload cannot overwrite latest frame");
+    Check(host.Mailbox.Snapshot().Frames == 2, "malformed payload cannot overwrite latest frame");
     host.Revoke();
     await RejectAsync(() => link.Poll(default), "revoked pairing stops existing client");
     Check(host.Mailbox.Latest() == null, "revocation clears all capture state");

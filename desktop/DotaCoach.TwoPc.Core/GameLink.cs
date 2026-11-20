@@ -161,6 +161,19 @@ public sealed class GameLink : IDisposable
         if (!response.IsSuccessStatusCode) throw new HttpRequestException(
             "画面被拒绝或会话已失效，请重新连接。", null, response.StatusCode);
     }
+    /// <summary>Video off: own GSI and window size, no picture. Reminders may then be based on its sequence.</summary>
+    public async Task SendStatus(FrameMeta meta, CancellationToken cancellation)
+    {
+        if (meta.SessionId != SessionId) throw new InvalidOperationException("Old session");
+        using var request = Request(HttpMethod.Post, "/v1/status");
+        request.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(meta, Wire.Json));
+        request.Content.Headers.ContentType = new("application/json");
+        Remember(meta, now());
+        using var response = await http.SendAsync(request, cancellation);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) throw new CoachVersionException();
+        if (!response.IsSuccessStatusCode) throw new HttpRequestException(
+            "状态被拒绝或会话已失效，请重新连接。", null, response.StatusCode);
+    }
     public async Task<Reminder?> Poll(CancellationToken cancellation)
     {
         long started = now();

@@ -68,6 +68,8 @@ internal sealed class GameWindowUi : Window
     private Reminder? shown;
     private long reminderDeadline;
     private readonly E2ERun? e2e;
+    // Video off (the default, see Features): own GSI only, and no video, preview or capture controls.
+    private readonly bool video;
     private string? lastReceivedId;
     private bool exported;
     private bool persistentGsi;
@@ -85,6 +87,7 @@ internal sealed class GameWindowUi : Window
     public GameWindowUi(E2ERun? run, string? debugRoot, string? videoSettingsFile, string? overlaySettingsFile)
     {
         e2e = run; debug = new DebugPanel("game", debugRoot); overlay = new AdviceOverlay(run, () => debug.Recorder);
+        video = Features.VideoUpload || e2e != null; // the local-bot E2E evidence is built on uploaded pictures
         // E2E evidence keeps the default subtitle style, whatever this machine's player chose.
         if (e2e == null) overlayPanel = new OverlayPanel(overlaySettingsFile ?? GameOverlaySettings.DefaultPath, overlay);
         videoSettingsPath = videoSettingsFile ?? GameVideoSettings.DefaultPath;
@@ -101,15 +104,17 @@ internal sealed class GameWindowUi : Window
         root.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var top = new StackPanel();
         top.Children.Add(Ui.Text("游戏端", 26, Ui.Accent));
-        top.Children.Add(Ui.Text("把 Dota 窗口画面和自身GSI加密传给教练端，并显示教练提醒。不读内存、不控制英雄；画面可能含游戏内聊天。", 12, Brushes.LightGray));
+        top.Children.Add(Ui.Text(video ? "把 Dota 窗口画面和自身GSI加密传给教练端，并显示教练提醒。不读内存、不控制英雄；画面可能含游戏内聊天。" :
+            "把自身GSI加密传给教练端，在游戏里显示教练推送的字幕和对手面板。不传画面、不读内存、不控制英雄。", 12, Brushes.LightGray));
         top.Children.Add(Ui.Label("配对码（在教练端点“复制配对码”；含密钥，勿外传）"));
         connect = Ui.Button("连接", async (_, _) => { if (busy || active != null) await Stop(); else await Start(); });
         connect.MinWidth = 90; connect.Margin = new Thickness(0, 0, 0, 8);
         top.Children.Add(Ui.Row(pairing, connect));
-        top.Children.Add(status); top.Children.Add(metrics); top.Children.Add(gsiStatus);
+        top.Children.Add(status); if (video) top.Children.Add(metrics); top.Children.Add(gsiStatus);
         if (e2e == null) ShowLaunchOptions(); else ShowGsi();
         root.Children.Add(top);
-        preview.Children.Add(image); preview.Children.Add(marks); Grid.SetRow(preview, 1); root.Children.Add(preview);
+        if (video) { preview.Children.Add(image); preview.Children.Add(marks); Grid.SetRow(preview, 1); root.Children.Add(preview); }
+        else root.RowDefinitions[1].Height = GridLength.Auto;
         var bottom = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
         bottom.Children.Add(caption);
         creepHpButton = Ui.Button("显示小兵血量", async (_, _) => await ToggleCreepHp());
@@ -121,7 +126,7 @@ internal sealed class GameWindowUi : Window
             Loaded += async (_, _) => { if (CreepHpLog != null) await ToggleCreepHp(); };
         }
         if (overlayPanel != null) bottom.Children.Add(Ui.Section("游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", overlayPanel));
-        bottom.Children.Add(Ui.Section("设置：画面来源、视频、Dota 目录", BuildSettings()));
+        bottom.Children.Add(Ui.Section(video ? "设置：画面来源、视频、Dota 目录" : "设置：Dota 目录", BuildSettings()));
         bottom.Children.Add(Ui.Section("Debug", debug.View));
         Grid.SetRow(bottom, 2); root.Children.Add(bottom); Content = root;
         preview.SizeChanged += (_, _) => DrawMark();
@@ -213,16 +218,18 @@ internal sealed class GameWindowUi : Window
         {
             var pair = Pairing.Decode(pairing.Password.Trim());
             bool diagnostic = source.SelectedIndex == 1;
-            var chosen = ReadVideoSettings();
-            if (!diagnostic && e2e == null && MessageBox.Show(this,
-                "开始传送 Dota 2 游戏画面并启用自动教练？\n\n画面含主视图、小地图、HUD，也可能含游戏内聊天。\n" +
-                (chosen.Capture == "window"
-                    ? "窗口采集：切到其他窗口时仍持续传送 Dota 窗口自身的画面；其他应用的内容不会被采集。\n"
-                    : "前台模式：只在 Dota 位于前台时采集屏幕区域，可能含系统通知。\n") +
-                "教练端默认将真实画面＋自身GSI发送到指定云模型，会计费。\n不会传音频或控制英雄；可随时停止。",
-                "确认游戏画面传输", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
-            try { chosen.Save(videoSettingsPath); } catch { /* Settings still apply to this run. */ }
-            videoSettings = chosen;
+            var chosen = video ? ReadVideoSettings() : null;
+            if (chosen != null) {
+                if (!diagnostic && e2e == null && MessageBox.Show(this,
+                    "开始传送 Dota 2 游戏画面并启用自动教练？\n\n画面含主视图、小地图、HUD，也可能含游戏内聊天。\n" +
+                    (chosen.Capture == "window"
+                        ? "窗口采集：切到其他窗口时仍持续传送 Dota 窗口自身的画面；其他应用的内容不会被采集。\n"
+                        : "前台模式：只在 Dota 位于前台时采集屏幕区域，可能含系统通知。\n") +
+                    "教练端默认将真实画面＋自身GSI发送到指定云模型，会计费。\n不会传音频或控制英雄；可随时停止。",
+                    "确认游戏画面传输", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+                try { chosen.Save(videoSettingsPath); } catch { /* Settings still apply to this run. */ }
+                videoSettings = chosen;
+            }
             starting = new CancellationTokenSource(); active = starting;
             SetIdle(false);
             if (!diagnostic && e2e == null && gsi != null && !persistentGsi) {
@@ -239,7 +246,7 @@ internal sealed class GameWindowUi : Window
                     ShowGsi("自身GSI：本机端口 3219 已启动");
                 }
                 catch (OperationCanceledException) { throw; }
-                catch { ShowGsi("自身GSI启动失败：检查3219端口及本地凭据存储权限。视频仍可传，但没有自身状态时不调用AI。"); }
+                catch { ShowGsi("自身GSI启动失败：检查3219端口及本地凭据存储权限。" + (video ? "视频仍可传，但没有自身状态时不调用AI。" : "字幕和对手面板照常。")); }
             }
             if (e2e == null && !diagnostic && gsi != null) {
                 try {
@@ -255,7 +262,7 @@ internal sealed class GameWindowUi : Window
             }
             starting.Token.ThrowIfCancellationRequested();
             var cancellation = starting.Token;
-            running = Run(pair, diagnostic, chosen, cancellation);
+            running = chosen != null ? Run(pair, diagnostic, chosen, cancellation) : RunStatus(pair, diagnostic, cancellation);
             _ = FinishRun(running);
         }
         catch (OperationCanceledException) { status.Text = "启动已取消 · 不采集画面"; }
@@ -279,8 +286,10 @@ internal sealed class GameWindowUi : Window
     {
         var panel = new StackPanel();
         source.Items.Add("Dota 2 游戏画面"); source.Items.Add("诊断画面（不采集桌面，测试连接用）"); source.SelectedIndex = 0;
-        panel.Children.Add(Ui.Label("画面来源")); panel.Children.Add(source);
-        panel.Children.Add(BuildVideoSettings());
+        if (video) {
+            panel.Children.Add(Ui.Label("画面来源")); panel.Children.Add(source);
+            panel.Children.Add(BuildVideoSettings());
+        }
         if (e2e == null) {
             panel.Children.Add(Ui.Label("Dota 安装目录（连接时自动写入自身GSI配置）"));
             panel.Children.Add(dotaInstall);
@@ -461,6 +470,54 @@ internal sealed class GameWindowUi : Window
             try { await link.End(timeout.Token); } catch { }
         }
     }
+    /// <summary>
+    /// Video off: no picture leaves this machine. Own GSI and the Dota window size go to the coach a few times a second,
+    /// which keeps the link; subtitles and the enemy panel come back as with video. Diagnostic mode needs no Dota window.
+    /// </summary>
+    private async Task RunStatus(Pairing pair, bool diagnostic, CancellationToken cancellation)
+    {
+        using var link = new GameLink(pair);
+        long statusAt = 0, enemiesAt = 0;
+        try {
+            await link.Connect(cancellation);
+            transportConnected = true;
+            while (!cancellation.IsCancellationRequested) {
+                bool minimized = false;
+                var surface = diagnostic ? null : GameWindow.Find(out minimized);
+                if (!diagnostic && surface == null) {
+                    // Nothing to draw on: stop reporting, so the coach sees the game machine as away and withdraws its advice.
+                    ClearReminder(); overlay.Enemies(null); lastCaptureAt = null;
+                    status.Text = minimized ? "已连接 · Dota 已最小化，恢复后自动继续" : "已连接 · 等待 Dota 2 窗口…";
+                    await Task.Delay(250, cancellation); continue;
+                }
+                long now = Environment.TickCount64;
+                if (now >= statusAt) {
+                    statusAt = now + Wire.StatusIntervalMs;
+                    var own = diagnostic ? (Player: (OwnState?)null, AgeMs: (int?)null) : gsi?.Latest() ?? (null, null);
+                    await link.SendStatus(new(link.SessionId!, "", Interlocked.Increment(ref localSequence), diagnostic ? "diagnostic" : "dota2",
+                        surface?.Width ?? 1280, surface?.Height ?? 720, own.Player, own.AgeMs), cancellation);
+                    lastCaptureAt = now;
+                    overlay.FrameArrived(own.Player?.MatchId == "0");
+                    status.Text = diagnostic ? "已连接 · 诊断模式（不需要 Dota）" :
+                        GameWindow.IsForeground(surface!) ? "已连接 · 只传自身GSI，不传画面" : "已连接 · Dota 在后台 · 只传自身GSI，不传画面";
+                    if (!diagnostic) ShowGsi(own.Player is { } p ? $"自身GSI：{p.Team} · {p.Hero} · {p.Clock:F1}s" : "自身GSI：暂无新鲜数据");
+                }
+                ApplyReminder(await link.Poll(cancellation), diagnostic);
+                if (now >= enemiesAt) {
+                    enemiesAt = now + 1000;
+                    await UpdateEnemies(link, cancellation);
+                }
+                await Task.Delay(100, cancellation);
+            }
+        } catch (Exception error) {
+            debug.Recorder?.Error("status-transport", error);
+            status.Text = LinkErrors.Message(error, cancellation.IsCancellationRequested);
+        } finally {
+            transportConnected = false; lastCaptureAt = null; ClearReminder(); overlay.Enemies(null);
+            using var timeout = new CancellationTokenSource(1500);
+            try { await link.End(timeout.Token); } catch { }
+        }
+    }
     /// <summary>The coach's enemy panel and any icons it needs that this client has not fetched yet (a few per second).</summary>
     private async Task UpdateEnemies(GameLink link, CancellationToken cancellation)
     {
@@ -601,7 +658,7 @@ internal sealed class GameWindowUi : Window
         active?.Cancel(); ClearReminder();
         while (busy) await Task.Delay(25);
         var task = running; if (task != null) try { await task; } catch { }
-        status.Text = "已停止 · 不再采集或传输画面";
+        status.Text = video ? "已停止 · 不再采集或传输画面" : "已停止 · 已断开教练端";
         metrics.Text = "";
     }
     private void ShowLaunchOptions() { launchText = Ui.LaunchOptionsText(SteamLaunch.Inspect()); ShowGsi(); }

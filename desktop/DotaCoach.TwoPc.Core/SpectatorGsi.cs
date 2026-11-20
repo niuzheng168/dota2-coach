@@ -76,7 +76,7 @@ public sealed record DelayStats(int Samples, double? MedianMs, double? P10Ms, do
 /// <summary>
 /// How far the coach's Plus view lags the game machine. Both sides are stamped with this coach
 /// machine's monotonic clock, so no wall-clock sync is needed. The game side is estimated as
-/// frame arrival minus GSI age, so the result reads low by the video pipeline latency (~0.1–0.2 s).
+/// frame (or status) arrival minus GSI age, so the result reads low by the transfer latency (video ~0.1–0.2 s).
 /// </summary>
 public sealed class PlusDelayTracker
 {

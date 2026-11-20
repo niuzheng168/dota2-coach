@@ -55,7 +55,7 @@ public sealed class CloudCoach : IDisposable
         };
         http.DefaultRequestHeaders.Add("api-key", key);
     }
-    public static bool Eligible(FrameView frame, bool localBotOnly = true) => frame.Meta.Source == "dota2" &&
+    public static bool Eligible(FrameView frame, bool localBotOnly = true) => frame.HasImage && frame.Meta.Source == "dota2" &&
         frame.Meta.Player is { Alive: true } p && (!localBotOnly || p.MatchId == "0") &&
         frame.Meta.GsiAgeMs is >= 0 and <= 3000;
     public static void Validate(ModelAdvice a, FrameView frame, bool localBotOnly = true, MinimapLayout? layout = null)

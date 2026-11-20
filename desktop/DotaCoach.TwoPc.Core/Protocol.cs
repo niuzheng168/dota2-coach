@@ -9,6 +9,9 @@ public static class Wire
 {
     public const int Version = 1;
     public const int MaxFrameBytes = 1_048_576;
+    public const int MaxStatusBytes = 32_768;
+    /// <summary>Video off: how often the game machine reports its own GSI; often enough to see every game-clock second.</summary>
+    public const int StatusIntervalMs = 250;
     /// <summary>Oldest source frame an answer may still be published for (model timeout ≤ 20 s plus capture lease slack).</summary>
     public const int FrameLifetimeMs = 22_000;
     /// <summary>Longest a published reminder stays on screen; the display time itself is a coach setting.</summary>
@@ -59,6 +62,17 @@ public static class Wire
         int height = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(data[20..24]);
         return width is >= 1 and <= MaxIconSide && height is >= 1 and <= MaxIconSide;
     }
+}
+
+/// <summary>
+/// Game→coach video is off since 2026-11-20: enemy items come from the coach's own Plus spectating, last hits from the
+/// game machine's local creep HP numbers. The game machine then sends only its own GSI and window size
+/// (<see cref="CoachMailbox.AcceptStatus"/>), which keeps the link, subtitles and the enemy panel; no AI coach runs.
+/// The video code and its UI stay in place behind this switch (tests still switch it on).
+/// </summary>
+public static class Features
+{
+    public static bool VideoUpload { get; set; }
 }
 
 // This bundle is a credential. Never log it, put it in a URL, or save it with diagnostics.
@@ -112,8 +126,11 @@ public sealed record FrameView
     public long CapturedNoEarlierThan { get; init; }
     public long ReceivedAt { get; init; }
     public VideoPixels? Video { get; init; }
+    /// <summary>False for a status (video off): <see cref="Jpeg"/> is empty; never previewed or sent to a model.</summary>
+    public bool HasImage { get; private init; } = true;
     public FrameView(FrameMeta Meta, byte[] Jpeg, long CapturedNoEarlierThan, long ReceivedAt)
     { this.Meta = Meta; this.Jpeg = Jpeg; this.CapturedNoEarlierThan = CapturedNoEarlierThan; this.ReceivedAt = ReceivedAt; }
+    internal static FrameView Status(FrameMeta meta, long received) => new(meta, [], received, received) { HasImage = false };
     internal FrameView(FrameMeta meta, VideoPixels pixels, Func<VideoPixels, byte[]> encode, long at, long received)
     {
         Meta = meta; Video = pixels; CapturedNoEarlierThan = at; ReceivedAt = received;
@@ -214,6 +231,21 @@ public sealed class CoachMailbox
             Store(new(meta, jpeg.ToArray(), t.At, now()), jpeg.Length);
         }
         try { DebugSink?.Invoke()?.Frame("frame-received", meta, jpeg); } catch { /* Legacy diagnostic ingress. */ }
+    }
+    /// <summary>
+    /// Video off: the game machine's own GSI and window size, without a picture. Like a frame it keeps the game
+    /// machine present and is what reminders are based on; its arrival time stands in for the capture time.
+    /// </summary>
+    public void AcceptStatus(FrameMeta meta)
+    {
+        ValidateMeta(meta, meta.SourceWidth, meta.SourceHeight);
+        lock (gate)
+        {
+            Check(meta.SessionId);
+            if (videoOwner != null) throw new InvalidOperationException("Session uses continuous video");
+            if (meta.Sequence <= sequence) throw new InvalidOperationException("Stale status sequence");
+            Store(FrameView.Status(meta, now()), 0);
+        }
     }
     internal static void ValidateMeta(FrameMeta meta, int width, int height)
     {

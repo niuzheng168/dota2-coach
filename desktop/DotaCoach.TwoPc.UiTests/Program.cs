@@ -24,7 +24,7 @@ internal static partial class Program
             CheckGameControls(game);
             if (Field<CancellationTokenSource?>(game,"active") != null || Field<GsiReceiver?>(game,"gsi") != null)
                 throw new Exception("Idle game client must not start a connection or GSI receiver");
-            Console.WriteLine("PASS idle client: normal controls and creep HP switch present, lane controls and overlay worker absent");
+            Console.WriteLine("PASS idle client: normal controls and creep HP switch present; no video controls, lane controls or overlay worker");
             return;
         }
         if (args is ["--offline-practice"]) { OfflinePractice(); return; }
@@ -130,13 +130,18 @@ internal static partial class Program
     {
         var controls = Children(game).ToArray();
         var sections = controls.OfType<Expander>().Select(e => e.Header as string).ToArray();
+        string settings = Features.VideoUpload ? "设置：画面来源、视频、Dota 目录" : "设置：Dota 目录";
         // The creep HP numbers (CreepHpDisplay) are back as their own switch; the old lane overlay and its shortcuts are not.
-        if (!sections.SequenceEqual(new[]{"小兵血量：本机实时显示", "游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", "设置：画面来源、视频、Dota 目录", "Debug"}) ||
+        if (!sections.SequenceEqual(new[]{"小兵血量：本机实时显示", "游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", settings, "Debug"}) ||
             !controls.OfType<Button>().Any(b => Equals(b.Content,"连接")) ||
             !controls.OfType<Button>().Any(b => Equals(b.Content,"显示小兵血量")) ||
             controls.OfType<Button>().Any(b => b.Content is "停止显示血量" or "试算") ||
             typeof(GameWindowUi).Assembly.GetType("DotaCoach.TwoPc.LastHitPractice") != null)
             throw new Exception("Game client should ship only its normal controls and the creep HP switch, without the experimental lane overlay");
+        // Video off (the shipped default): no preview, picture source, video settings or transfer rates.
+        if (!Features.VideoUpload && new DependencyObject[] { Field<Grid>(game, "preview"), Field<ComboBox>(game, "source"),
+                Field<ComboBox>(game, "fpsChoice"), Field<TextBlock>(game, "metrics"), Field<TextBlock>(game, "videoNote") }.Any(controls.Contains))
+            throw new Exception("With video off the game client must not show any video control");
     }
     private static CheckBox DebugSwitch(Window w) => Children(w).OfType<CheckBox>()
         .Single(c => Equals(c.Content, "开启 Debug 记录"));
@@ -181,6 +186,8 @@ internal static partial class Program
     private static async Task Run(string output)
     {
         Directory.CreateDirectory(output);
+        Features.VideoUpload = true; // the video path is switched off in the product but kept working; StatusOnly covers the default
+
         var coachType = Assembly.Load("DotaCoach.CoachClient").GetType("DotaCoach.TwoPc.CoachWindow")!;
         var gameType = Assembly.Load("DotaCoach.GameClient").GetType("DotaCoach.TwoPc.GameWindowUi")!;
         string debugRoot = Path.GetFullPath(Path.Combine(output, "debug"));
@@ -310,6 +317,61 @@ internal static partial class Program
         await Wait(() => !emptyGame.IsVisible && !emptyCoach.IsVisible, "unused clients close without reentrant-close errors");
         await OccludedWindowCapture();
         await LiveMode(output, coachType, gameType);
+        await StatusOnly(output, coachType, gameType);
+    }
+
+    /// <summary>
+    /// The shipped default, video off: the game client sends only its own GSI and window size. The coach still delivers
+    /// its link-test subtitle and the enemy panel; neither window shows video, model or calibration controls.
+    /// </summary>
+    private static async Task StatusOnly(string output, Type coachType, Type gameType)
+    {
+        Features.VideoUpload = false;
+        string debugRoot = Path.GetFullPath(Path.Combine(output, "status-debug"));
+        var coach = (Window)Activator.CreateInstance(coachType, [null, false, Path.Combine(output, "status-coach.json"), debugRoot])!;
+        Set(coach, "scanFile", Path.GetFullPath(Path.Combine(output, "no-scan", "live.json")));
+        var game = (Window)Activator.CreateInstance(gameType, [null, debugRoot, Path.Combine(output, "status-video.json"),
+            Path.Combine(output, "status-overlay.json")])!;
+        coach.Show(); game.Show();
+        CheckGameControls(game);
+        var coachControls = Children(coach).ToArray();
+        await Wait(() => coachControls.OfType<Expander>().Select(e => e.Header as string).SequenceEqual(["Plus 实时观战（实验）", "Debug"]) &&
+            !coachControls.Contains(Field<Grid>(coach, "preview")) && coachControls.Contains(Field<TextBox>(coach, "subtitleSeconds")),
+            "video off: no preview, video, model or calibration controls; the subtitle time moves to the Plus panel");
+        Field<TextBox>(coach, "port").Text = "38482"; Click(coach, "启动接收");
+        await Wait(() => Field<CoachHost?>(coach, "host") != null && !Field<bool>(coach, "busy"), "status-only coach starts its listener");
+        var host = Field<CoachHost>(coach, "host");
+        await Wait(() => host.Mailbox.VideoJpegEncoder == null && !Field<bool>(coach, "modelConfigured"),
+            "the coach has no video decoder (video streams are refused) and no model");
+        Field<PasswordBox>(game, "pairing").Password = host.Pair(IPAddress.Loopback).Encode();
+        if (DotaCoach.Desktop.GameWindow.Find(out _) == null) {
+            Click(game, "连接");
+            await Wait(() => Field<TextBlock>(game, "status").Text.Contains("等待 Dota 2 窗口") &&
+                host.Mailbox.Snapshot() is { SessionId: not null, Connected: false }, "without a Dota window the game client connects but reports nothing");
+            Click(game, "断开");
+            await Wait(() => Field<CancellationTokenSource?>(game, "active") == null && host.Mailbox.Snapshot().SessionId == null,
+                "disconnecting while waiting for Dota ends the session");
+        }
+        Field<ComboBox>(game, "source").SelectedIndex = 1; // diagnostic: no Dota window needed
+        Click(game, "连接");
+        await Wait(() => host.Mailbox.Snapshot() is { Connected: true, Frames: >= 3, Bytes: 0 } && host.Mailbox.Latest() is { HasImage: false } &&
+            Field<TextBlock>(coach, "status").Text.Contains("不传画面") && Field<TextBlock>(game, "status").Text.StartsWith("已连接"),
+            "the game client connects and keeps reporting without sending any picture");
+        Click(coach, "发送测试提醒");
+        await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("双机链路测试") && Field<TextBlock>(coach, "notice").Text.StartsWith("已发送"),
+            "the coach's test subtitle reaches the game client without video");
+        var plus = coachControls.OfType<Expander>().First();
+        plus.IsExpanded = true; Render(coach, Path.Combine(output, "coach-status-only.png")); plus.IsExpanded = false;
+        Render(game, Path.Combine(output, "game-status-only.png"));
+        Set(coach, "nextScanPoll", long.MaxValue); // the coach would replace the test's enemy panel with its own (none)
+        host.Mailbox.SetEnemies(new([new("npc_dota_hero_razor", 12, ["item_blink", null, null, null, null, null], null, 3)]));
+        await Wait(() => Member<EnemyBoard?>(Field<AdviceOverlay>(game, "overlay"), "enemies") is { Heroes: [{ Level: 12 }] },
+            "the enemy panel reaches the game client without video");
+        Click(game, "断开");
+        await Wait(() => host.Mailbox.Snapshot().SessionId == null && Field<CancellationTokenSource?>(game, "active") == null &&
+            Field<TextBlock>(game, "status").Text.Contains("已断开"), "disconnecting ends the status session");
+        game.Close(); coach.Close();
+        await Wait(() => !game.IsVisible && !coach.IsVisible, "status-only clients close cleanly");
     }
 
     /// <summary>
