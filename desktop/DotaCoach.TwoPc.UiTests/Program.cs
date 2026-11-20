@@ -10,12 +10,15 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using DotaCoach.TwoPc;
 
-internal static class Program
+internal static partial class Program
 {
     private static int passed;
     [STAThread] public static void Main(string[] args)
     {
-        RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+        bool trial = args.Length == 3 && args[0] == "--panel-trial";
+        // The trial draws over the real game like the shipped client: per-monitor DPI aware, hardware rendering.
+        if (trial) SetProcessDpiAwarenessContext(-4);
+        else RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         if (args is ["--game-controls"]) {
             var game = new GameWindowUi(); // Inspect the logical tree without showing a window or connecting.
             CheckGameControls(game);
@@ -30,7 +33,8 @@ internal static class Program
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.Startup += async (_, _) => {
             try {
-                if (args.Contains("--real-dota")) { await RealDota(); Console.WriteLine($"Real Dota window pipeline: {passed} checks passed."); }
+                if (trial) { await PanelTrial(args[1], args[2]); Console.WriteLine($"Enemy panel trial on the real Dota window: {passed} checks passed."); }
+                else if (args.Contains("--real-dota")) { await RealDota(); Console.WriteLine($"Real Dota window pipeline: {passed} checks passed."); }
                 else { await Run(args.FirstOrDefault() ?? ".tmp/twopc-ui"); Console.WriteLine($"Two native WPF clients: {passed} UI checks passed."); }
                 app.Shutdown(0);
             }
@@ -113,6 +117,7 @@ internal static class Program
     }
     private static T Field<T>(Window w, string name) => (T)w.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(w)!;
     private static void Set(Window w, string name, object value) => w.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(w, value);
+    private static T Member<T>(object o, string name) => (T)o.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(o)!;
     private static IEnumerable<DependencyObject> Children(DependencyObject parent)
     {
         yield return parent;
@@ -126,7 +131,7 @@ internal static class Program
         var controls = Children(game).ToArray();
         var sections = controls.OfType<Expander>().Select(e => e.Header as string).ToArray();
         // The creep HP numbers (CreepHpDisplay) are back as their own switch; the old lane overlay and its shortcuts are not.
-        if (!sections.SequenceEqual(new[]{"小兵血量：本机实时显示", "设置：画面来源、视频、Dota 目录", "Debug"}) ||
+        if (!sections.SequenceEqual(new[]{"小兵血量：本机实时显示", "游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", "设置：画面来源、视频、Dota 目录", "Debug"}) ||
             !controls.OfType<Button>().Any(b => Equals(b.Content,"连接")) ||
             !controls.OfType<Button>().Any(b => Equals(b.Content,"显示小兵血量")) ||
             controls.OfType<Button>().Any(b => b.Content is "停止显示血量" or "试算") ||
@@ -180,13 +185,16 @@ internal static class Program
         var gameType = Assembly.Load("DotaCoach.GameClient").GetType("DotaCoach.TwoPc.GameWindowUi")!;
         string debugRoot = Path.GetFullPath(Path.Combine(output, "debug"));
         var coach = (Window)Activator.CreateInstance(coachType, [null, false, Path.Combine(output, "coach-settings.json"), debugRoot])!;
+        Set(coach, "scanFile", Path.GetFullPath(Path.Combine(output, "no-scan", "live.json"))); // never the user's scanner output
         string videoSettings = Path.GetFullPath(Path.Combine(output, "game-video.json"));
-        var game = (Window)Activator.CreateInstance(gameType, [null, debugRoot, videoSettings])!;
+        string overlaySettings = Path.GetFullPath(Path.Combine(output, "game-overlay.json"));
+        File.Delete(overlaySettings);
+        var game = (Window)Activator.CreateInstance(gameType, [null, debugRoot, videoSettings, overlaySettings])!;
         // Exercise packaged UI handlers without desktop input, clipboard, real game capture or AI.
         coach.Show(); game.Show();
         await Wait(() => Children(coach).Concat(Children(game)).OfType<Expander>().All(e => !e.IsExpanded) &&
-            Children(coach).OfType<Expander>().Count() == 4 && Children(game).OfType<Expander>().Count() == 3,
-            "rarely used settings start collapsed (game: creep HP, settings and Debug)");
+            Children(coach).OfType<Expander>().Count() == 4 && Children(game).OfType<Expander>().Count() == 4,
+            "rarely used settings start collapsed (game: creep HP, in-game display, settings and Debug)");
         CheckGameControls(game);
         await Wait(() => DebugSwitch(coach).IsChecked != true && DebugSwitch(game).IsChecked != true &&
             !Directory.Exists(debugRoot), "Debug is opt-in and creates no recording directory while off");
@@ -258,6 +266,9 @@ internal static class Program
         host.Mailbox.ClearReminder();
         await Wait(() => Field<Canvas>(game, "marks").Children.Count == 0 &&
             Field<TextBlock>(game, "caption").Text.Contains("无有效提醒"), "a cleared reminder clears game caption and marker");
+        Set(coach, "nextScanPoll", long.MaxValue); // the coach would replace the test's enemy panel with its own (none)
+        await GameOverlay(output, game, host, overlaySettings);
+        Set(coach, "nextScanPoll", 0L);
         await Task.Delay(500);
         Click(coach, "发送测试提醒");
         await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("双机链路测试") &&
@@ -299,6 +310,144 @@ internal static class Program
         await Wait(() => !emptyGame.IsVisible && !emptyCoach.IsVisible, "unused clients close without reentrant-close errors");
         await OccludedWindowCapture();
         await LiveMode(output, coachType, gameType);
+    }
+
+    /// <summary>
+    /// Game-side subtitle and enemy panel style through the real panel controls, the enemy panel and its icons through
+    /// the real client loop, then the overlay's own drawing code rendered off screen (the live overlay is excluded
+    /// from screen capture, so its pixels cannot be checked any other way).
+    /// </summary>
+    private static async Task GameOverlay(string output, Window game, CoachHost host, string file)
+    {
+        var panel = Field<OverlayPanel>(game, "overlayPanel");
+        var overlay = Field<AdviceOverlay>(game, "overlay");
+        await Wait(() => panel.Current == new GameOverlaySettings() && overlay.Settings == panel.Current &&
+            Children(panel).OfType<Slider>().Count() == 9 && !File.Exists(file), "overlay panel starts from the default style and writes nothing");
+        Member<Slider>(panel, "x").Value = 0; Member<Slider>(panel, "y").Value = 100;
+        Member<CheckBox>(panel, "alerts").IsChecked = false;
+        var background = Member<ComboBox>(panel, "backgroundColor");
+        background.SelectedItem = background.Items.OfType<ComboBoxItem>().Single(i => (string)i.Tag == "#FF5A5A");
+        await Wait(() => File.Exists(file) && GameOverlaySettings.Load(file) is { X: 0, Y: 100, ShowAlerts: false, BackgroundColor: "#FF5A5A" } s &&
+            overlay.Settings == s, "sliders, switches and colours apply to the overlay at once and are saved");
+        var latest = host.Mailbox.Latest()!;
+        host.Mailbox.SetReminder(latest.Meta.SessionId, latest.Meta.Sequence, "local-vision-observation", "剃刀 离开视野 · 最后在中路", null);
+        await Wait(() => Field<TextBlock>(game, "caption").Text is { } t && t.Contains("剃刀 离开视野") && t.Contains("不在游戏里显示"),
+            "a kind hidden in game still shows in the client window, marked as hidden");
+        host.Mailbox.ClearReminder();
+        var icons = new Dictionary<string, byte[]> {
+            ["npc_dota_hero_razor"] = SolidPng(Colors.Red, 32, 32), ["item_blink"] = SolidPng(Colors.Blue, 88, 64) };
+        host.Mailbox.Icons = key => icons.GetValueOrDefault(key);
+        var board = new EnemyBoard([new("npc_dota_hero_razor", 12, ["item_blink", null, null, null, null, null], null, 3),
+            new("npc_dota_hero_lion", 9, [null, null, null, null, null, null], null, 75), new("npc_dota_hero_pudge", null, null, null, null)]);
+        host.Mailbox.SetEnemies(board);
+        await Wait(() => Member<EnemyBoard?>(overlay, "enemies") is { Heroes: [{ Level: 12 }, _, _] } && overlay.Icons.Count == 2 &&
+            overlay.Icons["item_blink"] is BitmapSource { PixelWidth: 88 },
+            "the game client fetches the enemy panel and its icons from the coach; a hero without an icon is retried later");
+        // A release bundles the icons beside the program: those are never asked for; anything else still is.
+        string bundle = Path.Combine(output, "bundled-icons");
+        Directory.CreateDirectory(bundle);
+        File.WriteAllBytes(Path.Combine(bundle, "item_blink.png"), SolidPng(Colors.Lime, 88, 64));
+        File.WriteAllBytes(Path.Combine(bundle, "npc_dota_hero_lion.png"), SolidPng(Colors.Lime, 32, 32));
+        File.WriteAllText(Path.Combine(bundle, "npc_dota_hero_razor.png"), "not an image");
+        var bundled = new IconCache(bundle);
+        await Wait(() => bundled["npc_dota_hero_lion"] is BitmapSource { PixelWidth: 32 } &&
+            bundled.Missing(board, 0).SequenceEqual(["npc_dota_hero_razor", "npc_dota_hero_pudge"]) && bundled.Count == 2,
+            "bundled icons load from the program folder; missing or broken ones are asked from the coach");
+
+        const int W = 1280, H = 720;
+        var alert = new Reminder("a", "s", 1, "local-vision-observation", "剃刀 离开视野 · 最后在中路；主宰 新装备 狂战斧", null, W, H, 3000);
+        (Canvas Canvas, byte[] Pixels) Draw(GameOverlaySettings style, Reminder? r, string? png = null, EnemyBoard? enemies = null)
+        {
+            var canvas = new Canvas { Width = W, Height = H };
+            AdviceOverlay.Compose(canvas, r, style, 1, enemies, key => overlay.Icons[key]);
+            canvas.Measure(new Size(W, H)); canvas.Arrange(new Rect(0, 0, W, H)); canvas.UpdateLayout();
+            var bitmap = new RenderTargetBitmap(W, H, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(canvas);
+            var pixels = new byte[W * H * 4];
+            bitmap.CopyPixels(pixels, W * 4, 0);
+            if (png != null) {
+                var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                using var stream = File.Create(Path.Combine(output, png)); encoder.Save(stream);
+            }
+            return (canvas, pixels);
+        }
+        Rect Box(Canvas c) => c.Children.OfType<Border>().Select(b => new Rect(Canvas.GetLeft(b), Canvas.GetTop(b), b.ActualWidth, b.ActualHeight)).Single();
+        byte[] At(byte[] pixels, double x, double y) { int i = ((int)y * W + (int)x) * 4; return pixels[i..(i + 4)]; }
+
+        var defaults = new GameOverlaySettings();
+        var (plain, plainPixels) = Draw(defaults, alert, "caption-default.png");
+        var box = Box(plain);
+        await Wait(() => Math.Abs(box.Left + box.Width / 2 - W / 2.0) < 1 && Math.Abs(box.Top - (H - box.Height) * .1) < 1 &&
+            box.Width < W * .7 && At(plainPixels, box.Left + 4, box.Top + box.Height / 2)[3] is >= 205 and <= 213,
+            "default subtitle: centred near the top, box hugs the text, 82% opaque background");
+        var custom = defaults with { X = 0, Y = 100, BackgroundColor = "#FF5A5A", BackgroundOpacity = 100, TextColor = "#FFFFFF" };
+        var (moved, movedPixels) = Draw(custom, alert, "caption-bottom-left.png");
+        var corner = Box(moved);
+        await Wait(() => corner.Left == 0 && Math.Abs(corner.Bottom - H) < 1 &&
+            At(movedPixels, 4, corner.Top + corner.Height / 2).SequenceEqual(new byte[] { 0x5A, 0x5A, 0xFF, 255 }) &&
+            At(movedPixels, W / 2, box.Top + box.Height / 2)[3] == 0,
+            "bottom-left style draws an opaque red box flush with the corner and nothing at the old place");
+        var big = Box(Draw(defaults with { Size = 200 }, alert).Canvas);
+        var narrow = Box(Draw(defaults with { Width = 25 }, alert).Canvas);
+        await Wait(() => big.Height > box.Height * 1.8 && narrow.Width <= W * .25 + .5 && narrow.Height > box.Height * 1.5,
+            "font size scales the box; a narrow maximum width wraps the text into more lines");
+        var clear = Draw(defaults with { BackgroundOpacity = 0 }, alert).Pixels;
+        await Wait(() => At(clear, box.Left + 4, box.Top + box.Height / 2)[3] == 0, "background opacity 0 leaves only the text");
+        var untitled = Draw(defaults with { ShowTitle = false }, alert).Canvas;
+        var advice = new Reminder("b", "s", 1, "visible-farming-advice", "去打野", new ScreenMark(.1, .8), W, H, 3000);
+        await Wait(() => ((TextBlock)untitled.Children.OfType<Border>().Single().Child).Inlines.Count == 1 &&
+            Draw(defaults with { ShowAlerts = false }, alert).Canvas.Children.Count == 0 &&
+            Draw(defaults with { ShowAdvice = false }, advice).Canvas.Children is { Count: > 0 } marks && marks.OfType<Border>().Count() == 0,
+            "without the title only the message is drawn; hidden kinds draw no subtitle but keep map marks");
+        var (left, leftPixels) = Draw(defaults, null, "enemy-panel.png", board);
+        var view = left.Children.OfType<StackPanel>().Single();
+        double top = Canvas.GetTop(view), row = 14;
+        byte[] hero = At(leftPixels, 4 + row / 2, top + row / 2), item = At(leftPixels, 4 + row + 16 + row * 88 / 64 / 2, top + row / 2);
+        string Labels(int line) => string.Join(" ", ((StackPanel)view.Children[line]).Children.OfType<TextBlock>().Select(t => t.Text));
+        await Wait(() => Canvas.GetLeft(view) == 4 && Math.Abs(top - (H - view.DesiredSize.Height) * .4) < 1 &&
+            hero[2] > 150 && hero[0] < 40 && hero[3] is >= 185 and <= 197 && item[0] > 150 && item[2] < 40 &&
+            Labels(0) == "12" && Labels(1) == "9 1分前" && Labels(2) == "? 未见" && ((StackPanel)view.Children[1]).Opacity < 1 &&
+            ((StackPanel)view.Children[2]).Children.Count == 3,
+            "enemy panel at the left edge: head icon and items as images at 75% opacity, level, age from 10 s, old rows dimmed, unseen heroes without slots");
+        var bigPanel = Draw(defaults with { EnemySize = 200, EnemyY = 0 }, null, null, board).Canvas.Children.OfType<StackPanel>().Single();
+        await Wait(() => bigPanel.DesiredSize.Height > view.DesiredSize.Height * 1.8 && Canvas.GetTop(bigPanel) == 0,
+            "panel size and position follow the settings");
+        // For looking at: the default panel at 1080p with Dota's own icons, when this machine has extracted them.
+        string assets = Path.GetFullPath(".tmp/vision-assets");
+        if (File.Exists(Path.Combine(assets, "manifest.json"))) {
+            using var manifest = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(assets, "manifest.json")));
+            var real = new IconCache();
+            var sample = new EnemyBoard([
+                new("npc_dota_hero_razor", 12, ["item_power_treads", "item_black_king_bar", "item_blink", "item_magic_wand", null, null], "item_pogo_stick", 2),
+                new("npc_dota_hero_juggernaut", 14, ["item_phase_boots", "item_bfury", "item_manta", "item_ward_observer", null, null], null, 35),
+                new("npc_dota_hero_lion", 9, ["item_tranquil_boots", "item_blink", null, null, null, null], null, 95),
+                new("npc_dota_hero_pudge", null, null, null, null)]);
+            foreach (string key in real.Missing(sample, 0))
+                if (manifest.RootElement.GetProperty(key.StartsWith("item_") ? "items" : "heroes").TryGetProperty(key, out var entry) &&
+                    entry.TryGetProperty("icon", out var icon) && icon.GetString() is { } relative)
+                    real.Add(key, File.ReadAllBytes(Path.Combine(assets, relative)), 0);
+            var canvas = new Canvas { Width = 1920, Height = 1080 };
+            AdviceOverlay.Compose(canvas, null, defaults, 1.5, sample, key => real[key]);
+            canvas.Measure(new Size(1920, 1080)); canvas.Arrange(new Rect(0, 0, 1920, 1080)); canvas.UpdateLayout();
+            var bitmap = new RenderTargetBitmap(1920, 1080, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(canvas);
+            var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using var stream = File.Create(Path.Combine(output, "enemy-panel-1080p-real-icons.png")); encoder.Save(stream);
+        }
+
+        var section = (Expander)((Border)panel.Parent).Parent;
+        section.IsExpanded = true; Render(game, Path.Combine(output, "game-overlay.png")); section.IsExpanded = false;
+        Click(game, "恢复默认");
+        await Wait(() => GameOverlaySettings.Load(file) == new GameOverlaySettings() && overlay.Settings == new GameOverlaySettings() &&
+            Member<Slider>(panel, "x").Value == 50, "恢复默认 restores and saves the default style");
+    }
+
+    private static byte[] SolidPng(Color color, int width, int height)
+    {
+        var pixels = Enumerable.Repeat(new[] { color.B, color.G, color.R, color.A }, width * height).SelectMany(p => p).ToArray();
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, width * 4)));
+        using var stream = new MemoryStream(); encoder.Save(stream); return stream.ToArray();
     }
 
     /// <summary>
@@ -533,7 +682,7 @@ internal static class Program
             "second click reuses the receiver and does not ask for another Dota restart");
         using var http = new HttpClient { BaseAddress = new($"http://127.0.0.1:{receiver.Port}") };
         string body = JsonSerializer.Serialize(new { auth = new { token },
-            map = new { clock_time = 125, game_state = "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS", paused = false },
+            map = new { clock_time = 125, matchid = "9876543210", game_state = "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS", paused = false },
             player = new { team_name = "spectator" }, hero = new { id = 0 },
             minimap = new {
                 o0 = new { xpos = 1, ypos = 2, team = 3, unitname = "npc_dota_hero_troll_warlord", image = "minimap_herocircle_self", visionrange = 1800 },
@@ -563,6 +712,40 @@ internal static class Program
             System.Text.RegularExpressions.Regex.Match(t, @"比游戏机慢：中位 (\d+\.\d+)s") is { Success: true } m &&
             double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) is >= .10 and <= .40,
             "real window measures Plus lag from game-machine frames on the coach clock");
+        // Plus alerts: an enemy seen 4 s and then gone, and an item change from the scanner's live file, become the
+        // game machine's subtitle. The live file is a test copy, never the user's scanner output.
+        string live = Path.GetFullPath(Path.Combine(output, "scan-live.json"));
+        Set(w, "scanFile", live);
+        string without = body.Replace(",\"o1\":{\"xpos\":3,\"ypos\":4,\"team\":2,\"unitname\":\"npc_dota_hero_razor\",\"image\":\"minimap_enemyicon\",\"visionrange\":1800}", "");
+        if (without == body) throw new InvalidOperationException("test body layout changed");
+        long sequence = 134;
+        for (int step = 0; step < 18; step++) {
+            var ticket = host.Mailbox.Issue(session);
+            host.Mailbox.Accept(new(session, ticket.Id, sequence++, "dota2", 3840, 2160, new OwnState("9876543210", "npc_dota_hero_luna",
+                "dire", 134 + step / 2, true, 1200, 500, 1, 2, [], []), 10), jpeg);
+            await http.PostAsync("/spectator", new StringContent((step < 8 ? body : without).Replace("\"clock_time\":125", $"\"clock_time\":{134 + step / 2}")));
+            await Task.Delay(500);
+        }
+        await Wait(() => host.Mailbox.Poll(session) is { Kind: "local-vision-observation", Marker: null } r &&
+            r.Message.Contains("离开视野 · 最后在中路") && Field<TextBlock>(w, "alertStatus").Text.Contains("已推送"),
+            "an enemy leaving the friend team's vision is pushed as a subtitle with its last area");
+        File.WriteAllText(live, JsonSerializer.Serialize(new { version = 2, run = "a1", written = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0,
+            stopped = false, mode = "team-view", matchId = "9876543210", ownTeam = 3, clock = 143, selecting = true,
+            enemies = new[] { new { hero = "npc_dota_hero_razor", level = 11, age = 1.5,
+                items = new string?[] { "item_blink", null, null, null, null, null }, neutral = (string?)null } } }));
+        Directory.CreateDirectory(Path.Combine(output, "icons"));
+        File.WriteAllBytes(Path.Combine(output, "icons", "item_blink.png"), SolidPng(Colors.Blue, 88, 64));
+        var keepAlive = host.Mailbox.Issue(session);
+        host.Mailbox.Accept(new(session, keepAlive.Id, sequence++, "dota2", 3840, 2160, new OwnState("9876543210", "npc_dota_hero_luna",
+            "dire", 143, true, 1200, 500, 1, 2, [], []), 10), jpeg);
+        await Wait(() => host.Mailbox.Enemies(session) is { Heroes: [{ Hero: "npc_dota_hero_razor", Level: 11 }] } &&
+            host.Mailbox.Icon(session, "item_blink") is { Length: > 0 } && host.Mailbox.Icon(session, "item_bfury") == null &&
+            Field<TextBlock>(w, "alertStatus").Text.Contains("已推送 1 名敌方英雄"),
+            "the scanner's enemy panel and its icons are published to the game machine");
+        Field<CheckBox>(w, "enemyPanel").IsChecked = false;
+        await Wait(() => host.Mailbox.Enemies(session) == null && Field<TextBlock>(w, "alertStatus").Text.Contains("对手面板已关") &&
+            LiveCoachSettings.Load(Path.Combine(output, "spectator-settings.json")).EnemyPanel == false,
+            "switching the enemy panel off hides it on the game machine and is saved");
         w.Close(); await Wait(() => !w.IsVisible && Field<SpectatorReceiver?>(w, "spectator") == null, "closing releases the spectator port");
         string realState = GsiSetup.StateDirectoryFor("Coach");
         await Wait(() => File.Exists(Path.Combine(state, "installed-spectator-gsi.json")) &&

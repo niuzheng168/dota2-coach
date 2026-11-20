@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -91,6 +92,19 @@ internal sealed class CoachWindow : Window
     private bool spectatorStarting;
     private string? delaySession;
     private long delaySequence, nextSpectatorText;
+    // Plus spectating on the game machine: a panel of enemy levels and items (hero_scan.py on this machine) and
+    // subtitles when enemies leave the friend team's vision (this machine's own Plus GSI). Team-view data only.
+    private readonly CheckBox enemyPanel = new() { Content = "对手等级和装备（游戏左侧面板）", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
+    private readonly CheckBox enemyVision = new() { Content = "对手离开视野", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
+    private readonly TextBlock alertStatus = Ui.Text("对手提醒：等待 Plus 队伍视角", 12, Brushes.LightGray);
+    private readonly VisionLossTracker visionLoss = new();
+    private readonly AlertComposer alerts = new();
+    private HeroNames heroNames = new();
+    private string scanFile = ScanFeed.DefaultPath; // instance field so UI tests never read the real scanner output
+    private ScanStatus scanStatus = new(false, "视觉扫描未运行");
+    private volatile bool panelOn, visionAlertsOn; // also read on the spectator receiver's threads
+    private long nextScanPoll;
+    private string lastAlert = "", panelText = "";
 
     // Tests instantiate inert windows explicitly; the application entry point uses automaticStartup=true.
     public CoachWindow() : this(null, false) { }
@@ -102,6 +116,8 @@ internal sealed class CoachWindow : Window
         settingsPath = preferencesFile ?? LiveCoachSettings.DefaultPath;
         try { preferences = LiveCoachSettings.Load(settingsPath); }
         catch { preferences = new(); notice.Text = "已保存的设置无效，请检查并重新应用；没有读取或输出密钥内容。"; }
+        try { heroNames = new HeroNames(System.IO.Path.Combine(AppContext.BaseDirectory, "data", "dota2-dictionary.json")); }
+        catch { /* Alerts fall back to internal hero names. */ }
         Title = "Dota Coach · 教练端 v0.4.2";
         Width = Math.Min(1320, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(940, SystemParameters.WorkArea.Height - 40);
@@ -147,7 +163,7 @@ internal sealed class CoachWindow : Window
             left.Children.Add(Ui.Section("模型设置", modelSettings));
             var calibration = new StackPanel(); BuildCalibration(calibration);
             left.Children.Add(Ui.Section("小地图校准", calibration));
-            left.Children.Add(Ui.Section("Plus 实时观战（实验，只记录）", BuildSpectatorPanel()));
+            left.Children.Add(Ui.Section("Plus 实时观战（实验）", BuildSpectatorPanel()));
         }
         var diagnostics = new StackPanel();
         diagnostics.Children.Add(debug.View);
@@ -217,6 +233,7 @@ internal sealed class CoachWindow : Window
             host = await CoachHost.Start(bind, number, starting.Token);
             host.Mailbox.DebugSink = () => debug.Recorder;
             host.Mailbox.VideoJpegEncoder = Ui.ExtractJpeg;
+            host.Mailbox.Icons = key => ScanFeed.Icon(scanFile, key);
             port.IsEnabled = false; address.IsEnabled = false;
             if (e2e == null) {
                 preferences = preferences with { BindAddress = bind.ToString() };
@@ -250,12 +267,24 @@ internal sealed class CoachWindow : Window
     private StackPanel BuildSpectatorPanel()
     {
         var panel = new StackPanel();
-        panel.Children.Add(Ui.Text("本机 Dota 用账号 B（有 Dota Plus，与游戏账号互为好友）对游戏账号“实时观战”时，这里显示收到的小地图并测量比游戏机慢多少。只显示和记录，不进自动教练。", 12, Brushes.LightGray));
+        panel.Children.Add(Ui.Text("本机 Dota 用账号 B（有 Dota Plus，与游戏账号互为好友）对游戏账号“实时观战”时，这里显示收到的小地图并测量比游戏机慢多少。观战数据不进自动教练。", 12, Brushes.LightGray));
         panel.Children.Add(Ui.Label("本机 Dota 安装目录")); panel.Children.Add(spectatorInstall);
         var buttons = new WrapPanel();
         buttons.Children.Add(Ui.Button("一键配置观战 GSI", async (_, _) => await StartSpectator()));
         buttons.Children.Add(Ui.Button("复制启动参数", (_, _) => spectatorSetup.Text = Ui.CopyLaunchOptions(SteamLaunch.Inspect())));
         panel.Children.Add(buttons); panel.Children.Add(spectatorSetup); panel.Children.Add(spectatorLive);
+        panel.Children.Add(Ui.Label("推送到游戏机（只用队伍视角看得到的信息）"));
+        enemyPanel.IsChecked = panelOn = preferences.EnemyPanel;
+        enemyVision.IsChecked = visionAlertsOn = preferences.EnemyVisionAlerts;
+        var toggles = new WrapPanel();
+        foreach (var toggle in new[] { enemyPanel, enemyVision }) {
+            toggles.Children.Add(toggle);
+            toggle.Checked += (_, _) => SaveAlertToggles(); toggle.Unchecked += (_, _) => SaveAlertToggles();
+        }
+        panel.Children.Add(toggles); panel.Children.Add(alertStatus);
+        panel.Children.Add(Ui.Text("对手面板一直显示在游戏画面左侧：敌方英雄最近一次被看到时的等级和装备，旧了会标出几秒前；" +
+            "需要本机同时运行视觉扫描（scripts/vision/hero_scan.py scan）。离开视野是字幕，只用观战GSI；" +
+            "被击杀和走进迷雾分不出来，都会提示，字幕时长同模型设置。", 12, Brushes.LightGray));
         return panel;
     }
     private async Task StartSpectator()
@@ -266,7 +295,7 @@ internal sealed class CoachWindow : Window
             if (spectator == null) {
                 var receiver = await SpectatorReceiver.Start(spectatorPort, GsiSetup.Token(spectatorState), stop.Token);
                 // Called on server threads; both sinks are thread-safe.
-                receiver.Received = s => { plusDelay.Spectator(s); debug.Recorder?.Spectator(s); };
+                receiver.Received = s => { plusDelay.Spectator(s); debug.Recorder?.Spectator(s); OnSpectator(s); };
                 spectator = receiver;
             }
             bool changed = GsiSetup.Install(spectatorInstall.Text.Trim(), spectator.Config, spectatorState, GsiSetup.SpectatorConfigName).Changed;
@@ -310,6 +339,54 @@ internal sealed class CoachWindow : Window
             : $"\n延迟：{delay.Note}" + (delay.ClockGapSeconds is double gap ? $"（两边游戏时间相差 {gap:F0}s）" : ""));
         spectatorLive.Text = text.ToString();
     }
+    /// <summary>Spectator receiver threads: enemies leaving the friend team's vision become pending alerts.</summary>
+    private void OnSpectator(SpectatorSnapshot s)
+    {
+        List<PlusAlert> found;
+        lock (visionLoss) found = visionLoss.Update(s, heroNames);
+        if (visionAlertsOn && found.Count > 0) alerts.Add(found, Environment.TickCount64);
+    }
+    private void SaveAlertToggles()
+    {
+        panelOn = enemyPanel.IsChecked == true; visionAlertsOn = enemyVision.IsChecked == true;
+        if (!visionAlertsOn) alerts.Clear();
+        preferences = preferences with { EnemyPanel = panelOn, EnemyVisionAlerts = visionAlertsOn };
+        try { preferences.Save(settingsPath); }
+        catch { notice.Text = "设置无法保存，当前开关仅本次有效。"; }
+    }
+    /// <summary>Publishes the scanner's enemy panel and waiting vision alerts (as a subtitle) to the game machine.</summary>
+    private void UpdateAlerts()
+    {
+        var plus = spectator?.Status().Latest;
+        long now = Environment.TickCount64;
+        var frame = host?.Mailbox.Latest();
+        string? gameMatch = frame?.Meta.Player?.MatchId;
+        bool sameGame = plus?.MatchId == null || gameMatch == null || plus.MatchId == gameMatch;
+        if (now >= nextScanPoll) {
+            nextScanPoll = now + 500;
+            EnemyBoard? board = null;
+            if (panelOn) (scanStatus, board) = ScanFeed.Poll(scanFile, plus?.MatchId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            bool deliver = board != null && frame != null && sameGame;
+            host?.Mailbox.SetEnemies(deliver ? board : null);
+            panelText = !panelOn ? "对手面板已关" : board == null ? "对手面板：" + scanStatus.Text :
+                deliver ? $"对手面板：已推送 {board.Heroes.Length} 名敌方英雄" :
+                $"对手面板：未推送（{(frame == null ? "游戏机未连接" : "观战的不是游戏机这一局")}）";
+        }
+        if (alerts.Next(now, preferences.SubtitleSeconds * 1000) is { } text) {
+            try {
+                if (host == null || frame == null || !sameGame) throw new InvalidOperationException("Not deliverable");
+                host.Mailbox.SetReminder(frame.Meta.SessionId, frame.Meta.Sequence, "local-vision-observation", text, null,
+                    displayMs: preferences.SubtitleSeconds * 1000);
+                if (host.Mailbox.Poll(frame.Meta.SessionId) is { } sent) debug.Recorder?.Reminder("reminder-published", sent);
+                lastAlert = "已推送：" + text;
+            } catch (Exception e) when (e is InvalidOperationException or ArgumentException) {
+                lastAlert = $"未推送（{(frame == null ? "游戏机未连接" : !sameGame ? "观战的不是游戏机这一局" : "英雄阵亡或画面过期")}）：{text}";
+            }
+        }
+        alertStatus.Text = (panelOn || visionAlertsOn ? "" : "已关闭 · ") +
+            (plus is { Mode: "team-view" } && now - plus.ReceivedAt <= 3000 ? "Plus 队伍视角" : "等待 Plus 队伍视角（完整观战不推送）") +
+            "\n" + panelText + (lastAlert.Length > 0 ? "\n" + lastAlert : "");
+    }
     private void Refresh()
     {
         if (e2e != null && !closing && File.Exists(System.IO.Path.Combine(e2e.Directory, "stop-requested"))) { Close(); return; }
@@ -326,6 +403,7 @@ internal sealed class CoachWindow : Window
             }
         } catch { /* Debug must not affect live refresh. */ }
         UpdateSpectator();
+        UpdateAlerts();
         if (host == null) return;
         var snapshot = host.Mailbox.Snapshot();
         if (e2e != null && File.Exists(System.IO.Path.Combine(e2e.Directory, "enable-model")) &&

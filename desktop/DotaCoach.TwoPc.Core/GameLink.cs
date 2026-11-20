@@ -44,16 +44,20 @@ public sealed class GameLink : IDisposable
     {
         if (!response.IsSuccessStatusCode) throw new HttpRequestException(
             $"教练连接被拒绝（{(int)response.StatusCode}）；请重新配对。", null, response.StatusCode);
-        if (response.Content.Headers.ContentLength > 65536) throw new InvalidOperationException("Unexpected response size");
+        return JsonSerializer.Deserialize<T>(await Body(response, 65536, cancellation), Wire.Json) ?? throw new InvalidOperationException("Invalid response");
+    }
+    private static async Task<byte[]> Body(HttpResponseMessage response, int limit, CancellationToken cancellation)
+    {
+        if (response.Content.Headers.ContentLength > limit) throw new InvalidOperationException("Unexpected response size");
         await using var input = await response.Content.ReadAsStreamAsync(cancellation);
         using var output = new MemoryStream();
         var bytes = new byte[4096]; int count;
         while ((count = await input.ReadAsync(bytes, cancellation)) > 0)
         {
-            if (output.Length + count > 65536) throw new InvalidOperationException("Unexpected response size");
+            if (output.Length + count > limit) throw new InvalidOperationException("Unexpected response size");
             output.Write(bytes, 0, count);
         }
-        return JsonSerializer.Deserialize<T>(output.ToArray(), Wire.Json) ?? throw new InvalidOperationException("Invalid response");
+        return output.ToArray();
     }
     public async Task Connect(CancellationToken cancellation)
     {
@@ -189,6 +193,25 @@ public sealed class GameLink : IDisposable
             return r with { RemainingMs = remaining, SourceAgeMs = (int)(now() - captured.At) };
         }
     }
+    /// <summary>The coach's enemy panel, or null: none published, or a coach without one (404).</summary>
+    public async Task<EnemyBoard?> Enemies(CancellationToken cancellation)
+    {
+        using var request = Request(HttpMethod.Get, "/v1/enemies");
+        using var response = await http.SendAsync(request, cancellation);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        var board = (await Json<BoardEnvelope>(response, cancellation)).Enemies;
+        return Wire.ValidBoard(board) ? board : null;
+    }
+    /// <summary>One icon of the enemy panel as PNG bytes, or null when the coach has none.</summary>
+    public async Task<byte[]?> Icon(string key, CancellationToken cancellation)
+    {
+        if (!Wire.ValidIconKey(key)) return null;
+        using var request = Request(HttpMethod.Get, "/v1/icon/" + key);
+        using var response = await http.SendAsync(request, cancellation);
+        if (!response.IsSuccessStatusCode) return null;
+        var data = await Body(response, Wire.MaxIconBytes, cancellation);
+        return Wire.IsIcon(data) ? data : null;
+    }
     public async Task End(CancellationToken cancellation)
     {
         CloseVideo();
@@ -207,4 +230,5 @@ public sealed class GameLink : IDisposable
     }
     public void Dispose() { CloseVideo(); http.Dispose(); ClearCaptures(); }
     private sealed record ReminderEnvelope(Reminder? Reminder);
+    private sealed record BoardEnvelope(EnemyBoard? Enemies);
 }

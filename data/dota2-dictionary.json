@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-11-11T17:30:08.903Z",
+  "generatedAt": "2026-11-19T11:37:28.527Z",
   "source": "Valve Official Dota 2 Datafeed (english + schinese) + Community Coaching Slang",
   "counts": {
     "tacticalTerms": 43,
     "heroes": 127,
-    "abilities": 734,
-    "shopItems": 326,
-    "neutralAndEnhancements": 76
+    "abilities": 736,
+    "shopItems": 344,
+    "neutralAndEnhancements": 75
   },
   "tacticalTerms": [
     {
@@ -665,7 +665,7 @@
           "zh": "迷雾缠绕",
           "isInnate": false,
           "isShard": false,
-          "isScepter": false,
+          "isScepter": true,
           "enAliases": [],
           "zhSlang": []
         },
@@ -705,7 +705,7 @@
           "zh": "回光返照",
           "isInnate": false,
           "isShard": false,
-          "isScepter": true,
+          "isScepter": false,
           "enAliases": [],
           "zhSlang": []
         }
@@ -1276,9 +1276,9 @@
           "zhSlang": []
         },
         {
-          "key": "beastmaster_drums_of_slom",
-          "en": "Drums of Slom",
-          "zh": "斯洛姆战鼓",
+          "key": "beastmaster_summon_thunderhide",
+          "en": "Summon Ancient Thunderhide",
+          "zh": "召唤远古雷肤兽",
           "isInnate": false,
           "isShard": false,
           "isScepter": false,
@@ -1792,9 +1792,9 @@
           "zhSlang": []
         },
         {
-          "key": "chaos_knight_fundamental_forging",
-          "en": "Fundamental Forging",
-          "zh": "基本法则锻造",
+          "key": "chaos_knight_armageddon",
+          "en": "Ahead, Armageddon",
+          "zh": "天劫前进",
           "isInnate": true,
           "isShard": false,
           "isScepter": false,
@@ -1808,6 +1808,16 @@
           "isInnate": false,
           "isShard": false,
           "isScepter": true,
+          "enAliases": [],
+          "zhSlang": []
+        },
+        {
+          "key": "chaos_knight_armageddons_flank_end",
+          "en": "Heel, Armageddon",
+          "zh": "Heel, Armageddon",
+          "isInnate": true,
+          "isShard": false,
+          "isScepter": false,
           "enAliases": [],
           "zhSlang": []
         }
@@ -2404,11 +2414,21 @@
           "zhSlang": []
         },
         {
+          "key": "dazzle_through_the_realm",
+          "en": "Through the Realm",
+          "zh": "穿越绝境",
+          "isInnate": false,
+          "isShard": false,
+          "isScepter": false,
+          "enAliases": [],
+          "zhSlang": []
+        },
+        {
           "key": "dazzle_innate_weave",
           "en": "Weave",
           "zh": "编织",
           "isInnate": true,
-          "isShard": true,
+          "isShard": false,
           "isScepter": false,
           "enAliases": [],
           "zhSlang": []
@@ -2418,7 +2438,7 @@
           "en": "Nothl Projection",
           "zh": "虚无投影",
           "isInnate": false,
-          "isShard": false,
+          "isShard": true,
           "isScepter": false,
           "enAliases": [],
           "zhSlang": []
@@ -2446,7 +2466,7 @@
           "en": "Crypt Swarm",
           "zh": "地穴虫群",
           "isInnate": false,
-          "isShard": false,
+          "isShard": true,
           "isScepter": false,
           "enAliases": [],
           "zhSlang": []
@@ -2466,8 +2486,8 @@
           "en": "Spirit Siphon",
           "zh": "吸魂巫术",
           "isInnate": false,
-          "isShard": true,
-          "isScepter": false,
+          "isShard": false,
+          "isScepter": true,
           "enAliases": [],
           "zhSlang": []
         },
@@ -2487,7 +2507,7 @@
           "zh": "驱使恶灵",
           "isInnate": false,
           "isShard": false,
-          "isScepter": true,
+          "isScepter": false,
           "enAliases": [],
           "zhSlang": []
         }
@@ -2538,7 +2558,7 @@
           "en": "Kinetic Field",
           "zh": "动能力场",
           "isInnate": false,
-          "isShard": false,
+          "isShard": true,
           "isScepter": false,
           "enAliases": [],
           "zhSlang": []
@@ -4025,7 +4045,7 @@
           "zh": "剑刃风暴",
           "isInnate": false,
           "isShard": false,
-          "isScepter": false,
+          "isScepter": true,
           "enAliases": [
             "Spin"
           ],
@@ -4051,16 +4071,6 @@
           "isInnate": false,
           "isShard": false,
           "isScepter": false,
-          "enAliases": [],
-          "zhSlang": []
-        },
-        {
-          "key": "juggernaut_swift_slash",
-          "en": "Swiftslash",
-          "zh": "迅风斩",
-          "isInnate": false,
-          "isShard": false,
-          "isScepter": true,
           "enAliases": [],
           "zhSlang": []
         },
@@ -5113,9 +5123,9 @@
           "zhSlang": []
         },
         {
-          "key": "lycan_apex_predator",
-          "en": "Apex Predator",
-          "zh": "顶级掠食者",
+          "key": "lycan_pack_hunter",
+          "en": "Pack Hunter",
+          "zh": "Pack Hunter",
           "isInnate": true,
           "isShard": false,
           "isScepter": false,
@@ -5467,7 +5477,7 @@
           "zh": "忽悠",
           "isInnate": false,
           "isShard": false,
-          "isScepter": true,
+          "isScepter": false,
           "enAliases": [],
           "zhSlang": []
         },
@@ -5492,26 +5502,6 @@
           "zhSlang": []
         },
         {
-          "key": "meepo_megameepo",
-          "en": "MegaMeepo",
-          "zh": "超大米波",
-          "isInnate": false,
-          "isShard": false,
-          "isScepter": false,
-          "enAliases": [],
-          "zhSlang": []
-        },
-        {
-          "key": "meepo_divided_we_stand",
-          "en": "Divided We Stand",
-          "zh": "分则能成",
-          "isInnate": false,
-          "isShard": false,
-          "isScepter": false,
-          "enAliases": [],
-          "zhSlang": []
-        },
-        {
           "key": "meepo_geomancy",
           "en": "Geomancy",
           "zh": "地卜术",
@@ -5522,9 +5512,19 @@
           "zhSlang": []
         },
         {
-          "key": "meepo_megameepo_fling",
-          "en": "MegaMeepo Fling",
-          "zh": "超大米波摔扔",
+          "key": "meepo_divided_we_stand",
+          "en": "Divided We Stand",
+          "zh": "分则能成",
+          "isInnate": false,
+          "isShard": true,
+          "isScepter": false,
+          "enAliases": [],
+          "zhSlang": []
+        },
+        {
+          "key": "meepo_fling_release",
+          "en": "Fling",
+          "zh": "摔扔",
           "isInnate": false,
           "isShard": false,
           "isScepter": false,
@@ -5532,7 +5532,7 @@
           "zhSlang": []
         }
       ],
-      "primaryAttr": 1,
+      "primaryAttr": 3,
       "portrait": "/heroes/meepo.jpg"
     },
     {
@@ -5961,7 +5961,7 @@
         {
           "key": "furion_force_of_nature",
           "en": "Nature's Call",
-          "zh": "自然的呼唤",
+          "zh": "自然感召",
           "isInnate": false,
           "isShard": false,
           "isScepter": false,
@@ -6209,9 +6209,9 @@
           "zhSlang": []
         },
         {
-          "key": "nyx_assassin_neuro_sting",
-          "en": "Mana Burn",
-          "zh": "法力燃烧",
+          "key": "nyx_assassin_scarab_metabolism",
+          "en": "Scarab Metabolism",
+          "zh": "圣甲虫代谢",
           "isInnate": true,
           "isShard": false,
           "isScepter": false,
@@ -7099,7 +7099,7 @@
           "zh": "湮灭专家",
           "isInnate": true,
           "isShard": false,
-          "isScepter": false,
+          "isScepter": true,
           "enAliases": [],
           "zhSlang": []
         },
@@ -7109,7 +7109,7 @@
           "zh": "生命汲取",
           "isInnate": false,
           "isShard": true,
-          "isScepter": true,
+          "isScepter": false,
           "enAliases": [],
           "zhSlang": []
         }
@@ -7521,7 +7521,7 @@
           "zh": "掘地穿刺",
           "isInnate": false,
           "isShard": false,
-          "isScepter": false,
+          "isScepter": true,
           "enAliases": [],
           "zhSlang": []
         },
@@ -7538,7 +7538,7 @@
         {
           "key": "sandking_scorpion_strike",
           "en": "Stinger",
-          "zh": "尾刺",
+          "zh": "尾螫",
           "isInnate": false,
           "isShard": false,
           "isScepter": false,
@@ -7561,7 +7561,7 @@
           "zh": "地震",
           "isInnate": false,
           "isShard": true,
-          "isScepter": true,
+          "isScepter": false,
           "enAliases": [],
           "zhSlang": []
         }
@@ -9474,7 +9474,7 @@
           "en": "Tombstone",
           "zh": "墓碑",
           "isInnate": false,
-          "isShard": true,
+          "isShard": false,
           "isScepter": false,
           "enAliases": [
             "Tomb",
@@ -9483,6 +9483,16 @@
           "zhSlang": [
             "墓碑"
           ]
+        },
+        {
+          "key": "undying_bite",
+          "en": "Zombie Bite",
+          "zh": "僵尸撕咬",
+          "isInnate": false,
+          "isShard": false,
+          "isScepter": false,
+          "enAliases": [],
+          "zhSlang": []
         },
         {
           "key": "undying_ceaseless_dirge",
@@ -10026,6 +10036,16 @@
           "isInnate": false,
           "isShard": false,
           "isScepter": false,
+          "enAliases": [],
+          "zhSlang": []
+        },
+        {
+          "key": "weaver_time_lapse_ally",
+          "en": "Time Lapse (Ally)",
+          "zh": "时光倒流（友军）",
+          "isInnate": false,
+          "isShard": false,
+          "isScepter": true,
           "enAliases": [],
           "zhSlang": []
         },
@@ -10760,6 +10780,16 @@
       "zhSlang": []
     },
     {
+      "id": 1881,
+      "key": "item_berserkers_hood",
+      "en": "Berserker's Hood",
+      "zh": "Berserker's Hood",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 1440,
       "key": "item_black_grimoire",
       "en": "Black Grimoire (Warlock)",
@@ -10876,6 +10906,16 @@
         "血腥榴弹",
         "榴弹"
       ]
+    },
+    {
+      "id": 1942,
+      "key": "item_bloodslinger",
+      "en": "Bloodslinger",
+      "zh": "Bloodslinger",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
     },
     {
       "id": 121,
@@ -11060,14 +11100,16 @@
       ]
     },
     {
-      "id": 676,
-      "key": "item_ceremonial_robe",
-      "en": "Ceremonial Robe",
-      "zh": "祭礼长袍",
+      "id": 1955,
+      "key": "item_caduceus",
+      "en": "Caduceus",
+      "zh": "双蛇杖",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
-      "zhSlang": []
+      "zhSlang": [
+        "大灵匣"
+      ]
     },
     {
       "id": 4,
@@ -11125,6 +11167,16 @@
       ]
     },
     {
+      "id": 1884,
+      "key": "item_claszian_timepiece",
+      "en": "Claszian Timepiece",
+      "zh": "Claszian Timepiece",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 5,
       "key": "item_claymore",
       "en": "Claymore",
@@ -11139,6 +11191,16 @@
       "key": "item_cloak",
       "en": "Cloak",
       "zh": "抗魔斗篷",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 574,
+      "key": "item_cloak_of_flames",
+      "en": "Cloak of Flames",
+      "zh": "火焰斗篷",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
@@ -11247,6 +11309,16 @@
       "zhSlang": [
         "大炮"
       ]
+    },
+    {
+      "id": 1077,
+      "key": "item_dagger_of_ristul",
+      "en": "Dagger of Ristul",
+      "zh": "瑞斯图尔尖匕",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
     },
     {
       "id": 104,
@@ -11397,6 +11469,16 @@
       ]
     },
     {
+      "id": 2097,
+      "key": "item_duelist_gloves",
+      "en": "Duelist Gloves",
+      "zh": "决斗家手套",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 40,
       "key": "item_dust",
       "en": "Dust of Appearance",
@@ -11504,6 +11586,16 @@
       "key": "item_essence_distiller",
       "en": "Essence Distiller",
       "zh": "精之灵器",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 359,
+      "key": "item_essence_ring",
+      "en": "Essence Ring",
+      "zh": "精华指环",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
@@ -11645,10 +11737,10 @@
       ]
     },
     {
-      "id": 335,
-      "key": "item_flicker",
-      "en": "Flicker",
-      "zh": "闪灵",
+      "id": 1721,
+      "key": "item_flayers_bota",
+      "en": "Flayer's Bota",
+      "zh": "剥皮血囊",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
@@ -11769,10 +11861,10 @@
       ]
     },
     {
-      "id": 678,
-      "key": "item_giants_ring",
-      "en": "Giant's Ring",
-      "zh": "巨人之戒",
+      "id": 1643,
+      "key": "item_giant_maul",
+      "en": "Giant's Maul",
+      "zh": "巨人之槌",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
@@ -11853,6 +11945,16 @@
       "key": "item_greater_famango",
       "en": "Greater Healing Lotus",
       "zh": "巨大疗伤莲花",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1951,
+      "key": "item_horn_of_battle_greater",
+      "en": "Greater Horn of Battle",
+      "zh": "Greater Horn of Battle",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
@@ -12071,6 +12173,16 @@
       "zhSlang": []
     },
     {
+      "id": 1950,
+      "key": "item_horn_of_battle",
+      "en": "Horn of Battle",
+      "zh": "战斗号角",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 263,
       "key": "item_hurricane_pike",
       "en": "Hurricane Pike",
@@ -12110,16 +12222,6 @@
       "key": "item_illusionsts_cape",
       "en": "Illusionist's Cape",
       "zh": "幻术师披风",
-      "neutralTier": -1,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 334,
-      "key": "item_imp_claw",
-      "en": "Imp Claw",
-      "zh": "魔童之爪",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
@@ -12446,6 +12548,16 @@
       ]
     },
     {
+      "id": 187,
+      "key": "item_medallion_of_courage",
+      "en": "Medallion of Courage",
+      "zh": "勇气勋章",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 79,
       "key": "item_mekansm",
       "en": "Mekansm",
@@ -12483,16 +12595,6 @@
       "zhSlang": [
         "陨星锤"
       ]
-    },
-    {
-      "id": 309,
-      "key": "item_mind_breaker",
-      "en": "Mind Breaker",
-      "zh": "智灭",
-      "neutralTier": -1,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
     },
     {
       "id": 301,
@@ -12615,6 +12717,16 @@
       "zhSlang": []
     },
     {
+      "id": 1883,
+      "key": "item_nothl_sigil",
+      "en": "Nothl Sigil",
+      "zh": "Nothl Sigil",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 77,
       "key": "item_null_talisman",
       "en": "Null Talisman",
@@ -12675,6 +12787,16 @@
       "zhSlang": [
         "假眼"
       ]
+    },
+    {
+      "id": 947,
+      "key": "item_occult_bracelet",
+      "en": "Occult Bracelet",
+      "zh": "玄奥手镯",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
     },
     {
       "id": 354,
@@ -12998,6 +13120,16 @@
       "zhSlang": []
     },
     {
+      "id": 71,
+      "key": "item_poor_mans_shield",
+      "en": "Poor Man's Shield",
+      "zh": "穷鬼盾",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 63,
       "key": "item_power_treads",
       "en": "Power Treads",
@@ -13150,21 +13282,6 @@
       "zhSlang": []
     },
     {
-      "id": 911,
-      "key": "item_revenants_brooch",
-      "en": "Revenant's Brooch",
-      "zh": "英灵胸针",
-      "neutralTier": -1,
-      "isEnhancement": false,
-      "enAliases": [
-        "Brooch"
-      ],
-      "zhSlang": [
-        "亡魂胸针",
-        "胸针"
-      ]
-    },
-    {
       "id": 212,
       "key": "item_ring_of_aquila",
       "en": "Ring of Aquila",
@@ -13229,6 +13346,16 @@
       "key": "item_rippers_lash",
       "en": "Ripper's Lash",
       "zh": "撕裂之鞭",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1944,
+      "key": "item_ristuls_devotion",
+      "en": "Ristul's Devotion",
+      "zh": "Ristul's Devotion",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
@@ -13350,20 +13477,23 @@
       "zhSlang": []
     },
     {
+      "id": 1953,
+      "key": "item_berserkers_sabatons",
+      "en": "Sabatons of Mordiggian",
+      "zh": "莫尔迪基安的护足",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": [
+        "大相位",
+        "大臂章"
+      ]
+    },
+    {
       "id": 54,
       "key": "item_relic",
       "en": "Sacred Relic",
       "zh": "圣者遗物",
-      "neutralTier": -1,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1157,
-      "key": "item_safety_bubble",
-      "en": "Safety Bubble",
-      "zh": "安全泡泡",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
@@ -13444,6 +13574,16 @@
       "zhSlang": [
         "羊刀"
       ]
+    },
+    {
+      "id": 1604,
+      "key": "item_searing_signet",
+      "en": "Searing Signet",
+      "zh": "炽热纹章",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
     },
     {
       "id": 294,
@@ -13563,6 +13703,16 @@
       ]
     },
     {
+      "id": 1948,
+      "key": "item_skypiercer",
+      "en": "Skypiercer",
+      "zh": "Skypiercer",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 14,
       "key": "item_slippers",
       "en": "Slippers of Agility",
@@ -13656,6 +13806,16 @@
       "zhSlang": []
     },
     {
+      "id": 326,
+      "key": "item_spider_legs",
+      "en": "Spider Legs",
+      "zh": "网虫腿",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 267,
       "key": "item_spirit_vessel",
       "en": "Spirit Vessel",
@@ -13690,10 +13850,42 @@
       "zhSlang": []
     },
     {
+      "id": 1946,
+      "key": "item_starforge",
+      "en": "Starforge",
+      "zh": "Starforge",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": [
+        "大陨星锤"
+      ]
+    },
+    {
+      "id": 1949,
+      "key": "item_stone_of_recall",
+      "en": "Stone of Recall",
+      "zh": "Stone of Recall",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 182,
       "key": "item_stout_shield",
       "en": "Stout Shield",
       "zh": "圆盾",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 292,
+      "key": "item_stygian_desolator",
+      "en": "Stygian Desolator",
+      "zh": "寂灭",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
@@ -13959,6 +14151,16 @@
       "key": "item_ultimate_orb",
       "en": "Ultimate Orb",
       "zh": "极限法球",
+      "neutralTier": -1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1598,
+      "key": "item_unrelenting_eye",
+      "en": "Unrelenting Eye",
+      "zh": "不屈之眼",
       "neutralTier": -1,
       "isEnhancement": false,
       "enAliases": [],
@@ -14519,30 +14721,10 @@
       "zhSlang": []
     },
     {
-      "id": 1077,
-      "key": "item_dagger_of_ristul",
-      "en": "Dagger of Ristul",
-      "zh": "瑞斯图尔尖匕",
-      "neutralTier": 0,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
       "id": 1638,
       "key": "item_dormant_curio",
       "en": "Dormant Curio",
       "zh": "休眠珍品",
-      "neutralTier": 0,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 2097,
-      "key": "item_duelist_gloves",
-      "en": "Duelist Gloves",
-      "zh": "决斗家手套",
       "neutralTier": 0,
       "isEnhancement": false,
       "enAliases": [],
@@ -14569,16 +14751,6 @@
       "zhSlang": []
     },
     {
-      "id": 947,
-      "key": "item_occult_bracelet",
-      "en": "Occult Bracelet",
-      "zh": "玄奥手镯",
-      "neutralTier": 0,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
       "id": 1606,
       "key": "item_polliwog_charm",
       "en": "Pollywog Charm",
@@ -14599,10 +14771,40 @@
       "zhSlang": []
     },
     {
+      "id": 1880,
+      "key": "item_red_ledger",
+      "en": "Red Ledger",
+      "zh": "悬红",
+      "neutralTier": 0,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 945,
+      "key": "item_seeds_of_serenity",
+      "en": "Seeds of Serenity",
+      "zh": "宁静种籽",
+      "neutralTier": 0,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
       "id": 1861,
       "key": "item_stonefeather_satchel",
       "en": "Stonefeather Satchel",
       "zh": "石羽小包",
+      "neutralTier": 0,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 840,
+      "key": "item_pogo_stick",
+      "en": "Tumbler's Toy",
+      "zh": "杂技玩具",
       "neutralTier": 0,
       "isEnhancement": false,
       "enAliases": [],
@@ -14614,6 +14816,16 @@
       "en": "Weighted Dice",
       "zh": "加重骰子",
       "neutralTier": 0,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1916,
+      "key": "item_brick",
+      "en": "Brick",
+      "zh": "板砖",
+      "neutralTier": 1,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
@@ -14639,10 +14851,30 @@
       "zhSlang": []
     },
     {
-      "id": 359,
-      "key": "item_essence_ring",
-      "en": "Essence Ring",
-      "zh": "精华指环",
+      "id": 1603,
+      "key": "item_gunpowder_gauntlets",
+      "en": "Gunpowder Gauntlet",
+      "zh": "火药手套",
+      "neutralTier": 1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 334,
+      "key": "item_imp_claw",
+      "en": "Imp Claw",
+      "zh": "魔童之爪",
+      "neutralTier": 1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1640,
+      "key": "item_jidi_pollen_bag",
+      "en": "Jidi Pollen Bag",
+      "zh": "基迪花粉袋",
       "neutralTier": 1,
       "isEnhancement": false,
       "enAliases": [],
@@ -14659,81 +14891,11 @@
       "zhSlang": []
     },
     {
-      "id": 187,
-      "key": "item_medallion_of_courage",
-      "en": "Medallion of Courage",
-      "zh": "勇气勋章",
+      "id": 1719,
+      "key": "item_metamorphic_mandible",
+      "en": "Metamorphic Mandible",
+      "zh": "变态上颚",
       "neutralTier": 1,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 71,
-      "key": "item_poor_mans_shield",
-      "en": "Poor Man's Shield",
-      "zh": "穷鬼盾",
-      "neutralTier": 1,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1604,
-      "key": "item_searing_signet",
-      "en": "Searing Signet",
-      "zh": "炽热纹章",
-      "neutralTier": 1,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 945,
-      "key": "item_seeds_of_serenity",
-      "en": "Seeds of Serenity",
-      "zh": "宁静种籽",
-      "neutralTier": 1,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 840,
-      "key": "item_pogo_stick",
-      "en": "Tumbler's Toy",
-      "zh": "杂技玩具",
-      "neutralTier": 1,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 574,
-      "key": "item_cloak_of_flames",
-      "en": "Cloak of Flames",
-      "zh": "火焰斗篷",
-      "neutralTier": 2,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1603,
-      "key": "item_gunpowder_gauntlets",
-      "en": "Gunpowder Gauntlet",
-      "zh": "火药手套",
-      "neutralTier": 2,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1640,
-      "key": "item_jidi_pollen_bag",
-      "en": "Jidi Pollen Bag",
-      "zh": "基迪花粉袋",
-      "neutralTier": 2,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
@@ -14743,7 +14905,7 @@
       "key": "item_partisans_brand",
       "en": "Partisan's Brand",
       "zh": "天游烙印",
-      "neutralTier": 2,
+      "neutralTier": 1,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
@@ -14753,17 +14915,17 @@
       "key": "item_psychic_headband",
       "en": "Psychic Headband",
       "zh": "通灵头带",
-      "neutralTier": 2,
+      "neutralTier": 1,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
     },
     {
-      "id": 1605,
-      "key": "item_serrated_shiv",
-      "en": "Serrated Shiv",
-      "zh": "锯齿短刀",
-      "neutralTier": 2,
+      "id": 1157,
+      "key": "item_safety_bubble",
+      "en": "Safety Bubble",
+      "zh": "安全泡泡",
+      "neutralTier": 1,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
@@ -14773,6 +14935,111 @@
       "key": "item_spellslinger",
       "en": "Spellslinger",
       "zh": "咏咒之坠",
+      "neutralTier": 1,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1917,
+      "key": "item_balmhook",
+      "en": "Balmhook",
+      "zh": "Balmhook",
+      "neutralTier": 2,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 676,
+      "key": "item_ceremonial_robe",
+      "en": "Ceremonial Robe",
+      "zh": "祭礼长袍",
+      "neutralTier": 2,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 2190,
+      "key": "item_dandelion_amulet",
+      "en": "Dandelion Amulet",
+      "zh": "蒲公英护符",
+      "neutralTier": 2,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1862,
+      "key": "item_enchanters_bauble",
+      "en": "Enchanter's Bauble",
+      "zh": "附魔师之椟",
+      "neutralTier": 2,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1863,
+      "key": "item_harmonizer",
+      "en": "Harmonizer",
+      "zh": "协和",
+      "neutralTier": 2,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1720,
+      "key": "item_idol_of_screeauk",
+      "en": "Idol of Scree'auk",
+      "zh": "丝奎奥克神像",
+      "neutralTier": 2,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1860,
+      "key": "item_prophets_pendulum",
+      "en": "Prophet's Pendulum",
+      "zh": "先知灵摆",
+      "neutralTier": 2,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1168,
+      "key": "item_rattlecage",
+      "en": "Rattlecage",
+      "zh": "回响之笼",
+      "neutralTier": 2,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 911,
+      "key": "item_revenants_brooch",
+      "en": "Revenant's Brooch",
+      "zh": "英灵胸针",
+      "neutralTier": 2,
+      "isEnhancement": false,
+      "enAliases": [
+        "Brooch"
+      ],
+      "zhSlang": [
+        "亡魂胸针",
+        "胸针"
+      ]
+    },
+    {
+      "id": 1605,
+      "key": "item_serrated_shiv",
+      "en": "Serrated Shiv",
+      "zh": "锯齿短刀",
       "neutralTier": 2,
       "isEnhancement": false,
       "enAliases": [],
@@ -14789,11 +15056,21 @@
       "zhSlang": []
     },
     {
-      "id": 1598,
-      "key": "item_unrelenting_eye",
-      "en": "Unrelenting Eye",
-      "zh": "不屈之眼",
+      "id": 1882,
+      "key": "item_vile_phial",
+      "en": "Vile Phial",
+      "zh": "Vile Phial",
       "neutralTier": 2,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 370,
+      "key": "item_demonicon",
+      "en": "Book of the Dead",
+      "zh": "冥灵书",
+      "neutralTier": 3,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
@@ -14809,101 +15086,11 @@
       "zhSlang": []
     },
     {
-      "id": 2190,
-      "key": "item_dandelion_amulet",
-      "en": "Dandelion Amulet",
-      "zh": "蒲公英护符",
-      "neutralTier": 3,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1862,
-      "key": "item_enchanters_bauble",
-      "en": "Enchanter's Bauble",
-      "zh": "附魔师之椟",
-      "neutralTier": 3,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1721,
-      "key": "item_flayers_bota",
-      "en": "Flayer's Bota",
-      "zh": "剥皮血囊",
-      "neutralTier": 3,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1643,
-      "key": "item_giant_maul",
-      "en": "Giant's Maul",
-      "zh": "巨人之槌",
-      "neutralTier": 3,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1720,
-      "key": "item_idol_of_screeauk",
-      "en": "Idol of Scree'auk",
-      "zh": "丝奎奥克神像",
-      "neutralTier": 3,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1719,
-      "key": "item_metamorphic_mandible",
-      "en": "Metamorphic Mandible",
-      "zh": "变态上颚",
-      "neutralTier": 3,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1860,
-      "key": "item_prophets_pendulum",
-      "en": "Prophet's Pendulum",
-      "zh": "先知灵摆",
-      "neutralTier": 3,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 1168,
-      "key": "item_rattlecage",
-      "en": "Rattlecage",
-      "zh": "回响之笼",
-      "neutralTier": 3,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 370,
-      "key": "item_demonicon",
-      "en": "Book of the Dead",
-      "zh": "冥灵书",
-      "neutralTier": 4,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
       "id": 1642,
       "key": "item_dezun_bloodrite",
       "en": "Dezun Bloodrite",
       "zh": "德尊血式",
-      "neutralTier": 4,
+      "neutralTier": 3,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
@@ -14913,7 +15100,7 @@
       "key": "item_divine_regalia",
       "en": "Divine Regalia",
       "zh": "天赐华冠",
-      "neutralTier": 4,
+      "neutralTier": 3,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
@@ -14923,17 +15110,47 @@
       "key": "item_fallen_sky",
       "en": "Fallen Sky",
       "zh": "天崩",
-      "neutralTier": 4,
+      "neutralTier": 3,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
     },
     {
-      "id": 1863,
-      "key": "item_harmonizer",
-      "en": "Harmonizer",
-      "zh": "协和",
-      "neutralTier": 4,
+      "id": 335,
+      "key": "item_flicker",
+      "en": "Flicker",
+      "zh": "闪灵",
+      "neutralTier": 3,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 678,
+      "key": "item_giants_ring",
+      "en": "Giant's Ring",
+      "zh": "巨人之戒",
+      "neutralTier": 3,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 1911,
+      "key": "item_helm_of_the_hivemind",
+      "en": "Helm of the Hivemind",
+      "zh": "虫巢思维头盔",
+      "neutralTier": 3,
+      "isEnhancement": false,
+      "enAliases": [],
+      "zhSlang": []
+    },
+    {
+      "id": 309,
+      "key": "item_mind_breaker",
+      "en": "Mind Breaker",
+      "zh": "智灭",
+      "neutralTier": 3,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
@@ -14943,7 +15160,7 @@
       "key": "item_minotaur_horn",
       "en": "Minotaur Horn",
       "zh": "恶牛角",
-      "neutralTier": 4,
+      "neutralTier": 3,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
@@ -14953,27 +15170,7 @@
       "key": "item_riftshadow_prism",
       "en": "Riftshadow Prism",
       "zh": "影墟棱晶",
-      "neutralTier": 4,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 326,
-      "key": "item_spider_legs",
-      "en": "Spider Legs",
-      "zh": "网虫腿",
-      "neutralTier": 4,
-      "isEnhancement": false,
-      "enAliases": [],
-      "zhSlang": []
-    },
-    {
-      "id": 292,
-      "key": "item_desolator_2",
-      "en": "Stygian Desolator",
-      "zh": "寂灭",
-      "neutralTier": 4,
+      "neutralTier": 3,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []
@@ -14983,7 +15180,7 @@
       "key": "item_heavy_blade",
       "en": "Witchbane",
       "zh": "行巫之祸",
-      "neutralTier": 4,
+      "neutralTier": 3,
       "isEnhancement": false,
       "enAliases": [],
       "zhSlang": []

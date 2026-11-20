@@ -19,6 +19,10 @@ public sealed record LiveCoachSettings
     public int ModelTimeoutSeconds { get; init; } = 15;
     /// <summary>Without a confirmed calibration, use the default bottom-left box scaled from the HUD height.</summary>
     public bool AutoMinimap { get; init; } = true;
+    /// <summary>Plus live spectating: enemy levels and items in a panel on the game machine (needs hero_scan.py).</summary>
+    public bool EnemyPanel { get; init; } = true;
+    /// <summary>Plus live spectating: subtitle on the game machine when an enemy leaves the friend team's vision.</summary>
+    public bool EnemyVisionAlerts { get; init; } = true;
     public string BindAddress { get; init; } = "";
     public MinimapLayout[] Calibrations { get; init; } = [];
     public static string DefaultPath => Path.Combine(

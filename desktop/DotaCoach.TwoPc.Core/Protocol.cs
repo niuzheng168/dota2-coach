@@ -37,6 +37,28 @@ public static class Wire
         route.All(p => p != null && Finite(p.X, 0, 1) && Finite(p.Y, 0, 1));
     public static bool ValidSteps(string[]? steps) => steps == null ||
         steps.Length <= MaxRouteSteps && steps.All(s => !string.IsNullOrWhiteSpace(s) && s.Length <= MaxStepText);
+    /// <summary>An enemy panel the coach stops renewing disappears after this long.</summary>
+    public const int BoardLifetimeMs = 5_000;
+    public const int MaxIconBytes = 65_536, MaxIconSide = 256;
+    private static readonly System.Text.RegularExpressions.Regex IconName =
+        new("^(item|npc_dota_hero)_[a-z0-9_]{1,60}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    /// <summary>Icon names are Dota's own internal names: items and heroes only.</summary>
+    public static bool ValidIconKey(string? key) => key != null && IconName.IsMatch(key);
+    private static bool Item(string? name) => name == null || name.StartsWith("item_", StringComparison.Ordinal) && ValidIconKey(name);
+    public static bool ValidBoard(EnemyBoard? board) => board?.Heroes is { Length: <= 5 } heroes &&
+        heroes.All(h => h is { Hero: { } hero } && hero.StartsWith("npc_dota_hero_", StringComparison.Ordinal) && ValidIconKey(hero) &&
+            h.Level is null or (>= 1 and <= 30) && (h.Items == null || h.Items.Length == 6 && h.Items.All(Item)) && Item(h.Neutral) &&
+            (h.Age == null || Finite(h.Age.Value, 0, 86_400))) &&
+        heroes.Select(h => h.Hero).Distinct().Count() == heroes.Length;
+    /// <summary>A small PNG, checked from its header before any image decoder sees network data.</summary>
+    public static bool IsIcon(ReadOnlySpan<byte> data)
+    {
+        if (data.Length is < 33 or > MaxIconBytes || !data[..8].SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }) ||
+            !data[12..16].SequenceEqual("IHDR"u8)) return false;
+        int width = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(data[16..20]);
+        int height = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(data[20..24]);
+        return width is >= 1 and <= MaxIconSide && height is >= 1 and <= MaxIconSide;
+    }
 }
 
 // This bundle is a credential. Never log it, put it in a URL, or save it with diagnostics.
@@ -75,6 +97,13 @@ public sealed record Reminder(string Id, string SessionId, long FrameSequence, s
     bool ShowSubtitle = true, ScreenMark[]? Route = null, string[]? NextSteps = null,
     // Set by the game machine from its own capture clock; ignored if a coach sends it.
     int? SourceAgeMs = null);
+/// <summary>
+/// One enemy in the game machine's enemy panel, from Plus team view only: the level and items last read while
+/// the friend team saw the hero, and how many seconds ago that was. Null = never read. Items are the six main
+/// slots in order (null = empty).
+/// </summary>
+public sealed record EnemyHero(string Hero, int? Level, string?[]? Items, string? Neutral, double? Age);
+public sealed record EnemyBoard(EnemyHero[] Heroes);
 public sealed record FrameView
 {
     private Lazy<byte[]> jpeg = null!;
@@ -141,6 +170,7 @@ public sealed class CoachMailbox
     private (string Id, long At)? ticket;
     private FrameView? frame;
     private (Reminder Value, long Until)? reminder;
+    private (EnemyBoard Value, long At)? board;
     private readonly Dictionary<long, (FrameMeta Meta, long At)> history = new();
     private readonly Queue<long> historyOrder = new();
     private long sequence, frames, bytes;
@@ -148,6 +178,8 @@ public sealed class CoachMailbox
     private string? videoOwner;
     public Func<VideoPixels, byte[]>? VideoJpegEncoder { get; set; }
     public Func<DebugRecorder?>? DebugSink { get; set; }
+    /// <summary>Icons of the enemy panel by name (PNG), from files on this machine; null when there is none.</summary>
+    public Func<string, byte[]?>? Icons { get; set; }
     public CoachMailbox(Func<long>? clock = null) { now = clock ?? (() => Environment.TickCount64); }
     public SessionHello Begin()
     {
@@ -163,7 +195,7 @@ public sealed class CoachMailbox
         if (session == null || id != session) throw new InvalidOperationException("Session expired");
     }
     public void End(string id) { lock (gate) { Check(id); Clear(); } }
-    public void Clear() { lock (gate) { session = null; frame = null; reminder = null; ticket = null; sequence = 0; history.Clear(); historyOrder.Clear(); videoLeases.Clear(); videoOwner = null; } }
+    public void Clear() { lock (gate) { session = null; frame = null; reminder = null; board = null; ticket = null; sequence = 0; history.Clear(); historyOrder.Clear(); videoLeases.Clear(); videoOwner = null; } }
     public Ticket Issue(string id)
     {
         lock (gate) { Check(id); ticket = (Guid.NewGuid().ToString("N"), now()); return new(id, ticket.Value.Id); }
@@ -298,6 +330,29 @@ public sealed class CoachMailbox
         }
     }
     public void ClearReminder() { lock (gate) reminder = null; }
+    /// <summary>Replaces the enemy panel on the game machine; null hides it. Unless renewed it expires after <see cref="Wire.BoardLifetimeMs"/>.</summary>
+    public void SetEnemies(EnemyBoard? value)
+    {
+        if (value != null && !Wire.ValidBoard(value)) throw new ArgumentException("Invalid enemy board");
+        lock (gate) board = value == null ? null : (value, now());
+    }
+    public EnemyBoard? Enemies(string id)
+    {
+        lock (gate)
+        {
+            Check(id);
+            if (frame == null || now() - frame.ReceivedAt > Wire.PresenceLifetimeMs ||
+                board is not { } b || now() - b.At > Wire.BoardLifetimeMs) return null;
+            double held = (now() - b.At) / 1000.0;
+            return new(b.Value.Heroes.Select(h => h with { Age = h.Age + held }).ToArray());
+        }
+    }
+    public byte[]? Icon(string id, string key)
+    {
+        lock (gate) Check(id);
+        if (!Wire.ValidIconKey(key)) throw new ArgumentException("Invalid icon name");
+        return Icons?.Invoke(key) is { } data && Wire.IsIcon(data) ? data : null;
+    }
     public Reminder? Poll(string id)
     {
         lock (gate)

@@ -123,6 +123,27 @@ await using (var host = await CoachHost.Start(IPAddress.Loopback, 0))
     Check(host.Mailbox.Snapshot().Frames == 1, "real pinned-TLS frame upload");
     host.Mailbox.SetReminder(link.SessionId!, 1, "manual-link-test", "回传字幕", new(.2, .7));
     Check((await link.Poll(default))?.Message == "回传字幕", "real encrypted caption/marker roundtrip");
+    // Plus alerts ride the subtitle-only kind that game clients since v0.2 accept.
+    host.Mailbox.SetReminder(link.SessionId!, 1, "local-vision-observation", "剃刀 离开视野 · 最后在中路", null, displayMs: 3000);
+    Check((await link.Poll(default)) is { Kind: "local-vision-observation", Marker: null, ShowSubtitle: true, Message: "剃刀 离开视野 · 最后在中路" },
+        "a Plus alert reaches the game client as a subtitle without a map mark");
+    // The enemy panel and its icons have their own routes, polled about once a second.
+    Check(await link.Enemies(default) == null, "no enemy panel until the coach publishes one");
+    host.Mailbox.SetEnemies(new([new("npc_dota_hero_razor", 12, ["item_blink", null, null, null, null, null], "item_pogo_stick", 3)]));
+    Check(await link.Enemies(default) is { Heroes: [{ Hero: "npc_dota_hero_razor", Level: 12, Items: ["item_blink", null, null, null, null, null],
+        Neutral: "item_pogo_stick" }] }, "the enemy panel reaches the game client over pinned TLS");
+    byte[] Png(int width, int height) {
+        var png = new byte[64];
+        new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13 }.CopyTo(png, 0);
+        "IHDR"u8.CopyTo(png.AsSpan(12));
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(png.AsSpan(16), width);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(png.AsSpan(20), height);
+        return png;
+    }
+    host.Mailbox.Icons = key => key switch { "item_blink" => Png(88, 64), "item_huge" => Png(4096, 4096), "item_text" => "not an image"u8.ToArray(), _ => null };
+    Check(await link.Icon("item_blink", default) is { Length: 64 } && await link.Icon("item_missing", default) == null &&
+          await link.Icon("item_huge", default) == null && await link.Icon("item_text", default) == null && await link.Icon("../secrets", default) == null,
+        "icons are small PNGs by Dota name only; missing, oversized and non-PNG ones are not served");
     using var badPin = new GameLink(pairing with { Fingerprint = new string('0', 64) });
     await RejectAsync(() => badPin.Connect(default), "TLS certificate mismatch rejected");
     using var badToken = new GameLink(pairing with { Token = new string('0', 64) });
@@ -355,6 +376,27 @@ Reject(() => lifeBox.SetReminder(lifeSession, lifeSequence, "visible-farming-adv
 Reject(() => lifeBox.SetReminder(lifeSession, lifeSequence, "manual-link-test", "route", stop1, null, true, 3000, [stop1]),
     "manual tests cannot impersonate an AI route");
 
+// Enemy panel: validated, aged while it waits, gone unless renewed, and only for a live session.
+EnemyHero Enemy(string hero = "npc_dota_hero_razor", int? level = 12, string?[]? items = null, double? age = 3) =>
+    new(hero, level, items ?? ["item_blink", null, null, null, null, null], null, age);
+Feed();
+lifeBox.SetEnemies(new([Enemy(), new EnemyHero("npc_dota_hero_pudge", null, null, null, null)]));
+lifeClock += 2000; Feed();
+Check(lifeBox.Enemies(lifeSession) is { Heroes: [{ Age: 5 }, { Level: null, Items: null, Age: null }] },
+    "the enemy panel reaches the session with its ages grown by the time it waited");
+lifeClock += Wire.BoardLifetimeMs - 1999; Feed();
+Check(lifeBox.Enemies(lifeSession) == null, "an enemy panel the coach stops renewing disappears");
+lifeBox.SetEnemies(new([Enemy()]));
+Reject(() => lifeBox.Enemies("not-the-session"), "another session cannot read the enemy panel");
+foreach (var (bad, why) in new (EnemyBoard, string)[] {
+    (new(Enumerable.Range(0, 6).Select(i => Enemy("npc_dota_hero_h" + i)).ToArray()), "more than five enemies"),
+    (new([Enemy(), Enemy()]), "the same hero twice"), (new([Enemy(level: 31)]), "a level above 30"),
+    (new([Enemy(items: ["item_blink"])]), "fewer than six item slots"), (new([Enemy(items: ["../x", null, null, null, null, null])]), "a path as an item"),
+    (new([Enemy("item_blink")]), "an item as a hero"), (new([Enemy(age: double.NaN)]), "a non-finite age") })
+    Reject(() => lifeBox.SetEnemies(bad), "enemy panel with " + why + " rejected");
+lifeBox.SetEnemies(null);
+Check(lifeBox.Enemies(lifeSession) == null, "null hides the enemy panel");
+
 // Model route: up to three distinct own-side landmarks, projected by the program.
 string routeEnv = Path.GetTempFileName();
 try {
@@ -499,6 +541,8 @@ await using (var gsiProbe = await GsiReceiver.Start(0)) {
 }
 await SpectatorTests.Run(Check);
 LastHitTests.Run(Check);
+PlusAlertTests.Run(Check);
+OverlaySettingsTests.Run(Check);
 CreepHealthTests.Run(Check);
 Console.WriteLine($"Two-PC protocol + real TLS + GSI + mocked model contracts: {passed} checks passed.");
 

@@ -13,7 +13,7 @@
     <ProjectReference Include="../DotaCoach.TwoPc.Core/DotaCoach.TwoPc.Core.csproj" />
     <Compile Include="../TwoPc.SharedUi/Ui.cs" Link="Ui.cs" />
     <Compile Include="../TwoPc.SharedUi/DebugPanel.cs" Link="DebugPanel.cs" />
-    <Content Include="../../data/dota2-map-reference.json;../../data/luna-live-lessons.json">
+    <Content Include="../../data/dota2-map-reference.json;../../data/luna-live-lessons.json;../../data/dota2-dictionary.json">
       <Link>data/%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

@@ -37,6 +37,7 @@ import os
 import queue
 import re
 import secrets
+import shutil
 import sys
 import threading
 import time
@@ -52,6 +53,9 @@ import wgc  # noqa: E402
 
 GSI_NAME = "gamestate_integration_coach_hero_scan.cfg"
 SECRETS = Path(os.environ.get("LOCALAPPDATA", ".")) / "DotaCoach" / "hero-scan" / "secrets.json"
+# Read by DotaCoach.CoachClient, which shows its enemy levels and items in a panel on the game machine;
+# the panel's icons are copied to icons/ beside it.
+LIVE = Path(os.environ.get("LOCALAPPDATA", ".")) / "DotaCoach" / "hero-scan" / "live.json"
 BAND_TOP = 880  # 1080-scale row where the captured HUD band starts (the name label begins at 912)
 CHANGE = (945, 1075, -300, 500)  # rows, and columns around the centre, compared to detect a new hero
 SWITCH_MAD = 15.0  # hero switches measured 20-44 here; other HUD changes up to ~6
@@ -213,6 +217,22 @@ def leftover(roster: set[str], players: dict[int, str], player: int | None) -> s
     return next(iter(rest)) if len(rest) == 1 else None
 
 
+class ItemSlots:
+    """Enemy inventories for the enemy panel on the game machine: the six main slots and the neutral
+    slot from the latest item read, recipes shown as empty slots. A read with an unknown slot is skipped.
+    Replayed against full-spectator truth, the latest read was right more often than waiting for two
+    reads to agree, which lags behind every purchase."""
+
+    def __init__(self, items: dict):
+        self.recipes = {k for k, v in items.items() if v.get("recipe")} | {"item_recipe"}
+        self.shown: dict[str, tuple] = {}  # hero -> (slot0..slot5, neutral0)
+
+    def read(self, hero: str, slots: dict):
+        current = tuple(slots.get(f"slot{i}") for i in range(6)) + (slots.get("neutral0"),)
+        if "?" not in current:
+            self.shown[hero] = tuple(None if n in self.recipes else n for n in current)
+
+
 def dota_window() -> int:
     user32 = ctypes.windll.user32
     handle = user32.FindWindowW(None, "Dota 2")
@@ -261,6 +281,9 @@ class Scanner:
                                         "truth": args.truth, "every": args.timeline_every, "names": {"heroes": names("heroes"), "items": names("items")}},
                                        ensure_ascii=False, separators=(",", ":")) + "\n")
         self.started = time.perf_counter()
+        self.item_slots = ItemSlots(hud.manifest["items"])  # enemies in Plus team view only
+        self.exported: set[str] = set()  # icons copied next to the live file in this run
+        self.run_id = secrets.token_hex(8)
 
     # ---- controller: capture and selection (main thread) ----
     def plan(self, now: float) -> list[tuple[int, bool]]:
@@ -386,6 +409,7 @@ class Scanner:
             if now - last_record >= self.args.timeline_every:
                 snap = self.snapshot()
                 self.record(snap)
+                self.write_live(snap)
                 last_record = now
                 if now - last_print > 1:
                     self.write_state(snap)
@@ -412,6 +436,7 @@ class Scanner:
             self.canvas[BAND_TOP:] = bgr
             with self.feed.lock:
                 clock, mode, roster = self.feed.clock, self.feed.mode, set(self.feed.teams)
+                own, teams = self.feed.own_team, dict(self.feed.teams)
             out = self.hud.read(self.canvas, roster, full=settled)
             self.read_ms.append((time.perf_counter() - t0) * 1000)
             hero = out.get("hero")
@@ -449,6 +474,11 @@ class Scanner:
                 if items:
                     record["items"] = items
             self.shown = hero
+            # Plus team view only: there the enemies are the heroes outside the friend team, and they are read
+            # only while that team sees them. Full-spectator data never reaches the game machine.
+            if items and mode == "team-view" and own in (2, 3) and teams.get(hero) not in (None, own):
+                with self.lock:
+                    self.item_slots.read(hero, items)
             self.stats["readings"] += 1
             self.stats["itemReadings"] += bool(items)
             entry |= {k: v for k, v in status.items() if k not in ("at", "clock")}
@@ -493,6 +523,50 @@ class Scanner:
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(snap, ensure_ascii=False, indent=1), encoding="utf-8")
         os.replace(tmp, path)
+
+    def enemies(self, snap: dict) -> list[dict]:
+        """The enemy panel on the game machine (Plus team view only), in player order: level and items as
+        last read while the friend team saw the hero, and the age of that reading in seconds. Never-read
+        enemies are listed with nulls."""
+        if snap["mode"] != "team-view" or snap["ownTeam"] not in (2, 3):
+            return []
+        order = {hero: int(player) for player, hero in snap["players"].items()}
+        heroes = sorted((h for h, s in snap["heroes"].items() if s["team"] in (2, 3) and s["team"] != snap["ownTeam"]),
+                        key=lambda h: (order.get(h, 99), h))[:5]
+        with self.lock:
+            shown = dict(self.item_slots.shown)
+        out = []
+        for hero in heroes:
+            status, slots = snap["heroes"][hero]["status"], shown.get(hero)
+            out.append({"hero": hero, "level": status and status["level"], "age": status and status["age"],
+                        "items": slots and list(slots[:6]), "neutral": slots and slots[6]})
+        return out
+
+    def export_icons(self, enemies: list[dict]):
+        """Copies the panel's hero and item icons next to the live file, where the coach client serves them to
+        the game machine. Valve artwork stays on the user's own machines."""
+        folder = self.args.live.parent / "icons"
+        keys = {e["hero"] for e in enemies} | {n for e in enemies for n in (e["items"] or []) + [e["neutral"]] if n}
+        for key in sorted(keys - self.exported):
+            self.exported.add(key)
+            icon = (self.hud.manifest["heroes" if key.startswith("npc_dota_hero_") else "items"].get(key) or {}).get("icon")
+            if icon:
+                folder.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(self.args.assets / icon, folder / f"{key}.png")
+
+    def write_live(self, snap: dict, stopped: bool = False):
+        """Scanner status and the enemy panel for the coach client, replaced atomically."""
+        if not self.args.live:
+            return
+        enemies = [] if stopped else self.enemies(snap)
+        self.export_icons(enemies)
+        live = {"version": 2, "run": self.run_id, "written": round(time.time(), 3), "stopped": stopped, "mode": snap["mode"],
+                "matchId": snap["matchId"], "ownTeam": snap["ownTeam"], "clock": snap["clock"], "selecting": snap["selecting"],
+                "enemies": enemies}
+        self.args.live.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.args.live.with_suffix(".tmp")
+        tmp.write_text(json.dumps(live, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, self.args.live)
 
     def record(self, snap: dict):
         snap = {"type": "snapshot", "t": round(time.perf_counter() - self.started, 2), "cycle": self.cycle_now(), **snap}
@@ -570,6 +644,8 @@ def main():
     ap.add_argument("command", choices=["setup", "scan"])
     ap.add_argument("--install", type=Path, default=INSTALL)
     ap.add_argument("--secrets", type=Path, default=SECRETS)
+    ap.add_argument("--live", type=lambda v: Path(v) if v else None, default=LIVE,
+                    help="status and the enemy panel for the coach client (empty: do not write)")
     ap.add_argument("--select", choices=["keys", "console"], default="keys",
                     help="keys: spectator hotkeys (live spectating); console: -netconport under -insecure (replays)")
     ap.add_argument("--keys", default="1234567890", help="hotkeys of SpectatorCameraFocusPlayer1-10")
@@ -621,6 +697,7 @@ def main():
         snap = scanner.snapshot()
         scanner.record(snap)
         scanner.write_state(snap)
+        scanner.write_live(snap, stopped=True)
         scanner.capture.close()
         feed.shutdown()
         summary = json.dumps(scanner.summary(), ensure_ascii=False)

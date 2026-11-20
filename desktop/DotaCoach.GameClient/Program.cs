@@ -57,6 +57,7 @@ internal sealed class GameWindowUi : Window
     private readonly Canvas marks = new() { IsHitTestVisible = false };
     private readonly Grid preview = new() { Background = Brushes.Black, MinHeight = 240 };
     private readonly AdviceOverlay overlay;
+    private readonly OverlayPanel? overlayPanel;
     private readonly DebugPanel debug;
     private readonly DispatcherTimer reminderTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private CancellationTokenSource? active;
@@ -80,9 +81,12 @@ internal sealed class GameWindowUi : Window
     public GameWindowUi() : this(null) { }
     public GameWindowUi(E2ERun? run) : this(run, null) { }
     public GameWindowUi(E2ERun? run, string? debugRoot) : this(run, debugRoot, null) { }
-    public GameWindowUi(E2ERun? run, string? debugRoot, string? videoSettingsFile)
+    public GameWindowUi(E2ERun? run, string? debugRoot, string? videoSettingsFile) : this(run, debugRoot, videoSettingsFile, null) { }
+    public GameWindowUi(E2ERun? run, string? debugRoot, string? videoSettingsFile, string? overlaySettingsFile)
     {
         e2e = run; debug = new DebugPanel("game", debugRoot); overlay = new AdviceOverlay(run, () => debug.Recorder);
+        // E2E evidence keeps the default subtitle style, whatever this machine's player chose.
+        if (e2e == null) overlayPanel = new OverlayPanel(overlaySettingsFile ?? GameOverlaySettings.DefaultPath, overlay);
         videoSettingsPath = videoSettingsFile ?? GameVideoSettings.DefaultPath;
         videoSettings = GameVideoSettings.Load(videoSettingsPath);
         Title = "Dota Coach · 游戏端 v0.4.2";
@@ -116,6 +120,7 @@ internal sealed class GameWindowUi : Window
             bottom.Children.Add(Ui.Section("小兵血量：本机实时显示", panel));
             Loaded += async (_, _) => { if (CreepHpLog != null) await ToggleCreepHp(); };
         }
+        if (overlayPanel != null) bottom.Children.Add(Ui.Section("游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", overlayPanel));
         bottom.Children.Add(Ui.Section("设置：画面来源、视频、Dota 目录", BuildSettings()));
         bottom.Children.Add(Ui.Section("Debug", debug.View));
         Grid.SetRow(bottom, 2); root.Children.Add(bottom); Content = root;
@@ -149,6 +154,7 @@ internal sealed class GameWindowUi : Window
             e.Cancel = true;
             if (closing) return;
             closing = true;
+            overlayPanel?.Flush();
             if (creepHp != null) { await creepHp.DisposeAsync(); creepHp = null; }
             await Stop();
             if (gsi != null) { await gsi.DisposeAsync(); gsi = null; }
@@ -380,7 +386,7 @@ internal sealed class GameWindowUi : Window
                 var captureTask = stream.StartCapture(open, diagnostic,
                     () => Interlocked.Increment(ref localSequence), () => gsi?.Latest() ?? (null, null), streamStop.Token);
                 var sendTask = Task.Run(() => stream.SendLoop(link, gpuEncoder, bitrate, streamStop.Token));
-                long renewAt = Environment.TickCount64 + 750, previewAt = 0, rateAt = Environment.TickCount64, rateSent = 0, rateBytes = 0;
+                long renewAt = Environment.TickCount64 + 750, previewAt = 0, rateAt = Environment.TickCount64, rateSent = 0, rateBytes = 0, enemiesAt = 0;
                 double actualFps = 0, actualMbps = 0;
                 bool background = false;
                 try {
@@ -430,12 +436,16 @@ internal sealed class GameWindowUi : Window
                             }
                         }
                         ApplyReminder(await link.Poll(cancellation), diagnostic);
+                        if (Environment.TickCount64 >= enemiesAt) {
+                            enemiesAt = Environment.TickCount64 + 1000;
+                            await UpdateEnemies(link, cancellation);
+                        }
                         await Task.Delay(100, cancellation);
                     }
                 } finally {
                     streamStop.Cancel(); link.AbortVideo();
                     try { await Task.WhenAll(captureTask, sendTask); } catch when (streamStop.IsCancellationRequested) { }
-                    ClearReminder(); image.Source = null; transportConnected = false; lastCaptureAt = null;
+                    ClearReminder(); overlay.Enemies(null); image.Source = null; transportConnected = false; lastCaptureAt = null;
                     using var timeout = new CancellationTokenSource(1500);
                     try { await link.End(timeout.Token); } catch { }
                     if (stream.HardwareFailed) gpuEncoder = false; // Later sessions use the CPU limits, not a retry loop.
@@ -451,6 +461,15 @@ internal sealed class GameWindowUi : Window
             try { await link.End(timeout.Token); } catch { }
         }
     }
+    /// <summary>The coach's enemy panel and any icons it needs that this client has not fetched yet (a few per second).</summary>
+    private async Task UpdateEnemies(GameLink link, CancellationToken cancellation)
+    {
+        var board = await link.Enemies(cancellation);
+        overlay.Enemies(board);
+        if (board == null) return;
+        foreach (string key in overlay.Icons.Missing(board, Environment.TickCount64).Take(8))
+            overlay.Icons.Add(key, await link.Icon(key, cancellation), Environment.TickCount64);
+    }
     private void ApplyReminder(Reminder? reminder, bool diagnostic)
     {
         if (reminder == null) { ClearReminder(); return; }
@@ -459,7 +478,8 @@ internal sealed class GameWindowUi : Window
         shown = reminder;
         caption.Text = !reminder.ShowSubtitle ? "地图路线提示（字幕已关闭）" :
             AdviceOverlay.Label(reminder) + "： " + reminder.Message +
-            (reminder.NextSteps is { Length: > 0 } steps ? "\n下一步：" + string.Join(" → ", steps) : "");
+            (reminder.NextSteps is { Length: > 0 } steps ? "\n下一步：" + string.Join(" → ", steps) : "") +
+            (overlay.Settings.Shows(reminder.Kind) ? "" : "\n（按本机“游戏内字幕”设置，这类字幕不在游戏里显示）");
         if (lastReceivedId != reminder.Id) {
             debug.Recorder?.Reminder("reminder-received", reminder); lastReceivedId = reminder.Id;
         }

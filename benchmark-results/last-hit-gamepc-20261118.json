@@ -1,0 +1,1265 @@
+{
+  "dateLocal": "2026-11-18",
+  "timezone": "Asia/Hong_Kong",
+  "commit": "f5aae42b6240603a17874c2b137decefe9543693",
+  "hardware": {
+    "cpu": "AMD Ryzen 7 9700X",
+    "cores": 8,
+    "logicalProcessors": 16,
+    "gpu": "NVIDIA GeForce RTX 3090 Ti",
+    "ramGiBAvailableToOS": 31.1,
+    "windowsBuild": "28000",
+    "dotaBuild": 6976
+  },
+  "conditions": {
+    "scene": "Private official hero_demo_main, level-one naked Luna. A normal allied melee creep alternated between full and 20 HP; no attacks or player inputs. Only the pulse control had additional 40 -> 25 HP edges.",
+    "build": "Release game client built from the pinned commit in an isolated directory; test instrumentation observes actual LastHitPractice, WGC source time, LaneDrill and WPF Surface.OnRender. The GSI and foreground gates were not overridden. Main client UI minimized in every block.",
+    "method": "At each resolution: stock FPS cap 182.75676, then unlimited; ABBA = off/on/on/off per ceiling. Warm-up after mode switches. Every timed block about 18 s. Authenticated GSI remained on in the off baseline.",
+    "gameFPS": "Delta of Dota cl_printfps total frame counter divided by collection wall time between START and END; cl_showfps=2, cl_resetfps before each block as in the installed perftest.cfg. Console polling at 75 ms limits precision, not a display FPS or 1% low measurement.",
+    "workMs": "Wall time from just before WGC Grab until the tracking decision; includes GPU readback, pixel scan and tracking. sourceToMarkedDrawMs starts at the WGC source frame timestamp, ends at WPF OnRender of a positive mark, not monitor scanout or first eligibility.",
+    "cpu": "Coach CPU seconds / wall seconds / 16; percentage of whole machine. WS is the median resident process working set, not private allocation nor peak.",
+    "latencyPulse": "First captured low-health picture to first WPF draw of a matching deny mark (separate 1080p capped run); not game-engine-event or input-to-photon timing.",
+    "rawLocal": ".tmp/last-hit-gamepc-20261118-1935/{live1080,live4k,edge1080}"
+  },
+  "runs": [
+    {
+      "run": "live1080",
+      "blocks": [
+        {
+          "tag": "off_capped_1",
+          "startQ": 73112.219888,
+          "endQ": 73130.364055,
+          "sec": 18.144,
+          "frames": 3308,
+          "gameFPS": 182.318,
+          "sampleSec": 17.067797199997585,
+          "cpuSec": 0.3125,
+          "coachCpuPct16": 0.114,
+          "gameCpuPct16": 9.595,
+          "medianWsMiB": 83.035,
+          "maxWsMiB": 139.492,
+          "validSamples": 19,
+          "n": 0,
+          "fps": 0.0,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": null,
+          "analysisSize": null,
+          "grabMs": null,
+          "scanTrackMs": null,
+          "workMs": null,
+          "sourceToDecisionMs": null,
+          "frameGapMs": null,
+          "sourceToMarkedDrawMs": null
+        },
+        {
+          "tag": "on_capped_2",
+          "startQ": 73134.395513,
+          "endQ": 73152.545188,
+          "sec": 18.15,
+          "frames": 3306,
+          "gameFPS": 182.152,
+          "sampleSec": 18.00830629999109,
+          "cpuSec": 4.125,
+          "coachCpuPct16": 1.432,
+          "gameCpuPct16": 9.571,
+          "medianWsMiB": 138.201,
+          "maxWsMiB": 151.234,
+          "validSamples": 20,
+          "n": 380,
+          "fps": 20.937,
+          "anyBars": 380,
+          "markedFrames": 226,
+          "denyFrames": 226,
+          "draws": 163,
+          "sourceSize": [
+            1920,
+            1080
+          ],
+          "analysisSize": [
+            1920,
+            1080
+          ],
+          "grabMs": {
+            "n": 380,
+            "p50": 2.969,
+            "p95": 4.978,
+            "p99": 5.794,
+            "max": 6.574
+          },
+          "scanTrackMs": {
+            "n": 380,
+            "p50": 8.788,
+            "p95": 17.997,
+            "p99": 18.751,
+            "max": 21.791
+          },
+          "workMs": {
+            "n": 380,
+            "p50": 11.971,
+            "p95": 20.854,
+            "p99": 22.565,
+            "max": 24.596
+          },
+          "sourceToDecisionMs": {
+            "n": 380,
+            "p50": 38.186,
+            "p95": 60.937,
+            "p99": 63.096,
+            "max": 63.871
+          },
+          "frameGapMs": {
+            "n": 379,
+            "p50": 46.657,
+            "p95": 62.477,
+            "p99": 62.918,
+            "max": 63.85
+          },
+          "sourceToMarkedDrawMs": {
+            "n": 163,
+            "p50": 55.222,
+            "p95": 86.157,
+            "p99": 91.287,
+            "max": 101.542
+          }
+        },
+        {
+          "tag": "on_capped_3",
+          "startQ": 73156.57306,
+          "endQ": 73174.725634,
+          "sec": 18.153,
+          "frames": 3308,
+          "gameFPS": 182.233,
+          "sampleSec": 17.04567190000671,
+          "cpuSec": 3.484375,
+          "coachCpuPct16": 1.278,
+          "gameCpuPct16": 9.963,
+          "medianWsMiB": 141.395,
+          "maxWsMiB": 146.652,
+          "validSamples": 19,
+          "n": 380,
+          "fps": 20.934,
+          "anyBars": 380,
+          "markedFrames": 240,
+          "denyFrames": 240,
+          "draws": 195,
+          "sourceSize": [
+            1920,
+            1080
+          ],
+          "analysisSize": [
+            1920,
+            1080
+          ],
+          "grabMs": {
+            "n": 380,
+            "p50": 2.975,
+            "p95": 5.066,
+            "p99": 5.802,
+            "max": 7.843
+          },
+          "scanTrackMs": {
+            "n": 380,
+            "p50": 9.119,
+            "p95": 18.059,
+            "p99": 19.136,
+            "max": 23.373
+          },
+          "workMs": {
+            "n": 380,
+            "p50": 12.391,
+            "p95": 20.791,
+            "p99": 21.756,
+            "max": 26.171
+          },
+          "sourceToDecisionMs": {
+            "n": 380,
+            "p50": 37.261,
+            "p95": 60.529,
+            "p99": 62.683,
+            "max": 63.419
+          },
+          "frameGapMs": {
+            "n": 379,
+            "p50": 46.591,
+            "p95": 62.59,
+            "p99": 63.345,
+            "max": 63.907
+          },
+          "sourceToMarkedDrawMs": {
+            "n": 195,
+            "p50": 58.02,
+            "p95": 87.549,
+            "p99": 89.261,
+            "max": 89.637
+          }
+        },
+        {
+          "tag": "off_capped_4",
+          "startQ": 73178.751258,
+          "endQ": 73196.897443,
+          "sec": 18.146,
+          "frames": 3308,
+          "gameFPS": 182.297,
+          "sampleSec": 17.048757999989903,
+          "cpuSec": 0.328125,
+          "coachCpuPct16": 0.12,
+          "gameCpuPct16": 9.251,
+          "medianWsMiB": 83.512,
+          "maxWsMiB": 90.625,
+          "validSamples": 19,
+          "n": 0,
+          "fps": 0.0,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": null,
+          "analysisSize": null,
+          "grabMs": null,
+          "scanTrackMs": null,
+          "workMs": null,
+          "sourceToDecisionMs": null,
+          "frameGapMs": null,
+          "sourceToMarkedDrawMs": null
+        },
+        {
+          "tag": "off_uncapped_1",
+          "startQ": 73200.934052,
+          "endQ": 73219.08604,
+          "sec": 18.152,
+          "frames": 10093,
+          "gameFPS": 556.027,
+          "sampleSec": 17.032872899988433,
+          "cpuSec": 0.328125,
+          "coachCpuPct16": 0.12,
+          "gameCpuPct16": 20.262,
+          "medianWsMiB": 98.184,
+          "maxWsMiB": 101.094,
+          "validSamples": 19,
+          "n": 0,
+          "fps": 0.0,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": null,
+          "analysisSize": null,
+          "grabMs": null,
+          "scanTrackMs": null,
+          "workMs": null,
+          "sourceToDecisionMs": null,
+          "frameGapMs": null,
+          "sourceToMarkedDrawMs": null
+        },
+        {
+          "tag": "on_uncapped_2",
+          "startQ": 73223.120091,
+          "endQ": 73241.209079,
+          "sec": 18.089,
+          "frames": 9353,
+          "gameFPS": 517.055,
+          "sampleSec": 17.068484899995383,
+          "cpuSec": 3.9375,
+          "coachCpuPct16": 1.442,
+          "gameCpuPct16": 20.5,
+          "medianWsMiB": 141.586,
+          "maxWsMiB": 158.91,
+          "validSamples": 19,
+          "n": 374,
+          "fps": 20.676,
+          "anyBars": 374,
+          "markedFrames": 208,
+          "denyFrames": 208,
+          "draws": 162,
+          "sourceSize": [
+            1920,
+            1080
+          ],
+          "analysisSize": [
+            1920,
+            1080
+          ],
+          "grabMs": {
+            "n": 374,
+            "p50": 12.865,
+            "p95": 30.555,
+            "p99": 37.561,
+            "max": 44.099
+          },
+          "scanTrackMs": {
+            "n": 374,
+            "p50": 9.276,
+            "p95": 22.648,
+            "p99": 23.904,
+            "max": 24.561
+          },
+          "workMs": {
+            "n": 374,
+            "p50": 22.677,
+            "p95": 50.961,
+            "p99": 52.699,
+            "max": 67.598
+          },
+          "sourceToDecisionMs": {
+            "n": 374,
+            "p50": 46.628,
+            "p95": 76.266,
+            "p99": 85.067,
+            "max": 92.172
+          },
+          "frameGapMs": {
+            "n": 373,
+            "p50": 46.775,
+            "p95": 62.581,
+            "p99": 63.09,
+            "max": 77.669
+          },
+          "sourceToMarkedDrawMs": {
+            "n": 162,
+            "p50": 68.586,
+            "p95": 102.579,
+            "p99": 118.131,
+            "max": 126.05
+          }
+        },
+        {
+          "tag": "on_uncapped_3",
+          "startQ": 73245.245607,
+          "endQ": 73263.426915,
+          "sec": 18.181,
+          "frames": 9411,
+          "gameFPS": 517.62,
+          "sampleSec": 17.976557500005583,
+          "cpuSec": 4.15625,
+          "coachCpuPct16": 1.445,
+          "gameCpuPct16": 19.915,
+          "medianWsMiB": 142.0,
+          "maxWsMiB": 147.164,
+          "validSamples": 20,
+          "n": 384,
+          "fps": 21.121,
+          "anyBars": 384,
+          "markedFrames": 254,
+          "denyFrames": 254,
+          "draws": 206,
+          "sourceSize": [
+            1920,
+            1080
+          ],
+          "analysisSize": [
+            1920,
+            1080
+          ],
+          "grabMs": {
+            "n": 384,
+            "p50": 14.872,
+            "p95": 30.776,
+            "p99": 38.965,
+            "max": 40.675
+          },
+          "scanTrackMs": {
+            "n": 384,
+            "p50": 8.873,
+            "p95": 21.905,
+            "p99": 23.72,
+            "max": 24.289
+          },
+          "workMs": {
+            "n": 384,
+            "p50": 23.138,
+            "p95": 50.666,
+            "p99": 51.98,
+            "max": 53.494
+          },
+          "sourceToDecisionMs": {
+            "n": 384,
+            "p50": 46.085,
+            "p95": 73.602,
+            "p99": 79.528,
+            "max": 89.145
+          },
+          "frameGapMs": {
+            "n": 383,
+            "p50": 46.558,
+            "p95": 62.165,
+            "p99": 62.889,
+            "max": 63.464
+          },
+          "sourceToMarkedDrawMs": {
+            "n": 206,
+            "p50": 70.356,
+            "p95": 97.295,
+            "p99": 105.292,
+            "max": 106.233
+          }
+        },
+        {
+          "tag": "off_uncapped_4",
+          "startQ": 73267.457,
+          "endQ": 73285.611976,
+          "sec": 18.155,
+          "frames": 9979,
+          "gameFPS": 549.656,
+          "sampleSec": 17.037406100003864,
+          "cpuSec": 0.4375,
+          "coachCpuPct16": 0.16,
+          "gameCpuPct16": 19.483,
+          "medianWsMiB": 87.953,
+          "maxWsMiB": 91.801,
+          "validSamples": 19,
+          "n": 0,
+          "fps": 0.0,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": null,
+          "analysisSize": null,
+          "grabMs": null,
+          "scanTrackMs": null,
+          "workMs": null,
+          "sourceToDecisionMs": null,
+          "frameGapMs": null,
+          "sourceToMarkedDrawMs": null
+        }
+      ],
+      "byProfile": {
+        "capped": {
+          "off": {
+            "gameFPS": 182.307,
+            "coachCpuPct16": 0.117,
+            "seconds": 36.29,
+            "wsMedianMiB": 83.484,
+            "n": 0,
+            "fps": 0.0,
+            "anyBars": 0,
+            "markedFrames": 0,
+            "denyFrames": 0,
+            "draws": 0,
+            "sourceSize": null,
+            "analysisSize": null,
+            "grabMs": null,
+            "scanTrackMs": null,
+            "workMs": null,
+            "sourceToDecisionMs": null,
+            "frameGapMs": null,
+            "sourceToMarkedDrawMs": null
+          },
+          "on": {
+            "gameFPS": 182.193,
+            "coachCpuPct16": 1.357,
+            "seconds": 36.302,
+            "wsMedianMiB": 139.387,
+            "n": 760,
+            "fps": 20.935,
+            "anyBars": 760,
+            "markedFrames": 466,
+            "denyFrames": 466,
+            "draws": 358,
+            "sourceSize": [
+              1920,
+              1080
+            ],
+            "analysisSize": [
+              1920,
+              1080
+            ],
+            "grabMs": {
+              "n": 760,
+              "p50": 2.975,
+              "p95": 5.032,
+              "p99": 5.8,
+              "max": 7.843
+            },
+            "scanTrackMs": {
+              "n": 760,
+              "p50": 9.119,
+              "p95": 18.024,
+              "p99": 18.913,
+              "max": 23.373
+            },
+            "workMs": {
+              "n": 760,
+              "p50": 12.391,
+              "p95": 20.828,
+              "p99": 21.756,
+              "max": 26.171
+            },
+            "sourceToDecisionMs": {
+              "n": 760,
+              "p50": 38.186,
+              "p95": 60.756,
+              "p99": 62.804,
+              "max": 63.871
+            },
+            "frameGapMs": {
+              "n": 758,
+              "p50": 46.636,
+              "p95": 62.53,
+              "p99": 63.04,
+              "max": 63.907
+            },
+            "sourceToMarkedDrawMs": {
+              "n": 358,
+              "p50": 56.856,
+              "p95": 87.517,
+              "p99": 90.406,
+              "max": 101.542
+            }
+          },
+          "deltaFpsPct": -0.063
+        },
+        "uncapped": {
+          "off": {
+            "gameFPS": 552.842,
+            "coachCpuPct16": 0.14,
+            "seconds": 36.307,
+            "wsMedianMiB": 93.391,
+            "n": 0,
+            "fps": 0.0,
+            "anyBars": 0,
+            "markedFrames": 0,
+            "denyFrames": 0,
+            "draws": 0,
+            "sourceSize": null,
+            "analysisSize": null,
+            "grabMs": null,
+            "scanTrackMs": null,
+            "workMs": null,
+            "sourceToDecisionMs": null,
+            "frameGapMs": null,
+            "sourceToMarkedDrawMs": null
+          },
+          "on": {
+            "gameFPS": 517.338,
+            "coachCpuPct16": 1.443,
+            "seconds": 36.27,
+            "wsMedianMiB": 141.625,
+            "n": 758,
+            "fps": 20.899,
+            "anyBars": 758,
+            "markedFrames": 462,
+            "denyFrames": 462,
+            "draws": 368,
+            "sourceSize": [
+              1920,
+              1080
+            ],
+            "analysisSize": [
+              1920,
+              1080
+            ],
+            "grabMs": {
+              "n": 758,
+              "p50": 13.558,
+              "p95": 30.776,
+              "p99": 37.561,
+              "max": 44.099
+            },
+            "scanTrackMs": {
+              "n": 758,
+              "p50": 9.12,
+              "p95": 22.203,
+              "p99": 23.878,
+              "max": 24.561
+            },
+            "workMs": {
+              "n": 758,
+              "p50": 23.101,
+              "p95": 50.89,
+              "p99": 52.609,
+              "max": 67.598
+            },
+            "sourceToDecisionMs": {
+              "n": 758,
+              "p50": 46.345,
+              "p95": 74.78,
+              "p99": 82.832,
+              "max": 92.172
+            },
+            "frameGapMs": {
+              "n": 756,
+              "p50": 46.655,
+              "p95": 62.463,
+              "p99": 62.945,
+              "max": 77.669
+            },
+            "sourceToMarkedDrawMs": {
+              "n": 368,
+              "p50": 69.832,
+              "p95": 99.66,
+              "p99": 113.847,
+              "max": 126.05
+            }
+          },
+          "deltaFpsPct": -6.422
+        }
+      },
+      "lowHealthToFirstDrawMs": null
+    },
+    {
+      "run": "live4k",
+      "blocks": [
+        {
+          "tag": "off_capped_1",
+          "startQ": 73352.58398,
+          "endQ": 73370.718158,
+          "sec": 18.134,
+          "frames": 3303,
+          "gameFPS": 182.142,
+          "sampleSec": 18.017198800007463,
+          "cpuSec": 0.515625,
+          "coachCpuPct16": 0.179,
+          "gameCpuPct16": 9.567,
+          "medianWsMiB": 105.76,
+          "maxWsMiB": 111.574,
+          "validSamples": 20,
+          "n": 0,
+          "fps": 0.0,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": null,
+          "analysisSize": null,
+          "grabMs": null,
+          "scanTrackMs": null,
+          "workMs": null,
+          "sourceToDecisionMs": null,
+          "frameGapMs": null,
+          "sourceToMarkedDrawMs": null
+        },
+        {
+          "tag": "on_capped_2",
+          "startQ": 73374.74564,
+          "endQ": 73392.883495,
+          "sec": 18.138,
+          "frames": 3308,
+          "gameFPS": 182.381,
+          "sampleSec": 17.054855400012457,
+          "cpuSec": 2.84375,
+          "coachCpuPct16": 1.042,
+          "gameCpuPct16": 9.94,
+          "medianWsMiB": 130.82,
+          "maxWsMiB": 139.098,
+          "validSamples": 19,
+          "n": 379,
+          "fps": 20.896,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": [
+            3840,
+            2160
+          ],
+          "analysisSize": [
+            1920,
+            1080
+          ],
+          "grabMs": {
+            "n": 379,
+            "p50": 3.814,
+            "p95": 6.992,
+            "p99": 9.07,
+            "max": 10.052
+          },
+          "scanTrackMs": {
+            "n": 379,
+            "p50": 8.481,
+            "p95": 17.525,
+            "p99": 18.889,
+            "max": 20.789
+          },
+          "workMs": {
+            "n": 379,
+            "p50": 15.537,
+            "p95": 20.806,
+            "p99": 22.17,
+            "max": 23.612
+          },
+          "sourceToDecisionMs": {
+            "n": 379,
+            "p50": 36.578,
+            "p95": 59.93,
+            "p99": 62.036,
+            "max": 65.255
+          },
+          "frameGapMs": {
+            "n": 378,
+            "p50": 46.619,
+            "p95": 62.607,
+            "p99": 63.081,
+            "max": 63.324
+          },
+          "sourceToMarkedDrawMs": null
+        },
+        {
+          "tag": "on_capped_3",
+          "startQ": 73396.90915,
+          "endQ": 73414.97219,
+          "sec": 18.063,
+          "frames": 3292,
+          "gameFPS": 182.251,
+          "sampleSec": 17.04858490001061,
+          "cpuSec": 2.9375,
+          "coachCpuPct16": 1.077,
+          "gameCpuPct16": 9.618,
+          "medianWsMiB": 120.137,
+          "maxWsMiB": 128.004,
+          "validSamples": 19,
+          "n": 385,
+          "fps": 21.314,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": [
+            3840,
+            2160
+          ],
+          "analysisSize": [
+            1920,
+            1080
+          ],
+          "grabMs": {
+            "n": 385,
+            "p50": 3.743,
+            "p95": 6.811,
+            "p99": 8.927,
+            "max": 9.106
+          },
+          "scanTrackMs": {
+            "n": 385,
+            "p50": 10.013,
+            "p95": 17.612,
+            "p99": 18.878,
+            "max": 20.003
+          },
+          "workMs": {
+            "n": 385,
+            "p50": 18.171,
+            "p95": 20.953,
+            "p99": 22.086,
+            "max": 23.043
+          },
+          "sourceToDecisionMs": {
+            "n": 385,
+            "p50": 38.645,
+            "p95": 59.571,
+            "p99": 62.143,
+            "max": 63.055
+          },
+          "frameGapMs": {
+            "n": 384,
+            "p50": 46.631,
+            "p95": 62.445,
+            "p99": 63.044,
+            "max": 63.301
+          },
+          "sourceToMarkedDrawMs": null
+        },
+        {
+          "tag": "off_capped_4",
+          "startQ": 73419.072876,
+          "endQ": 73437.208613,
+          "sec": 18.136,
+          "frames": 3306,
+          "gameFPS": 182.292,
+          "sampleSec": 17.06447450000269,
+          "cpuSec": 0.203125,
+          "coachCpuPct16": 0.074,
+          "gameCpuPct16": 9.002,
+          "medianWsMiB": 108.414,
+          "maxWsMiB": 118.859,
+          "validSamples": 19,
+          "n": 0,
+          "fps": 0.0,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": null,
+          "analysisSize": null,
+          "grabMs": null,
+          "scanTrackMs": null,
+          "workMs": null,
+          "sourceToDecisionMs": null,
+          "frameGapMs": null,
+          "sourceToMarkedDrawMs": null
+        },
+        {
+          "tag": "off_uncapped_1",
+          "startQ": 73441.238836,
+          "endQ": 73459.380963,
+          "sec": 18.142,
+          "frames": 6006,
+          "gameFPS": 331.053,
+          "sampleSec": 17.03326300000481,
+          "cpuSec": 0.4375,
+          "coachCpuPct16": 0.161,
+          "gameCpuPct16": 13.869,
+          "medianWsMiB": 94.305,
+          "maxWsMiB": 111.73,
+          "validSamples": 19,
+          "n": 0,
+          "fps": 0.0,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": null,
+          "analysisSize": null,
+          "grabMs": null,
+          "scanTrackMs": null,
+          "workMs": null,
+          "sourceToDecisionMs": null,
+          "frameGapMs": null,
+          "sourceToMarkedDrawMs": null
+        },
+        {
+          "tag": "on_uncapped_2",
+          "startQ": 73463.405609,
+          "endQ": 73481.542621,
+          "sec": 18.137,
+          "frames": 5923,
+          "gameFPS": 326.57,
+          "sampleSec": 18.003276799994637,
+          "cpuSec": 2.203125,
+          "coachCpuPct16": 0.765,
+          "gameCpuPct16": 14.087,
+          "medianWsMiB": 118.141,
+          "maxWsMiB": 134.797,
+          "validSamples": 20,
+          "n": 213,
+          "fps": 11.744,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": [
+            3840,
+            2160
+          ],
+          "analysisSize": [
+            1920,
+            1080
+          ],
+          "grabMs": {
+            "n": 213,
+            "p50": 64.748,
+            "p95": 79.544,
+            "p99": 80.465,
+            "max": 85.6
+          },
+          "scanTrackMs": {
+            "n": 213,
+            "p50": 8.096,
+            "p95": 22.826,
+            "p99": 23.242,
+            "max": 23.802
+          },
+          "workMs": {
+            "n": 213,
+            "p50": 71.786,
+            "p95": 98.544,
+            "p99": 99.783,
+            "max": 103.346
+          },
+          "sourceToDecisionMs": {
+            "n": 213,
+            "p50": 86.774,
+            "p95": 101.722,
+            "p99": 105.79,
+            "max": 142.308
+          },
+          "frameGapMs": {
+            "n": 212,
+            "p50": 78.321,
+            "p95": 109.549,
+            "p99": 110.724,
+            "max": 111.441
+          },
+          "sourceToMarkedDrawMs": null
+        },
+        {
+          "tag": "on_uncapped_3",
+          "startQ": 73485.568911,
+          "endQ": 73503.705853,
+          "sec": 18.137,
+          "frames": 5930,
+          "gameFPS": 326.957,
+          "sampleSec": 17.054321699994034,
+          "cpuSec": 1.734375,
+          "coachCpuPct16": 0.636,
+          "gameCpuPct16": 13.926,
+          "medianWsMiB": 118.121,
+          "maxWsMiB": 120.234,
+          "validSamples": 19,
+          "n": 211,
+          "fps": 11.634,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": [
+            3840,
+            2160
+          ],
+          "analysisSize": [
+            1920,
+            1080
+          ],
+          "grabMs": {
+            "n": 211,
+            "p50": 65.491,
+            "p95": 79.378,
+            "p99": 81.396,
+            "max": 86.958
+          },
+          "scanTrackMs": {
+            "n": 211,
+            "p50": 8.293,
+            "p95": 22.619,
+            "p99": 23.845,
+            "max": 24.584
+          },
+          "workMs": {
+            "n": 211,
+            "p50": 73.049,
+            "p95": 98.659,
+            "p99": 99.386,
+            "max": 99.925
+          },
+          "sourceToDecisionMs": {
+            "n": 211,
+            "p50": 86.432,
+            "p95": 101.726,
+            "p99": 104.492,
+            "max": 111.046
+          },
+          "frameGapMs": {
+            "n": 210,
+            "p50": 78.679,
+            "p95": 109.533,
+            "p99": 110.353,
+            "max": 110.692
+          },
+          "sourceToMarkedDrawMs": null
+        },
+        {
+          "tag": "off_uncapped_4",
+          "startQ": 73507.732904,
+          "endQ": 73525.875969,
+          "sec": 18.143,
+          "frames": 6020,
+          "gameFPS": 331.807,
+          "sampleSec": 17.064059199998155,
+          "cpuSec": 0.234375,
+          "coachCpuPct16": 0.086,
+          "gameCpuPct16": 13.048,
+          "medianWsMiB": 110.117,
+          "maxWsMiB": 119.637,
+          "validSamples": 19,
+          "n": 0,
+          "fps": 0.0,
+          "anyBars": 0,
+          "markedFrames": 0,
+          "denyFrames": 0,
+          "draws": 0,
+          "sourceSize": null,
+          "analysisSize": null,
+          "grabMs": null,
+          "scanTrackMs": null,
+          "workMs": null,
+          "sourceToDecisionMs": null,
+          "frameGapMs": null,
+          "sourceToMarkedDrawMs": null
+        }
+      ],
+      "byProfile": {
+        "capped": {
+          "off": {
+            "gameFPS": 182.217,
+            "coachCpuPct16": 0.128,
+            "seconds": 36.27,
+            "wsMedianMiB": 106.32,
+            "n": 0,
+            "fps": 0.0,
+            "anyBars": 0,
+            "markedFrames": 0,
+            "denyFrames": 0,
+            "draws": 0,
+            "sourceSize": null,
+            "analysisSize": null,
+            "grabMs": null,
+            "scanTrackMs": null,
+            "workMs": null,
+            "sourceToDecisionMs": null,
+            "frameGapMs": null,
+            "sourceToMarkedDrawMs": null
+          },
+          "on": {
+            "gameFPS": 182.316,
+            "coachCpuPct16": 1.06,
+            "seconds": 36.201,
+            "wsMedianMiB": 125.537,
+            "n": 764,
+            "fps": 21.104,
+            "anyBars": 0,
+            "markedFrames": 0,
+            "denyFrames": 0,
+            "draws": 0,
+            "sourceSize": [
+              3840,
+              2160
+            ],
+            "analysisSize": [
+              1920,
+              1080
+            ],
+            "grabMs": {
+              "n": 764,
+              "p50": 3.775,
+              "p95": 6.881,
+              "p99": 8.927,
+              "max": 10.052
+            },
+            "scanTrackMs": {
+              "n": 764,
+              "p50": 9.84,
+              "p95": 17.579,
+              "p99": 18.878,
+              "max": 20.789
+            },
+            "workMs": {
+              "n": 764,
+              "p50": 16.144,
+              "p95": 20.872,
+              "p99": 22.086,
+              "max": 23.612
+            },
+            "sourceToDecisionMs": {
+              "n": 764,
+              "p50": 37.866,
+              "p95": 59.75,
+              "p99": 62.036,
+              "max": 65.255
+            },
+            "frameGapMs": {
+              "n": 762,
+              "p50": 46.631,
+              "p95": 62.464,
+              "p99": 63.067,
+              "max": 63.324
+            },
+            "sourceToMarkedDrawMs": null
+          },
+          "deltaFpsPct": 0.054
+        },
+        "uncapped": {
+          "off": {
+            "gameFPS": 331.43,
+            "coachCpuPct16": 0.123,
+            "seconds": 36.285,
+            "wsMedianMiB": 109.891,
+            "n": 0,
+            "fps": 0.0,
+            "anyBars": 0,
+            "markedFrames": 0,
+            "denyFrames": 0,
+            "draws": 0,
+            "sourceSize": null,
+            "analysisSize": null,
+            "grabMs": null,
+            "scanTrackMs": null,
+            "workMs": null,
+            "sourceToDecisionMs": null,
+            "frameGapMs": null,
+            "sourceToMarkedDrawMs": null
+          },
+          "on": {
+            "gameFPS": 326.763,
+            "coachCpuPct16": 0.702,
+            "seconds": 36.274,
+            "wsMedianMiB": 118.121,
+            "n": 424,
+            "fps": 11.689,
+            "anyBars": 0,
+            "markedFrames": 0,
+            "denyFrames": 0,
+            "draws": 0,
+            "sourceSize": [
+              3840,
+              2160
+            ],
+            "analysisSize": [
+              1920,
+              1080
+            ],
+            "grabMs": {
+              "n": 424,
+              "p50": 65.39,
+              "p95": 79.484,
+              "p99": 81.396,
+              "max": 86.958
+            },
+            "scanTrackMs": {
+              "n": 424,
+              "p50": 8.153,
+              "p95": 22.634,
+              "p99": 23.679,
+              "max": 24.584
+            },
+            "workMs": {
+              "n": 424,
+              "p50": 71.971,
+              "p95": 98.555,
+              "p99": 99.783,
+              "max": 103.346
+            },
+            "sourceToDecisionMs": {
+              "n": 424,
+              "p50": 86.599,
+              "p95": 101.722,
+              "p99": 104.938,
+              "max": 142.308
+            },
+            "frameGapMs": {
+              "n": 422,
+              "p50": 78.605,
+              "p95": 109.533,
+              "p99": 110.501,
+              "max": 111.441
+            },
+            "sourceToMarkedDrawMs": null
+          },
+          "deltaFpsPct": -1.408
+        }
+      },
+      "lowHealthToFirstDrawMs": null
+    }
+  ],
+  "offline1080": {
+    "frames": 35,
+    "demo": 6,
+    "warm": 32,
+    "repeat": 150,
+    "timed": 5250,
+    "barRange": [
+      0,
+      7
+    ],
+    "framesWithBars": 17,
+    "marksTotal": 180,
+    "scan": {
+      "mean": 4.3383,
+      "p50": 4.2515,
+      "p95": 4.7566,
+      "p99": 6.3301,
+      "max": 11.9817
+    },
+    "tracking": {
+      "mean": 0.0013,
+      "p50": 0.0009,
+      "p95": 0.0033,
+      "p99": 0.0047,
+      "max": 0.0709
+    },
+    "combined": {
+      "mean": 4.3396,
+      "p50": 4.2527,
+      "p95": 4.7578,
+      "p99": 6.3318,
+      "max": 11.9827
+    }
+  },
+  "thresholdPulse1080": {
+    "large": {
+      "transitions": 6,
+      "rendered": 6,
+      "medianMs": 618.0,
+      "minMs": 588.6,
+      "maxMs": 635.3,
+      "observations": [
+        {
+          "fromFill": 1.0,
+          "toFill": 0.03846,
+          "ms": 588.6
+        },
+        {
+          "fromFill": 1.0,
+          "toFill": 0.03846,
+          "ms": 615.3
+        },
+        {
+          "fromFill": 1.0,
+          "toFill": 0.03846,
+          "ms": 620.6
+        },
+        {
+          "fromFill": 1.0,
+          "toFill": 0.03846,
+          "ms": 605.7
+        },
+        {
+          "fromFill": 1.0,
+          "toFill": 0.03846,
+          "ms": 635.3
+        },
+        {
+          "fromFill": 1.0,
+          "toFill": 0.03846,
+          "ms": 635.2
+        }
+      ]
+    },
+    "near": {
+      "transitions": 5,
+      "rendered": 5,
+      "medianMs": 59.5,
+      "minMs": 45.5,
+      "maxMs": 101.8,
+      "observations": [
+        {
+          "fromFill": 0.07692,
+          "toFill": 0.05128,
+          "ms": 59.5
+        },
+        {
+          "fromFill": 0.07692,
+          "toFill": 0.05128,
+          "ms": 101.8
+        },
+        {
+          "fromFill": 0.07692,
+          "toFill": 0.05128,
+          "ms": 93.2
+        },
+        {
+          "fromFill": 0.07692,
+          "toFill": 0.05128,
+          "ms": 45.5
+        },
+        {
+          "fromFill": 0.07692,
+          "toFill": 0.05128,
+          "ms": 58.4
+        }
+      ]
+    },
+    "goodGateForegroundSamples": 48
+  },
+  "visualCheck": {
+    "source": "Window-only WGC captures of the same controlled scene after the 4K timed windows. Center-crop #3 is full health, #0 is low health.",
+    "evidence": "last-hit-gamepc-20261118-4k-bar.png",
+    "conclusion": "**4K 不能只看 FPS。** 原始 3840×2160 游戏画面中能看见目标兵条在满血和残血之间切换（[兵条局部原图对照，上满血、下残血](last-hit-gamepc-20261118-4k-bar.png)）；但 4K 窗口缩到 1080p 分析后，本轮 1,188 张计时帧中识别到兵条的为 0，标记绘制也为 0。4K 栏测到的是采集和扫描开销，不是成功显示提示的开销。未单独定位是哪条识别判定导致漏检。"
+  },
+  "regression": {
+    "suite": "LastHitTests.Run",
+    "passed": 19
+  }
+}

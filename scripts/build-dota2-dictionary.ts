@@ -263,6 +263,12 @@ const ITEM_SLANG: Record<string, { enAliases?: string[]; zhSlang?: string[] }> =
   item_helm_of_the_overlord: { enAliases: ['Overlord'], zhSlang: ['大支配', '统御头盔'] },
   item_meteor_hammer: { enAliases: ['Meteor Hammer', 'Meme Hammer'], zhSlang: ['陨星锤'] },
   item_dagon: { enAliases: ['Dagon 1'], zhSlang: ['一级红杖', '红杖'] },
+  // 7.42 items. Bloodslinger, Ristul's Devotion, Skypiercer and Starforge have no Chinese name in the
+  // datafeed or the client yet (the Chinese client shows them in English); these nicknames are the
+  // client's own Chinese shop-search aliases (DOTA_SearchAlias_Ability_*).
+  item_caduceus: { zhSlang: ['大灵匣'] },
+  item_berserkers_sabatons: { zhSlang: ['大相位', '大臂章'] },
+  item_starforge: { zhSlang: ['大陨星锤'] },
 };
 
 export interface TacticalTerm {

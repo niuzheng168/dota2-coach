@@ -21,14 +21,39 @@ if ($LASTEXITCODE -ne 0) { throw "Two-PC protocol tests failed." }
 $uiOutput = Join-Path $PSScriptRoot ("../.tmp/twopc-release-ui-" + [Guid]::NewGuid().ToString("N"))
 & $dotnet run --project (Join-Path $PSScriptRoot "DotaCoach.TwoPc.UiTests") -c Release -- $uiOutput
 if ($LASTEXITCODE -ne 0) { throw "Two-PC native UI tests failed." }
+# Enemy panel icons for the game client: Dota's own artwork from this machine's local extraction (never committed).
+# The game client asks the coach for any icon not bundled, e.g. items from a later Dota patch.
+function Copy-PanelIcons([string]$destination) {
+    $assets = Join-Path $PSScriptRoot "../.tmp/vision-assets"
+    if (!(Test-Path -LiteralPath (Join-Path $assets "manifest.json"))) {
+        Write-Warning "No .tmp/vision-assets: the game client ships without panel icons and asks the coach for each one."
+        return 0
+    }
+    $extracted = Get-Content -LiteralPath (Join-Path $assets "manifest.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    $folder = (New-Item -ItemType Directory -Path (Join-Path $destination "icons")).FullName
+    $count = 0
+    foreach ($kind in @("heroes", "items")) {
+        foreach ($entry in $extracted.$kind.PSObject.Properties) {
+            # Recipes are shown as empty slots, never drawn.
+            if (!$entry.Value.icon -or $entry.Value.recipe) { continue }
+            Copy-Item -LiteralPath (Join-Path $assets $entry.Value.icon) -Destination (Join-Path $folder "$($entry.Name).png")
+            $count++
+        }
+    }
+    Set-Content -LiteralPath (Join-Path $folder "NOTICE.txt") -Encoding ascii -Value ("Dota 2 hero and item icons belong to Valve. " +
+        "Extracted unmodified from a locally installed Dota 2 client (build $($extracted.serverBuild)) for this personal tool; do not redistribute.")
+    return $count
+}
 New-Item -ItemType Directory -Path $output | Out-Null
 $artifacts = @()
+$panelIcons = 0
 foreach ($role in @("Game", "Coach")) {
     $name = "DotaCoach.${role}Client"
     $destination = Join-Path $output $name
     & $dotnet publish (Join-Path $PSScriptRoot "$name/$name.csproj") -c Release -r win-x64 `
         --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o $destination
     if ($LASTEXITCODE -ne 0) { throw "Publish failed: $name" }
+    if ($role -eq "Game") { $panelIcons = Copy-PanelIcons $destination }
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v042-ui.md") -Destination (Join-Path $destination "README.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v040.md") -Destination (Join-Path $destination "VIDEO-v040.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v021-debug.md") -Destination (Join-Path $destination "DEBUG-DETAILS.md")
@@ -59,6 +84,7 @@ $manifest = [ordered]@{
     debugRecordingOptIn = $true; debugMaximumBytes = 2L * 1024 * 1024 * 1024; debugMaximumMinutes = 120
     plusSpectatorObservationOnly = $true; plusSpectatorPort = 3220
     playerMinimapDebugIntervalMs = 1000; playerMinimapObservationOnly = $true
+    enemyPanel = $true; bundledPanelIcons = $panelIcons; panelIconFallback = "coach"
     sourceCommit = (& git -C (Join-Path $PSScriptRoot "..") rev-parse HEAD)
     sourceDirty = [bool](& git -C (Join-Path $PSScriptRoot "..") status --porcelain)
 }

@@ -58,6 +58,9 @@ public sealed class CoachHost : IAsyncDisposable
         app.MapDelete("/v1/session", (HttpContext c) => { Mailbox.End(Session(c)); return Results.NoContent(); });
         app.MapGet("/v1/ticket", (HttpContext c) => Results.Json(Mailbox.Issue(Session(c)), Wire.Json));
         app.MapGet("/v1/reminder", (HttpContext c) => Results.Json(new { reminder = Mailbox.Poll(Session(c)) }, Wire.Json));
+        app.MapGet("/v1/enemies", (HttpContext c) => Results.Json(new { enemies = Mailbox.Enemies(Session(c)) }, Wire.Json));
+        app.MapGet("/v1/icon/{key}", (HttpContext c, string key) =>
+            Mailbox.Icon(Session(c), key) is { } png ? Results.Bytes(png, "image/png") : Results.NotFound());
         app.MapGet("/v2/video-ticket", (HttpContext c) => Results.Json(Mailbox.IssueVideoLease(Session(c)), Wire.Json));
         app.Map("/v2/video", async (HttpContext c) => {
             if (!c.WebSockets.IsWebSocketRequest || !c.WebSockets.WebSocketRequestedProtocols.Contains(VideoWire.Subprotocol) ||
