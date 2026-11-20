@@ -63,8 +63,9 @@ internal static partial class Program
         await Wait(() => Member<EnemyBoard?>(overlay, "enemies") is { Heroes.Length: 5 } && overlay.Icons.Count == iconCount,
             "the game client receives the panel and its icons over the paired link", 15000);
         Mark("icons", new { overlay.Icons.Count });
-        nint handle = new WindowInteropHelper(overlay).EnsureHandle();
-        SetWindowDisplayAffinity(handle, 0); // trial only: screenshots may show the overlay
+        // The panel has a window of its own, sized to the panel.
+        nint handle = overlay.Panel.Handle;
+        SetWindowDisplayAffinity(handle, 0); // trial only: screenshots may show the panel
 
         Process self = Process.GetCurrentProcess();
         async Task<string> Shot(string name)
@@ -74,10 +75,10 @@ internal static partial class Program
             string file = Path.Combine(output, name + ".png");
             Capture(surface, file);
             GetWindowRect(handle, out var rect);
-            var view = Member<Canvas>(overlay, "canvas").Children.OfType<StackPanel>().FirstOrDefault();
+            var view = overlay.Panel.View.Children.OfType<StackPanel>().FirstOrDefault();
             Mark("screenshot", new { file = Path.GetFileName(file), foreground = DotaCoach.Desktop.GameWindow.IsForeground(surface),
-                overlayVisible = overlay.IsVisible, overlay = new { rect.Left, rect.Top, Width = rect.Right - rect.Left, Height = rect.Bottom - rect.Top },
-                panel = view == null ? null : new { Left = Canvas.GetLeft(view), Top = Canvas.GetTop(view), view.ActualWidth, view.ActualHeight, rows = view.Children.Count } });
+                panelVisible = overlay.Panel.IsVisible, panelWindow = new { rect.Left, rect.Top, Width = rect.Right - rect.Left, Height = rect.Bottom - rect.Top },
+                panel = view == null ? null : new { view.ActualWidth, view.ActualHeight, rows = view.Children.Count } });
             return file;
         }
         async Task Hold(string what, int seconds)
@@ -86,10 +87,10 @@ internal static partial class Program
             var cpu = self.TotalProcessorTime; long at = Environment.TickCount64;
             Mark(what + "-start");
             int shown = 0, samples = 0; // 10 checks a second: a panel that blinks would show up here
-            for (; Environment.TickCount64 - at < seconds * 1000; samples++) { shown += overlay.IsVisible ? 1 : 0; await Task.Delay(100); }
+            for (; Environment.TickCount64 - at < seconds * 1000; samples++) { shown += overlay.Panel.IsVisible ? 1 : 0; await Task.Delay(100); }
             self.Refresh();
             double percent = (self.TotalProcessorTime - cpu).TotalMilliseconds / (Environment.TickCount64 - at) / Environment.ProcessorCount * 100;
-            Mark(what + "-end", new { overlayVisibleSamples = $"{shown}/{samples}", dotaForeground = DotaCoach.Desktop.GameWindow.IsForeground(surface),
+            Mark(what + "-end", new { panelVisibleSamples = $"{shown}/{samples}", dotaForeground = DotaCoach.Desktop.GameWindow.IsForeground(surface),
                 cpuPercentOfMachine = Math.Round(percent, 2), workingSetMiB = self.WorkingSet64 >> 20 });
         }
 
@@ -105,7 +106,7 @@ internal static partial class Program
         await Hold("panel-on-again", 20);
         Click(game, "断开");
         long stopped = Environment.TickCount64;
-        await Wait(() => !overlay.IsVisible, "after disconnecting the panel disappears", 8000);
+        await Wait(() => !overlay.Panel.IsVisible, "after disconnecting the panel disappears", 8000);
         Mark("disconnected", new { hiddenAfterMs = Environment.TickCount64 - stopped });
         publish.Cancel(); await publisher;
         game.Close();

@@ -470,7 +470,15 @@ internal static partial class Program
             hero[2] > 150 && hero[0] < 40 && hero[3] is >= 185 and <= 197 && item[0] > 150 && item[2] < 40 &&
             Labels(0) == "12" && Labels(1) == "9 1分前" && Labels(2) == "? 未见" && ((StackPanel)view.Children[1]).Opacity < 1 &&
             ((StackPanel)view.Children[2]).Children.Count == 3,
-            "enemy panel at the left edge: head icon and items as images at 75% opacity, level, age from 10 s, old rows dimmed, unseen heroes without slots");
+            "enemy panel at the left edge: head icon and items as images at 75% opacity, level, age from 30 s, old rows dimmed, unseen heroes without slots");
+        // A ticking age must not repaint the panel every few seconds: labels change at 30 s and then once a minute.
+        var aged = new EnemyBoard(new[] { 29.9, 30, 59.9, 61, 125 }.Select((age, i) =>
+            new EnemyHero(new[] { "npc_dota_hero_razor", "npc_dota_hero_lion", "npc_dota_hero_pudge", "npc_dota_hero_axe", "npc_dota_hero_lina" }[i],
+                10, null, null, age)).ToArray());
+        var agedView = Draw(defaults, null, null, aged).Canvas.Children.OfType<StackPanel>().Single();
+        string Aged(int line) => string.Join(" ", ((StackPanel)agedView.Children[line]).Children.OfType<TextBlock>().Select(t => t.Text));
+        await Wait(() => Enumerable.Range(0, 5).Select(Aged).SequenceEqual(["10", "10 30秒前", "10 30秒前", "10 1分前", "10 2分前"]),
+            "age labels: none under 30 s, then 30 s and whole minutes");
         var bigPanel = Draw(defaults with { EnemySize = 200, EnemyY = 0 }, null, null, board).Canvas.Children.OfType<StackPanel>().Single();
         await Wait(() => bigPanel.DesiredSize.Height > view.DesiredSize.Height * 1.8 && Canvas.GetTop(bigPanel) == 0,
             "panel size and position follow the settings");

@@ -20,9 +20,14 @@ internal sealed class AdviceOverlay : Window
     private Reminder? reminder;
     private long until, lastFrame, previewUntil, enemiesAt;
     private EnemyBoard? enemies;
-    // What the canvas shows. The window spans the whole game and is redrawn only when this changes: the enemy
-    // panel stays up for the whole match, and repainting a full-screen layered window every tick costs frames.
+    // What the canvas shows. The window spans the whole game and is redrawn only when this changes: repainting a
+    // full-screen layered window costs frames. It is hidden while there is no subtitle.
     private string? drawn;
+    // The enemy panel stays up for the whole match: it has its own window of just its size, redrawn only when what it
+    // shows changes, so a change repaints the panel and not a transparent layer over the whole game.
+    internal PanelWindow Panel { get; } = new();
+    private string? panelDrawn;
+    private Rect panelBox;
     /// <summary>The player's local subtitle and enemy panel style; applied from the next redraw on.</summary>
     public GameOverlaySettings Settings { get; set; } = new();
     public IconCache Icons { get; } = new(System.IO.Path.Combine(AppContext.BaseDirectory, "icons"));
@@ -41,15 +46,20 @@ internal sealed class AdviceOverlay : Window
         Focusable = false; IsHitTestVisible = false; Content = canvas;
         SourceInitialized += (_, _) => {
             handle = new WindowInteropHelper(this).Handle;
-            SetWindowLongPtr(handle, -20, new IntPtr(GetWindowLongPtr(handle, -20).ToInt64() | 0x20 | 0x80 | 0x08000000 | 0x80000));
-            SetWindowDisplayAffinity(handle, e2e?.CaptureOverlayEvidence == true && localBot ? 0u : 0x11u);
-            HwndSource.FromHwnd(handle)?.AddHook((IntPtr h, int m, IntPtr w, IntPtr l, ref bool handled) => {
-                if (m is 0x21 or 0x84) { handled = true; return new IntPtr(m == 0x21 ? 3 : -1); }
-                return IntPtr.Zero;
-            });
+            Passive(handle, e2e?.CaptureOverlayEvidence == true && localBot ? 0u : 0x11u);
         };
         timer.Tick += (_, _) => Draw(); timer.Start();
-        Closed += (_, _) => timer.Stop();
+        Closed += (_, _) => { timer.Stop(); Panel.Close(); };
+    }
+    /// <summary>Click-through, never activated, not in Alt-Tab; excluded from screen capture unless asked otherwise.</summary>
+    internal static void Passive(IntPtr window, uint affinity)
+    {
+        SetWindowLongPtr(window, -20, new IntPtr(GetWindowLongPtr(window, -20).ToInt64() | 0x20 | 0x80 | 0x08000000 | 0x80000));
+        SetWindowDisplayAffinity(window, affinity);
+        HwndSource.FromHwnd(window)?.AddHook((IntPtr h, int m, IntPtr w, IntPtr l, ref bool handled) => {
+            if (m is 0x21 or 0x84) { handled = true; return new IntPtr(m == 0x21 ? 3 : -1); }
+            return IntPtr.Zero;
+        });
     }
     public void FrameArrived(bool isLocalBot = false)
     {
@@ -91,6 +101,12 @@ internal sealed class AdviceOverlay : Window
     {
         drawn = null; canvas.Children.Clear();
         if (IsVisible) Hide();
+        HidePanel();
+    }
+    private void HidePanel()
+    {
+        panelDrawn = null; Panel.View.Children.Clear();
+        if (Panel.IsVisible) Panel.Hide();
     }
     /// <summary>Caption heading: what produced the text and how old the picture behind it is.</summary>
     public static string Label(Reminder r) =>
@@ -113,7 +129,15 @@ internal sealed class AdviceOverlay : Window
         if (game == null || r == null && board == null) { Blank(); return; }
         // Never float over other applications: hide while Dota is behind them, keep the reminder until it expires.
         // A preview also shows while this client is in front, so the style can be tuned from a second screen.
-        if (!GameWindow.IsForeground(game) && !(previewing && OwnWindowInFront())) { if (IsVisible) Hide(); return; }
+        if (!GameWindow.IsForeground(game) && !(previewing && OwnWindowInFront())) {
+            if (IsVisible) Hide();
+            if (Panel.IsVisible) Panel.Hide();
+            return;
+        }
+        // The sample is shown whatever kinds are switched off: it previews the style, not a reminder.
+        var style = sample ? Settings with { ShowAlerts = true } : Settings;
+        if (board == null) HidePanel(); else DrawPanel(game, board, style);
+        if (r == null) { drawn = null; canvas.Children.Clear(); if (IsVisible) Hide(); return; }
         if (!IsVisible) Show();
         double scale = Math.Max(96, GetDpiForWindow(handle)) / 96.0;
         double unit = DisplayGeometry.OverlayUnit(game.Height, scale);
@@ -125,11 +149,9 @@ internal sealed class AdviceOverlay : Window
             DropReminder(); Blank(); return;
         }
         canvas.Width = game.Width / scale; canvas.Height = game.Height / scale;
-        // The sample is shown whatever kinds are switched off: it previews the style, not a reminder.
-        var style = sample ? Settings with { ShowAlerts = true } : Settings;
-        string content = string.Join("|", r?.Id, r == null ? "" : Label(r), style, Describe(board), Icons.Count, canvas.Width, canvas.Height, unit);
-        if (content != drawn) { Compose(canvas, r, style, unit, board, key => Icons[key]); drawn = content; }
-        if (sample || r == null) return; // A preview leaves no Debug or E2E receipt.
+        string content = string.Join("|", r.Id, Label(r), style, canvas.Width, canvas.Height, unit);
+        if (content != drawn) { Compose(canvas, r, style, unit); drawn = content; }
+        if (sample) return; // A preview leaves no Debug or E2E receipt.
         if (renderedId != r.Id)
         {
             renderedId = r.Id;
@@ -147,6 +169,23 @@ internal sealed class AdviceOverlay : Window
                     captureEvidence = e2e.CaptureOverlayEvidence && localBot });
             }));
         }
+    }
+    /// <summary>The enemy panel window over the game's left edge; its content is rebuilt only when what it shows changes.</summary>
+    private void DrawPanel(GameSurface game, EnemyBoard board, GameOverlaySettings style)
+    {
+        if (!Panel.IsVisible) Panel.Show();
+        double scale = Math.Max(96, GetDpiForWindow(Panel.Handle)) / 96.0;
+        double unit = DisplayGeometry.OverlayUnit(game.Height, scale), height = game.Height / scale;
+        string content = string.Join("|", Describe(board), style, Icons.Count, height, unit);
+        if (content != panelDrawn) {
+            var (view, left, top) = EnemyPanel(board, style, unit, height, key => Icons[key]);
+            Panel.View.Children.Clear(); Panel.View.Children.Add(view);
+            panelBox = new Rect(left, top, view.DesiredSize.Width, view.DesiredSize.Height);
+            panelDrawn = content;
+        }
+        if (!SetWindowPos(Panel.Handle, new IntPtr(-1), game.Left + (int)Math.Round(panelBox.X * scale), game.Top + (int)Math.Round(panelBox.Y * scale),
+                (int)Math.Ceiling(panelBox.Width * scale), (int)Math.Ceiling(panelBox.Height * scale), 0x0010))
+            debug?.Invoke()?.Error("panel-position", new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()));
     }
     /// <summary>Draws a reminder and the enemy panel onto a canvas already sized to the game area, in WPF units.</summary>
     internal static void Compose(Canvas canvas, Reminder? r, GameOverlaySettings style, double unit,
@@ -210,6 +249,14 @@ internal sealed class AdviceOverlay : Window
     /// </summary>
     private static void DrawEnemies(Canvas canvas, EnemyBoard board, GameOverlaySettings style, double unit, Func<string, ImageSource?> icon)
     {
+        var (panel, left, top) = EnemyPanel(board, style, unit, canvas.Height, icon);
+        Canvas.SetLeft(panel, left); Canvas.SetTop(panel, top);
+        canvas.Children.Add(panel);
+    }
+    /// <summary>The enemy panel, measured, and where it goes over a game area <paramref name="height"/> WPF units high.</summary>
+    private static (StackPanel Panel, double Left, double Top) EnemyPanel(EnemyBoard board, GameOverlaySettings style, double unit,
+        double height, Func<string, ImageSource?> icon)
+    {
         double u = unit * style.EnemySize / 100, row = 14 * u, slot = row * 88 / 64;
         var panel = new StackPanel { Opacity = style.EnemyOpacity / 100.0 };
         RenderOptions.SetBitmapScalingMode(panel, BitmapScalingMode.HighQuality);
@@ -244,12 +291,14 @@ internal sealed class AdviceOverlay : Window
             panel.Children.Add(line);
         }
         panel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Canvas.SetLeft(panel, 4 * unit); Canvas.SetTop(panel, style.EnemyTop(canvas.Height, panel.DesiredSize.Height));
-        canvas.Children.Add(panel);
+        return (panel, 4 * unit, style.EnemyTop(height, panel.DesiredSize.Height));
     }
-    /// <summary>How old a row's reading is, in 5-second steps (so the panel repaints at most every few seconds).</summary>
+    /// <summary>
+    /// How old a row's reading is: nothing under 30 s, then "30秒前" and whole minutes. The panel repaints only when
+    /// a level, item or one of these labels changes, so a ticking age must not change it every few seconds.
+    /// </summary>
     private static string Age(double? seconds) => seconds switch {
-        null => "未见", < 10 => "", < 60 and var s => $"{(int)(s / 5) * 5}秒前", var s => $"{(int)(s / 60)}分前" };
+        null => "未见", < 30 => "", < 60 => "30秒前", var s => $"{(int)(s / 60)}分前" };
     private static string Describe(EnemyBoard? board) => board == null ? "" : string.Join(";", board.Heroes.Select(h =>
         $"{h.Hero},{h.Level},{string.Join(",", h.Items ?? [])},{h.Neutral},{Age(h.Age)},{h.Age >= 60}"));
     private static SolidColorBrush Brush(string hex, int opacity = 100)
@@ -268,4 +317,20 @@ internal sealed class AdviceOverlay : Window
     [DllImport("user32.dll")] private static extern bool SetWindowDisplayAffinity(IntPtr h, uint affinity);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int width, int height, uint flags);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr h);
+}
+
+/// <summary>The enemy panel's own window: passive like the subtitle window and sized to the panel by its owner.</summary>
+internal sealed class PanelWindow : Window
+{
+    public Canvas View { get; } = new() { IsHitTestVisible = false };
+    public IntPtr Handle { get; }
+    public PanelWindow()
+    {
+        Title = "双机教练 · 对手面板";
+        WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
+        ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false; ShowActivated = false; Topmost = true;
+        Focusable = false; IsHitTestVisible = false; Content = View;
+        SourceInitialized += (_, _) => AdviceOverlay.Passive(new WindowInteropHelper(this).Handle, 0x11);
+        Handle = new WindowInteropHelper(this).EnsureHandle();
+    }
 }
