@@ -49,6 +49,8 @@ internal static class HeroScanTests
                 sys.stdin.buffer.read()
                 print('{"readings": 0}')
                 """);
+            check(HeroScanProcess.Supported(fake) && !HeroScanProcess.Supported(tree) && !HeroScanProcess.Supported(root),
+                "a checkout whose scanner predates --stop-with-stdin is refused before it is started");
             var (code, output) = await HeroScanProcess.Setup(python, fake, install, live, default);
             check(code == 0 && output.Contains("Wrote " + install) && Directory.Exists(Path.GetDirectoryName(HeroScanProcess.ConfigPath(install))),
                 "setup runs with the Dota folder the coach uses and finds its cfg folder in place");

@@ -136,7 +136,7 @@ internal sealed class CoachWindow : Window
         catch { preferences = new(); notice.Text = "已保存的设置无效，请检查并重新应用；没有读取或输出密钥内容。"; }
         try { heroNames = new HeroNames(System.IO.Path.Combine(AppContext.BaseDirectory, "data", "dota2-dictionary.json")); }
         catch { /* Alerts fall back to internal hero names. */ }
-        Title = "Dota Coach · 教练端 v0.4.6";
+        Title = "Dota Coach · 教练端 v0.4.7";
         Width = Math.Min(video ? 1320 : 760, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(940, SystemParameters.WorkArea.Height - 40);
         MinWidth = video ? 1000 : 560; MinHeight = 640; WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -437,6 +437,8 @@ internal sealed class CoachWindow : Window
         string folder = scanFolder.Text.Trim(), python = scanPython.Text.Trim(), install = spectatorInstall.Text.Trim();
         if (!System.IO.Path.IsPathFullyQualified(folder) || !File.Exists(System.IO.Path.Combine(folder, HeroScanProcess.Script)))
             return @"仓库目录里没有 scripts\vision\hero_scan.py：在“Plus 实时观战”里填本机代码仓库的目录。";
+        if (!HeroScanProcess.Supported(folder))
+            return @"这个仓库里的 scripts\vision\hero_scan.py 是旧版，不能由教练端启动：先更新这个仓库（git pull），或在“Plus 实时观战”里改填新的仓库目录。";
         if (python.Length == 0) python = HeroScanProcess.FindPython(folder) ?? "";
         if (!System.IO.Path.IsPathFullyQualified(python) || !File.Exists(python))
             return @"找不到 Python：在“Plus 实时观战”里填装了视觉依赖的 python.exe（一般是仓库里的 .tmp\vision-tools\Scripts\python.exe）。";

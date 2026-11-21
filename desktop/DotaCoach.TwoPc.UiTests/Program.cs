@@ -850,7 +850,7 @@ internal static partial class Program
         string fakeScanner = Path.GetFullPath(Path.Combine(output, "fake-scanner"));
         if (python != null) {
             Directory.CreateDirectory(Path.Combine(fakeScanner, "scripts", "vision"));
-            File.WriteAllText(Path.Combine(fakeScanner, HeroScanProcess.Script), "import sys\nif sys.argv[1] == 'setup':\n" +
+            File.WriteAllText(Path.Combine(fakeScanner, HeroScanProcess.Script), "import sys  # scan --stop-with-stdin\nif sys.argv[1] == 'setup':\n" +
                 "    print('Wrote cfg - restart Dota once so it is loaded.')\n    sys.exit(0)\n" +
                 "print('Waiting for the Dota window...', flush=True)\nsys.stdin.buffer.read()\nopen('stopped.txt', 'a').write('stopped\\n')\n");
             Field<TextBox>(w, "scanFolder").Text = fakeScanner;

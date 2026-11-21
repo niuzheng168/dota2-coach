@@ -38,6 +38,12 @@ public sealed class HeroScanProcess : IAsyncDisposable
             if (File.Exists(Path.Combine(dir.FullName, Script))) return dir.FullName;
         return null;
     }
+    /// <summary>Whether the folder's scanner can be run by the coach client: older checkouts lack --stop-with-stdin and exit at once.</summary>
+    public static bool Supported(string folder)
+    {
+        try { return File.ReadAllText(Path.Combine(folder, Script)).Contains("--stop-with-stdin", StringComparison.Ordinal); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
+    }
     /// <summary>The vision venv (.tmp/vision-tools) of the folder, or of the main checkout when the folder is a git worktree.</summary>
     public static string? FindPython(string folder)
     {
