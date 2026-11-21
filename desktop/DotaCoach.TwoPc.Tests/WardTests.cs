@@ -94,7 +94,18 @@ internal static class WardTests
         Walk(rough, 620.5, 622, 5000, -2000, 5000, -2000);
         var vague = rough.Readings("9000000001", 2, Reads(R(601, 0, 2, 0), R(621, 0, 1, 0)));
         check(vague is [{ Kind: "sentry", Candidates: [{ Rough: true } k] }] && double.Hypot(k.X - 3200, k.Y + 1200) < 1 && k.Share == 1,
-            "with no common spot to fit, the place it went out of sight is marked as rough");
+            "with no common spot to fit, the place it went out of sight is rough");
+        check(vague[0].Unseen >= WardTracker.UnsureSeconds && rough.Active(630).Length == 1 && rough.Marks(630).Length == 0,
+            "out of sight 15 s or more: the guess stands (subtitle) but puts no marks on the minimap");
+        // Read as it left sight, gone 20 s, seen again with fewer: the unseen start of the window counts.
+        var late = new WardTracker(map, spots);
+        Walk(late, 590, 595, spot.X + 900, spot.Y, spot.X + 450, spot.Y);
+        late.Readings("9000000001", 2, Reads(R(600, 2, 0, 0)));
+        Fog(late, 595.5, 619.5);
+        Walk(late, 620, 622, spot.X - 450, spot.Y, spot.X - 700, spot.Y);
+        check(late.Readings("9000000001", 2, Reads(R(621, 1, 0, 0))) is [{ Unseen: >= 15 } edge] &&
+              double.Hypot(edge.Candidates[0].X - spot.X, edge.Candidates[0].Y - spot.Y) < 700,
+            "a window opening out of sight counts as unseen; the walk from the last sighting still finds the spot on the way");
 
         // The friend team sees the enemy ward: the player sees it too, the guess is done. A new match starts afresh.
         var seen = new WardTracker(map, spots);
@@ -103,6 +114,30 @@ internal static class WardTests
         var top = seen.Active(620)[0].Candidates[0];
         tick = 620_000; seen.Sight(Snap(620, units: ("npc_dota_observer_wards", 3, top.X + 100, top.Y)));
         check(seen.Active(621).Length == 0, "an enemy ward in the friend team's sight ends the guess near it");
+        // Found and dewarded while Lion is in the fog, before the scanner reads its lower count.
+        var dewarded = new WardTracker(map, spots);
+        Walk(dewarded, 600, 604, spot.X + 900, spot.Y, spot.X + 450, spot.Y);
+        dewarded.Readings("9000000001", 2, Reads(R(601, 2, 0, 0)));
+        for (double c = 604.5; c <= 608; c += 0.5) {
+            tick = (long)(c * 1000);
+            dewarded.Sight(c is >= 606 and < 608 ? Snap(Math.Floor(c), units: ("npc_dota_observer_wards", 3, spot.X + 150, spot.Y)) : Snap(Math.Floor(c)));
+        }
+        Walk(dewarded, 608.5, 610, spot.X - 450, spot.Y, spot.X - 700, spot.Y);
+        check(dewarded.Readings("9000000001", 2, Reads(R(609, 1, 0, 0))).Count == 0 && dewarded.Marks(620).Length == 0,
+            "a ward found and dewarded before the lower count is read gets no guess: no mark, no subtitle");
+        var older = new WardTracker(map, spots);
+        tick = 590_000; older.Sight(Snap(590, units: ("npc_dota_observer_wards", 3, spot.X + 150, spot.Y)));
+        Walk(older, 600, 604, spot.X + 900, spot.Y, spot.X + 450, spot.Y);
+        older.Readings("9000000001", 2, Reads(R(601, 2, 0, 0)));
+        Fog(older, 604.5, 608); Walk(older, 608.5, 610, spot.X - 450, spot.Y, spot.X - 700, spot.Y);
+        check(older.Readings("9000000001", 2, Reads(R(609, 1, 0, 0))).Count == 1, "a ward seen before the earlier read is an older one: the guess stands");
+        var placeholder = SpectatorGsi.Parse(JsonDocument.Parse("""
+            {"map": {"clock_time": 600, "matchid": "9000000001", "game_state": "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS"}, "player": {},
+             "minimap": {"o0": {"xpos": 0, "ypos": 0, "team": 3, "unitname": "npc_dota_hero_lion", "visionrange": 1800},
+                         "o1": {"xpos": 0, "ypos": 0, "team": 3, "unitname": "npc_dota_sentry_wards", "visionrange": 0},
+                         "o2": {"xpos": 0, "ypos": 120, "team": 3, "unitname": "npc_dota_hero_lina", "visionrange": 1800}}}
+            """).RootElement, 0);
+        check(placeholder.Minimap is [{ Name: "npc_dota_hero_lina" }], "units at 0,0 while coming into sight are left out: no mid-lane track points or wards");
         var other = new WardTracker(map, spots);
         Walk(other, 600, 604, 0, 0, 100, 100);
         other.Readings("9000000001", 2, Reads(R(601, 2, 0, 0)));

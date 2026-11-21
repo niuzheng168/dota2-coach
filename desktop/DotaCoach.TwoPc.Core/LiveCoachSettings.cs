@@ -25,6 +25,9 @@ public sealed record LiveCoachSettings
     public bool EnemyVisionAlerts { get; init; } = true;
     /// <summary>Plus live spectating: when an enemy's ward count drops, possible ward spots on the game machine's minimap and a subtitle.</summary>
     public bool EnemyWards { get; init; } = true;
+    /// <summary>The repository folder the vision scan (scripts/vision/hero_scan.py) runs from, and its Python; "" until first started.</summary>
+    public string ScanFolder { get; init; } = "";
+    public string ScanPython { get; init; } = "";
     public string BindAddress { get; init; } = "";
     public MinimapLayout[] Calibrations { get; init; } = [];
     public static string DefaultPath => Path.Combine(
@@ -41,8 +44,9 @@ public sealed record LiveCoachSettings
             SubtitleSeconds is < 1 or > Wire.MaxReminderMs / 1000 || ModelTimeoutSeconds is < 8 or > 20 ||
             Calibrations == null || Calibrations.Length > 16 ||
             Calibrations.Any(c => c == null || !c.IsValidFor(c.SourceWidth, c.SourceHeight)) ||
-            Calibrations.GroupBy(c => (c.SourceWidth, c.SourceHeight)).Any(g => g.Count() > 1))
-            throw new ArgumentException("模型路径、调用间隔/上限、字幕时长（1–15秒）、模型超时（8–20秒）或小地图校准无效。");
+            Calibrations.GroupBy(c => (c.SourceWidth, c.SourceHeight)).Any(g => g.Count() > 1) ||
+            new[] { ScanFolder, ScanPython }.Any(p => p == null || p.Length > 0 && !Path.IsPathFullyQualified(p)))
+            throw new ArgumentException("模型路径、调用间隔/上限、字幕时长（1–15秒）、模型超时（8–20秒）、小地图校准或视觉扫描路径无效。");
     }
     /// <summary>The user-confirmed calibration for this game resolution, if any.</summary>
     public MinimapLayout? LayoutFor(FrameView frame) =>

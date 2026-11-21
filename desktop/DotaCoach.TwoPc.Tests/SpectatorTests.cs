@@ -118,7 +118,7 @@ internal static class SpectatorTests
                 string body = Payload(new { team_name = "spectator" }, new { id = 0 }, teamMap, minimap, token: token);
                 check((await http.PostAsync("/spectator", new StringContent(body.Replace(token, Wire.Secret())))).StatusCode == HttpStatusCode.Unauthorized,
                     "spectator receiver requires its token");
-                var big = Enumerable.Range(0, 1500).ToDictionary(i => $"o{i}", i => Unit("npc_dota_creep_badguys_melee", 3, i, i));
+                var big = Enumerable.Range(1, 1500).ToDictionary(i => $"o{i}", i => Unit("npc_dota_creep_badguys_melee", 3, i, i));
                 string large = Payload(new { team_name = "spectator" }, new { id = 0 }, teamMap, big, token: token);
                 check(large.Length > 65536 && (await http.PostAsync("/spectator", new StringContent(large))).IsSuccessStatusCode,
                     "large spectator minimap payloads are accepted");
@@ -136,7 +136,7 @@ internal static class SpectatorTests
                 check(gsi.Config.Contains("\"minimap\" \"1\"") && gsi.Config.Contains("\"throttle\" \"0.2\""), "game GSI config tests player-mode minimap");
                 gsi.Snapshot = s => ownMap = s;
                 using var http = new HttpClient { BaseAddress = new($"http://127.0.0.1:{gsi.Port}") };
-                var units = Enumerable.Range(0, 1200).ToDictionary(i => $"o{i}", i => Unit("npc_dota_creep_goodguys_melee", 2, i, i));
+                var units = Enumerable.Range(1, 1200).ToDictionary(i => $"o{i}", i => Unit("npc_dota_creep_goodguys_melee", 2, i, i));
                 units["h0"] = Unit("npc_dota_hero_luna", 2, 1, 2, "minimap_herocircle_self");
                 units["h1"] = Unit("npc_dota_hero_razor", 3, 900, 900, "minimap_herocircle");
                 units["h2"] = Unit("npc_dota_hero_razor", 3, 950, 950, "minimap_herocircle", vision: 0); // Duplicate entry, one hero.

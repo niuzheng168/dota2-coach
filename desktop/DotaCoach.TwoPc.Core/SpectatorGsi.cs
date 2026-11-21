@@ -45,11 +45,15 @@ public static class SpectatorGsi
         string mode = map == null ? "menu" : grouped > 0 ? "full-spectator" : playing ? "player" : "team-view";
         var units = new List<MinimapUnit>();
         if (Obj(root, "minimap") is { } minimap) {
+            int entries = 0;
             foreach (var entry in minimap.EnumerateObject()) {
-                if (units.Count >= MaxUnits) throw new ArgumentException("Too many minimap units");
+                if (++entries > MaxUnits) throw new ArgumentException("Too many minimap units");
                 var e = entry.Value;
                 if (e.ValueKind != JsonValueKind.Object || Number(e, "xpos", 20000) is not double x ||
                     Number(e, "ypos", 20000) is not double y || Number(e, "team", 16) is not double team) continue;
+                // A unit coming into sight sits at 0,0 (mid lane) for a packet or two before its position arrives: heroes,
+                // creeps and wards in the 2026-11-17 and 11-21 Plus games. Such a hero put a ward guess in mid lane.
+                if (x == 0 && y == 0) continue;
                 string name = Text(e, "unitname") is { } n && Name.IsMatch(n) ? n : "?";
                 string? image = Text(e, "image") is { } i && Icon.IsMatch(i) ? i : null;
                 units.Add(new(name, (int)team, x, y, Number(e, "yaw", 720), Number(e, "visionrange", 10000), image));

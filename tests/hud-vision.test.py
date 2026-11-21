@@ -82,6 +82,22 @@ class Leftover(unittest.TestCase):
         self.assertIsNone(hero_scan.leftover(self.ROSTER - {"npc_dota_hero_4"}, nine, 4), "a hero not seen yet")
 
 
+class Fits(unittest.TestCase):
+    TEAMS = {"npc_dota_hero_undying": 2, "npc_dota_hero_invoker": 3, "npc_dota_hero_phantom_lancer": 3}
+
+    def test_a_switch_teaches_only_a_hero_of_the_players_team(self):
+        players = {4: "npc_dota_hero_undying", 8: "npc_dota_hero_phantom_lancer"}
+        self.assertFalse(hero_scan.fits(9, "npc_dota_hero_undying", self.TEAMS, players), "the friend's hero shown while selecting a Dire player")
+        self.assertFalse(hero_scan.fits(3, "npc_dota_hero_invoker", self.TEAMS, players), "a Dire hero for a Radiant hotkey")
+        self.assertTrue(hero_scan.fits(9, "npc_dota_hero_invoker", self.TEAMS, players))
+
+    def test_a_hero_matched_to_another_player_stays_there(self):
+        players = {4: "npc_dota_hero_undying", 8: "npc_dota_hero_phantom_lancer"}
+        self.assertFalse(hero_scan.fits(9, "npc_dota_hero_phantom_lancer", self.TEAMS, players))
+        self.assertTrue(hero_scan.fits(8, "npc_dota_hero_phantom_lancer", self.TEAMS, players), "the same player again")
+        self.assertTrue(hero_scan.fits(9, "npc_dota_hero_new", self.TEAMS, players), "team not known yet")
+
+
 class Selection(unittest.TestCase):
     """Plus team view, friend team radiant (2): players 0-4 radiant, 5-9 dire by the spectator hotkeys."""
     TEAMS = {**{f"npc_dota_hero_r{i}": 2 for i in range(5)}, **{f"npc_dota_hero_d{i}": 3 for i in range(5)}}

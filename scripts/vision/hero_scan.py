@@ -28,6 +28,9 @@ item slots cross-fade after a switch; sweeps without one follow each other witho
 Recognition runs in parallel on the GPU, on a HUD band that Windows.Graphics.Capture (wgc.py) crops on
 the GPU.
 
+The coach client's 启动视觉扫描 button runs `scan --stop-with-stdin` from the repository folder (after
+`setup` when this tool's GSI config is missing) and stops it by closing standard input.
+
 `setup` writes this tool's GSI config (read by Dota at start) and prints the launch options. Each run
 records a session folder: timeline.jsonl (a snapshot every --timeline-every seconds, shown by the
 local sandbox page /hero-scan), scan.jsonl (every reading), state.json (latest) and summary.json.
@@ -73,6 +76,21 @@ ITEM_SETTLE = 0.13
 STREAM_TAIL = 0.07  # after the last streamed selection: its switch shows within ~2 refreshes
 RETRY_UNKNOWN = 2.0  # seconds between attempts at a player whose hero is still unknown
 STREAM_MISSED = 1.0  # a streamed hero not read for this long gets its own visit next cycle
+# Ends the run early (--stop-with-stdin): the coach client starts the scanner with a pipe as standard input
+# and closes it to stop the scan; the pipe also closes when the client exits or crashes.
+STOP = threading.Event()
+
+
+def stop_when_stdin_closes():
+    try:
+        sys.stdin.buffer.read()  # nothing is ever written: returns when the pipe closes
+    except (OSError, ValueError):
+        pass
+    STOP.set()
+
+
+def running(end: float) -> bool:
+    return time.perf_counter() < end and not STOP.is_set()
 
 
 class ConsoleSelect:
@@ -188,8 +206,10 @@ class GsiFeed(http.server.ThreadingHTTPServer):
             elif self.own_team is None and mode == "team-view" and len(p.get("buildings") or {}) == 1:
                 self.own_team = 2 if "radiant" in p["buildings"] else 3
             for hero, spots in visible.items():
-                self.seen[hero] = {"x": spots[0][0], "y": spots[0][1], **({"others": spots[1:]} if len(spots) > 1 else {}),
-                                   "clock": self.clock, "at": now}
+                # A unit coming into sight sits at 0,0 for a packet or two before its position arrives.
+                if spots := [s for s in spots if s != [0, 0]]:
+                    self.seen[hero] = {"x": spots[0][0], "y": spots[0][1], **({"others": spots[1:]} if len(spots) > 1 else {}),
+                                       "clock": self.clock, "at": now}
             self.visible = set(visible)
             if self.keep_truth and grouped:
                 self.truth.append((now, truth_of(p)))
@@ -221,6 +241,16 @@ def leftover(roster: set[str], players: dict[int, str], player: int | None) -> s
         return None
     rest = roster - set(players.values())
     return next(iter(rest)) if len(rest) == 1 else None
+
+
+def fits(player: int, hero: str, teams: dict[str, int], players: dict[int, str]) -> bool:
+    """Whether a switch that showed `hero` may teach that it is `player`'s: hotkeys 1-5 select Radiant's players and
+    6-0 Dire's, and a hero already matched to another player is not this one's. On 2026-11-21 the HUD changed to the
+    friend's Radiant hero just as Dire's tenth player was selected (at the horn); taken for an ally, that player, Invoker,
+    was never selected again and the enemy panel never got his items."""
+    if teams.get(hero) in (2, 3) and teams[hero] != 2 + player // 5:
+        return False
+    return all(h != hero for p, h in players.items() if p != player)
 
 
 def selectable(mode: str, own: int | None, visible: set[str], teams: dict[str, int], players: dict[int, str],
@@ -335,6 +365,7 @@ class Scanner:
         r0, r1, c0, c1 = CHANGE
         self.change_rows = slice(round((r0 - BAND_TOP) * s), round((r1 - BAND_TOP) * s), 4)
         self.change_cols = slice(cw // 2 + round(c0 * s), cw // 2 + round(c1 * s), 4)
+        print(f"Capturing the Dota window ({cw}x{ch}).", flush=True)  # the coach client shows the scan as running from here
 
     def reopen(self, end: float) -> bool:
         """Dota's window changed size: minimized on alt-tab from fullscreen, resized, or a new display mode.
@@ -344,7 +375,8 @@ class Scanner:
         self.stats["reopened"] += 1
         print("Dota window changed: waiting for it, then capturing again.", flush=True)
         last = -1e9
-        while (now := time.perf_counter()) < end:
+        while running(end):
+            now = time.perf_counter()
             if now - last >= self.args.timeline_every:
                 snap = self.snapshot()
                 self.record(snap)
@@ -390,7 +422,7 @@ class Scanner:
         return float(np.abs(a - reference[self.change_rows, self.change_cols, :3]).mean())
 
     def first_frame(self, end: float):
-        while time.perf_counter() < end:
+        while running(end):
             try:
                 if (frame := self.capture.latest()) is not None:
                     return frame
@@ -411,7 +443,7 @@ class Scanner:
         streamed = -1e9  # when the last streamed selection was sent
         visits: collections.deque[tuple[int, bool]] = collections.deque()
         last_print = last_drain = last_record = cycle_start = self.started
-        while time.perf_counter() < end:
+        while running(end):
             try:
                 got = self.capture.latest()
             except (wgc.WindowChanged, TimeoutError, OSError):  # window resized/minimized, or capture lost
@@ -529,7 +561,7 @@ class Scanner:
             self.canvas[BAND_TOP:] = bgr
             with self.feed.lock:
                 clock, mode, roster = self.feed.clock, self.feed.mode, set(self.feed.teams)
-                own, teams = self.feed.own_team, dict(self.feed.teams)
+                own, teams, visible = self.feed.own_team, dict(self.feed.teams), set(self.feed.visible)
             out = self.hud.read(self.canvas, roster, full=settled)
             self.read_ms.append((time.perf_counter() - t0) * 1000)
             hero = out.get("hero")
@@ -556,18 +588,27 @@ class Scanner:
                                  # items drawn with the same icon (Dagon levels): the name is one of these
                                  "alt": {s: i["sameIcon"] for s, i in out["items"].items() if i and i.get("sameIcon")},
                                  "wards": out["wards"]}
+            # In Plus team view an enemy can stay on the HUD after the friend team loses sight of it (on 2026-11-21 Ancient
+            # Apparition for 8 s): that is its last sighting, not now. Such reads would date the panel and the ward counts
+            # the coach compares as current, so they only name the hero.
+            unseen = mode == "team-view" and own in (2, 3) and teams.get(hero) not in (None, own) and hero not in visible
             with self.lock:
                 # A changed frame that still shows the previous hero (a HUD change other than the
-                # switch) must not teach the player's hero.
-                if player is not None and changed and hero != self.shown:
+                # switch) must not teach the player's hero, nor one of the other team or another player's.
+                if player is not None and changed and hero != self.shown and fits(player, hero, teams, self.player_hero):
                     self.player_hero[player] = hero
-                if (last := self.heroes.get(hero, {}).get("status")) is not None:
-                    self.refresh_s.append(at - last["at"])
-                record = self.heroes.setdefault(hero, {})
-                record["status"] = status
-                if items:
-                    record["items"] = items
+                if not unseen:
+                    if (last := self.heroes.get(hero, {}).get("status")) is not None:
+                        self.refresh_s.append(at - last["at"])
+                    record = self.heroes.setdefault(hero, {})
+                    record["status"] = status
+                    if items:
+                        record["items"] = items
             self.shown = hero
+            if unseen:
+                self.stats["unseen"] += 1
+                self.log.write(json.dumps(entry | {"unseen": True, "mode": mode}, ensure_ascii=False) + "\n")
+                continue
             # Plus team view only: there the enemies are the heroes outside the friend team, and they are read
             # only while that team sees them. Full-spectator data never reaches the game machine.
             if items and mode == "team-view" and own in (2, 3) and teams.get(hero) not in (None, own):
@@ -772,10 +813,14 @@ def main():
     ap.add_argument("--no-stream", action="store_true", help="wait for every switch instead of one selection per frame")
     ap.add_argument("--items-every", type=float, default=3.0,
                     help="seconds between item reads of the same hero; each read holds the HUD ~0.15 s")
+    ap.add_argument("--stop-with-stdin", action="store_true",
+                    help="end the scan when standard input closes (how the coach client starts and stops it)")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     if args.command == "setup":
         return setup(args)
+    if args.stop_with_stdin:
+        threading.Thread(target=stop_when_stdin_closes, daemon=True).start()
     data = load_secrets(args.secrets, create=False)
     session = args.session or time.strftime("%Y%m%d-%H%M%S")
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", session):
@@ -795,6 +840,9 @@ def main():
             return keys
     announced = False
     while True:  # may be started before Dota
+        if STOP.is_set():
+            feed.shutdown()
+            return
         try:
             dota_window()
             break

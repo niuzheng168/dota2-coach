@@ -62,9 +62,14 @@ public sealed class WardTracker
 {
     public const double CastRange = 500, Speed = 420, PathSlack = 200;
     public const int ObserverLifetime = 360, SentryLifetime = 420, MaxCandidates = 3, MaxGuesses = 12;
+    /// <summary>Out of sight this long between the reads, the marks were mostly wrong: such a guess gets a subtitle, no marks.</summary>
+    public const double UnsureSeconds = 15;
     // Chosen on three 7.42 pro games with spots built without them (WardEval): the likeliest mark was within 600 of the
-    // real ward for 42 % of the guesses (67 % when the hero stayed in sight between the reads), one of three marks for 60 %.
-    private const double KeepSeconds = 600, MinSpacing = 700, DetourScale = 800, NearSigma = 250, PriorAll = 0.25;
+    // real ward for 43 % of the guesses (71 % when the hero stayed in sight between the reads), one of three marks for 58 %.
+    // SightSigma was 500 flat then 250 falling off until 2026-11-22: in a pub game watched in Plus team view, spots nearer
+    // the hero's path fitted better (50 % against 47 %), in the pro games too (71 % against 67 % in sight).
+    private const double KeepSeconds = 600, MinSpacing = 700, DetourScale = 800, SightSigma = 300, PriorAll = 0.25;
+    private const double EarlySlack = 0.5, LateSlack = 0.3;
     private readonly CoachMap map;
     private readonly WardSpots? spots;
     private readonly object gate = new();
@@ -72,6 +77,9 @@ public sealed class WardTracker
     private readonly Dictionary<string, Track> tracks = new(StringComparer.Ordinal);
     private readonly Dictionary<string, WardReading> last = new(StringComparer.Ordinal);
     private readonly List<WardGuess> guesses = new();
+    // Enemy wards the friend team has seen, with the clock of the first sight. Found wards are mostly dewarded within ~10 s
+    // (2026-11-17 Plus game), often before the scanner reads the enemy's lower count: the guess it then makes is answered too.
+    private readonly List<(string Kind, double X, double Y, double First)> sighted = new();
     private string? match;
     private int ownTeam;
     private double clock = double.NaN, clockBase;
@@ -97,19 +105,25 @@ public sealed class WardTracker
                     p.Add((clock, unit.X, unit.Y));
                 while (p.Count > 0 && clock - p[0].Clock > KeepSeconds) p.RemoveAt(0);
             }
-            // An enemy ward the friend team sees is on the player's own minimap already: the guess it answers is done.
+            // An enemy ward the friend team sees is on the player's own minimap already, and usually dewarded soon after:
+            // the guess it answers is done.
             foreach (var ward in s.Minimap.Where(u => u.Team is 2 or 3 && u.Team != ownTeam &&
                                                       u.Name is "npc_dota_observer_wards" or "npc_dota_sentry_wards")) {
                 string kind = ward.Name == "npc_dota_observer_wards" ? "observer" : "sentry";
-                guesses.RemoveAll(g => (g.Kind == kind || g.Kind == "ward") &&
-                    g.Candidates.Any(k => double.Hypot(k.X - ward.X, k.Y - ward.Y) <= 900));
+                guesses.RemoveAll(g => Answers(g, kind, ward.X, ward.Y));
+                if (!sighted.Any(w => w.Kind == kind && double.Hypot(w.X - ward.X, w.Y - ward.Y) < 50))
+                    sighted.Add((kind, ward.X, ward.Y, clock));
             }
+            sighted.RemoveAll(w => clock - w.First > KeepSeconds);
         }
     }
+    /// <summary>A seen enemy ward of the guess's kind (any kind for an unknown one) near one of its marks.</summary>
+    private static bool Answers(WardGuess g, string kind, double x, double y) =>
+        (g.Kind == kind || g.Kind == "ward") && g.Candidates.Any(k => double.Hypot(k.X - x, k.Y - y) <= 900);
     private void Reset(string? matchId, int team)
     {
         if (matchId == match && team == ownTeam) return;
-        match = matchId; ownTeam = team; tracks.Clear(); last.Clear(); guesses.Clear(); clock = double.NaN;
+        match = matchId; ownTeam = team; tracks.Clear(); last.Clear(); guesses.Clear(); sighted.Clear(); clock = double.NaN;
     }
     /// <summary>The newest game clock seen, with its fraction; NaN before the first packet.</summary>
     public double Clock { get { lock (gate) return clock; } }
@@ -129,8 +143,12 @@ public sealed class WardTracker
                     if (drop > 4) continue; // more than a hero places between two reads: a misread, not wards
                     int observers = Math.Min(drop, Math.Max(0, before.Observer - r.Observer));
                     int sentries = Math.Min(drop - observers, Math.Max(0, before.Sentry - r.Sentry));
-                    foreach (var (kind, count) in new[] { ("observer", observers), ("sentry", sentries), ("ward", drop - observers - sentries) })
-                        if (count > 0) found.Add(Guess(hero, kind, count, before.Clock, r.Clock));
+                    foreach (var (kind, count) in new[] { ("observer", observers), ("sentry", sentries), ("ward", drop - observers - sentries) }) {
+                        if (count == 0) continue;
+                        var guess = Guess(hero, kind, count, before.Clock, r.Clock);
+                        // Already seen since the earlier read (a ward cannot be seen before it is placed), maybe dewarded by now.
+                        if (!sighted.Any(w => w.First >= guess.After - 2 && Answers(guess, w.Kind, w.X, w.Y))) found.Add(guess);
+                    }
                 }
             guesses.AddRange(found);
             if (guesses.Count > MaxGuesses) guesses.RemoveRange(0, guesses.Count - MaxGuesses);
@@ -142,8 +160,8 @@ public sealed class WardTracker
     {
         lock (gate) { guesses.RemoveAll(g => g.Expires <= now); return guesses.ToArray(); }
     }
-    /// <summary>The active guesses as minimap marks for the game machine (positions 0..1 across the minimap).</summary>
-    public WardMark[] Marks(double now) => Active(now).SelectMany(g => g.Candidates.Select((k, rank) => {
+    /// <summary>The active guesses as minimap marks for the game machine (positions 0..1 across the minimap), except unsure ones.</summary>
+    public WardMark[] Marks(double now) => Active(now).Where(g => g.Unseen < UnsureSeconds).SelectMany(g => g.Candidates.Select((k, rank) => {
         var (x, y) = map.Minimap(k.X, k.Y);
         return new WardMark(g.Hero, g.Kind, Math.Clamp(x, 0, 1), Math.Clamp(y, 0, 1), rank, Math.Round(k.Share, 2),
             Math.Max(0, Math.Round(now - g.Before, 1)), Math.Max(0, Math.Round(g.Expires - now, 1)), k.Rough);
@@ -151,31 +169,45 @@ public sealed class WardTracker
 
     private WardGuess Guess(string hero, string kind, int count, double after, double before)
     {
-        var points = tracks.TryGetValue(hero, out var t)
-            ? t.Points.Where(p => p.Clock >= after - 1.5 && p.Clock <= before + 1.5).ToList() : [];
+        var track = tracks.TryGetValue(hero, out var t) ? t.Points : [];
+        // Reads carry the GSI's whole-second clock: the ward went down in [after, before + 1); sightings arrive a little late.
+        double from = after - EarlySlack, to = before + 1 + LateSlack;
+        var points = track.Where(p => p.Clock >= from && p.Clock <= to).ToList();
         // The window splits into stretches in sight (samples under 1.5 s apart) and gaps out of sight between them. The
         // ward went down in one of them, more likely in a longer one; within each, a spot's chance is its prior weight
         // times how well it fits (cast range of where the hero was seen, or a detour it could walk while unseen).
         var stretches = new List<(List<(double X, double Y)> Seen, double Seconds)>();
-        var gaps = new List<((double X, double Y) A, (double X, double Y) B, double Seconds)>();
+        var gaps = new List<((double X, double Y) A, (double X, double Y) B, double Reach, double Seconds)>();
         for (int i = 0; i < points.Count; i++) {
             if (i == 0 || points[i].Clock - points[i - 1].Clock > 1.5) {
-                if (i > 0) gaps.Add(((points[i - 1].X, points[i - 1].Y), (points[i].X, points[i].Y), points[i].Clock - points[i - 1].Clock));
+                if (i > 0) gaps.Add(((points[i - 1].X, points[i - 1].Y), (points[i].X, points[i].Y), points[i].Clock - points[i - 1].Clock,
+                    points[i].Clock - points[i - 1].Clock));
                 stretches.Add(([], 0.5));
             } else stretches[^1] = (stretches[^1].Seen, stretches[^1].Seconds + points[i].Clock - points[i - 1].Clock);
             stretches[^1].Seen.Add((points[i].X, points[i].Y));
+        }
+        // Out of sight as the window opens or closes: it walked unseen from where it was last seen before (or to where it
+        // was seen next). A read taken as the hero left sight (or, before 2026-11-22, while the HUD still showed it out of
+        // sight) otherwise put the ward where it reappeared and called the guess "in sight".
+        if (points.Count > 0 && track.FindLastIndex(p => p.Clock < from) is >= 0 and int i0 && points[0].Clock - Math.Max(track[i0].Clock, after) > 1.5) {
+            var last = track[i0];
+            gaps.Insert(0, ((last.X, last.Y), (points[0].X, points[0].Y), points[0].Clock - last.Clock, points[0].Clock - Math.Max(last.Clock, after)));
+        }
+        if (points.Count > 0 && track.FindIndex(p => p.Clock > to) is >= 0 and int i1 && before + 1 - points[^1].Clock > 1.5) {
+            var next = track[i1];
+            gaps.Add(((points[^1].X, points[^1].Y), (next.X, next.Y), next.Clock - points[^1].Clock, before + 1 - points[^1].Clock));
         }
         string enemy = ownTeam == 2 ? "dire" : "radiant";
         int phase = before < 600 ? 0 : before < 1500 ? 1 : 2;
         var pool = (spots?.For(enemy, kind) ?? []).Where(s => !map.NoWard(s.X, s.Y))
             .Select(s => (Spot: s, Prior: s.Phases.ElementAtOrDefault(phase) + PriorAll * s.Count)).ToArray();
         var parts = stretches.Select(st => (st.Seconds, Fit: (Func<WardSpot, double>)(s => {
-                double near = st.Seen.Min(p => double.Hypot(p.X - s.X, p.Y - s.Y)) - CastRange;
-                return near <= 0 ? 1 : Math.Exp(-near * near / (2 * NearSigma * NearSigma));
+                double near = st.Seen.Min(p => double.Hypot(p.X - s.X, p.Y - s.Y));
+                return Math.Exp(-near * near / (2 * SightSigma * SightSigma));
             })))
             .Concat(gaps.Select(g => (g.Seconds, Fit: (Func<WardSpot, double>)(s => {
                 double via = double.Hypot(g.A.X - s.X, g.A.Y - s.Y) + double.Hypot(s.X - g.B.X, s.Y - g.B.Y);
-                if (via > Speed * g.Seconds + 2 * CastRange) return 0;
+                if (via > Speed * g.Reach + 2 * CastRange) return 0;
                 return Math.Exp(-Math.Max(0, via - double.Hypot(g.A.X - g.B.X, g.A.Y - g.B.Y) - 2 * CastRange) / DetourScale);
             })))).ToArray();
         var scores = new double[pool.Length];

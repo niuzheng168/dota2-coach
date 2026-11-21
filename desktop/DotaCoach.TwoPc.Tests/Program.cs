@@ -10,6 +10,9 @@ void Check(bool value, string name) { if (!value) throw new Exception(name); pas
 if (args.Contains("--video-codec")) { VideoTests.Codec(Check); return; }
 if (args is ["--creep-scan", .. var scanFiles]) { CreepHealthTests.Eval(scanFiles); return; }
 if (args is ["--ward-eval", .. var wardFiles]) { WardEval.Run(wardFiles); return; }
+if (args is ["--ward-session", .. var sessionArgs] && sessionArgs.Where(a => a != "--as-scanned").ToArray() is [var wardSession, var wardTruth]) {
+    WardSessionEval.Run(wardSession, wardTruth, sessionArgs.Contains("--as-scanned")); return;
+}
 if (args is ["--creep-bars", var barsOut, var barsSeconds, var barsGsi]) { CreepHealthTests.RecordBars(barsOut, double.Parse(barsSeconds), barsGsi); return; }
 if (args is ["--overlay-test", var overlayDir]) { CreepHealthTests.OverlayTest(overlayDir); return; }
 if (args is ["--lethal-preview", var previewFrame, var previewGsi, var previewOut]) { HeroAttackTests.Preview(previewFrame, previewGsi, previewOut); return; }
@@ -455,6 +458,9 @@ Check(liveDefaults.EffectiveLayout(liveFrame with { Meta = liveFrame.Meta with {
 foreach (var bad in new[] { liveDefaults with { SubtitleSeconds = 0 }, liveDefaults with { SubtitleSeconds = 16 },
     liveDefaults with { ModelTimeoutSeconds = 7 }, liveDefaults with { ModelTimeoutSeconds = 21 } })
     Reject(bad.Validate, $"coach timing bounds enforced ({bad.SubtitleSeconds}s / {bad.ModelTimeoutSeconds}s)");
+Check(liveDefaults.ScanFolder == "" && liveDefaults.ScanPython == "", "vision scan paths start unset");
+Reject((liveDefaults with { ScanFolder = @"scripts\vision" }).Validate, "a relative vision scan folder is refused");
+Reject((liveDefaults with { ScanPython = "python.exe" }).Validate, "a bare python name is refused: the scan runs exactly the python chosen");
 
 var video = new GameVideoSettings();
 Check(video.Fps == 60 && video.Resolution == "1080" && video.Encoder == "auto" && video.Capture == "window",
@@ -574,6 +580,7 @@ WardTests.Run(Check);
 OverlaySettingsTests.Run(Check);
 CreepHealthTests.Run(Check);
 HeroAttackTests.Run(Check);
+await HeroScanTests.Run(Check);
 Console.WriteLine($"Two-PC protocol + real TLS + GSI + mocked model contracts: {passed} checks passed.");
 
 sealed class FakeCloudCoach(ModelAdvice advice) : HttpMessageHandler

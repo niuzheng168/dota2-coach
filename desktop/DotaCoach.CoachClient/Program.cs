@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -112,6 +113,13 @@ internal sealed class CoachWindow : Window
     private volatile bool panelOn, visionAlertsOn, wardsOn; // also read on the spectator receiver's threads
     private long nextScanPoll;
     private string lastAlert = "", panelText = "", wardText = "";
+    // The vision scan writing scanFile, started and stopped with the button beside 启动接收 (or by hand in a terminal).
+    private readonly Button? scanButton;
+    private readonly TextBlock scanState = Ui.Text("视觉扫描：未启动", 13);
+    private readonly TextBox scanFolder = Ui.Input(), scanPython = Ui.Input();
+    private HeroScanProcess? scan;
+    private bool scanBusy, scanStopped;
+    private string scanNote = "";
 
     // Tests instantiate inert windows explicitly; the application entry point uses automaticStartup=true.
     public CoachWindow() : this(null, false) { }
@@ -168,8 +176,10 @@ internal sealed class CoachWindow : Window
         connection.Children.Add(listen);
         connection.Children.Add(Ui.Button("复制配对码", (_, _) => CopyPairing()));
         connection.Children.Add(Ui.Button("撤销配对", (_, _) => { host?.Revoke(); ClearView(); notice.Text = "旧配对已撤销；请重新复制配对码。"; }));
+        if (e2e == null) connection.Children.Add(scanButton = Ui.Button("启动视觉扫描", async (_, _) => await ToggleScan()));
         left.Children.Add(connection);
         left.Children.Add(status); left.Children.Add(detail); left.Children.Add(notice);
+        if (e2e == null) left.Children.Add(scanState);
         var switches = new StackPanel();
         if (e2e == null) {
             if (video) {
@@ -229,6 +239,8 @@ internal sealed class CoachWindow : Window
             if (closing) return;
             e.Cancel = true; closing = true; stop.Cancel(); timer.Stop(); previewTimer.Stop(); CancelDecision();
             await Stop();
+            while (scanBusy) await Task.Delay(25);
+            if (scan != null) { await scan.DisposeAsync(); scan = null; }
             if (spectator != null) { await spectator.DisposeAsync(); spectator = null; }
             cloud?.Dispose();
             await debug.DisposeAsync();
@@ -302,6 +314,14 @@ internal sealed class CoachWindow : Window
             toggle.Checked += (_, _) => SaveAlertToggles(); toggle.Unchecked += (_, _) => SaveAlertToggles();
         }
         panel.Children.Add(toggles); panel.Children.Add(alertStatus);
+        // Found beside this client when it runs from a checkout; a packaged client needs them filled in once.
+        string? folder = preferences.ScanFolder.Length > 0 ? preferences.ScanFolder : HeroScanProcess.FindFolder(AppContext.BaseDirectory);
+        scanFolder.Text = folder ?? "";
+        scanPython.Text = preferences.ScanPython.Length > 0 ? preferences.ScanPython : folder == null ? "" : HeroScanProcess.FindPython(folder) ?? "";
+        panel.Children.Add(Ui.Label(@"视觉扫描（窗口上方“启动视觉扫描”）的代码仓库目录，含 scripts\vision\hero_scan.py"));
+        panel.Children.Add(scanFolder);
+        panel.Children.Add(Ui.Label(@"装了视觉依赖的 Python，一般是仓库里的 .tmp\vision-tools\Scripts\python.exe"));
+        panel.Children.Add(scanPython);
         if (!video) {
             // With video on this lives in the model settings, which are hidden now.
             subtitleSeconds.Text = preferences.SubtitleSeconds.ToString();
@@ -309,7 +329,7 @@ internal sealed class CoachWindow : Window
             panel.Children.Add(Ui.Row(subtitleSeconds, Ui.Button("保存", (_, _) => SaveSubtitleSeconds())));
         }
         panel.Children.Add(Ui.Text("对手面板一直显示在游戏画面左侧：敌方英雄最近一次被看到时的等级和装备，旧了会标出几秒前；" +
-            "需要本机同时运行视觉扫描（scripts/vision/hero_scan.py scan）。离开视野是字幕，只用观战GSI；" +
+            "需要本机同时运行视觉扫描（窗口上方“启动视觉扫描”；观战的 Dota 要在前台）。离开视野是字幕，只用观战GSI；" +
             "被击杀和走进迷雾分不出来，都会提示" + (video ? "，字幕时长同模型设置。" : "。") +
             "对手插眼：视觉扫描读到的敌方守卫数比上一次少了，就按它这段时间的行踪和 7.42 常见眼位，在游戏机小地图上圈出可能的眼位" +
             "（最多 3 处，最可能的实心），并发一条字幕；守卫交给队友、丢弃也会被当成插眼。" +
@@ -395,6 +415,67 @@ internal sealed class CoachWindow : Window
         try { preferences.Save(settingsPath); }
         catch { notice.Text = "设置无法保存，当前开关仅本次有效。"; }
     }
+    /// <summary>The 启动视觉扫描 button: starts hero_scan.py, or stops the one started here.</summary>
+    private async Task ToggleScan()
+    {
+        if (scanBusy || closing) return;
+        scanBusy = true; scanNote = "";
+        try {
+            if (scan is { ExitCode: null } running) { scanStopped = true; UpdateScan(); await running.StopAsync(); }
+            else scanNote = await StartScan();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception e) when (e is Win32Exception or IOException or UnauthorizedAccessException) {
+            debug.Recorder?.Error("hero-scan", e);
+            scanNote = "无法启动视觉扫描：" + e.Message;
+        }
+        finally { scanBusy = false; UpdateScan(); }
+    }
+    /// <returns>Why it did not start, or what the user has to do for it to work; "" when nothing.</returns>
+    private async Task<string> StartScan()
+    {
+        string folder = scanFolder.Text.Trim(), python = scanPython.Text.Trim(), install = spectatorInstall.Text.Trim();
+        if (!System.IO.Path.IsPathFullyQualified(folder) || !File.Exists(System.IO.Path.Combine(folder, HeroScanProcess.Script)))
+            return @"仓库目录里没有 scripts\vision\hero_scan.py：在“Plus 实时观战”里填本机代码仓库的目录。";
+        if (python.Length == 0) python = HeroScanProcess.FindPython(folder) ?? "";
+        if (!System.IO.Path.IsPathFullyQualified(python) || !File.Exists(python))
+            return @"找不到 Python：在“Plus 实时观战”里填装了视觉依赖的 python.exe（一般是仓库里的 .tmp\vision-tools\Scripts\python.exe）。";
+        if (!System.IO.Path.IsPathFullyQualified(install) || !Directory.Exists(System.IO.Path.Combine(install, "game", "dota")))
+            return "本机 Dota 安装目录不对：在“Plus 实时观战”里改好再启动。";
+        if (scan == null && ScanFeed.Poll(scanFile, null, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).Status.Running)
+            return "已有一个视觉扫描在运行（不是从这里启动的）：先关掉它，再点启动。";
+        scanFolder.Text = folder; scanPython.Text = python;
+        preferences = preferences with { ScanFolder = folder, ScanPython = python };
+        try { preferences.Save(settingsPath); } catch { /* The paths then last only this run. */ }
+        string note = "";
+        if (!HeroScanProcess.Configured(install, scanFile)) {
+            var (code, output) = await HeroScanProcess.Setup(python, folder, install, scanFile, stop.Token);
+            if (code != 0) return "视觉扫描配置失败：" + output.Trim().Split('\n')[^1].Trim();
+            if (output.Contains("Wrote ")) note = "已写入视觉扫描的 GSI 配置：本机 Dota 要完全退出再启动一次才能扫描（只需这一次）。";
+        }
+        if (closing) return "";
+        if (scan != null) await scan.DisposeAsync();
+        scanStopped = false;
+        scan = HeroScanProcess.Start(python, folder, scanFile,
+            System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(scanFile))!, "coach-scan.log"));
+        return note;
+    }
+    private void UpdateScan()
+    {
+        if (scanButton == null) return;
+        bool running = scan is { ExitCode: null };
+        scanButton.Content = running ? "停止视觉扫描" : "启动视觉扫描";
+        scanState.Text = "视觉扫描：" + (scan == null ? (scanBusy ? "启动中…" : "未启动") :
+            running ? (scanStopped ? "正在停止…" : scan.LastOutput switch {
+                "" => "启动中（加载识别模型要十几秒）",
+                var l when l.StartsWith("Waiting for the Dota window", StringComparison.Ordinal) => "等待本机 Dota 启动",
+                var l when l.StartsWith("Dota window changed", StringComparison.Ordinal) => "Dota 窗口变了（最小化或改了分辨率），等它恢复",
+                _ => "运行中 · Dota 在前台时轮流选中敌方英雄，读等级和装备",
+            }) :
+            scanBusy ? "启动中…" : scanStopped ? "已停止" :
+            $"已退出（代码 {scan.ExitCode}）" + (scan.LastError.Length > 0 ? "：" + scan.LastError : "")) +
+            (scanNote.Length > 0 ? "\n" + scanNote : "");
+    }
     /// <summary>Publishes the scanner's enemy panel and waiting vision alerts (as a subtitle) to the game machine.</summary>
     private void UpdateAlerts()
     {
@@ -405,6 +486,7 @@ internal sealed class CoachWindow : Window
         bool sameGame = plus?.MatchId == null || gameMatch == null || plus.MatchId == gameMatch;
         if (now >= nextScanPoll) {
             nextScanPoll = now + 500;
+            UpdateScan();
             EnemyBoard? board = null;
             IReadOnlyDictionary<string, WardReading[]> wards = new Dictionary<string, WardReading[]>();
             if (panelOn || wardsOn) (scanStatus, board, wards) = ScanFeed.Poll(scanFile, plus?.MatchId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
@@ -444,13 +526,13 @@ internal sealed class CoachWindow : Window
     }
     /// <summary>
     /// Subtitle for a ward guess, e.g. "莱恩 少了1个假眼 · 可能在敌方上路一塔大野（小地图已标）". Out of sight for long, the
-    /// marks are often wrong (in replays the likeliest was within 600 units for 67 % of guesses when the hero stayed in sight,
-    /// 27 % after 15–60 s unseen).
+    /// marks are mostly wrong (in replays the likeliest was within 600 units for 71 % of guesses when the hero stayed in sight,
+    /// 27 % after 15–60 s unseen): then only that it warded, and no marks (WardTracker.Marks).
     /// </summary>
     private string WardText(WardGuess g) =>
         $"{heroNames[g.Hero]} 少了{g.Count}个{g.Kind switch { "observer" => "假眼", "sentry" => "真眼", _ => "守卫" }}" +
-        (g.Candidates is [var top, ..] ? $" · 可能在{top.Place}{(top.Rough ? "一带" : "")}" +
-            (g.Unseen >= 15 ? $"（{g.Unseen:F0}秒不在视野，不确定）" : "（小地图已标）") : " · 位置不明");
+        (g.Unseen >= WardTracker.UnsureSeconds ? $" · {g.Unseen:F0}秒不在视野，位置不确定（小地图不标）" :
+            g.Candidates is [var top, ..] ? $" · 可能在{top.Place}{(top.Rough ? "一带" : "")}（小地图已标）" : " · 位置不明");
     private void Refresh()
     {
         if (e2e != null && !closing && File.Exists(System.IO.Path.Combine(e2e.Directory, "stop-requested"))) { Close(); return; }

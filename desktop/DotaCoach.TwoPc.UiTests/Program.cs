@@ -838,7 +838,38 @@ internal static partial class Program
         await Wait(() => host.Mailbox.Enemies(session) == null && Field<TextBlock>(w, "alertStatus").Text.Contains("对手面板已关") &&
             LiveCoachSettings.Load(Path.Combine(output, "spectator-settings.json")).EnemyPanel == false,
             "switching the enemy panel off hides it on the game machine and is saved");
+        // 启动视觉扫描 with a stand-in scanner (the real one needs Dota); never the user's scanner files.
+        Set(w, "scanFile", Path.GetFullPath(Path.Combine(output, "scan-button", "live.json")));
+        string? repo = HeroScanProcess.FindFolder(AppContext.BaseDirectory), python = repo == null ? null : HeroScanProcess.FindPython(repo);
+        await Wait(() => Field<TextBox>(w, "scanFolder").Text == (repo ?? "") && Field<TextBox>(w, "scanPython").Text == (python ?? ""),
+            "run from a checkout, the scan's folder and Python are filled in");
+        Field<TextBox>(w, "scanFolder").Text = fakeInstall;
+        Click(w, "启动视觉扫描");
+        await Wait(() => Field<TextBlock>(w, "scanState").Text.Contains(@"scripts\vision\hero_scan.py") && Field<HeroScanProcess?>(w, "scan") == null,
+            "the scan button explains a folder without the scanner and starts nothing");
+        string fakeScanner = Path.GetFullPath(Path.Combine(output, "fake-scanner"));
+        if (python != null) {
+            Directory.CreateDirectory(Path.Combine(fakeScanner, "scripts", "vision"));
+            File.WriteAllText(Path.Combine(fakeScanner, HeroScanProcess.Script), "import sys\nif sys.argv[1] == 'setup':\n" +
+                "    print('Wrote cfg - restart Dota once so it is loaded.')\n    sys.exit(0)\n" +
+                "print('Waiting for the Dota window...', flush=True)\nsys.stdin.buffer.read()\nopen('stopped.txt', 'a').write('stopped\\n')\n");
+            Field<TextBox>(w, "scanFolder").Text = fakeScanner;
+            Click(w, "启动视觉扫描");
+            await Wait(() => Field<TextBlock>(w, "scanState").Text is { } t && t.Contains("等待本机 Dota 启动") && t.Contains("完全退出再启动") &&
+                Equals(Field<Button>(w, "scanButton").Content, "停止视觉扫描") &&
+                LiveCoachSettings.Load(Path.Combine(output, "spectator-settings.json")) is { ScanFolder: var saved, ScanPython: var savedPython } &&
+                saved == fakeScanner && savedPython == python, "the scan button runs setup, then the scan, shows its state and remembers the paths");
+            Click(w, "停止视觉扫描");
+            await Wait(() => Field<TextBlock>(w, "scanState").Text == "视觉扫描：已停止" && File.Exists(Path.Combine(fakeScanner, "stopped.txt")) &&
+                Equals(Field<Button>(w, "scanButton").Content, "启动视觉扫描"), "the button stops the scan through its standard input");
+            Click(w, "启动视觉扫描");
+            await Wait(() => Field<TextBlock>(w, "scanState").Text.Contains("等待本机 Dota 启动"), "the scan starts again");
+        }
+        else Console.WriteLine("SKIP scan button process checks: no .tmp\\vision-tools Python in this checkout.");
         w.Close(); await Wait(() => !w.IsVisible && Field<SpectatorReceiver?>(w, "spectator") == null, "closing releases the spectator port");
+        if (File.Exists(Path.Combine(fakeScanner, "stopped.txt")))
+            await Wait(() => File.ReadAllLines(Path.Combine(fakeScanner, "stopped.txt")).Length == 2 && Field<HeroScanProcess?>(w, "scan") == null,
+                "closing the coach client stops the scan it started");
         string realState = GsiSetup.StateDirectoryFor("Coach");
         await Wait(() => File.Exists(Path.Combine(state, "installed-spectator-gsi.json")) &&
             (!File.Exists(Path.Combine(realState, "dota-install.txt")) ||
