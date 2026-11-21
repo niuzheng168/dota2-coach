@@ -143,6 +143,13 @@ class Items(unittest.TestCase):
             scanner.write_live(snap | {"mode": "full-spectator"})
             self.assertEqual(json.loads(scanner.args.live.read_text(encoding="utf-8"))["enemies"], [],
                              "full spectating never fills the panel")
+            # A reader holding the file open without sharing it for delete (as the coach client did) blocks replacing
+            # it on Windows: the scanner skips that write instead of stopping, and the next one goes through.
+            with open(scanner.args.live, "rb"):
+                scanner.write_live(snap)
+            self.assertEqual(json.loads(scanner.args.live.read_text(encoding="utf-8"))["mode"], "full-spectator")
+            scanner.write_live(snap)
+            self.assertEqual(json.loads(scanner.args.live.read_text(encoding="utf-8"))["mode"], "team-view")
 
 
 if __name__ == "__main__":

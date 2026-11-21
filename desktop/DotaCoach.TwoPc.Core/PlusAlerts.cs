@@ -99,10 +99,11 @@ public static class ScanFeed
     public static (ScanStatus Status, EnemyBoard? Board) Poll(string path, string? matchId, long nowUnixMs)
     {
         try {
-            var file = new FileInfo(path);
-            if (!file.Exists) return (new(false, "视觉扫描未运行"), null);
-            if (file.Length > MaxFileBytes) return (new(false, "视觉扫描文件异常（过大），已忽略"), null);
-            using var doc = JsonDocument.Parse(File.ReadAllBytes(path), new JsonDocumentOptions { MaxDepth = 8 });
+            if (!File.Exists(path)) return (new(false, "视觉扫描未运行"), null);
+            // Shared for delete: the scanner replaces the file every half second and must not find it locked.
+            using var stream = Shared(path);
+            if (stream.Length > MaxFileBytes) return (new(false, "视觉扫描文件异常（过大），已忽略"), null);
+            using var doc = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 8 });
             var root = doc.RootElement;
             if (root.GetProperty("version").GetInt32() != 2) return (new(false, "视觉扫描版本不符（请更新 hero_scan.py），已忽略"), null);
             long written = (long)(root.GetProperty("written").GetDouble() * 1000);
@@ -127,13 +128,18 @@ public static class ScanFeed
     {
         if (!Wire.ValidIconKey(key)) return null;
         try {
-            var file = new FileInfo(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(liveFile))!, "icons", key + ".png"));
-            if (!file.Exists || file.Length > Wire.MaxIconBytes) return null;
-            var data = File.ReadAllBytes(file.FullName);
+            string file = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(liveFile))!, "icons", key + ".png");
+            if (!File.Exists(file)) return null;
+            using var stream = Shared(file);
+            if (stream.Length > Wire.MaxIconBytes) return null;
+            var data = new byte[stream.Length];
+            stream.ReadExactly(data);
             return Wire.IsIcon(data) ? data : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
     }
+    /// <summary>Read without locking out the scanner, which writes and replaces these files while the coach runs.</summary>
+    private static FileStream Shared(string path) => new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
 }
 
 /// <summary>

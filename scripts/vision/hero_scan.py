@@ -600,11 +600,14 @@ class Scanner:
         folder = self.args.live.parent / "icons"
         keys = {e["hero"] for e in enemies} | {n for e in enemies for n in (e["items"] or []) + [e["neutral"]] if n}
         for key in sorted(keys - self.exported):
-            self.exported.add(key)
             icon = (self.hud.manifest["heroes" if key.startswith("npc_dota_hero_") else "items"].get(key) or {}).get("icon")
             if icon:
                 folder.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(self.args.assets / icon, folder / f"{key}.png")
+                try:
+                    shutil.copyfile(self.args.assets / icon, folder / f"{key}.png")
+                except PermissionError:
+                    continue  # the coach client is reading the old copy: tried again with the next write
+            self.exported.add(key)
 
     def write_live(self, snap: dict, stopped: bool = False):
         """Scanner status and the enemy panel for the coach client, replaced atomically."""
@@ -618,7 +621,14 @@ class Scanner:
         self.args.live.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.args.live.with_suffix(".tmp")
         tmp.write_text(json.dumps(live, ensure_ascii=False), encoding="utf-8")
-        os.replace(tmp, self.args.live)
+        # Windows refuses to replace a file another process has open: the coach client (before 2026-11-21 without
+        # sharing it for delete) may be reading it this moment. Retry briefly, else skip; the next write is 0.5 s away.
+        for _ in range(5):
+            try:
+                os.replace(tmp, self.args.live)
+                return
+            except PermissionError:
+                time.sleep(0.02)
 
     def record(self, snap: dict):
         snap = {"type": "snapshot", "t": round(time.perf_counter() - self.started, 2), "cycle": self.cycle_now(), **snap}
