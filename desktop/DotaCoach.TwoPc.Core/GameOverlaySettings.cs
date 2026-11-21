@@ -32,8 +32,14 @@ public sealed record GameOverlaySettings
     /// <summary>Icon size, % of the default (14 px rows at 720p, scaled with the game height).</summary>
     public int EnemySize { get; init; } = 100;
     public int EnemyOpacity { get; init; } = 75;
+    /// <summary>Possible enemy wards (Plus spectating) circled on Dota's minimap.</summary>
+    public bool ShowWards { get; init; } = true;
+    /// <summary>Dota's minimap is on the right (the HUD option to flip it).</summary>
+    public bool MinimapRight { get; init; }
+    /// <summary>Minimap size, % of the default HUD's (raise it for Dota's extra-large minimap).</summary>
+    public int MinimapSize { get; init; } = 100;
 
-    public const int MinSize = 50, MaxSize = 250, MinWidth = 20, MaxWidth = 95, MinTextOpacity = 20;
+    public const int MinSize = 50, MaxSize = 250, MinWidth = 20, MaxWidth = 95, MinTextOpacity = 20, MinMinimap = 70, MaxMinimap = 160;
     private static readonly Regex Hex = new("^#[0-9A-Fa-f]{6}$");
 
     public static string DefaultPath => Path.Combine(
@@ -43,8 +49,16 @@ public sealed record GameOverlaySettings
         if (X is < 0 or > 100 || Y is < 0 or > 100 || Size is < MinSize or > MaxSize || Width is < MinWidth or > MaxWidth ||
             TextOpacity is < MinTextOpacity or > 100 || BackgroundOpacity is < 0 or > 100 ||
             EnemyY is < 0 or > 100 || EnemySize is < MinSize or > MaxSize || EnemyOpacity is < MinTextOpacity or > 100 ||
+            MinimapSize is < MinMinimap or > MaxMinimap ||
             new[] { TextColor, TitleColor, BackgroundColor }.Any(c => c == null || !Hex.IsMatch(c)))
-            throw new ArgumentException("字幕或对手面板的位置、大小、透明度或颜色无效。");
+            throw new ArgumentException("字幕、对手面板或小地图的位置、大小、透明度或颜色无效。");
+    }
+    /// <summary>Where Dota draws its minimap in a game area of this size (pixels): the default HUD's box, scaled and placed by these settings.</summary>
+    public MinimapLayout Minimap(int width, int height)
+    {
+        var standard = MinimapLayout.Suggest(width, height, MinimapRight);
+        double size = Math.Min(standard.Size * MinimapSize / 100, height * .45);
+        return new(width, height, MinimapRight ? width - size : 0, height - size, size);
     }
     /// <summary>Whether a reminder of this kind gets its subtitle drawn in game; map marks are not affected.</summary>
     public bool Shows(string kind) => kind switch {

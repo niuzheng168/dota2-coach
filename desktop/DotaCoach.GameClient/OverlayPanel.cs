@@ -23,13 +23,13 @@ internal sealed class OverlayPanel : StackPanel
         ("天蓝", "#87CEFA"), ("黑色", "#000000"), ("深蓝黑", "#081018"), ("深灰", "#303030"), ("深蓝", "#0A2540")];
     private readonly string path;
     private readonly AdviceOverlay overlay;
-    private readonly CheckBox advice = Check("AI 打钱建议"), alerts = Check("对手离开视野（Plus 观战）"), title = Check("标题行（来源与“未经核验”）"),
-        enemies = Check("显示对手面板");
+    private readonly CheckBox advice = Check("AI 打钱建议"), alerts = Check("对手提醒（离开视野、插眼，Plus 观战）"), title = Check("标题行（来源与“未经核验”）"),
+        enemies = Check("显示对手面板"), wards = Check("小地图标出可能眼位"), minimapRight = Check("小地图在右侧");
     private readonly Slider x = Range(0, 100), y = Range(0, 100),
         size = Range(GameOverlaySettings.MinSize, GameOverlaySettings.MaxSize), width = Range(GameOverlaySettings.MinWidth, GameOverlaySettings.MaxWidth),
         textOpacity = Range(GameOverlaySettings.MinTextOpacity, 100), backgroundOpacity = Range(0, 100),
         enemyY = Range(0, 100), enemySize = Range(GameOverlaySettings.MinSize, GameOverlaySettings.MaxSize),
-        enemyOpacity = Range(GameOverlaySettings.MinTextOpacity, 100);
+        enemyOpacity = Range(GameOverlaySettings.MinTextOpacity, 100), minimapSize = Range(GameOverlaySettings.MinMinimap, GameOverlaySettings.MaxMinimap);
     private readonly ComboBox textColor = Ui.Choice(), titleColor = Ui.Choice(), backgroundColor = Ui.Choice();
     private readonly TextBlock status = Ui.Text("", 12, Ui.Accent);
     private readonly DispatcherTimer saver = new() { Interval = TimeSpan.FromMilliseconds(400) };
@@ -44,7 +44,7 @@ internal sealed class OverlayPanel : StackPanel
             foreach (var (name, hex) in Palette) combo.Items.Add(Swatch(name, hex));
             combo.SelectionChanged += (_, _) => Changed();
         }
-        foreach (var box in new[] { advice, alerts, title, enemies }) { box.Checked += (_, _) => Changed(); box.Unchecked += (_, _) => Changed(); }
+        foreach (var box in new[] { advice, alerts, title, enemies, wards, minimapRight }) { box.Checked += (_, _) => Changed(); box.Unchecked += (_, _) => Changed(); }
         Children.Add(Ui.Label("游戏内显示哪些字幕（只管这台机器怎么显示；推不推送、显示几秒在教练端设置）"));
         var kinds = new WrapPanel(); kinds.Children.Add(advice); kinds.Children.Add(alerts); kinds.Children.Add(title);
         Children.Add(kinds);
@@ -59,12 +59,17 @@ internal sealed class OverlayPanel : StackPanel
         Children.Add(Ui.Columns(shown,
             Cell("上下位置", enemyY, v => v switch { 0 => "最上", 50 => "正中", 100 => "最下", _ => v + "%" }),
             Cell("大小", enemySize, v => v + "%"), Cell("不透明度", enemyOpacity, v => v + "%")));
+        Children.Add(Ui.Label("可能眼位：教练端发现对手守卫数变少时，在 Dota 小地图上圈出可能的眼位（金色假眼、蓝色真眼、白色种类不明；实心为最可能处，虚线大圈只知道大致区域）"));
+        var mapChecks = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        mapChecks.Children.Add(wards); mapChecks.Children.Add(minimapRight);
+        Children.Add(Ui.Columns(mapChecks, Cell("小地图大小", minimapSize, v => v == 100 ? "默认" : v + "%")));
         Children.Add(Ui.Row(status,
             Ui.Button("预览 8 秒", (_, _) => { overlay.Preview(PreviewMs); status.Text = PreviewNote(); }),
             Ui.Button("恢复默认", (_, _) => { Fill(new()); Changed(); })));
         Children.Add(Ui.Text("改动立即生效并保存在本机。调整时示例字幕和对手面板会在 Dota 画面上显示 8 秒：Dota 用无边框窗口，" +
             "放在另一块屏幕上调最方便（本窗口在前台时也会显示预览）。只隐藏字幕，地图路线圈照常显示。" +
-            "对手面板的图标由教练端发来，还没收到的显示成灰色方块。", 11, Brushes.LightGray));
+            "对手面板的图标由教练端发来，还没收到的显示成灰色方块。预览时小地图上有一个蓝色虚线框：" +
+            "它应正好框住 Dota 的小地图，对不上就调“小地图在右侧”和“小地图大小”（Dota 里开了超大小地图要调大）。", 11, Brushes.LightGray));
         Fill(Current);
         overlay.Settings = Current;
         saver.Tick += (_, _) => Flush();
@@ -92,6 +97,7 @@ internal sealed class OverlayPanel : StackPanel
         TextColor = Hex(textColor), TitleColor = Hex(titleColor), BackgroundColor = Hex(backgroundColor),
         TextOpacity = Whole(textOpacity), BackgroundOpacity = Whole(backgroundOpacity),
         ShowEnemies = enemies.IsChecked == true, EnemyY = Whole(enemyY), EnemySize = Whole(enemySize), EnemyOpacity = Whole(enemyOpacity),
+        ShowWards = wards.IsChecked == true, MinimapRight = minimapRight.IsChecked == true, MinimapSize = Whole(minimapSize),
     };
     private void Fill(GameOverlaySettings s)
     {
@@ -100,6 +106,7 @@ internal sealed class OverlayPanel : StackPanel
         x.Value = s.X; y.Value = s.Y; size.Value = s.Size; width.Value = s.Width;
         textOpacity.Value = s.TextOpacity; backgroundOpacity.Value = s.BackgroundOpacity;
         enemies.IsChecked = s.ShowEnemies; enemyY.Value = s.EnemyY; enemySize.Value = s.EnemySize; enemyOpacity.Value = s.EnemyOpacity;
+        wards.IsChecked = s.ShowWards; minimapRight.IsChecked = s.MinimapRight; minimapSize.Value = s.MinimapSize;
         Select(textColor, s.TextColor); Select(titleColor, s.TitleColor); Select(backgroundColor, s.BackgroundColor);
         loading = false;
     }

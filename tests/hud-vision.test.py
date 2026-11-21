@@ -82,6 +82,85 @@ class Leftover(unittest.TestCase):
         self.assertIsNone(hero_scan.leftover(self.ROSTER - {"npc_dota_hero_4"}, nine, 4), "a hero not seen yet")
 
 
+class Selection(unittest.TestCase):
+    """Plus team view, friend team radiant (2): players 0-4 radiant, 5-9 dire by the spectator hotkeys."""
+    TEAMS = {**{f"npc_dota_hero_r{i}": 2 for i in range(5)}, **{f"npc_dota_hero_d{i}": 3 for i in range(5)}}
+    PLAYERS = {**{i: f"npc_dota_hero_r{i}" for i in range(5)}, **{5 + i: f"npc_dota_hero_d{i}" for i in range(5)}}
+
+    def pick(self, players, visible=(), mode="team-view", allies=False, due=lambda p: True):
+        return hero_scan.selectable(mode, 2, set(visible), self.TEAMS, players, due, allies)
+
+    def test_enemies_in_sight_only(self):
+        self.assertEqual(self.pick(self.PLAYERS, {"npc_dota_hero_d1", "npc_dota_hero_d4", "npc_dota_hero_r2"}), [6, 9])
+        self.assertEqual(self.pick(self.PLAYERS, {"npc_dota_hero_d1"}, allies=True), [0, 1, 2, 3, 4, 6], "--allies adds the friend team")
+        self.assertEqual(self.pick(self.PLAYERS, mode="full-spectator"), list(range(10)), "delayed spectating scans everyone")
+
+    def test_unknown_players_outside_the_friend_half(self):
+        players = {0: "npc_dota_hero_r0", 1: "npc_dota_hero_r1", 7: "npc_dota_hero_d2"}
+        self.assertEqual(self.pick(players, {"npc_dota_hero_d2"}), [5, 6, 7, 8, 9],
+                         "players 2-4 share the hotkey half of two allies; the other half may hold enemies")
+        self.assertEqual(self.pick({}), list(range(10)), "nothing matched yet: everyone is tried")
+        self.assertEqual(self.pick({}, due=lambda p: p in (3, 8)), [3, 8], "unknown players wait for their retry")
+        mixed = {0: "npc_dota_hero_r0", 1: "npc_dota_hero_d0"}  # a custom lobby's order: no half is all allies
+        self.assertEqual(self.pick(mixed), [2, 3, 4, 5, 6, 7, 8, 9])
+
+    def test_friend_team_unknown_scans_as_before(self):
+        out = hero_scan.selectable("team-view", None, {"npc_dota_hero_d0"}, self.TEAMS, self.PLAYERS, lambda p: True, False)
+        self.assertEqual(out, [5])
+
+
+class WardCounts(unittest.TestCase):
+    @staticmethod
+    def digit(d: int) -> np.ndarray:
+        """A crude bright glyph of `d` dots on dark ground, enough to tell templates apart."""
+        g = np.zeros(hr.DIGIT_PATCH, np.float32)
+        for i in range(d + 1):
+            g[2 + i, 2 + (i * 3) % 7] = 255
+        return g
+
+    def digits(self):
+        return hr.Digits({str(d): (self.digit(d), np.ones(hr.DIGIT_PATCH, np.float32)) for d in range(1, 10)})
+
+    def test_one_digit_is_found_where_counts_are_drawn(self):
+        reader, value = self.digits(), np.full((56, 74), 40, np.float32)
+        rows, cols = hr.DIGIT_PATCH
+        (x0, _), (y0, _) = hr.COUNT_SEARCH["main"]
+        xr, yb = 40 + x0 + 2, 32 + y0 + 1
+        value[yb - rows + 1:yb + 1, xr - cols + 1:xr + 1] = self.digit(3)
+        self.assertEqual(reader.read(value, 40, 32, hr.COUNT_SEARCH["main"]), 3)
+        self.assertIsNone(reader.read(np.full((56, 74), 40, np.float32), 40, 32, hr.COUNT_SEARCH["main"]), "flat ground reads as nothing")
+
+    def test_ward_summary(self):
+        hud = object.__new__(hr.HudRecognizer)
+        frame = np.zeros((1080, 1920, 3), np.uint8)
+        reads = {}
+
+        class FakeDigits:
+            def read(self, value, cx, cy, search, small=False):
+                return reads.get("behind" if small else "count")
+        hud.digits, tint = FakeDigits(), {}
+        hud.ward_tint = lambda f, cx, cy: tint.get("front")
+
+        def summary(name, slot="slot0", **values):
+            reads.clear(); reads.update(values)
+            return hud.wards(frame, {slot: {"name": name}, "slot1": {"name": "item_tango"}}, 0, 0)
+        tint["front"] = "observer"
+        self.assertEqual(summary("item_ward_observer", count=2), {"observer": 2, "sentry": 0, "unknown": 0})
+        tint["front"] = None
+        self.assertEqual(summary("item_ward_sentry", count=3), {"observer": 0, "sentry": 0, "unknown": 3},
+                         "a grey icon (cooldown) does not tell the kind")
+        tint["front"] = "sentry"
+        self.assertEqual(summary("item_ward_dispenser", count=2, behind=1), {"observer": 1, "sentry": 2, "unknown": 0},
+                         "a dispenser: the front kind's count bottom right, the other's bottom left")
+        self.assertEqual(summary("item_ward_dispenser", slot="slot7", count=1, behind=2), {"observer": 0, "sentry": 0, "unknown": 3},
+                         "in the backpack only the total is known")
+        self.assertIsNone(summary("item_ward_observer", count=None), "an unread count makes the read useless for counting")
+        self.assertIsNone(summary("item_ward_dispenser", count=1, behind=None))
+        self.assertEqual(summary("item_blink"), {"observer": 0, "sentry": 0, "unknown": 0})
+        hud.digits = None
+        self.assertIsNone(summary("item_ward_observer", count=1), "without digit templates no counts are claimed")
+
+
 class Items(unittest.TestCase):
     MANIFEST = {"item_blink": {"icon": "items/blink.png"}, "item_bfury": {"icon": "items/bfury.png"},
                 "item_boots": {"icon": "items/boots.png"}, "item_tango": {"consumable": True, "icon": "items/tango.png"},
@@ -107,6 +186,22 @@ class Items(unittest.TestCase):
         slots.read(hero, self.read("item_tango", "item_recipe_bfury", "item_recipe", "item_boots"))
         self.assertEqual(slots.shown[hero][:4], ("item_tango", None, None, "item_boots"), "consumables stay, recipes do not")
 
+    def test_ward_reads_are_kept_from_complete_reads(self):
+        slots, hero = hero_scan.ItemSlots(self.MANIFEST), "npc_dota_hero_lion"
+        wards = lambda o, clock: {"wards": {"observer": o, "sentry": 0, "unknown": 0}, "clock": clock}
+        slots.read(hero, self.read("item_boots") | wards(2, 600))
+        slots.read(hero, self.read("item_boots") | wards(2, 600))
+        slots.read(hero, self.read("item_boots", "?") | wards(1, 603))
+        slots.read(hero, self.read("item_boots") | {"wards": None, "clock": 606})
+        self.assertEqual(list(slots.wards[hero]), [{"clock": 600, "observer": 2, "sentry": 0, "unknown": 0}],
+                         "one entry per read clock; reads with an unknown slot or unread counts are left out")
+        backpack_unknown = self.read("item_boots") | {"slot7": "?"} | wards(1, 609)
+        slots.read(hero, backpack_unknown)
+        self.assertEqual(len(slots.wards[hero]), 1, "an unknown backpack slot could hide a ward")
+        for clock in range(612, 640, 3):
+            slots.read(hero, self.read("item_boots") | wards(1, clock))
+        self.assertEqual([r["clock"] for r in slots.wards[hero]], [630, 633, 636, 639], "the last few reads only")
+
     def test_live_file_lists_enemies_in_player_order_with_their_icons(self):
         import json
         import tempfile
@@ -123,7 +218,8 @@ class Items(unittest.TestCase):
                 "npc_dota_hero_pudge": {"icon": "heroes/pudge.png"}, "npc_dota_hero_juggernaut": {"icon": "heroes/jugg.png"}}})
             scanner.lock, scanner.exported, scanner.run_id = threading.Lock(), set(), "ab12"
             scanner.item_slots = hero_scan.ItemSlots(self.MANIFEST)
-            scanner.item_slots.read("npc_dota_hero_pudge", self.read("item_boots"))
+            scanner.item_slots.read("npc_dota_hero_pudge", self.read("item_boots") | {"wards": {"observer": 1, "sentry": 0, "unknown": 0}, "clock": 590})
+            scanner.item_slots.read("npc_dota_hero_juggernaut", self.read("?"))
             hero = lambda team, status: {"team": team, "status": status, "items": None, "seen": None}
             snap = {"mode": "team-view", "matchId": "9001", "ownTeam": 2, "clock": 600, "selecting": True,
                     "players": {"7": "npc_dota_hero_pudge", "1": "npc_dota_hero_lion"},
@@ -135,7 +231,7 @@ class Items(unittest.TestCase):
             self.assertEqual(live["version"], 2)
             self.assertEqual(live["enemies"], [
                 {"hero": "npc_dota_hero_pudge", "level": 11, "age": 4.5, "items": ["item_boots", None, None, None, None, None],
-                 "neutral": None},
+                 "neutral": None, "wards": [{"clock": 590, "observer": 1, "sentry": 0, "unknown": 0}]},
                 {"hero": "npc_dota_hero_juggernaut", "level": None, "age": None, "items": None, "neutral": None}],
                 "allies left out; matched players first; a never-read enemy has nulls")
             icons = sorted(p.name for p in (root / "live" / "icons").iterdir())

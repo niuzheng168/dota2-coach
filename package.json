@@ -19,6 +19,8 @@
     "map:reference": "node scripts/build-map-reference.ts",
     "map:client-audit": "node scripts/client/audit-installation.ts",
     "map:engine-probe": "node scripts/client/collect-engine.ts",
+    "map:coach": "node scripts/client/build-coach-map.ts",
+    "build:ward-spots": "node scripts/build-ward-spots.ts",
     "build:simulator": "node scripts/build-simulator-data.ts",
     "build:minimap": "node scripts/build-minimap-icons.ts",
     "replay:download": "node scripts/replays/download.ts",

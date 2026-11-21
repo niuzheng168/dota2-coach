@@ -98,15 +98,20 @@ internal sealed class CoachWindow : Window
     // subtitles when enemies leave the friend team's vision (this machine's own Plus GSI). Team-view data only.
     private readonly CheckBox enemyPanel = new() { Content = "对手等级和装备（游戏左侧面板）", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
     private readonly CheckBox enemyVision = new() { Content = "对手离开视野", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
+    private readonly CheckBox enemyWards = new() { Content = "对手插眼（小地图标记可能眼位）", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
     private readonly TextBlock alertStatus = Ui.Text("对手提醒：等待 Plus 队伍视角", 12, Brushes.LightGray);
-    private readonly VisionLossTracker visionLoss = new();
+    // The 7.42 map (place names, minimap projection) and common ward spots, bundled in data/. Without the map there
+    // are no ward guesses and alerts fall back to coarse areas.
+    private readonly CoachMap? coachMap = CoachMap.Bundled();
+    private readonly WardTracker? wardTracker;
+    private readonly VisionLossTracker visionLoss;
     private readonly AlertComposer alerts = new();
     private HeroNames heroNames = new();
     private string scanFile = ScanFeed.DefaultPath; // instance field so UI tests never read the real scanner output
     private ScanStatus scanStatus = new(false, "视觉扫描未运行");
-    private volatile bool panelOn, visionAlertsOn; // also read on the spectator receiver's threads
+    private volatile bool panelOn, visionAlertsOn, wardsOn; // also read on the spectator receiver's threads
     private long nextScanPoll;
-    private string lastAlert = "", panelText = "";
+    private string lastAlert = "", panelText = "", wardText = "";
 
     // Tests instantiate inert windows explicitly; the application entry point uses automaticStartup=true.
     public CoachWindow() : this(null, false) { }
@@ -116,6 +121,8 @@ internal sealed class CoachWindow : Window
     {
         e2e = run; debug = new DebugPanel("coach", debugRoot);
         video = Features.VideoUpload || e2e != null; // the local-bot E2E evidence is built on uploaded pictures
+        visionLoss = new VisionLossTracker { Map = coachMap };
+        if (coachMap != null) wardTracker = new WardTracker(coachMap, WardSpots.Bundled());
         settingsPath = preferencesFile ?? LiveCoachSettings.DefaultPath;
         try { preferences = LiveCoachSettings.Load(settingsPath); }
         catch { preferences = new(); notice.Text = "已保存的设置无效，请检查并重新应用；没有读取或输出密钥内容。"; }
@@ -287,8 +294,10 @@ internal sealed class CoachWindow : Window
         panel.Children.Add(Ui.Label("推送到游戏机（只用队伍视角看得到的信息）"));
         enemyPanel.IsChecked = panelOn = preferences.EnemyPanel;
         enemyVision.IsChecked = visionAlertsOn = preferences.EnemyVisionAlerts;
+        enemyWards.IsChecked = wardsOn = preferences.EnemyWards && wardTracker != null;
+        enemyWards.IsEnabled = wardTracker != null;
         var toggles = new WrapPanel();
-        foreach (var toggle in new[] { enemyPanel, enemyVision }) {
+        foreach (var toggle in new[] { enemyPanel, enemyVision, enemyWards }) {
             toggles.Children.Add(toggle);
             toggle.Checked += (_, _) => SaveAlertToggles(); toggle.Unchecked += (_, _) => SaveAlertToggles();
         }
@@ -301,7 +310,10 @@ internal sealed class CoachWindow : Window
         }
         panel.Children.Add(Ui.Text("对手面板一直显示在游戏画面左侧：敌方英雄最近一次被看到时的等级和装备，旧了会标出几秒前；" +
             "需要本机同时运行视觉扫描（scripts/vision/hero_scan.py scan）。离开视野是字幕，只用观战GSI；" +
-            "被击杀和走进迷雾分不出来，都会提示" + (video ? "，字幕时长同模型设置。" : "。"), 12, Brushes.LightGray));
+            "被击杀和走进迷雾分不出来，都会提示" + (video ? "，字幕时长同模型设置。" : "。") +
+            "对手插眼：视觉扫描读到的敌方守卫数比上一次少了，就按它这段时间的行踪和 7.42 常见眼位，在游戏机小地图上圈出可能的眼位" +
+            "（最多 3 处，最可能的实心），并发一条字幕；守卫交给队友、丢弃也会被当成插眼。" +
+            (wardTracker == null ? "\n本机缺少 data/dota2-coach-map.json，插眼推测不可用。" : ""), 12, Brushes.LightGray));
         return panel;
     }
     private async Task StartSpectator()
@@ -346,9 +358,11 @@ internal sealed class CoachWindow : Window
         if (s is { Running: true }) {
             int Count(Func<MinimapUnit, bool> f) => s.Heroes.Where(f).Select(u => u.Name).Distinct().Count();
             int allies = Count(u => u.Team == s.OwnTeam), enemies = Count(u => u.Team is 2 or 3 && u.Team != s.OwnTeam);
-            int neutrals = s.Minimap.Count(u => u.Team == 4 && u.Name.StartsWith("npc_dota_neutral_", StringComparison.Ordinal));
+            var neutrals = s.Minimap.Where(u => u.Team == 4 && u.Name.StartsWith("npc_dota_neutral_", StringComparison.Ordinal)).ToArray();
+            // Neutrals inside a 7.42 camp's spawn box (a little beyond, as they wander) tell how many camps are in sight.
+            int camps = coachMap == null ? 0 : neutrals.Select(u => coachMap.CampAt(u.X, u.Y, 300)?.Id).OfType<string>().Distinct().Count();
             text.Append($"\n游戏 {Clock(s.Clock!.Value)} · {(s.OwnTeam == 2 ? "天辉" : s.OwnTeam == 3 ? "夜魇" : "阵营未知")} · 小地图 {s.Minimap.Length} 个单位\n" +
-                $"己方英雄 {allies} · 视野内敌方英雄 {enemies} · 视野内野怪 {neutrals}" +
+                $"己方英雄 {allies} · 视野内敌方英雄 {enemies} · 视野内野怪 {neutrals.Length}" + (camps > 0 ? $"（{camps} 个营地）" : "") +
                 (s.GroupedPlayers > 0 ? $" · 10人分组 {s.GroupedPlayers}" : ""));
         }
         text.Append(delay.MedianMs is double median
@@ -362,6 +376,7 @@ internal sealed class CoachWindow : Window
         List<PlusAlert> found;
         lock (visionLoss) found = visionLoss.Update(s, heroNames);
         if (visionAlertsOn && found.Count > 0) alerts.Add(found, Environment.TickCount64);
+        wardTracker?.Sight(s); // tracks are kept even while switched off, so switching on has the recent past
     }
     private void SaveSubtitleSeconds()
     {
@@ -374,9 +389,9 @@ internal sealed class CoachWindow : Window
     }
     private void SaveAlertToggles()
     {
-        panelOn = enemyPanel.IsChecked == true; visionAlertsOn = enemyVision.IsChecked == true;
-        if (!visionAlertsOn) alerts.Clear();
-        preferences = preferences with { EnemyPanel = panelOn, EnemyVisionAlerts = visionAlertsOn };
+        panelOn = enemyPanel.IsChecked == true; visionAlertsOn = enemyVision.IsChecked == true; wardsOn = enemyWards.IsChecked == true;
+        if (!visionAlertsOn && !wardsOn) alerts.Clear();
+        preferences = preferences with { EnemyPanel = panelOn, EnemyVisionAlerts = visionAlertsOn, EnemyWards = wardsOn };
         try { preferences.Save(settingsPath); }
         catch { notice.Text = "设置无法保存，当前开关仅本次有效。"; }
     }
@@ -391,9 +406,23 @@ internal sealed class CoachWindow : Window
         if (now >= nextScanPoll) {
             nextScanPoll = now + 500;
             EnemyBoard? board = null;
-            if (panelOn) (scanStatus, board) = ScanFeed.Poll(scanFile, plus?.MatchId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            IReadOnlyDictionary<string, WardReading[]> wards = new Dictionary<string, WardReading[]>();
+            if (panelOn || wardsOn) (scanStatus, board, wards) = ScanFeed.Poll(scanFile, plus?.MatchId, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            WardMark[]? marks = null;
+            if (wardTracker != null && board != null && plus is { Mode: "team-view", OwnTeam: 2 or 3 }) {
+                // Reads are taken in even while switched off: switching on must not mistake the last hour's wards for new ones.
+                var guessed = wardTracker.Readings(plus.MatchId, plus.OwnTeam.Value, wards);
+                if (wardsOn) {
+                    if (guessed.Count > 0) alerts.Add(guessed.Select(g => new PlusAlert(now, "ward-guess", g.Hero, WardText(g))), now);
+                    marks = wardTracker.Marks(wardTracker.Clock);
+                    wardText = marks.Length == 0 ? "插眼推测：暂无" : $"插眼推测：小地图 {marks.Count(m => m.Rank == 0)} 处" +
+                        (guessed.Count > 0 ? " · 新：" + WardText(guessed[^1]) : "");
+                }
+            }
+            else if (wardsOn) wardText = "插眼推测：等待 Plus 队伍视角和视觉扫描";
+            if (!wardsOn) wardText = wardTracker == null ? "" : "插眼推测已关";
             bool deliver = board != null && frame != null && sameGame;
-            host?.Mailbox.SetEnemies(deliver ? board : null);
+            host?.Mailbox.SetEnemies(deliver && (panelOn || marks is { Length: > 0 }) ? new EnemyBoard(panelOn ? board!.Heroes : [], marks) : null);
             panelText = !panelOn ? "对手面板已关" : board == null ? "对手面板：" + scanStatus.Text :
                 deliver ? $"对手面板：已推送 {board.Heroes.Length} 名敌方英雄" :
                 $"对手面板：未推送（{(frame == null ? "游戏机未连接" : "观战的不是游戏机这一局")}）";
@@ -409,10 +438,19 @@ internal sealed class CoachWindow : Window
                 lastAlert = $"未推送（{(frame == null ? "游戏机未连接" : !sameGame ? "观战的不是游戏机这一局" : "英雄阵亡或游戏机已断开")}）：{text}";
             }
         }
-        alertStatus.Text = (panelOn || visionAlertsOn ? "" : "已关闭 · ") +
+        alertStatus.Text = (panelOn || visionAlertsOn || wardsOn ? "" : "已关闭 · ") +
             (plus is { Mode: "team-view" } && now - plus.ReceivedAt <= 3000 ? "Plus 队伍视角" : "等待 Plus 队伍视角（完整观战不推送）") +
-            "\n" + panelText + (lastAlert.Length > 0 ? "\n" + lastAlert : "");
+            "\n" + panelText + (wardText.Length > 0 ? "\n" + wardText : "") + (lastAlert.Length > 0 ? "\n" + lastAlert : "");
     }
+    /// <summary>
+    /// Subtitle for a ward guess, e.g. "莱恩 少了1个假眼 · 可能在敌方上路一塔大野（小地图已标）". Out of sight for long, the
+    /// marks are often wrong (in replays the likeliest was within 600 units for 67 % of guesses when the hero stayed in sight,
+    /// 27 % after 15–60 s unseen).
+    /// </summary>
+    private string WardText(WardGuess g) =>
+        $"{heroNames[g.Hero]} 少了{g.Count}个{g.Kind switch { "observer" => "假眼", "sentry" => "真眼", _ => "守卫" }}" +
+        (g.Candidates is [var top, ..] ? $" · 可能在{top.Place}{(top.Rough ? "一带" : "")}" +
+            (g.Unseen >= 15 ? $"（{g.Unseen:F0}秒不在视野，不确定）" : "（小地图已标）") : " · 位置不明");
     private void Refresh()
     {
         if (e2e != null && !closing && File.Exists(System.IO.Path.Combine(e2e.Directory, "stop-requested"))) { Close(); return; }
@@ -646,7 +684,7 @@ internal sealed class CoachWindow : Window
             preferences = candidate;
             if (save) preferences.Save(settingsPath);
             string data = System.IO.Path.Combine(AppContext.BaseDirectory, "data");
-            liveMap = new CalibratedMap(System.IO.Path.Combine(data, "dota2-map-reference.json"));
+            liveMap = new CalibratedMap(System.IO.Path.Combine(data, "dota2-coach-map.json")); // 7.42 camps and towers
             liveLessons = File.ReadAllText(System.IO.Path.Combine(data, "luna-live-lessons.json"));
             cloud = CreateLiveModel(null); modelConfigured = true;
             autoStatus.Text = "模型配置就绪；收到新鲜自身GSI＋真实游戏画面后自动推理。";

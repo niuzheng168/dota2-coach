@@ -384,12 +384,14 @@ internal static partial class Program
         var panel = Field<OverlayPanel>(game, "overlayPanel");
         var overlay = Field<AdviceOverlay>(game, "overlay");
         await Wait(() => panel.Current == new GameOverlaySettings() && overlay.Settings == panel.Current &&
-            Children(panel).OfType<Slider>().Count() == 9 && !File.Exists(file), "overlay panel starts from the default style and writes nothing");
+            Children(panel).OfType<Slider>().Count() == 10 && !File.Exists(file), "overlay panel starts from the default style and writes nothing");
         Member<Slider>(panel, "x").Value = 0; Member<Slider>(panel, "y").Value = 100;
         Member<CheckBox>(panel, "alerts").IsChecked = false;
+        Member<CheckBox>(panel, "minimapRight").IsChecked = true; Member<Slider>(panel, "minimapSize").Value = 120;
         var background = Member<ComboBox>(panel, "backgroundColor");
         background.SelectedItem = background.Items.OfType<ComboBoxItem>().Single(i => (string)i.Tag == "#FF5A5A");
-        await Wait(() => File.Exists(file) && GameOverlaySettings.Load(file) is { X: 0, Y: 100, ShowAlerts: false, BackgroundColor: "#FF5A5A" } s &&
+        await Wait(() => File.Exists(file) && GameOverlaySettings.Load(file) is
+            { X: 0, Y: 100, ShowAlerts: false, BackgroundColor: "#FF5A5A", ShowWards: true, MinimapRight: true, MinimapSize: 120 } s &&
             overlay.Settings == s, "sliders, switches and colours apply to the overlay at once and are saved");
         var latest = host.Mailbox.Latest()!;
         host.Mailbox.SetReminder(latest.Meta.SessionId, latest.Meta.Sequence, "local-vision-observation", "剃刀 离开视野 · 最后在中路", null);
@@ -415,6 +417,26 @@ internal static partial class Program
         await Wait(() => bundled["npc_dota_hero_lion"] is BitmapSource { PixelWidth: 32 } &&
             bundled.Missing(board, 0).SequenceEqual(["npc_dota_hero_razor", "npc_dota_hero_pudge"]) && bundled.Count == 2,
             "bundled icons load from the program folder; missing or broken ones are asked from the coach");
+        WardMark[] marks = [new("npc_dota_hero_lion", "observer", .25, .25, 0, .6, 20, 340), new("npc_dota_hero_lion", "observer", .75, .25, 1, .3, 20, 340),
+            new("npc_dota_hero_lion", "sentry", .25, .75, 0, 1, 50, 370), new("npc_dota_hero_pudge", "ward", .75, .75, 0, 1, 380, 40, Rough: true)];
+        host.Mailbox.SetEnemies(new([], marks));
+        await Wait(() => Member<EnemyBoard?>(overlay, "enemies") is { Heroes: [], Wards: [{ Kind: "observer", Rank: 0 }, _, _, { Rough: true }] },
+            "ward guesses reach the game client without an enemy panel");
+        // The marks as the overlay draws them over a 300-unit minimap: a filled gold ring for the likeliest observer spot,
+        // a filled blue one for the sentry, dashed rings (no fill) for the second observer spot and the rough guess.
+        var minimap = AdviceOverlay.WardMarks(marks, 300, 1.5, outline: true);
+        minimap.Measure(new Size(300, 300)); minimap.Arrange(new Rect(0, 0, 300, 300)); minimap.UpdateLayout();
+        var wardBitmap = new RenderTargetBitmap(300, 300, 96, 96, PixelFormats.Pbgra32);
+        wardBitmap.Render(minimap);
+        var wardPixels = new byte[300 * 300 * 4];
+        wardBitmap.CopyPixels(wardPixels, 300 * 4, 0);
+        using (var stream = File.Create(Path.Combine(output, "ward-marks.png"))) {
+            var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(wardBitmap)); encoder.Save(stream);
+        }
+        byte[] Mark(double x, double y) { int i = ((int)y * 300 + (int)x) * 4; return wardPixels[i..(i + 4)]; }
+        await Wait(() => Mark(75, 75) is [< 60, > 70, > 90, > 100] && Mark(75, 225) is [> 90, > 60, < 60, > 100] &&
+            Mark(225, 75)[3] < 40 && Mark(225, 225)[3] < 40 && Enumerable.Range(100, 60).Any(x => Mark(x, 1)[0] > 150),
+            "ward marks: likeliest spots filled in the ward colour, other candidates and rough guesses as empty rings, the minimap outlined");
 
         const int W = 1280, H = 720;
         var alert = new Reminder("a", "s", 1, "local-vision-observation", "剃刀 离开视野 · 最后在中路；主宰 新装备 狂战斧", null, W, H, 3000);

@@ -13,7 +13,8 @@ public sealed class CalibratedMap
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(file));
         var root = doc.RootElement;
-        if (root.GetProperty("patch").GetString() != "7.41f") throw new ArgumentException("Unreviewed map patch");
+        // 7.41f: the replay-checked reference (local bot E2E); 7.42: the coach map read from the installed client.
+        if (root.GetProperty("patch").GetString() is not ("7.41f" or "7.42")) throw new ArgumentException("Unreviewed map patch");
         var overview = root.GetProperty("overview");
         left = overview.GetProperty("posX").GetDouble(); top = overview.GetProperty("posY").GetDouble();
         span = overview.GetProperty("coordinateSpan").GetDouble();

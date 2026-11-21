@@ -49,10 +49,15 @@ public static class Wire
     public static bool ValidIconKey(string? key) => key != null && IconName.IsMatch(key);
     private static bool Item(string? name) => name == null || name.StartsWith("item_", StringComparison.Ordinal) && ValidIconKey(name);
     public static bool ValidBoard(EnemyBoard? board) => board?.Heroes is { Length: <= 5 } heroes &&
-        heroes.All(h => h is { Hero: { } hero } && hero.StartsWith("npc_dota_hero_", StringComparison.Ordinal) && ValidIconKey(hero) &&
+        heroes.All(h => h is { Hero: { } hero } && Hero(hero) &&
             h.Level is null or (>= 1 and <= 30) && (h.Items == null || h.Items.Length == 6 && h.Items.All(Item)) && Item(h.Neutral) &&
             (h.Age == null || Finite(h.Age.Value, 0, 86_400))) &&
-        heroes.Select(h => h.Hero).Distinct().Count() == heroes.Length;
+        heroes.Select(h => h.Hero).Distinct().Count() == heroes.Length &&
+        (board.Wards == null || board.Wards.Length <= MaxWardMarks && board.Wards.All(w => w is { Hero: { } hero, Kind: "observer" or "sentry" or "ward" } &&
+            Hero(hero) && Finite(w.X, 0, 1) && Finite(w.Y, 0, 1) && w.Rank is >= 0 and < WardTracker.MaxCandidates &&
+            Finite(w.Share, 0, 1) && Finite(w.Age, 0, 86_400) && Finite(w.Left, 0, WardTracker.SentryLifetime)));
+    public const int MaxWardMarks = WardTracker.MaxGuesses * WardTracker.MaxCandidates;
+    private static bool Hero(string name) => name.StartsWith("npc_dota_hero_", StringComparison.Ordinal) && ValidIconKey(name);
     /// <summary>A small PNG, checked from its header before any image decoder sees network data.</summary>
     public static bool IsIcon(ReadOnlySpan<byte> data)
     {
@@ -117,7 +122,15 @@ public sealed record Reminder(string Id, string SessionId, long FrameSequence, s
 /// slots in order (null = empty).
 /// </summary>
 public sealed record EnemyHero(string Hero, int? Level, string?[]? Items, string? Neutral, double? Age);
-public sealed record EnemyBoard(EnemyHero[] Heroes);
+/// <summary>
+/// A possible enemy ward for the game machine's minimap, guessed by the coach (<see cref="WardTracker"/>): X/Y run 0..1
+/// across the minimap square from its top-left corner. Kind observer, sentry or ward (unknown kind). Rank 0 is the
+/// likeliest of a guess's candidates, Share its weight; Age is seconds since the ward was missed, Left until it would
+/// expire. Rough: no common spot fitted, only where the hero went.
+/// </summary>
+public sealed record WardMark(string Hero, string Kind, double X, double Y, int Rank, double Share, double Age, double Left, bool Rough = false);
+/// <summary>The enemy panel and, since v0.4.5, possible enemy wards (older game clients ignore them).</summary>
+public sealed record EnemyBoard(EnemyHero[] Heroes, WardMark[]? Wards = null);
 public sealed record FrameView
 {
     private Lazy<byte[]> jpeg = null!;
@@ -376,7 +389,8 @@ public sealed class CoachMailbox
             if (frame == null || now() - frame.ReceivedAt > Wire.PresenceLifetimeMs ||
                 board is not { } b || now() - b.At > Wire.BoardLifetimeMs) return null;
             double held = (now() - b.At) / 1000.0;
-            return new(b.Value.Heroes.Select(h => h with { Age = h.Age + held }).ToArray());
+            return new(b.Value.Heroes.Select(h => h with { Age = h.Age + held }).ToArray(),
+                b.Value.Wards?.Where(w => w.Left > held).Select(w => w with { Age = w.Age + held, Left = w.Left - held }).ToArray());
         }
     }
     public byte[]? Icon(string id, string key)

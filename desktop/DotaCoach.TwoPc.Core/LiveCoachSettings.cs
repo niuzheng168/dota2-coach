@@ -23,6 +23,8 @@ public sealed record LiveCoachSettings
     public bool EnemyPanel { get; init; } = true;
     /// <summary>Plus live spectating: subtitle on the game machine when an enemy leaves the friend team's vision.</summary>
     public bool EnemyVisionAlerts { get; init; } = true;
+    /// <summary>Plus live spectating: when an enemy's ward count drops, possible ward spots on the game machine's minimap and a subtitle.</summary>
+    public bool EnemyWards { get; init; } = true;
     public string BindAddress { get; init; } = "";
     public MinimapLayout[] Calibrations { get; init; } = [];
     public static string DefaultPath => Path.Combine(

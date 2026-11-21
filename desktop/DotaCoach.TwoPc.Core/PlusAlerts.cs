@@ -54,6 +54,8 @@ public sealed class VisionLossTracker
     public int MinVisibleMs { get; init; } = 3000;
     public int GoneMs { get; init; } = 3000;
     public int CooldownMs { get; init; } = 20000;
+    /// <summary>The 7.42 map for place names (camps, towers, objectives); without it the coarse <see cref="MapArea"/>.</summary>
+    public CoachMap? Map { get; init; }
     private sealed class Sighting { public long RunStart, LastVisible, LastAlert = long.MinValue / 2; public double X, Y; public bool Announced; }
     private readonly Dictionary<string, Sighting> heroes = new(StringComparer.Ordinal);
     private string? match;
@@ -76,7 +78,7 @@ public sealed class VisionLossTracker
             h.Announced = true; // one alert per absence, even when the cooldown suppresses it
             if (h.LastVisible - h.RunStart < MinVisibleMs || now - h.LastAlert < CooldownMs) continue;
             h.LastAlert = now;
-            alerts.Add(new(now, "vision-lost", hero, $"{names[hero]} 离开视野 · 最后在{MapArea.Name(h.X, h.Y, ownTeam)}"));
+            alerts.Add(new(now, "vision-lost", hero, $"{names[hero]} 离开视野 · 最后在{Map?.Describe(h.X, h.Y, ownTeam) ?? MapArea.Name(h.X, h.Y, ownTeam)}"));
         }
         return alerts;
     }
@@ -96,32 +98,51 @@ public static class ScanFeed
 
     /// <param name="matchId">The spectated match (Plus GSI); a scan of another match is ignored.</param>
     /// <param name="nowUnixMs">Wall clock, which the scanner also stamps its file with.</param>
-    public static (ScanStatus Status, EnemyBoard? Board) Poll(string path, string? matchId, long nowUnixMs)
+    /// <returns>Also each enemy's recent ward reads (oldest first; empty from scanners before ward counts).</returns>
+    public static (ScanStatus Status, EnemyBoard? Board, IReadOnlyDictionary<string, WardReading[]> Wards) Poll(string path, string? matchId, long nowUnixMs)
     {
+        IReadOnlyDictionary<string, WardReading[]> none = new Dictionary<string, WardReading[]>();
         try {
-            if (!File.Exists(path)) return (new(false, "视觉扫描未运行"), null);
+            if (!File.Exists(path)) return (new(false, "视觉扫描未运行"), null, none);
             // Shared for delete: the scanner replaces the file every half second and must not find it locked.
             using var stream = Shared(path);
-            if (stream.Length > MaxFileBytes) return (new(false, "视觉扫描文件异常（过大），已忽略"), null);
+            if (stream.Length > MaxFileBytes) return (new(false, "视觉扫描文件异常（过大），已忽略"), null, none);
             using var doc = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 8 });
             var root = doc.RootElement;
-            if (root.GetProperty("version").GetInt32() != 2) return (new(false, "视觉扫描版本不符（请更新 hero_scan.py），已忽略"), null);
+            if (root.GetProperty("version").GetInt32() != 2) return (new(false, "视觉扫描版本不符（请更新 hero_scan.py），已忽略"), null, none);
             long written = (long)(root.GetProperty("written").GetDouble() * 1000);
             if (root.TryGetProperty("stopped", out var stopped) && stopped.ValueKind == JsonValueKind.True)
-                return (new(false, "视觉扫描已停止"), null);
-            if (nowUnixMs - written > StaleMs) return (new(false, "视觉扫描未运行（文件已过期）"), null);
+                return (new(false, "视觉扫描已停止"), null, none);
+            if (nowUnixMs - written > StaleMs) return (new(false, "视觉扫描未运行（文件已过期）"), null, none);
             string? scanMatch = root.TryGetProperty("matchId", out var m) && m.ValueKind == JsonValueKind.String ? m.GetString() : null;
             if (root.GetProperty("mode").GetString() != "team-view")
-                return (new(true, "视觉扫描运行中，但不是 Plus 队伍视角：不显示对手面板"), null);
+                return (new(true, "视觉扫描运行中，但不是 Plus 队伍视角：不显示对手面板"), null, none);
             if (scanMatch == null || scanMatch != matchId)
-                return (new(true, "视觉扫描运行中，但对局与观战 GSI 不一致：不显示对手面板"), null);
-            var board = new EnemyBoard(root.GetProperty("enemies").Deserialize<EnemyHero[]>(Wire.Json) ?? []);
-            if (!Wire.ValidBoard(board)) return (new(true, "视觉扫描的对手数据无效，已忽略"), null);
-            return (new(true, "视觉扫描运行中"), board);
+                return (new(true, "视觉扫描运行中，但对局与观战 GSI 不一致：不显示对手面板"), null, none);
+            var enemies = root.GetProperty("enemies");
+            var board = new EnemyBoard(enemies.Deserialize<EnemyHero[]>(Wire.Json) ?? []);
+            if (!Wire.ValidBoard(board)) return (new(true, "视觉扫描的对手数据无效，已忽略"), null, none);
+            return (new(true, "视觉扫描运行中"), board, Wards(enemies));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException or
                                    InvalidOperationException or FormatException)
-        { return (new(false, "视觉扫描文件暂不可读"), null); }
+        { return (new(false, "视觉扫描文件暂不可读"), null, none); }
+    }
+    /// <summary>The "wards" reads of each enemy row; a malformed list is left out rather than trusted.</summary>
+    private static Dictionary<string, WardReading[]> Wards(JsonElement enemies)
+    {
+        var result = new Dictionary<string, WardReading[]>(StringComparer.Ordinal);
+        foreach (var row in enemies.EnumerateArray()) {
+            if (!row.TryGetProperty("wards", out var reads) || reads.ValueKind != JsonValueKind.Array || reads.GetArrayLength() > 8) continue;
+            static int Count(JsonElement r, string key) => r.TryGetProperty(key, out var v) && v.TryGetInt32(out int n) && n is >= 0 and <= 30
+                ? n : throw new FormatException();
+            try {
+                result[row.GetProperty("hero").GetString()!] = reads.EnumerateArray().Select(r =>
+                    r.GetProperty("clock").GetDouble() is var c && Wire.Finite(c, -300, 43_200)
+                        ? new WardReading(c, Count(r, "observer"), Count(r, "sentry"), Count(r, "unknown")) : throw new FormatException()).ToArray();
+            } catch (Exception e) when (e is FormatException or InvalidOperationException or KeyNotFoundException) { }
+        }
+        return result;
     }
     /// <summary>A panel icon the scanner copied beside its live file, or null.</summary>
     public static byte[]? Icon(string liveFile, string key)

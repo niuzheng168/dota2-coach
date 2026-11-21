@@ -13,8 +13,13 @@ local replays, not for live spectating.
 
 It uses only what this spectator's own screen and GSI show. In Dota Plus live spectating that is the
 friend team's vision: enemies are scanned while that team sees them and otherwise keep their last
-observed state with its age. Delayed or replay spectating shows both teams in full; the state file
-says so in "mode", and live coaching must not use such data.
+observed state with its age. Allies are not selected there unless --allies: nothing live needs them, and
+the enemies come round sooner. Delayed or replay spectating shows both teams in full and scans all ten;
+the state file says so in "mode", and live coaching must not use such data.
+
+Ward counts (observer, sentry, or unknown kind for grey icons) are read with every item read and the last
+few go to the live file with the read's game clock: the coach client guesses where a ward went when an
+enemy's count drops.
 
 Speed: heroes already matched to their player are selected one per captured frame; Dota shows a new
 selection about every 20 ms, at 60 Hz and 144 Hz alike, so a sweep of ten heroes takes ~0.2 s. A hero
@@ -41,6 +46,7 @@ import shutil
 import sys
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import cv2
@@ -217,20 +223,60 @@ def leftover(roster: set[str], players: dict[int, str], player: int | None) -> s
     return next(iter(rest)) if len(rest) == 1 else None
 
 
+def selectable(mode: str, own: int | None, visible: set[str], teams: dict[str, int], players: dict[int, str],
+               due: Callable[[int], bool], allies: bool) -> list[int]:
+    """Players to select this cycle. In Plus team view an enemy is selectable only while the friend team sees it, and
+    allies are left out unless `allies`: the enemy panel and ward guesses need enemies only, and every hero skipped
+    makes the enemies' turn come sooner. Unknown players are tried when `due(player)`, except in a five-player half of
+    the hotkeys (1-5, 6-0) where every player matched so far is an ally. Delayed spectating selects everyone."""
+    ally_halves = set()
+    if mode == "team-view" and own in (2, 3) and not allies:
+        sides: dict[int, set[bool]] = {}
+        for p, hero in players.items():
+            sides.setdefault(p // 5, set()).add(teams.get(hero) == own)
+        ally_halves = {half for half, kinds in sides.items() if kinds == {True}}
+    out = []
+    for p in range(10):
+        hero = players.get(p)
+        if hero is None:
+            if due(p) and p // 5 not in ally_halves:
+                out.append(p)
+        elif mode != "team-view":
+            out.append(p)
+        elif teams.get(hero) == own:
+            if allies or own not in (2, 3):
+                out.append(p)
+        elif hero in visible:
+            out.append(p)
+    return out
+
+
 class ItemSlots:
     """Enemy inventories for the enemy panel on the game machine: the six main slots and the neutral
     slot from the latest item read, recipes shown as empty slots. A read with an unknown slot is skipped.
     Replayed against full-spectator truth, the latest read was right more often than waiting for two
-    reads to agree, which lags behind every purchase."""
+    reads to agree, which lags behind every purchase.
+
+    Also the ward counts of the last few complete reads (game clock of the read; observer, sentry and unknown kind):
+    the coach client compares them to guess where a ward went when the count drops."""
+
+    WARD_READS = 4
 
     def __init__(self, items: dict):
         self.recipes = {k for k, v in items.items() if v.get("recipe")} | {"item_recipe"}
         self.shown: dict[str, tuple] = {}  # hero -> (slot0..slot5, neutral0)
+        self.wards: dict[str, collections.deque] = {}  # hero -> recent {"clock", "observer", "sentry", "unknown"}
 
     def read(self, hero: str, slots: dict):
         current = tuple(slots.get(f"slot{i}") for i in range(6)) + (slots.get("neutral0"),)
         if "?" not in current:
             self.shown[hero] = tuple(None if n in self.recipes else n for n in current)
+        # The backpack counts too: a ward moved there is still carried.
+        counts, clock = slots.get("wards"), slots.get("clock")
+        if counts is not None and clock is not None and "?" not in current + tuple(slots.get(f"slot{i}") for i in range(6, 9)):
+            reads = self.wards.setdefault(hero, collections.deque(maxlen=self.WARD_READS))
+            if not reads or reads[-1]["clock"] != clock:
+                reads.append({"clock": clock, **counts})
 
 
 def dota_window() -> int:
@@ -326,19 +372,14 @@ class Scanner:
             if match_id != self.match_id:  # another match: nothing known carries over
                 self.match_id, self.player_hero, self.heroes, self.shown = match_id, {}, {}, None
                 self.items_queued = {}
+                self.item_slots = ItemSlots(self.hud.manifest["items"])
             players = dict(self.player_hero)
             items_at = {h: (r.get("items") or {}).get("at", -1e9) for h, r in self.heroes.items()}
             status_at = {h: (r.get("status") or {}).get("at", -1e9) for h, r in self.heroes.items()}
         if mode not in ("team-view", "full-spectator"):
             return []  # menus or playing: the hero hotkeys would land in whatever Dota shows
-        out = []
-        for p in range(10):
-            hero = players.get(p)
-            if hero is None:
-                if now - self.tried.get(p, -1e9) >= RETRY_UNKNOWN:
-                    out.append(p)
-            elif mode != "team-view" or teams.get(hero) == own or hero in visible:
-                out.append(p)
+        out = selectable(mode, own, visible, teams, players, lambda p: now - self.tried.get(p, -1e9) >= RETRY_UNKNOWN,
+                         self.args.allies)
         self.missed = {p for p in out if p in players and now - status_at.get(players[p], -1e9) > STREAM_MISSED}
         stale = sorted((max(items_at.get(players[p], -1e9), self.items_queued.get(p, -1e9)), p) for p in out if p in players)
         slow = {p for at, p in stale[:self.args.item_visits] if now - at >= self.args.items_every}
@@ -513,7 +554,8 @@ class Scanner:
                       "health": out["health"], "mana": out["mana"]}
             items = settled and {"at": at, "clock": clock, **{s: (i and (i["name"] or "?")) for s, i in out["items"].items()},
                                  # items drawn with the same icon (Dagon levels): the name is one of these
-                                 "alt": {s: i["sameIcon"] for s, i in out["items"].items() if i and i.get("sameIcon")}}
+                                 "alt": {s: i["sameIcon"] for s, i in out["items"].items() if i and i.get("sameIcon")},
+                                 "wards": out["wards"]}
             with self.lock:
                 # A changed frame that still shows the previous hero (a HUD change other than the
                 # switch) must not teach the player's hero.
@@ -587,11 +629,13 @@ class Scanner:
                         key=lambda h: (order.get(h, 99), h))[:5]
         with self.lock:
             shown = dict(self.item_slots.shown)
+            wards = {h: list(r) for h, r in self.item_slots.wards.items()}
         out = []
         for hero in heroes:
             status, slots = snap["heroes"][hero]["status"], shown.get(hero)
             out.append({"hero": hero, "level": status and status["level"], "age": status and status["age"],
-                        "items": slots and list(slots[:6]), "neutral": slots and slots[6]})
+                        "items": slots and list(slots[:6]), "neutral": slots and slots[6],
+                        **({"wards": wards[hero]} if hero in wards else {})})
         return out
 
     def export_icons(self, enemies: list[dict]):
@@ -722,6 +766,8 @@ def main():
     ap.add_argument("--print", action="store_true", help="print the hero table every second")
     ap.add_argument("--truth", action="store_true", help="log full-spectator GSI with each reading (replay evaluation)")
     ap.add_argument("--item-visits", type=int, default=1, help="heroes per cycle that stay long enough for items")
+    ap.add_argument("--allies", action="store_true",
+                    help="in Plus team view also select the friend team's heroes (by default only enemies are scanned)")
     ap.add_argument("--save-misses", type=int, default=0, help="save this many HUD bands that could not be read")
     ap.add_argument("--no-stream", action="store_true", help="wait for every switch instead of one selection per frame")
     ap.add_argument("--items-every", type=float, default=3.0,
