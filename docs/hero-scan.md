@@ -53,7 +53,7 @@
 
 ## 推送到游戏机的对手面板
 
-Plus 实时观战时，扫描每 0.5 秒把敌方英雄最近读到的等级和装备写进 `%LOCALAPPDATA%\DotaCoach\hero-scan\live.json`（`--live` 可改路径，传空字符串不写），面板用到的英雄头像和物品图标复制到旁边的 `icons\`。教练端读取后推到游戏机，显示在游戏画面左侧，规则和用法见 [`twopc-plus-alerts.md`](twopc-plus-alerts.md)。只在 Plus 队伍视角下写入敌方；完整观战的扫描不写任何英雄。每名敌人还附上最近 4 次完整读取的守卫数量（`wards`：游戏时间和假眼、真眼、种类不明各几个），教练端用来推测插眼，见 [`twopc-enemy-wards.md`](twopc-enemy-wards.md)。
+Plus 实时观战时，扫描每 0.5 秒把敌方英雄最近读到的等级和装备写进 `%LOCALAPPDATA%\DotaCoach\hero-scan\live.json`（`--live` 可改路径，传空字符串不写），面板用到的英雄头像和物品图标复制到旁边的 `icons\`。教练端读取后推到游戏机，显示在游戏画面左侧，规则和用法见 [`twopc-plus-alerts.md`](twopc-plus-alerts.md)。只在 Plus 队伍视角下写入敌方；完整观战的扫描不写任何英雄。2026-11-21 之前的扫描在教练端正好读这个文件时会自己退出（Windows 不让替换正被读取的文件），对手面板随之消失；现在跳过那一次写入，v0.4.5 教练端读取时也不再锁住文件。每名敌人还附上最近 4 次完整读取的守卫数量（`wards`：游戏时间和假眼、真眼、种类不明各几个），教练端用来推测插眼，见 [`twopc-enemy-wards.md`](twopc-enemy-wards.md)。
 
 ## 只扫描对手
 

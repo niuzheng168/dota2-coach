@@ -54,11 +54,12 @@ foreach ($role in @("Game", "Coach")) {
         --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o $destination
     if ($LASTEXITCODE -ne 0) { throw "Publish failed: $name" }
     if ($role -eq "Game") { $panelIcons = Copy-PanelIcons $destination }
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v044.md") -Destination (Join-Path $destination "README.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v045.md") -Destination (Join-Path $destination "README.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v043.md") -Destination (Join-Path $destination "USAGE.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-status-only.md") -Destination (Join-Path $destination "NO-VIDEO.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/game-creep-hp.md") -Destination (Join-Path $destination "CREEP-HP.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-plus-alerts.md") -Destination (Join-Path $destination "PLUS-ALERTS.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-enemy-wards.md") -Destination (Join-Path $destination "ENEMY-WARDS.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-game-overlay.md") -Destination (Join-Path $destination "GAME-OVERLAY.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v021-debug.md") -Destination (Join-Path $destination "DEBUG-DETAILS.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v031-plus.md") -Destination (Join-Path $destination "PLUS-SPECTATOR.md")
@@ -90,6 +91,7 @@ $manifest = [ordered]@{
     plusSpectatorObservationOnly = $true; plusSpectatorPort = 3220
     playerMinimapDebugIntervalMs = 1000; playerMinimapObservationOnly = $true
     enemyPanel = $true; bundledPanelIcons = $panelIcons; panelIconFallback = "coach"
+    enemyWardGuesses = "coach-guess-game-minimap"; coachMapPatch = "7.42"
     creepHpDisplay = "game-local-gpu"; gameStatusIntervalMs = 250
     sourceCommit = (& git -C (Join-Path $PSScriptRoot "..") rev-parse HEAD)
     sourceDirty = [bool](& git -C (Join-Path $PSScriptRoot "..") status --porcelain)
