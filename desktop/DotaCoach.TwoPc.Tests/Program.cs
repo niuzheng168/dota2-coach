@@ -12,6 +12,7 @@ if (args is ["--creep-scan", .. var scanFiles]) { CreepHealthTests.Eval(scanFile
 if (args is ["--ward-eval", .. var wardFiles]) { WardEval.Run(wardFiles); return; }
 if (args is ["--creep-bars", var barsOut, var barsSeconds, var barsGsi]) { CreepHealthTests.RecordBars(barsOut, double.Parse(barsSeconds), barsGsi); return; }
 if (args is ["--overlay-test", var overlayDir]) { CreepHealthTests.OverlayTest(overlayDir); return; }
+if (args is ["--lethal-preview", var previewFrame, var previewGsi, var previewOut]) { HeroAttackTests.Preview(previewFrame, previewGsi, previewOut); return; }
 if (args.Contains("--last-hit")) { LastHitTests.Run(Check); return; }
 if (args is ["--lane-role-audit",var samplesFile]) { LaneRoleTests.Audit(samplesFile); return; }
 if (args.Contains("--last-hit-latency")) { LastHitLatencyReplay.Run(); return; }
@@ -115,7 +116,7 @@ Check(statusBox.Poll(statusSession) == null && !statusBox.Snapshot().Connected, 
 JsonElement Payload(string team = "radiant") => JsonSerializer.SerializeToElement(new {
     auth = new { token = "must-not-leave-game-machine" },
     player = new { team_name = team, steamid = "PRIVATE", name = "PRIVATE", gold = 999 },
-    hero = new { name = "npc_dota_hero_luna", alive = true, health = 900, mana = 450, xpos = -2000, ypos = -3000 },
+    hero = new { name = "npc_dota_hero_luna", level = 9, alive = true, health = 900, mana = 450, xpos = -2000, ypos = -3000 },
     map = new { matchid = "1234567890", clock_time = 750 },
     items = new { slot0 = new { name = "item_power_treads", cooldown = 0 } },
     abilities = new { ability0 = new { name = "luna_lucent_beam", level = 4, cooldown = 3 } },
@@ -200,9 +201,10 @@ await using (var gsi = await GsiReceiver.Start(0))
     string raw = Payload().GetRawText().Replace("must-not-leave-game-machine", tokenValue);
     Check((await client.PostAsync("/gsi", new StringContent(raw))).IsSuccessStatusCode, "official GSI receiver ingests authenticated own state");
     Check(gsi.Latest().Player?.Hero == "npc_dota_hero_luna", "GSI own state available to capture");
+    Check(gsi.LatestLoadout() is { Hero: "npc_dota_hero_luna", Level: 9, Items: [{ Name: "item_power_treads" }] }, "own hero loadout kept for the creep HP display");
     string menu = JsonSerializer.Serialize(new { auth = new { token = tokenValue }, player = new { }, hero = new { }, map = new { } });
     await client.PostAsync("/gsi", new StringContent(menu));
-    Check(gsi.Latest().Player == null, "authenticated menu state invalidates prior GSI");
+    Check(gsi.Latest().Player == null && gsi.LatestLoadout() == null, "authenticated menu state invalidates prior GSI");
 }
 
 using (var fake = new FakeLocalVision())
@@ -571,6 +573,7 @@ PlusAlertTests.Run(Check);
 WardTests.Run(Check);
 OverlaySettingsTests.Run(Check);
 CreepHealthTests.Run(Check);
+HeroAttackTests.Run(Check);
 Console.WriteLine($"Two-PC protocol + real TLS + GSI + mocked model contracts: {passed} checks passed.");
 
 sealed class FakeCloudCoach(ModelAdvice advice) : HttpMessageHandler

@@ -1,0 +1,5290 @@
+{
+ "version": "hero-attack-1",
+ "patch": "7.42",
+ "sources": {
+  "client": {
+   "build": 6989,
+   "steamInf": "game/dota/steam.inf"
+  },
+  "pak": {
+   "file": "game/dota/pak01_dir.vpk",
+   "sha256": "2efead8aadbdeda49a5c6c29bbb002dd59c168a846854207163e4a71f9fd2e2e"
+  },
+  "files": {
+   "scripts/npc/items.txt": "d4923ea8d11f55147140eeda13924ec9deed7bbdc675a0c04c3c6dbf20eaa8be",
+   "scripts/npc/npc_abilities.txt": "8f938611b0f41667e6e93a1bbb8c952ef70fbd8f935b7c93c16891c210925242",
+   "scripts/npc/npc_units.txt": "8c03a13181777495ce46dbb5c183a5ecd14281eb040b4c29e9d3157da302fdb7",
+   "resource/localization/abilities_english.txt": "6b765a5c17ea13b27b4285b42d807373c7decf24b919ca6e832ab25e9b7c2703",
+   "resource/localization/dota_english.txt": "6adc51709793e66d19ae6c58d737e1269a0864192cfc11ef3ac2f05a0d970865"
+  },
+  "tool": {
+   "name": "ValveResourceFormat CLI",
+   "version": "21.1",
+   "executableSha256": "50502077543856a3f760eecf53b073dcdea5073c193f0274c2088b5a2a8f4d13"
+  }
+ },
+ "note": "Attack damage before armor of the installed client (build 6989). Hero damage [min, max] excludes attributes; talents are in the order GSI reports talent_1..talent_8. Item values are per item level; only values the game tooltips as plain stats. Attack interval = attackRate x 100 / attack speed; towers by tier.",
+ "universalDamagePerAttribute": 0.45,
+ "attributeBonus": [
+  2,
+  4,
+  6,
+  8,
+  10,
+  12,
+  14
+ ],
+ "heroes": {
+  "npc_dota_hero_abaddon": {
+   "primary": "all",
+   "attack": "melee",
+   "damage": [
+    22,
+    32
+   ],
+   "attributes": [
+    21,
+    22,
+    19
+   ],
+   "gains": [
+    2.6,
+    1.5,
+    2
+   ],
+   "attackRate": 1.5,
+   "attackSpeed": 100,
+   "attackPoint": 0.56,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_abyssal_underlord": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    37,
+    43
+   ],
+   "attributes": [
+    25,
+    12,
+    18
+   ],
+   "gains": [
+    3.2,
+    1.6,
+    2.3
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.45,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_alchemist": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    27,
+    33
+   ],
+   "attributes": [
+    23,
+    19,
+    25
+   ],
+   "gains": [
+    2.7,
+    1.5,
+    1.8
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 110,
+   "attackPoint": 0.35,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_ancient_apparition": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    21,
+    31
+   ],
+   "attributes": [
+    20,
+    20,
+    23
+   ],
+   "gains": [
+    1.9,
+    2,
+    3.1
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 110,
+   "attackPoint": 0.45,
+   "projectileSpeed": 1250,
+   "range": 675,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_antimage": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    29,
+    33
+   ],
+   "attributes": [
+    21,
+    25,
+    12
+   ],
+   "gains": [
+    1.6,
+    2.8,
+    1.8
+   ],
+   "attackRate": 1.4,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_arc_warden": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    23,
+    29
+   ],
+   "attributes": [
+    20,
+    22,
+    24
+   ],
+   "gains": [
+    2.2,
+    2.7,
+    2.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 110,
+   "attackPoint": 0.3,
+   "projectileSpeed": 900,
+   "range": 625,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+     "str": 7,
+     "agi": 7,
+     "int": 7
+    },
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_axe": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    31,
+    35
+   ],
+   "attributes": [
+    25,
+    18,
+    18
+   ],
+   "gains": [
+    2.7,
+    1.5,
+    1.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {
+     "str": 15
+    },
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_bane": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    24,
+    30
+   ],
+   "attributes": [
+    23,
+    23,
+    23
+   ],
+   "gains": [
+    2.5,
+    2.5,
+    2.5
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 900,
+   "range": 425,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_batrider": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    12,
+    16
+   ],
+   "attributes": [
+    23,
+    13,
+    23
+   ],
+   "gains": [
+    2.9,
+    2,
+    3.2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 900,
+   "range": 400,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_beastmaster": {
+   "primary": "all",
+   "attack": "melee",
+   "damage": [
+    23,
+    27
+   ],
+   "attributes": [
+    24,
+    19,
+    16
+   ],
+   "gains": [
+    2.9,
+    2.3,
+    1.9
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 90,
+   "attackPoint": 0.3,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_bloodseeker": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    35,
+    41
+   ],
+   "attributes": [
+    24,
+    24,
+    17
+   ],
+   "gains": [
+    2.7,
+    3.1,
+    2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.43,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+     "agi": 15
+    },
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_bounty_hunter": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    33,
+    41
+   ],
+   "attributes": [
+    19,
+    21,
+    20
+   ],
+   "gains": [
+    2.5,
+    2.6,
+    1.9
+   ],
+   "attackRate": 1.5,
+   "attackSpeed": 100,
+   "attackPoint": 0.59,
+   "talents": [
+    {},
+    {
+     "damage": 30
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_brewmaster": {
+   "primary": "all",
+   "attack": "melee",
+   "damage": [
+    26,
+    33
+   ],
+   "attributes": [
+    24,
+    19,
+    17
+   ],
+   "gains": [
+    3.2,
+    2,
+    1.9
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+     "attackSpeed": 110
+    },
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_bristleback": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    34,
+    40
+   ],
+   "attributes": [
+    22,
+    17,
+    14
+   ],
+   "gains": [
+    2.8,
+    1.8,
+    2.8
+   ],
+   "attackRate": 1.8,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "talents": [
+    {
+     "attackSpeed": 25
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_broodmother": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    27,
+    33
+   ],
+   "attributes": [
+    18,
+    20,
+    18
+   ],
+   "gains": [
+    2.9,
+    3.4,
+    2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 125,
+   "attackPoint": 0.4,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_centaur": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    34,
+    36
+   ],
+   "attributes": [
+    28,
+    15,
+    15
+   ],
+   "gains": [
+    4.3,
+    1,
+    1.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 90,
+   "attackPoint": 0.3,
+   "talents": [
+    {},
+    {},
+    {
+     "str": 10
+    },
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_chaos_knight": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    37,
+    47
+   ],
+   "attributes": [
+    24,
+    18,
+    18
+   ],
+   "gains": [
+    3.1,
+    1.8,
+    1.2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "talents": [
+    {},
+    {},
+    {},
+    {
+     "str": 10
+    },
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_chen": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    29,
+    39
+   ],
+   "attributes": [
+    23,
+    15,
+    19
+   ],
+   "gains": [
+    2.2,
+    2.1,
+    3.2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "projectileSpeed": 1100,
+   "range": 650,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_clinkz": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    19,
+    25
+   ],
+   "attributes": [
+    18,
+    25,
+    21
+   ],
+   "gains": [
+    2,
+    2.7,
+    2.2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "projectileSpeed": 900,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_crystal_maiden": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    28,
+    34
+   ],
+   "attributes": [
+    17,
+    16,
+    20
+   ],
+   "gains": [
+    2.2,
+    1.8,
+    3.3
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.45,
+   "projectileSpeed": 900,
+   "range": 600,
+   "talents": [
+    {},
+    {
+     "int": 12
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_dark_seer": {
+   "primary": "int",
+   "attack": "melee",
+   "damage": [
+    31,
+    37
+   ],
+   "attributes": [
+    20,
+    19,
+    23
+   ],
+   "gains": [
+    2.6,
+    1.5,
+    2.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.59,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_dark_willow": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    27,
+    35
+   ],
+   "attributes": [
+    19,
+    18,
+    22
+   ],
+   "gains": [
+    2,
+    1.6,
+    3.5
+   ],
+   "attackRate": 1.5,
+   "attackSpeed": 115,
+   "attackPoint": 0.3,
+   "projectileSpeed": 1200,
+   "range": 475,
+   "talents": [
+    {},
+    {
+     "int": 12
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_dawnbreaker": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    30,
+    34
+   ],
+   "attributes": [
+    25,
+    14,
+    20
+   ],
+   "gains": [
+    3.4,
+    1.7,
+    2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.46,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_dazzle": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    19,
+    25
+   ],
+   "attributes": [
+    19,
+    20,
+    25
+   ],
+   "gains": [
+    2.3,
+    1.7,
+    3.5
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 1200,
+   "range": 575,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_death_prophet": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    18,
+    28
+   ],
+   "attributes": [
+    21,
+    17,
+    24
+   ],
+   "gains": [
+    2.9,
+    2.3,
+    3
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "projectileSpeed": 1000,
+   "range": 500,
+   "talents": [
+    {
+     "damage": 20
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_disruptor": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    26,
+    36
+   ],
+   "attributes": [
+    21,
+    15,
+    21
+   ],
+   "gains": [
+    2.4,
+    1.4,
+    2.9
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "projectileSpeed": 1200,
+   "range": 625,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_doom_bringer": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    32,
+    42
+   ],
+   "attributes": [
+    24,
+    15,
+    15
+   ],
+   "gains": [
+    3.6,
+    1.5,
+    2.1
+   ],
+   "attackRate": 1.9,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+     "damage": 66
+    },
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_dragon_knight": {
+   "primary": "str",
+   "attack": "both",
+   "damage": [
+    34,
+    40
+   ],
+   "attributes": [
+    21,
+    14,
+    18
+   ],
+   "gains": [
+    3.2,
+    2,
+    1.7
+   ],
+   "attackRate": 1.6,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "projectileSpeed": 900,
+   "range": 150,
+   "talents": [
+    {
+     "damage": 12
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_drow_ranger": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    27,
+    34
+   ],
+   "attributes": [
+    16,
+    24,
+    15
+   ],
+   "gains": [
+    1.9,
+    2.8,
+    1.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "projectileSpeed": 1250,
+   "range": 625,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_earth_spirit": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    25,
+    29
+   ],
+   "attributes": [
+    23,
+    17,
+    17
+   ],
+   "gains": [
+    3.8,
+    2.4,
+    2.1
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 95,
+   "attackPoint": 0.35,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_earthshaker": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    29,
+    39
+   ],
+   "attributes": [
+    22,
+    12,
+    18
+   ],
+   "gains": [
+    3.7,
+    1.4,
+    2.1
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.467,
+   "talents": [
+    {
+     "damage": 25
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_elder_titan": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    23,
+    33
+   ],
+   "attributes": [
+    26,
+    16,
+    23
+   ],
+   "gains": [
+    3,
+    1.8,
+    1.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_ember_spirit": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    30,
+    34
+   ],
+   "attributes": [
+    21,
+    21,
+    20
+   ],
+   "gains": [
+    2.5,
+    3.2,
+    2.2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "talents": [
+    {
+     "damage": 12
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_enchantress": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    21,
+    31
+   ],
+   "attributes": [
+    17,
+    19,
+    22
+   ],
+   "gains": [
+    2,
+    2.1,
+    4
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 900,
+   "range": 575,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_enigma": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    19,
+    25
+   ],
+   "attributes": [
+    21,
+    14,
+    20
+   ],
+   "gains": [
+    2.5,
+    1,
+    3.5
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "projectileSpeed": 900,
+   "range": 500,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_faceless_void": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    34,
+    40
+   ],
+   "attributes": [
+    20,
+    24,
+    15
+   ],
+   "gains": [
+    2.6,
+    3.3,
+    1.5
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_furion": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    20,
+    26
+   ],
+   "attributes": [
+    19,
+    14,
+    22
+   ],
+   "gains": [
+    2.6,
+    2.6,
+    3.5
+   ],
+   "attackRate": 1.5,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "projectileSpeed": 1125,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_grimstroke": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    24,
+    28
+   ],
+   "attributes": [
+    21,
+    18,
+    25
+   ],
+   "gains": [
+    2.4,
+    1.9,
+    3.8
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "projectileSpeed": 900,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_gyrocopter": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    18,
+    24
+   ],
+   "attributes": [
+    22,
+    25,
+    21
+   ],
+   "gains": [
+    2.5,
+    3.4,
+    2.4
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 115,
+   "attackPoint": 0.2,
+   "projectileSpeed": 3000,
+   "range": 365,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_hoodwink": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    25,
+    32
+   ],
+   "attributes": [
+    16,
+    22,
+    21
+   ],
+   "gains": [
+    2,
+    3.6,
+    2.9
+   ],
+   "attackRate": 2,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "projectileSpeed": 1800,
+   "range": 575,
+   "talents": [
+    {},
+    {},
+    {},
+    {
+     "agi": 15
+    },
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_huskar": {
+   "primary": "str",
+   "attack": "ranged",
+   "damage": [
+    21,
+    26
+   ],
+   "attributes": [
+    22,
+    10,
+    18
+   ],
+   "gains": [
+    3.4,
+    1.8,
+    0
+   ],
+   "attackRate": 1.6,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 1400,
+   "range": 400,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_invoker": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    19,
+    25
+   ],
+   "attributes": [
+    19,
+    14,
+    22
+   ],
+   "gains": [
+    2.5,
+    2,
+    4
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "projectileSpeed": 900,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_jakiro": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    27,
+    35
+   ],
+   "attributes": [
+    25,
+    15,
+    26
+   ],
+   "gains": [
+    2.8,
+    1.2,
+    3.3
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "projectileSpeed": 1100,
+   "range": 400,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ],
+   "unsupported": "杰奇洛的普攻分两下、每下伤害打折（双重麻烦），暂不标红"
+  },
+  "npc_dota_hero_juggernaut": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    22,
+    24
+   ],
+   "attributes": [
+    20,
+    32,
+    14
+   ],
+   "gains": [
+    2,
+    2.8,
+    1.4
+   ],
+   "attackRate": 1.4,
+   "attackSpeed": 110,
+   "attackPoint": 0.33,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_keeper_of_the_light": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    20,
+    27
+   ],
+   "attributes": [
+    18,
+    15,
+    24
+   ],
+   "gains": [
+    2.3,
+    1.6,
+    3.3
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 90,
+   "attackPoint": 0.3,
+   "projectileSpeed": 900,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_kez": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    22,
+    28
+   ],
+   "attributes": [
+    20,
+    27,
+    20
+   ],
+   "gains": [
+    2.8,
+    3.5,
+    1.7
+   ],
+   "attackRate": 1.9,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_kunkka": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    30,
+    36
+   ],
+   "attributes": [
+    24,
+    14,
+    18
+   ],
+   "gains": [
+    3.6,
+    1.6,
+    1.8
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_largo": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    37,
+    43
+   ],
+   "attributes": [
+    24,
+    14,
+    21
+   ],
+   "gains": [
+    3.6,
+    1.3,
+    2.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_legion_commander": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    33,
+    37
+   ],
+   "attributes": [
+    25,
+    18,
+    20
+   ],
+   "gains": [
+    2.8,
+    1.7,
+    2.2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 105,
+   "attackPoint": 0.46,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_leshrac": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    27,
+    33
+   ],
+   "attributes": [
+    20,
+    17,
+    22
+   ],
+   "gains": [
+    2.5,
+    2.5,
+    3.5
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "projectileSpeed": 900,
+   "range": 575,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_lich": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    24,
+    33
+   ],
+   "attributes": [
+    20,
+    17,
+    28
+   ],
+   "gains": [
+    2.1,
+    1.7,
+    3.4
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.46,
+   "projectileSpeed": 900,
+   "range": 550,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_life_stealer": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    23,
+    29
+   ],
+   "attributes": [
+    23,
+    15,
+    15
+   ],
+   "gains": [
+    2.4,
+    1.9,
+    1.8
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 120,
+   "attackPoint": 0.39,
+   "talents": [
+    {
+     "str": 4,
+     "agi": 4,
+     "int": 4
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_lina": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    21,
+    29
+   ],
+   "attributes": [
+    20,
+    21,
+    28
+   ],
+   "gains": [
+    2.4,
+    2.4,
+    4
+   ],
+   "attackRate": 1.6,
+   "attackSpeed": 100,
+   "attackPoint": 0.65,
+   "projectileSpeed": 1000,
+   "range": 670,
+   "talents": [
+    {},
+    {},
+    {
+     "damage": 30
+    },
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_lion": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    29,
+    35
+   ],
+   "attributes": [
+    18,
+    18,
+    19
+   ],
+   "gains": [
+    2.4,
+    1.7,
+    3.5
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 115,
+   "attackPoint": 0.43,
+   "projectileSpeed": 900,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_lone_druid": {
+   "primary": "agi",
+   "attack": "both",
+   "damage": [
+    22,
+    26
+   ],
+   "attributes": [
+    20,
+    22,
+    13
+   ],
+   "gains": [
+    2.7,
+    2.8,
+    1.4
+   ],
+   "attackRate": 1.6,
+   "attackSpeed": 100,
+   "attackPoint": 0.33,
+   "projectileSpeed": 1125,
+   "range": 550,
+   "talents": [
+    {},
+    {},
+    {},
+    {
+     "agi": 12
+    },
+    {},
+    {
+     "attackSpeed": 55
+    },
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_luna": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    26,
+    32
+   ],
+   "attributes": [
+    21,
+    24,
+    23
+   ],
+   "gains": [
+    2.2,
+    3.2,
+    1.9
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "projectileSpeed": 900,
+   "range": 330,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ],
+   "levelDamage": {
+    "source": "luna_lunar_blessing.self_bonus_damage",
+    "perLevel": 2,
+    "talent": 7,
+    "talentBonus": 50
+   }
+  },
+  "npc_dota_hero_lycan": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    24,
+    29
+   ],
+   "attributes": [
+    28,
+    18,
+    23
+   ],
+   "gains": [
+    3.4,
+    1.7,
+    1.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 110,
+   "attackPoint": 0.55,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_magnataur": {
+   "primary": "all",
+   "attack": "melee",
+   "damage": [
+    31,
+    39
+   ],
+   "attributes": [
+    24,
+    14,
+    20
+   ],
+   "gains": [
+    3.1,
+    2.2,
+    2.1
+   ],
+   "attackRate": 1.8,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_marci": {
+   "primary": "all",
+   "attack": "melee",
+   "damage": [
+    29,
+    33
+   ],
+   "attributes": [
+    23,
+    22,
+    19
+   ],
+   "gains": [
+    3.2,
+    2.2,
+    1.9
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_mars": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    26,
+    34
+   ],
+   "attributes": [
+    23,
+    18,
+    21
+   ],
+   "gains": [
+    3.7,
+    1.7,
+    2.4
+   ],
+   "attackRate": 1.8,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_medusa": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    26,
+    32
+   ],
+   "attributes": [
+    0,
+    22,
+    26
+   ],
+   "gains": [
+    0,
+    3.6,
+    3.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "projectileSpeed": 1200,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+     "int": 40
+    }
+   ]
+  },
+  "npc_dota_hero_meepo": {
+   "primary": "all",
+   "attack": "melee",
+   "damage": [
+    20,
+    26
+   ],
+   "attributes": [
+    23,
+    17,
+    18
+   ],
+   "gains": [
+    2,
+    2.1,
+    1.9
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.38,
+   "talents": [
+    {
+     "str": 6
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_mirana": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    22,
+    28
+   ],
+   "attributes": [
+    20,
+    26,
+    22
+   ],
+   "gains": [
+    2.2,
+    3.1,
+    1.9
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "projectileSpeed": 900,
+   "range": 630,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_monkey_king": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    29,
+    33
+   ],
+   "attributes": [
+    19,
+    23,
+    20
+   ],
+   "gains": [
+    2.8,
+    3.7,
+    1.8
+   ],
+   "attackRate": 1.6,
+   "attackSpeed": 95,
+   "attackPoint": 0.45,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_morphling": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    12,
+    21
+   ],
+   "attributes": [
+    16,
+    33,
+    19
+   ],
+   "gains": [
+    2.8,
+    4.2,
+    2
+   ],
+   "attackRate": 1.5,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "projectileSpeed": 1300,
+   "range": 350,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+     "agi": 15
+    },
+    {},
+    {
+     "str": 35
+    }
+   ]
+  },
+  "npc_dota_hero_muerta": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    28,
+    31
+   ],
+   "attributes": [
+    19,
+    21,
+    23
+   ],
+   "gains": [
+    2,
+    2.7,
+    3.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 110,
+   "attackPoint": 0.35,
+   "projectileSpeed": 3000,
+   "range": 575,
+   "talents": [
+    {},
+    {
+     "attackSpeed": 20
+    },
+    {},
+    {
+     "int": 15
+    },
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_naga_siren": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    23,
+    25
+   ],
+   "attributes": [
+    21,
+    22,
+    19
+   ],
+   "gains": [
+    2.4,
+    3.4,
+    2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+     "agi": 25
+    }
+   ]
+  },
+  "npc_dota_hero_necrolyte": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    26,
+    30
+   ],
+   "attributes": [
+    18,
+    12,
+    23
+   ],
+   "gains": [
+    2.3,
+    1.3,
+    2.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 1200,
+   "range": 500,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_nevermore": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    16,
+    22
+   ],
+   "attributes": [
+    19,
+    25,
+    16
+   ],
+   "gains": [
+    2.7,
+    3.6,
+    2.2
+   ],
+   "attackRate": 1.6,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "projectileSpeed": 1200,
+   "range": 525,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_night_stalker": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    40,
+    44
+   ],
+   "attributes": [
+    23,
+    18,
+    15
+   ],
+   "gains": [
+    3,
+    2.2,
+    1.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.55,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+     "str": 15
+    },
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_nyx_assassin": {
+   "primary": "all",
+   "attack": "melee",
+   "damage": [
+    26,
+    30
+   ],
+   "attributes": [
+    17,
+    18,
+    21
+   ],
+   "gains": [
+    2.7,
+    2.9,
+    2.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.46,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+     "agi": 80
+    }
+   ]
+  },
+  "npc_dota_hero_obsidian_destroyer": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    23,
+    32
+   ],
+   "attributes": [
+    21,
+    17,
+    30
+   ],
+   "gains": [
+    2.7,
+    1.6,
+    4.2
+   ],
+   "attackRate": 1.9,
+   "attackSpeed": 100,
+   "attackPoint": 0.46,
+   "projectileSpeed": 900,
+   "range": 450,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_ogre_magi": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    45,
+    51
+   ],
+   "attributes": [
+    26,
+    14,
+    0
+   ],
+   "gains": [
+    4,
+    1.5,
+    0
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "talents": [
+    {},
+    {},
+    {
+     "damage": 80
+    },
+    {},
+    {
+     "str": 25
+    },
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_omniknight": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    31,
+    41
+   ],
+   "attributes": [
+    22,
+    15,
+    18
+   ],
+   "gains": [
+    3.1,
+    1.7,
+    2.1
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.433,
+   "talents": [
+    {},
+    {
+     "damage": 30
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_oracle": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    13,
+    19
+   ],
+   "attributes": [
+    20,
+    15,
+    26
+   ],
+   "gains": [
+    2.2,
+    1.7,
+    3.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 900,
+   "range": 625,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_pangolier": {
+   "primary": "all",
+   "attack": "melee",
+   "damage": [
+    26,
+    32
+   ],
+   "attributes": [
+    20,
+    17,
+    16
+   ],
+   "gains": [
+    2.7,
+    3.2,
+    2.5
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.33,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_phantom_assassin": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    35,
+    37
+   ],
+   "attributes": [
+    19,
+    22,
+    15
+   ],
+   "gains": [
+    2.2,
+    3.4,
+    1.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 110,
+   "attackPoint": 0.3,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_phantom_lancer": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    26,
+    36
+   ],
+   "attributes": [
+    21,
+    26,
+    21
+   ],
+   "gains": [
+    2.2,
+    3.2,
+    1.8
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 110,
+   "attackPoint": 0.5,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_phoenix": {
+   "primary": "str",
+   "attack": "ranged",
+   "damage": [
+    21,
+    31
+   ],
+   "attributes": [
+    23,
+    12,
+    16
+   ],
+   "gains": [
+    3.3,
+    1.5,
+    1.8
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "projectileSpeed": 1100,
+   "range": 500,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_primal_beast": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    36,
+    48
+   ],
+   "attributes": [
+    26,
+    15,
+    16
+   ],
+   "gains": [
+    4.3,
+    1,
+    1.7
+   ],
+   "attackRate": 1.9,
+   "attackSpeed": 100,
+   "attackPoint": 0.6,
+   "talents": [
+    {
+     "damage": 25
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_puck": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    22,
+    30
+   ],
+   "attributes": [
+    17,
+    16,
+    23
+   ],
+   "gains": [
+    2.4,
+    2.1,
+    3.8
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "projectileSpeed": 900,
+   "range": 550,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_pudge": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    45,
+    51
+   ],
+   "attributes": [
+    25,
+    13,
+    16
+   ],
+   "gains": [
+    3,
+    1.4,
+    1.8
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_pugna": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    21,
+    28
+   ],
+   "attributes": [
+    19,
+    16,
+    29
+   ],
+   "gains": [
+    2,
+    1.5,
+    4.5
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "projectileSpeed": 900,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_queenofpain": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    26,
+    32
+   ],
+   "attributes": [
+    20,
+    20,
+    25
+   ],
+   "gains": [
+    2.4,
+    2.5,
+    3.7
+   ],
+   "attackRate": 1.5,
+   "attackSpeed": 100,
+   "attackPoint": 0.56,
+   "projectileSpeed": 1500,
+   "range": 550,
+   "talents": [
+    {},
+    {
+     "str": 7
+    },
+    {},
+    {
+     "damage": 35
+    },
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_rattletrap": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    24,
+    26
+   ],
+   "attributes": [
+    26,
+    13,
+    18
+   ],
+   "gains": [
+    3.2,
+    2.3,
+    1.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.33,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_razor": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    20,
+    32
+   ],
+   "attributes": [
+    22,
+    24,
+    21
+   ],
+   "gains": [
+    2.8,
+    2.8,
+    2.2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 110,
+   "attackPoint": 0.3,
+   "projectileSpeed": 2000,
+   "range": 475,
+   "talents": [
+    {},
+    {},
+    {},
+    {
+     "str": 12
+    },
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_riki": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    22,
+    26
+   ],
+   "attributes": [
+    18,
+    30,
+    14
+   ],
+   "gains": [
+    2,
+    2.4,
+    1.3
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 90,
+   "attackPoint": 0.3,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_ringmaster": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    23,
+    33
+   ],
+   "attributes": [
+    21,
+    11,
+    25
+   ],
+   "gains": [
+    2.1,
+    1.6,
+    3
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.5,
+   "projectileSpeed": 1200,
+   "range": 575,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_rubick": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    25,
+    31
+   ],
+   "attributes": [
+    21,
+    23,
+    24
+   ],
+   "gains": [
+    2,
+    2.2,
+    3.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "projectileSpeed": 1125,
+   "range": 550,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_sand_king": {
+   "primary": "all",
+   "attack": "melee",
+   "damage": [
+    19,
+    29
+   ],
+   "attributes": [
+    23,
+    19,
+    17
+   ],
+   "gains": [
+    2.5,
+    2,
+    2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.53,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_shadow_demon": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    29,
+    33
+   ],
+   "attributes": [
+    23,
+    18,
+    22
+   ],
+   "gains": [
+    2.6,
+    2.2,
+    3.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "projectileSpeed": 900,
+   "range": 500,
+   "talents": [
+    {},
+    {
+     "str": 8
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_shadow_shaman": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    40,
+    47
+   ],
+   "attributes": [
+    20,
+    16,
+    23
+   ],
+   "gains": [
+    2.3,
+    1.6,
+    3.3
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 900,
+   "range": 400,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_shredder": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    25,
+    29
+   ],
+   "attributes": [
+    23,
+    13,
+    24
+   ],
+   "gains": [
+    3.6,
+    1.8,
+    2.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 90,
+   "attackPoint": 0.36,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_silencer": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    23,
+    30
+   ],
+   "attributes": [
+    19,
+    22,
+    25
+   ],
+   "gains": [
+    2.2,
+    2.2,
+    2.9
+   ],
+   "attackRate": 1.6,
+   "attackSpeed": 110,
+   "attackPoint": 0.5,
+   "projectileSpeed": 900,
+   "range": 600,
+   "talents": [
+    {
+     "attackSpeed": 25
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_skeleton_king": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    40,
+    42
+   ],
+   "attributes": [
+    22,
+    16,
+    16
+   ],
+   "gains": [
+    2.8,
+    1.7,
+    1.4
+   ],
+   "attackRate": 1.8,
+   "attackSpeed": 100,
+   "attackPoint": 0.56,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {
+     "attackSpeed": 40
+    },
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_skywrath_mage": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    16,
+    26
+   ],
+   "attributes": [
+    22,
+    13,
+    25
+   ],
+   "gains": [
+    2,
+    0.8,
+    4.1
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 90,
+   "attackPoint": 0.4,
+   "projectileSpeed": 1000,
+   "range": 625,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_slardar": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    30,
+    38
+   ],
+   "attributes": [
+    21,
+    17,
+    15
+   ],
+   "gains": [
+    3.4,
+    2.1,
+    1.5
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.36,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_slark": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    35,
+    41
+   ],
+   "attributes": [
+    20,
+    21,
+    16
+   ],
+   "gains": [
+    2.1,
+    1.5,
+    1.9
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 120,
+   "attackPoint": 0.5,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_snapfire": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    27,
+    33
+   ],
+   "attributes": [
+    21,
+    16,
+    21
+   ],
+   "gains": [
+    3.5,
+    1.9,
+    2.2
+   ],
+   "attackRate": 1.8,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "projectileSpeed": 1800,
+   "range": 400,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_sniper": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    13,
+    19
+   ],
+   "attributes": [
+    19,
+    27,
+    15
+   ],
+   "gains": [
+    2,
+    3.2,
+    2.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.17,
+   "projectileSpeed": 3000,
+   "range": 550,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_spectre": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    23,
+    27
+   ],
+   "attributes": [
+    22,
+    29,
+    16
+   ],
+   "gains": [
+    2.3,
+    2.3,
+    1.7
+   ],
+   "attackRate": 1.8,
+   "attackSpeed": 110,
+   "attackPoint": 0.3,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_spirit_breaker": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    34,
+    44
+   ],
+   "attributes": [
+    28,
+    17,
+    14
+   ],
+   "gains": [
+    3.3,
+    1.7,
+    1.8
+   ],
+   "attackRate": 1.9,
+   "attackSpeed": 100,
+   "attackPoint": 0.6,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_storm_spirit": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    23,
+    36
+   ],
+   "attributes": [
+    21,
+    22,
+    24
+   ],
+   "gains": [
+    2,
+    2.6,
+    3.7
+   ],
+   "attackRate": 1.6,
+   "attackSpeed": 110,
+   "attackPoint": 0.5,
+   "projectileSpeed": 1100,
+   "range": 480,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_sven": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    37,
+    39
+   ],
+   "attributes": [
+    24,
+    18,
+    16
+   ],
+   "gains": [
+    3.5,
+    2.2,
+    1.5
+   ],
+   "attackRate": 1.9,
+   "attackSpeed": 110,
+   "attackPoint": 0.4,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_techies": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    20,
+    22
+   ],
+   "attributes": [
+    19,
+    16,
+    25
+   ],
+   "gains": [
+    2.6,
+    1.8,
+    2.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 90,
+   "attackPoint": 0.5,
+   "projectileSpeed": 900,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {
+     "damage": 253
+    },
+    {}
+   ]
+  },
+  "npc_dota_hero_templar_assassin": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    28,
+    33
+   ],
+   "attributes": [
+    21,
+    23,
+    20
+   ],
+   "gains": [
+    2.4,
+    3.4,
+    2.2
+   ],
+   "attackRate": 1.6,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 1000,
+   "range": 250,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_terrorblade": {
+   "primary": "agi",
+   "attack": "both",
+   "damage": [
+    26,
+    32
+   ],
+   "attributes": [
+    18,
+    23,
+    19
+   ],
+   "gains": [
+    2,
+    4,
+    1.6
+   ],
+   "attackRate": 1.5,
+   "attackSpeed": 110,
+   "attackPoint": 0.3,
+   "projectileSpeed": 900,
+   "range": 150,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {
+     "str": 10,
+     "agi": 10,
+     "int": 10
+    },
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_tidehunter": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    25,
+    31
+   ],
+   "attributes": [
+    25,
+    15,
+    20
+   ],
+   "gains": [
+    3.7,
+    1.5,
+    1.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.6,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_tinker": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    22,
+    28
+   ],
+   "attributes": [
+    20,
+    17,
+    30
+   ],
+   "gains": [
+    2.3,
+    1.4,
+    3.3
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "projectileSpeed": 900,
+   "range": 500,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_tiny": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    31,
+    37
+   ],
+   "attributes": [
+    30,
+    0,
+    19
+   ],
+   "gains": [
+    4.2,
+    0,
+    2.4
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 85,
+   "attackPoint": 0.4,
+   "talents": [
+    {},
+    {},
+    {
+     "str": 10
+    },
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_treant": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    60,
+    68
+   ],
+   "attributes": [
+    25,
+    15,
+    17
+   ],
+   "gains": [
+    3.4,
+    1.8,
+    1.8
+   ],
+   "attackRate": 1.9,
+   "attackSpeed": 90,
+   "attackPoint": 0.6,
+   "talents": [
+    {},
+    {
+     "damage": 50
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_troll_warlord": {
+   "primary": "agi",
+   "attack": "both",
+   "damage": [
+    27,
+    35
+   ],
+   "attributes": [
+    21,
+    24,
+    13
+   ],
+   "gains": [
+    2.5,
+    3.3,
+    1
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 1200,
+   "range": 500,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_tusk": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    29,
+    33
+   ],
+   "attributes": [
+    23,
+    23,
+    18
+   ],
+   "gains": [
+    3.9,
+    1.9,
+    1.8
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.36,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_undying": {
+   "primary": "str",
+   "attack": "melee",
+   "damage": [
+    33,
+    41
+   ],
+   "attributes": [
+    22,
+    13,
+    27
+   ],
+   "gains": [
+    2.4,
+    1.2,
+    2.8
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_ursa": {
+   "primary": "agi",
+   "attack": "melee",
+   "damage": [
+    24,
+    28
+   ],
+   "attributes": [
+    25,
+    18,
+    16
+   ],
+   "gains": [
+    2.4,
+    2.8,
+    1.5
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_vengefulspirit": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    28,
+    34
+   ],
+   "attributes": [
+    21,
+    23,
+    19
+   ],
+   "gains": [
+    2.6,
+    2.8,
+    1.5
+   ],
+   "attackRate": 1.5,
+   "attackSpeed": 110,
+   "attackPoint": 0.33,
+   "projectileSpeed": 1500,
+   "range": 400,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_venomancer": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    18,
+    21
+   ],
+   "attributes": [
+    19,
+    25,
+    19
+   ],
+   "gains": [
+    2.1,
+    2.8,
+    1.9
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 115,
+   "attackPoint": 0.3,
+   "projectileSpeed": 900,
+   "range": 450,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_viper": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    27,
+    29
+   ],
+   "attributes": [
+    21,
+    21,
+    17
+   ],
+   "gains": [
+    2.4,
+    2.9,
+    2
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 110,
+   "attackPoint": 0.33,
+   "projectileSpeed": 1200,
+   "range": 575,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_visage": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    21,
+    31
+   ],
+   "attributes": [
+    22,
+    12,
+    22
+   ],
+   "gains": [
+    2.8,
+    1.3,
+    2.9
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 110,
+   "attackPoint": 0.4,
+   "projectileSpeed": 1400,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_void_spirit": {
+   "primary": "all",
+   "attack": "melee",
+   "damage": [
+    18,
+    22
+   ],
+   "attributes": [
+    22,
+    22,
+    24
+   ],
+   "gains": [
+    2.6,
+    2.2,
+    3.1
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_warlock": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    27,
+    37
+   ],
+   "attributes": [
+    22,
+    10,
+    25
+   ],
+   "gains": [
+    2.4,
+    1,
+    3.1
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 95,
+   "attackPoint": 0.3,
+   "projectileSpeed": 1200,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_weaver": {
+   "primary": "agi",
+   "attack": "ranged",
+   "damage": [
+    37,
+    43
+   ],
+   "attributes": [
+    16,
+    17,
+    20
+   ],
+   "gains": [
+    2.1,
+    3.3,
+    2
+   ],
+   "attackRate": 1.8,
+   "attackSpeed": 120,
+   "attackPoint": 0.55,
+   "projectileSpeed": 900,
+   "range": 425,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_windrunner": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    24,
+    36
+   ],
+   "attributes": [
+    18,
+    20,
+    18
+   ],
+   "gains": [
+    2.6,
+    2.1,
+    3.2
+   ],
+   "attackRate": 1.5,
+   "attackSpeed": 90,
+   "attackPoint": 0.4,
+   "projectileSpeed": 1250,
+   "range": 600,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_winter_wyvern": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    16,
+    23
+   ],
+   "attributes": [
+    22,
+    16,
+    26
+   ],
+   "gains": [
+    2.5,
+    1.7,
+    3.6
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.25,
+   "projectileSpeed": 700,
+   "range": 450,
+   "talents": [
+    {},
+    {
+     "damage": 30
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_wisp": {
+   "primary": "all",
+   "attack": "ranged",
+   "damage": [
+    21,
+    27
+   ],
+   "attributes": [
+    19,
+    14,
+    21
+   ],
+   "gains": [
+    3,
+    1.6,
+    1.7
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.3,
+   "projectileSpeed": 1200,
+   "range": 500,
+   "talents": [
+    {},
+    {
+     "str": 8
+    },
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_witch_doctor": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    26,
+    36
+   ],
+   "attributes": [
+    20,
+    13,
+    22
+   ],
+   "gains": [
+    2.1,
+    1.4,
+    3.1
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.4,
+   "projectileSpeed": 1200,
+   "range": 550,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  },
+  "npc_dota_hero_zuus": {
+   "primary": "int",
+   "attack": "ranged",
+   "damage": [
+    29,
+    45
+   ],
+   "attributes": [
+    21,
+    11,
+    23
+   ],
+   "gains": [
+    2.1,
+    1.2,
+    3.3
+   ],
+   "attackRate": 1.7,
+   "attackSpeed": 100,
+   "attackPoint": 0.35,
+   "projectileSpeed": 1100,
+   "range": 365,
+   "talents": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+   ]
+  }
+ },
+ "items": {
+  "item_overwhelming_blink": {
+   "str": [
+    25
+   ]
+  },
+  "item_swift_blink": {
+   "agi": [
+    25
+   ]
+  },
+  "item_arcane_blink": {
+   "int": [
+    25
+   ]
+  },
+  "item_blades_of_attack": {
+   "damage": [
+    9
+   ]
+  },
+  "item_broadsword": {
+   "damage": [
+    15
+   ]
+  },
+  "item_claymore": {
+   "damage": [
+    20
+   ]
+  },
+  "item_mithril_hammer": {
+   "damage": [
+    24
+   ]
+  },
+  "item_quarterstaff": {
+   "attackSpeed": [
+    10
+   ],
+   "damage": [
+    10
+   ]
+  },
+  "item_quelling_blade": {
+   "quell": [
+    8,
+    4
+   ]
+  },
+  "item_faerie_fire": {
+   "damage": [
+    2
+   ]
+  },
+  "item_moon_shard": {
+   "attackSpeed": [
+    140
+   ]
+  },
+  "item_gauntlets": {
+   "str": [
+    3
+   ]
+  },
+  "item_slippers": {
+   "agi": [
+    3
+   ]
+  },
+  "item_mantle": {
+   "int": [
+    3
+   ]
+  },
+  "item_branches": {
+   "all": [
+    1
+   ]
+  },
+  "item_belt_of_strength": {
+   "str": [
+    6
+   ]
+  },
+  "item_boots_of_elves": {
+   "agi": [
+    6
+   ]
+  },
+  "item_robe": {
+   "int": [
+    6
+   ]
+  },
+  "item_circlet": {
+   "all": [
+    2
+   ]
+  },
+  "item_crown": {
+   "all": [
+    4
+   ]
+  },
+  "item_diadem": {
+   "all": [
+    6
+   ]
+  },
+  "item_ogre_axe": {
+   "str": [
+    10
+   ]
+  },
+  "item_blade_of_alacrity": {
+   "agi": [
+    10
+   ]
+  },
+  "item_staff_of_wizardry": {
+   "int": [
+    10
+   ]
+  },
+  "item_ultimate_orb": {
+   "all": [
+    15
+   ]
+  },
+  "item_gloves": {
+   "attackSpeed": [
+    20
+   ]
+  },
+  "item_blitz_knuckles": {
+   "attackSpeed": [
+    35
+   ]
+  },
+  "item_magic_wand": {
+   "all": [
+    3
+   ]
+  },
+  "item_ghost": {
+   "all": [
+    5
+   ]
+  },
+  "item_bloodslinger": {
+   "int": [
+    8
+   ]
+  },
+  "item_phase_boots": {
+   "damage": [
+    15
+   ]
+  },
+  "item_demon_edge": {
+   "damage": [
+    40
+   ]
+  },
+  "item_eagle": {
+   "agi": [
+    25
+   ]
+  },
+  "item_reaver": {
+   "str": [
+    25
+   ]
+  },
+  "item_relic": {
+   "damage": [
+    55
+   ]
+  },
+  "item_hyperstone": {
+   "attackSpeed": [
+    60
+   ]
+  },
+  "item_mystic_staff": {
+   "int": [
+    25
+   ]
+  },
+  "item_power_treads": {
+   "attackSpeed": [
+    25
+   ],
+   "selected": [
+    10
+   ]
+  },
+  "item_phylactery": {
+   "all": [
+    6
+   ]
+  },
+  "item_angels_demise": {
+   "all": [
+    8
+   ]
+  },
+  "item_caduceus": {
+   "agi": [
+    8
+   ],
+   "int": [
+    20
+   ],
+   "str": [
+    8
+   ]
+  },
+  "item_hand_of_midas": {
+   "attackSpeed": [
+    40
+   ]
+  },
+  "item_oblivion_staff": {
+   "attackSpeed": [
+    35
+   ],
+   "int": [
+    10
+   ]
+  },
+  "item_witch_blade": {
+   "attackSpeed": [
+    40
+   ],
+   "int": [
+    12
+   ]
+  },
+  "item_cornucopia": {
+   "damage": [
+    7
+   ]
+  },
+  "item_bracer": {
+   "agi": [
+    2
+   ],
+   "int": [
+    2
+   ],
+   "str": [
+    5
+   ]
+  },
+  "item_wraith_band": {
+   "agi": [
+    5
+   ],
+   "attackSpeed": [
+    10
+   ],
+   "int": [
+    2
+   ],
+   "str": [
+    2
+   ]
+  },
+  "item_null_talisman": {
+   "agi": [
+    2
+   ],
+   "int": [
+    5
+   ],
+   "str": [
+    2
+   ]
+  },
+  "item_holy_locket": {
+   "all": [
+    7
+   ]
+  },
+  "item_urn_of_shadows": {
+   "all": [
+    2
+   ]
+  },
+  "item_sheepstick": {
+   "int": [
+    30
+   ]
+  },
+  "item_orchid": {
+   "attackSpeed": [
+    35
+   ],
+   "damage": [
+    20
+   ],
+   "int": [
+    12
+   ]
+  },
+  "item_bloodthorn": {
+   "attackSpeed": [
+    70
+   ],
+   "damage": [
+    20
+   ],
+   "int": [
+    25
+   ]
+  },
+  "item_echo_sabre": {
+   "damage": [
+    20
+   ],
+   "str": [
+    15
+   ]
+  },
+  "item_cyclone": {
+   "int": [
+    10
+   ]
+  },
+  "item_wind_waker": {
+   "int": [
+    35
+   ]
+  },
+  "item_force_staff": {
+   "int": [
+    10
+   ]
+  },
+  "item_hurricane_pike": {
+   "agi": [
+    20
+   ],
+   "int": [
+    15
+   ],
+   "str": [
+    15
+   ]
+  },
+  "item_dagon": {
+   "all": [
+    6,
+    7,
+    8,
+    9,
+    10
+   ]
+  },
+  "item_dagon_2": {
+   "all": [
+    6,
+    7,
+    8,
+    9,
+    10
+   ],
+   "baseLevel": [
+    2
+   ]
+  },
+  "item_dagon_3": {
+   "all": [
+    6,
+    7,
+    8,
+    9,
+    10
+   ],
+   "baseLevel": [
+    3
+   ]
+  },
+  "item_dagon_4": {
+   "all": [
+    6,
+    7,
+    8,
+    9,
+    10
+   ],
+   "baseLevel": [
+    4
+   ]
+  },
+  "item_dagon_5": {
+   "all": [
+    6,
+    7,
+    8,
+    9,
+    10
+   ],
+   "baseLevel": [
+    5
+   ]
+  },
+  "item_necronomicon": {
+   "str": [
+    6,
+    12,
+    18
+   ]
+  },
+  "item_necronomicon_2": {
+   "baseLevel": [
+    2
+   ],
+   "str": [
+    6,
+    12,
+    18
+   ]
+  },
+  "item_necronomicon_3": {
+   "baseLevel": [
+    3
+   ],
+   "str": [
+    6,
+    12,
+    18
+   ]
+  },
+  "item_ultimate_scepter": {
+   "all": [
+    10
+   ]
+  },
+  "item_assault": {
+   "attackSpeed": [
+    30
+   ]
+  },
+  "item_heart": {
+   "str": [
+    40
+   ]
+  },
+  "item_black_king_bar": {
+   "damage": [
+    24
+   ],
+   "str": [
+    10
+   ]
+  },
+  "item_bloodstone": {
+   "int": [
+    15
+   ]
+  },
+  "item_sphere": {
+   "all": [
+    17
+   ]
+  },
+  "item_meteor_hammer": {
+   "agi": [
+    6
+   ],
+   "int": [
+    22
+   ],
+   "str": [
+    6
+   ]
+  },
+  "item_starforge": {
+   "agi": [
+    24
+   ],
+   "int": [
+    40
+   ],
+   "str": [
+    24
+   ]
+  },
+  "item_nullifier": {
+   "damage": [
+    75
+   ]
+  },
+  "item_kaya": {
+   "int": [
+    16
+   ]
+  },
+  "item_trident": {
+   "agi": [
+    30
+   ],
+   "attackSpeed": [
+    30
+   ],
+   "int": [
+    30
+   ],
+   "str": [
+    30
+   ]
+  },
+  "item_spirit_vessel": {
+   "all": [
+    10
+   ]
+  },
+  "item_essence_distiller": {
+   "all": [
+    3
+   ]
+  },
+  "item_blade_mail": {
+   "damage": [
+    15
+   ]
+  },
+  "item_eternal_shroud": {
+   "str": [
+    10
+   ]
+  },
+  "item_consecrated_wraps": {
+   "all": [
+    5
+   ]
+  },
+  "item_crellas_crozier": {
+   "all": [
+    6
+   ]
+  },
+  "item_rapier": {
+   "damage": [
+    100
+   ]
+  },
+  "item_monkey_king_bar": {
+   "attackSpeed": [
+    50
+   ],
+   "damage": [
+    55
+   ]
+  },
+  "item_radiance": {
+   "damage": [
+    55
+   ]
+  },
+  "item_butterfly": {
+   "agi": [
+    30
+   ],
+   "attackSpeed": [
+    30
+   ],
+   "damage": [
+    30
+   ]
+  },
+  "item_greater_crit": {
+   "damage": [
+    88
+   ]
+  },
+  "item_basher": {
+   "damage": [
+    30
+   ],
+   "str": [
+    10
+   ]
+  },
+  "item_bfury": {
+   "damage": [
+    50
+   ],
+   "quell": [
+    10,
+    5
+   ]
+  },
+  "item_manta": {
+   "agi": [
+    26
+   ],
+   "attackSpeed": [
+    15
+   ],
+   "int": [
+    10
+   ],
+   "str": [
+    10
+   ]
+  },
+  "item_lesser_crit": {
+   "damage": [
+    32
+   ]
+  },
+  "item_dragon_lance": {
+   "agi": [
+    15
+   ],
+   "str": [
+    10
+   ]
+  },
+  "item_armlet": {
+   "attackSpeed": [
+    25
+   ],
+   "damage": [
+    15
+   ]
+  },
+  "item_invis_sword": {
+   "attackSpeed": [
+    35
+   ],
+   "damage": [
+    25
+   ]
+  },
+  "item_silver_edge": {
+   "attackSpeed": [
+    35
+   ],
+   "damage": [
+    70
+   ]
+  },
+  "item_sange_and_yasha": {
+   "agi": [
+    16
+   ],
+   "attackSpeed": [
+    20
+   ],
+   "str": [
+    16
+   ]
+  },
+  "item_kaya_and_sange": {
+   "int": [
+    16
+   ],
+   "str": [
+    16
+   ]
+  },
+  "item_yasha_and_kaya": {
+   "agi": [
+    16
+   ],
+   "attackSpeed": [
+    20
+   ],
+   "int": [
+    16
+   ]
+  },
+  "item_satanic": {
+   "damage": [
+    25
+   ],
+   "str": [
+    25
+   ]
+  },
+  "item_mjollnir": {
+   "attackSpeed": [
+    90
+   ],
+   "damage": [
+    25
+   ]
+  },
+  "item_skadi": {
+   "all": [
+    35
+   ]
+  },
+  "item_sange": {
+   "str": [
+    16
+   ]
+  },
+  "item_helm_of_the_dominator": {
+   "all": [
+    6
+   ]
+  },
+  "item_helm_of_the_overlord": {
+   "all": [
+    21
+   ]
+  },
+  "item_maelstrom": {
+   "attackSpeed": [
+    25
+   ],
+   "damage": [
+    25
+   ]
+  },
+  "item_gungir": {
+   "int": [
+    20
+   ]
+  },
+  "item_desolator": {
+   "damage": [
+    55
+   ]
+  },
+  "item_yasha": {
+   "agi": [
+    16
+   ],
+   "attackSpeed": [
+    15
+   ]
+  },
+  "item_mask_of_madness": {
+   "attackSpeed": [
+    10
+   ],
+   "damage": [
+    15
+   ]
+  },
+  "item_diffusal_blade": {
+   "agi": [
+    15
+   ],
+   "int": [
+    10
+   ]
+  },
+  "item_disperser": {
+   "agi": [
+    40
+   ],
+   "int": [
+    10
+   ]
+  },
+  "item_ethereal_blade": {
+   "all": [
+    25
+   ]
+  },
+  "item_soul_ring": {
+   "str": [
+    6
+   ]
+  },
+  "item_orb_of_corrosion": {
+   "agi": [
+    7
+   ]
+  },
+  "item_falcon_blade": {
+   "damage": [
+    14
+   ]
+  },
+  "item_mage_slayer": {
+   "damage": [
+    12
+   ]
+  },
+  "item_ancient_janggo": {
+   "str": [
+    8
+   ]
+  },
+  "item_boots_of_bearing": {
+   "str": [
+    8
+   ]
+  },
+  "item_veil_of_discord": {
+   "int": [
+    10
+   ]
+  },
+  "item_devastator": {
+   "attackSpeed": [
+    40
+   ],
+   "int": [
+    40
+   ]
+  },
+  "item_rod_of_atos": {
+   "int": [
+    15
+   ]
+  },
+  "item_abyssal_blade": {
+   "agi": [
+    15
+   ],
+   "damage": [
+    35
+   ],
+   "str": [
+    30
+   ]
+  },
+  "item_heavens_halberd": {
+   "str": [
+    12
+   ]
+  },
+  "item_skypiercer": {
+   "str": [
+    35
+   ]
+  },
+  "item_philosophers_stone": {
+   "damage": [
+    -30,
+    -60
+   ]
+  },
+  "item_greater_faerie_fire": {
+   "damage": [
+    20
+   ]
+  },
+  "item_ironwood_tree": {
+   "all": [
+    5
+   ]
+  },
+  "item_third_eye": {
+   "all": [
+    7
+   ]
+  },
+  "item_spell_prism": {
+   "all": [
+    5
+   ]
+  },
+  "item_vambrace": {
+   "all": [
+    4
+   ],
+   "selected": [
+    6
+   ]
+  },
+  "item_ocean_heart": {
+   "all": [
+    5
+   ]
+  },
+  "item_broom_handle": {
+   "damage": [
+    8
+   ]
+  },
+  "item_illusionsts_cape": {
+   "agi": [
+    14
+   ],
+   "str": [
+    14
+   ]
+  },
+  "item_havoc_hammer": {
+   "damage": [
+    16
+   ],
+   "str": [
+    14
+   ]
+  },
+  "item_apex": {
+   "primary": [
+    40
+   ],
+   "universal": [
+    24
+   ]
+  },
+  "item_paladin_sword": {
+   "damage": [
+    16
+   ]
+  },
+  "item_elven_tunic": {
+   "attackSpeed": [
+    26
+   ]
+  },
+  "item_penta_edged_sword": {
+   "damage": [
+    45
+   ]
+  },
+  "item_quicksilver_amulet": {
+   "attackSpeed": [
+    18
+   ]
+  },
+  "item_harpoon": {
+   "agi": [
+    15
+   ],
+   "damage": [
+    25
+   ],
+   "str": [
+    30
+   ]
+  },
+  "item_ancient_guardian": {
+   "damage": [
+    50
+   ]
+  },
+  "item_enhancement_vast": {
+   "damage": [
+    6,
+    10,
+    14
+   ]
+  },
+  "item_enhancement_audacious": {
+   "attackSpeed": [
+    100
+   ]
+  },
+  "item_enhancement_alert": {
+   "attackSpeed": [
+    8,
+    18,
+    28
+   ]
+  },
+  "item_enhancement_tough": {
+   "damage": [
+    6,
+    11,
+    16
+   ]
+  },
+  "item_enhancement_crude": {
+   "intPct": [
+    -9
+   ]
+  },
+  "item_enhancement_greedy": {
+   "damage": [
+    -70
+   ]
+  },
+  "item_enhancement_evolved": {
+   "primary": [
+    20
+   ],
+   "universal": [
+    12
+   ]
+  },
+  "item_enhancement_fierce": {
+   "damage": [
+    15
+   ]
+  },
+  "item_enhancement_dominant": {
+   "attackSpeed": [
+    25
+   ]
+  },
+  "item_specialists_array": {
+   "agi": [
+    15
+   ],
+   "damage": [
+    20
+   ]
+  },
+  "item_hydras_breath": {
+   "agi": [
+    30
+   ],
+   "damage": [
+    25
+   ],
+   "str": [
+    15
+   ]
+  },
+  "item_foragers_health": {
+   "damage": [
+    2
+   ]
+  },
+  "item_foragers_mana": {
+   "int": [
+    2
+   ]
+  },
+  "item_enhancement_nimble": {
+   "damage": [
+    12,
+    18
+   ]
+  },
+  "item_berserkers_sabatons": {
+   "attackSpeed": [
+    30
+   ],
+   "damage": [
+    40
+   ]
+  }
+ },
+ "towers": {
+  "1": {
+   "damage": [
+    88,
+    92
+   ],
+   "attackRate": 0.9,
+   "attackSpeed": 110,
+   "range": 700
+  },
+  "2": {
+   "damage": [
+    170,
+    174
+   ],
+   "attackRate": 0.9,
+   "attackSpeed": 110,
+   "range": 700
+  },
+  "3": {
+   "damage": [
+    170,
+    174
+   ],
+   "attackRate": 0.9,
+   "attackSpeed": 110,
+   "range": 700
+  },
+  "4": {
+   "damage": [
+    170,
+    174
+   ],
+   "attackRate": 0.9,
+   "attackSpeed": 110,
+   "range": 700
+  }
+ }
+}

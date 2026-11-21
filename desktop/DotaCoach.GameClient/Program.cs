@@ -120,7 +120,8 @@ internal sealed class GameWindowUi : Window
         creepHpButton = Ui.Button("显示小兵血量", async (_, _) => await ToggleCreepHp());
         if (e2e == null) {
             var panel = new StackPanel();
-            panel.Children.Add(Ui.Text("默认血条、无边框或窗口模式。Dota 画面只在本机显卡上识别，不传给教练端；显卡有空闲时每帧刷新，显卡被游戏占满时限 60 帧以免拖慢游戏；切出 Dota 时隐藏。", 12));
+            panel.Children.Add(Ui.Text("只给半血以下的兵标血量；你的英雄一刀必能打死（正补、反补）时数字变红。塔下的兵需要先垫刀时，" +
+                "血条右边的黄字是要垫几刀，垫完等塔打到变红再补。默认血条、无边框或窗口模式。Dota 画面只在本机显卡上识别，不传给教练端；显卡有空闲时每帧刷新，显卡被游戏占满时限 60 帧以免拖慢游戏；切出 Dota 时隐藏。", 12));
             panel.Children.Add(creepHpButton); panel.Children.Add(creepHpStatus);
             bottom.Children.Add(Ui.Section("小兵血量：本机实时显示", panel));
             Loaded += async (_, _) => { if (CreepHpLog != null) await ToggleCreepHp(); };
@@ -197,14 +198,14 @@ internal sealed class GameWindowUi : Window
             CreepHpDisplay? started = null;
             started = new CreepHpDisplay(s => {
                 if (log != null) try { File.AppendAllText(log, System.Text.Json.JsonSerializer.Serialize(new { at = DateTimeOffset.Now, s.Status,
-                    fps = Math.Round(s.Fps, 1), scanMs = Math.Round(s.ScanMs, 2), s.Bars, s.Known, s.GpuLoad, s.Limited }) + "\n"); } catch { }
+                    fps = Math.Round(s.Fps, 1), scanMs = Math.Round(s.ScanMs, 2), s.Bars, s.Known, s.Shown, s.GpuLoad, s.Limited, s.Kill }) + "\n"); } catch { }
                 Dispatcher.BeginInvoke(() => {
                     if (creepHp != started) return;
                     string rate = s.Fps > 0 ? $"\n{s.Fps:F0} 帧/秒{(s.Limited ? $"（显卡繁忙，限 {GpuPacing.LimitedFps} 以免拖慢游戏）" : "")} · 识别 {s.ScanMs:F1} ms · " +
-                        $"{s.Bars} 根血条，{s.Known} 根已认出兵种" : "";
-                    creepHpStatus.Text = s.Status + rate + (gsiNote.Length > 0 ? "\n" + gsiNote : "");
+                        $"{s.Bars} 根血条，{s.Known} 根已认出兵种，{s.Shown} 根半血以下标了数字" : "";
+                    creepHpStatus.Text = s.Status + rate + (s.Kill.Length > 0 ? "\n" + s.Kill : "") + (gsiNote.Length > 0 ? "\n" + gsiNote : "");
                 });
-            }, () => gsi?.LatestMinimap(), excludeFromCapture: log == null);
+            }, () => gsi?.LatestMinimap(), () => gsi?.LatestLoadout(), excludeFromCapture: log == null);
             creepHp = started;
             creepHpButton.Content = "关闭小兵血量";
         } finally { creepHpButton.IsEnabled = !closing; }

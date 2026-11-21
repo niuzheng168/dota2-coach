@@ -18,5 +18,10 @@
     <Compile Include="../TwoPc.SharedUi/Ui.cs" Link="Ui.cs" />
     <Compile Include="../TwoPc.SharedUi/DebugPanel.cs" Link="DebugPanel.cs" />
     <Compile Include="../DotaCoach.Desktop/GameWindow.cs" Link="GameWindow.cs" />
+    <Content Include="../../data/dota2-hero-attack.json">
+      <Link>data/%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 </Project>

@@ -21,6 +21,7 @@ public sealed class GsiReceiver : IAsyncDisposable
     private readonly object gate = new();
     private (OwnState Value, long At)? latest;
     private (SpectatorSnapshot Value, long At)? units;
+    private (HeroLoadout Value, long At)? loadout;
     public int Port { get; private set; }
     public Action<GsiDiagnostics>? Diagnostics { get; set; }
     /// <summary>Typed minimap units of each authenticated packet, for the opt-in Debug log only.</summary>
@@ -71,8 +72,9 @@ public sealed class GsiReceiver : IAsyncDisposable
                 // An authenticated menu/observer/invalid payload invalidates old own-player state.
                 OwnState own;
                 try { own = GsiState.Parse(root); }
-                catch { lock (gate) latest = null; if (diagnostics) Describe(root, false); throw; }
-                lock (gate) latest = (own, Environment.TickCount64);
+                catch { lock (gate) { latest = null; loadout = null; } if (diagnostics) Describe(root, false); throw; }
+                var hero = HeroLoadout.Parse(root);
+                lock (gate) { latest = (own, Environment.TickCount64); loadout = hero is null ? null : (hero, Environment.TickCount64); }
                 if (diagnostics) Describe(root, true);
                 return Results.Ok();
             }
@@ -121,6 +123,11 @@ public sealed class GsiReceiver : IAsyncDisposable
             return (m.Value, (int)(Environment.TickCount64 - m.At));
         }
     }
+    /// <summary>The own hero's level, talents and items from the newest packet, for the creep HP display; stays on this machine.</summary>
+    public HeroLoadout? LatestLoadout()
+    {
+        lock (gate) return loadout is { } l && Environment.TickCount64 - l.At <= 3000 ? l.Value : null;
+    }
     public string Config => $$"""
         "Dota Coach Two PC"
         {
@@ -154,7 +161,7 @@ public sealed class GsiReceiver : IAsyncDisposable
     }
     public async ValueTask DisposeAsync()
     {
-        lock (gate) { latest = null; units = null; }
+        lock (gate) { latest = null; units = null; loadout = null; }
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         try { await app.StopAsync(deadline.Token); } catch (OperationCanceledException) { }
         await app.DisposeAsync();
