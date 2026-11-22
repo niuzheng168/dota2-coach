@@ -136,7 +136,7 @@ internal sealed class CoachWindow : Window
         catch { preferences = new(); notice.Text = "已保存的设置无效，请检查并重新应用；没有读取或输出密钥内容。"; }
         try { heroNames = new HeroNames(System.IO.Path.Combine(AppContext.BaseDirectory, "data", "dota2-dictionary.json")); }
         catch { /* Alerts fall back to internal hero names. */ }
-        Title = "Dota Coach · 教练端 v0.4.7";
+        Title = "Dota Coach · 教练端 v0.4.8";
         Width = Math.Min(video ? 1320 : 760, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(940, SystemParameters.WorkArea.Height - 40);
         MinWidth = video ? 1000 : 560; MinHeight = 640; WindowStartupLocation = WindowStartupLocation.CenterScreen;

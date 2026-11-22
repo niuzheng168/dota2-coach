@@ -54,7 +54,7 @@ foreach ($role in @("Game", "Coach")) {
         --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o $destination
     if ($LASTEXITCODE -ne 0) { throw "Publish failed: $name" }
     if ($role -eq "Game") { $panelIcons = Copy-PanelIcons $destination }
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v047.md") -Destination (Join-Path $destination "README.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v048.md") -Destination (Join-Path $destination "README.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v043.md") -Destination (Join-Path $destination "USAGE.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-status-only.md") -Destination (Join-Path $destination "NO-VIDEO.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/game-creep-hp.md") -Destination (Join-Path $destination "CREEP-HP.md")
@@ -95,6 +95,8 @@ $manifest = [ordered]@{
     creepHpDisplay = "game-local-gpu"; creepHpShown = "below-half"; creepHpLethal = "red-sure-kill-gsi-attack"
     towerPrepHits = "amber-count"; heroAttackDataBuild = 6989; gameStatusIntervalMs = 250
     visionScanButton = $true; wardMarksMaxUnseenSeconds = 15
+    wardReads = "sub-second-per-change"; wardCarrierItemsEverySeconds = 0.4; wardInSightMark = "hero-ahead-350"
+    wardSpotWeights = "fitted-47-replays"
     sourceCommit = (& git -C (Join-Path $PSScriptRoot "..") rev-parse HEAD)
     sourceDirty = [bool](& git -C (Join-Path $PSScriptRoot "..") status --porcelain)
 }
