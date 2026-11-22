@@ -1,0 +1,123 @@
+{
+  "node": "v24.14.1",
+  "codey": "0.3.43",
+  "upstream": "loopback HTTP mock",
+  "csharp": {
+    "happy": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200",
+        "POST /v1/responses 200",
+        "POST /v1/responses 200",
+        "GET /v1/models 200",
+        "POST /v1/responses 200",
+        "POST /v1/responses 200"
+      ],
+      "upstream": [
+        "POST /responses gpt-6.2-astra text minute_farm_choice",
+        "POST /responses gpt-6.2-astra image visible_farming_advice",
+        "POST /responses gpt-6.2-sol text minute_farm_choice",
+        "POST /responses gpt-6.2-sol image visible_farming_advice"
+      ]
+    },
+    "wrong-echo": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200",
+        "POST /v1/responses 200",
+        "POST /v1/responses 200"
+      ],
+      "upstream": [
+        "POST /responses gpt-6.2-astra text minute_farm_choice",
+        "POST /responses gpt-6.2-astra image visible_farming_advice"
+      ]
+    },
+    "foreign-provider": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200"
+      ],
+      "upstream": [
+        "GET /alternate/v1/models"
+      ]
+    },
+    "no-vision": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200"
+      ],
+      "upstream": []
+    },
+    "non-native-endpoint": {
+      "passed": false,
+      "front": [
+        "GET /v1/models 200",
+        "POST /v1/responses 400"
+      ],
+      "upstream": []
+    },
+    "image-size-edge": {
+      "passed": false,
+      "front": [
+        "GET /v1/models 200",
+        "POST /v1/responses 200"
+      ],
+      "upstream": [
+        "POST /responses gpt-6.2-astra image visible_farming_advice REDACTED_PNG"
+      ]
+    }
+  },
+  "bundle": "server-BotZPvTv.js",
+  "sha256": "be7dcb0d52d6571317dd27c08282141152742022dee5c224550f412e56904f2b",
+  "mapSha256": "f1d176b487945336860e8d1fb519f229ca2389cebb7812e2228855a21cca4f3f",
+  "limitedCatalog": [
+    [
+      "gpt-6.2-astra",
+      [
+        "/v1/responses"
+      ],
+      true
+    ],
+    [
+      "gpt-6.2-sol",
+      [
+        "/responses"
+      ],
+      false
+    ]
+  ],
+  "imageEdge": {
+    "jpegBytes": 1585,
+    "cap": 1585,
+    "observedAtMock": "96x32 PNG, detail=low"
+  },
+  "passed": false,
+  "failure": "CloudCoach/non-native-endpoint exited 1; CloudCoach/image-size-edge exited 1",
+  "userAgents": [
+    "DotaCoach/0.6.1"
+  ],
+  "frontAuthAndEgressChecksPassed": true,
+  "front": {
+    "GET /v1/models 401": 1,
+    "GET /v1/models 200": 11,
+    "POST /v1/responses 400": 3,
+    "POST /v1/responses 200": 10
+  },
+  "mockCalls": [
+    "GET /models",
+    "POST /responses gpt-6.2-astra text probe",
+    "POST /responses gpt-6.2-sol image probe",
+    "POST /responses gpt-6.2-astra text minute_farm_choice",
+    "POST /responses gpt-6.2-astra image visible_farming_advice",
+    "POST /responses gpt-6.2-sol text minute_farm_choice",
+    "POST /responses gpt-6.2-sol image visible_farming_advice",
+    "POST /responses gpt-6.2-astra text minute_farm_choice",
+    "POST /responses gpt-6.2-astra image visible_farming_advice",
+    "GET /alternate/v1/models",
+    "GET /alternate/v1/models",
+    "GET /models",
+    "GET /models",
+    "POST /responses gpt-6.2-astra image probe REDACTED_PNG",
+    "POST /responses gpt-6.2-astra image visible_farming_advice REDACTED_PNG"
+  ]
+}

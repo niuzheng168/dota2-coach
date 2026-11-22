@@ -56,6 +56,11 @@ internal static class PlusAlertTests
         check(full.Update(Snap(9500) with { Mode = "full-spectator" }, names).Count == 0 &&
               paused.Update(Snap(9000) with { Paused = true }, names).Count == 0, "delayed/full spectating and a paused game never alert");
 
+        var outage = new VisionLossTracker();
+        Feed(outage, 0, 4000, true);
+        check(Feed(outage, 7000, 8500, false).Count == 0 && Feed(paused, 9500, 12000, false).Count == 0,
+            "silence or pause for the disappearance window is not a vision-loss observation");
+
         // --- The enemy panel from the scanner's live file.
         string dir = Path.Combine(Path.GetTempPath(), "dotacoach-plus-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -78,8 +83,48 @@ internal static class PlusAlertTests
             check(ScanFeed.Poll(file, "9000000001", now) is { Status.Running: true, Board: null }, "full-spectator scans never reach the game machine");
             Write("team-view", "9000000001", now / 1000.0 - 30, false, rows);
             check(ScanFeed.Poll(file, "9000000001", now) is { Status.Running: false, Board: null }, "a file not updated for 10 s means the scanner stopped");
-            Write("team-view", "9000000001", now / 1000.0, true, []);
-            check(ScanFeed.Poll(file, "9000000001", now).Status.Text.Contains("已停止"), "a stopped scanner says so");
+            Write("team-view", "9000000001", now / 1000.0 + 1, false, rows);
+            check(ScanFeed.Poll(file, "9000000001", now).Board == null, "a future file is not fresh");
+            Write("team-view", "0", now / 1000.0, false, rows);
+            check(ScanFeed.Poll(file, "0", now).Board == null, "matching placeholders never identify the game");
+            Write("team-view", "9000000001", now / 1000.0, false, rows);
+            string sample = File.ReadAllText(file);
+            foreach (string malformed in new[] { sample.Replace("\"ownTeam\":2", "\"ownTeam\":0"), sample.Replace("\"ownTeam\":2,", ""),
+                sample.Replace("\"clock\":900,", ""), sample.Replace("\"clock\":900", "\"clock\":900,\"gsiAge\":3.1") }) {
+                File.WriteAllText(file, malformed);
+                check(ScanFeed.Poll(file, "9000000001", now).Board == null, "missing side or sample clock and stale scanner GSI cannot supply equipment");
+            }
+            File.WriteAllText(file, sample);
+            var receipt = ScanFeed.Poll(file, "9000000001", now).Status.Sample!;
+            var cursor = new TeamScanCursor();
+            check(receipt.WrittenMs == now && cursor.Take(receipt) && !cursor.Take(ScanFeed.Poll(file, "9000000001", now + 250).Status.Sample!),
+                "polling the same write again never restamps or consumes the receipt twice");
+            check(ScanFeed.Poll(file, "9000000001", now + TeamViewEvidence.FreshMs) is { Status.Running: true, Status.Sample: null, Board: null, Wards.Count: 0 },
+                "the legacy file heartbeat is not evidence at the exact source freshness boundary");
+            File.WriteAllText(file, sample.Replace("\"clock\":900", "\"clock\":900,\"gsiAge\":1"));
+            var held = ScanFeed.Poll(file, "9000000001", now + 1999).Status.Sample;
+            check(held is { GsiAgeMs: 1000 } && held.WrittenMs == now && held.FreshAt(now + 1999) && !held.FreshAt(now + 2000),
+                "a sample waiting for the participant clock retains its GSI age without changing the receipt identity");
+            check(ScanFeed.Poll(file, "9000000001", now + 1999).Board != null &&
+                  ScanFeed.Poll(file, "9000000001", now + 2000) is { Status.Sample: null, Board: null, Wards.Count: 0 },
+                "source GSI age and time on disk share one strict three-second budget");
+            foreach (string mode in new[] { "waiting", "unknown", "menu", "postgame" }) {
+                Write(mode, "9000000001", now / 1000.0, false, rows);
+                check(ScanFeed.Poll(file, "9000000001", now) is { Status.Sample: null, Board: null, Wards.Count: 0 },
+                    "a running process without live team view supplies no observations: " + mode);
+            }
+            foreach (object[] unknown in new[] { Array.Empty<object>(), new[] { Row("npc_dota_hero_lion", null, null, null) } }) {
+                Write("team-view", "9000000001", now / 1000.0, false, unknown);
+                check(ScanFeed.Poll(file, "9000000001", now) is { Status.Running: true, Status.Sample: null, Board: null, Wards.Count: 0 },
+                    "a roster without any readings is unavailable, not an observed empty inventory");
+            }
+            Write("team-view", "9000000001", now / 1000.0, false, [Row("npc_dota_hero_lion", null, new string?[6], 0)]);
+            check(ScanFeed.Poll(file, "9000000001", now).Board?.Heroes is [{ Items.Length: 6, Age: 0 }],
+                "six explicitly observed empty slots are different from unknown equipment");
+            Write("team-view", "9000000001", now / 1000.0, true, rows);
+            var stopped = ScanFeed.Poll(file, "9000000001", now);
+            check(stopped is { Status.Running: false, Status.Sample: null, Board: null, Wards.Count: 0 } && stopped.Status.Text.Contains("已停止"),
+                "a stopped scanner says so and never republishes its final rows");
             Write("team-view", "9000000001", now / 1000.0, false, rows, version: 1);
             check(ScanFeed.Poll(file, "9000000001", now) is { Status.Running: false, Board: null, Status.Text: var old } && old.Contains("版本"),
                 "an old scanner's file is not read");

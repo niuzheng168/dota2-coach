@@ -1,0 +1,15 @@
+{
+  "patch":"7.42",
+  "bands":[
+    {"hero":"luna","fromMinute":5,"toMinuteExclusive":10,"replayMatches":8,"matchedMinutes":40,"laneOnly":8,"campOnly":5,"both":26,"neither":1,"replayAccounts":6,"matchesWithBoth":8,"completeMinutes":40,"ambiguousMinutesExcluded":0,"minutesWithUnlocatedBodyNeutral":3},
+    {"hero":"luna","fromMinute":10,"toMinuteExclusive":15,"replayMatches":8,"matchedMinutes":40,"laneOnly":6,"campOnly":7,"both":27,"neither":0,"replayAccounts":6,"matchesWithBoth":8,"completeMinutes":40,"ambiguousMinutesExcluded":0,"minutesWithUnlocatedBodyNeutral":5},
+    {"hero":"luna","fromMinute":15,"toMinuteExclusive":20,"replayMatches":8,"matchedMinutes":40,"laneOnly":6,"campOnly":11,"both":21,"neither":2,"replayAccounts":6,"matchesWithBoth":7,"completeMinutes":40,"ambiguousMinutesExcluded":0,"minutesWithUnlocatedBodyNeutral":5},
+    {"hero":"troll_warlord","fromMinute":5,"toMinuteExclusive":10,"replayMatches":8,"matchedMinutes":40,"laneOnly":21,"campOnly":1,"both":16,"neither":2,"replayAccounts":7,"matchesWithBoth":6,"completeMinutes":40,"ambiguousMinutesExcluded":0,"minutesWithUnlocatedBodyNeutral":0},
+    {"hero":"troll_warlord","fromMinute":10,"toMinuteExclusive":15,"replayMatches":8,"matchedMinutes":40,"laneOnly":7,"campOnly":7,"both":25,"neither":1,"replayAccounts":7,"matchesWithBoth":8,"completeMinutes":40,"ambiguousMinutesExcluded":0,"minutesWithUnlocatedBodyNeutral":3},
+    {"hero":"troll_warlord","fromMinute":15,"toMinuteExclusive":20,"replayMatches":8,"matchedMinutes":40,"laneOnly":9,"campOnly":5,"both":25,"neither":1,"replayAccounts":7,"matchesWithBoth":8,"completeMinutes":40,"ambiguousMinutesExcluded":0,"minutesWithUnlocatedBodyNeutral":6}
+  ],
+  "schemaVersion":1,
+  "scope":"weak historical kill mix, not path or safety",
+  "source":{"replayMatches":16,"focalAccounts":13,"captureDateUTC":"2026-11-22","expandedSha256":"86efb4d95145f6037647c6a24764339ac42edf1bea629c0d9030dd7fe2ba2b07","auditSha256":"297d4a331f037032b1e29201cd8e7af1093f28e9bc9fe41c68138eb87065ff15"},
+  "definition":"Per completed game-clock minute: at least one hero-body last hit on an enemy lane creep and/or a neutral from a resolved own-side spawn camp. Neither = no qualifying recorded kill, not no farm. Descriptive only; no destination, visibility, or income prediction."
+}

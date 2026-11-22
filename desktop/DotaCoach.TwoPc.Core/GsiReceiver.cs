@@ -14,12 +14,17 @@ public readonly record struct PracticeGate(bool Enabled, string Message)
 }
 
 /// <summary>Loopback-only official GSI ingress on the game machine. Raw payloads never leave it.</summary>
-public sealed class GsiReceiver : IAsyncDisposable
+public sealed partial class GsiReceiver : IAsyncDisposable
 {
     private readonly WebApplication app;
     private readonly string token;
     private readonly object gate = new();
     private (OwnState Value, long At)? latest;
+    private readonly MatchWitnessStream matches = new();
+    private readonly MinuteGsiStream farm = new();
+    private string? farmInstall;
+    private long farmDelivery, farmHandled;
+    private bool incompatibleInstall;
     private (SpectatorSnapshot Value, long At)? units;
     private (HeroLoadout Value, long At)? loadout;
     public int Port { get; private set; }
@@ -28,7 +33,8 @@ public sealed class GsiReceiver : IAsyncDisposable
     public Action<SpectatorSnapshot>? Snapshot { get; set; }
     public GsiDiagnostics? LastDiagnostics { get; private set; }
     private const int MaxBody = 1024 * 1024; // Own state is small; requested minimap data may not be.
-    private void Describe(JsonElement root, bool accepted)
+    private static bool InvalidPacket(Exception e) => e is JsonException or ArgumentException or InvalidOperationException or KeyNotFoundException;
+    private static (GsiDiagnostics Info, SpectatorSnapshot? Snapshot) Describe(JsonElement root, bool accepted, long received)
     {
         string[] keys = ["provider", "map", "player", "hero", "items", "abilities", "allplayers", "buildings", "draft", "minimap"];
         string[] present = keys.Where(k => root.TryGetProperty(k, out _)).ToArray();
@@ -38,19 +44,15 @@ public sealed class GsiReceiver : IAsyncDisposable
         int minimap = root.TryGetProperty("minimap", out var m) && m.ValueKind == JsonValueKind.Object ? m.EnumerateObject().Count() : 0;
         // Player mode does send a minimap (2026-11-17); which enemies it holds, i.e. fog filtering, is still unverified.
         SpectatorSnapshot? snapshot = null;
-        try { snapshot = SpectatorGsi.Parse(root, Environment.TickCount64); } catch { /* Debug view only. */ }
+        try { snapshot = SpectatorGsi.Parse(root, received); } catch (Exception e) when (InvalidPacket(e)) { /* Debug view only. */ }
         int enemies = snapshot is { OwnTeam: int own } ? snapshot.Heroes.Where(u => u.Team is 2 or 3 && u.Team != own)
             .Select(u => u.Name).Distinct().Count() : 0;
-        LastDiagnostics = new(accepted ? "flat-player" : teams || all ? "observer-shaped" : "missing-own-state",
-            present, teams, all, accepted, minimap, enemies);
-        try { Diagnostics?.Invoke(LastDiagnostics); } catch { /* Diagnostics must never change GSI acceptance. */ }
-        if (snapshot != null) {
-            lock (gate) units = (snapshot, Environment.TickCount64);
-            try { Snapshot?.Invoke(snapshot); } catch { /* Same rule for the typed view. */ }
-        }
+        return (new(accepted ? "flat-player" : teams || all ? "observer-shaped" : "missing-own-state",
+            present, teams, all, accepted, minimap, enemies), snapshot);
     }
-    private GsiReceiver(int port, string? resumeToken, bool diagnostics)
+    private GsiReceiver(int port, string? resumeToken, string? dotaInstall, bool diagnostics)
     {
+        farmInstall = dotaInstall;
         if (resumeToken != null && (resumeToken.Length != 64 || !resumeToken.All(Uri.IsHexDigit)))
             throw new ArgumentException("Invalid explicit receiver credential");
         token = resumeToken ?? Wire.Secret();
@@ -62,6 +64,8 @@ public sealed class GsiReceiver : IAsyncDisposable
         app = builder.Build();
         app.MapPost("/gsi", async (HttpContext c) => {
             if (c.Request.Headers.ContainsKey("Origin")) return Results.Unauthorized();
+            long request; PostgameOutbox? recipient;
+            lock (gate) { request = matches.BeginRequest(); recipient = postgameRecipient; } // Bind before the asynchronous body read.
             try
             {
                 using var doc = JsonDocument.Parse(await Bodies.Read(c.Request, MaxBody, c.RequestAborted),
@@ -70,17 +74,90 @@ public sealed class GsiReceiver : IAsyncDisposable
                 if (!Wire.EqualSecret(root.GetProperty("auth").GetProperty("token").GetString(), token))
                     return Results.Unauthorized();
                 // An authenticated menu/observer/invalid payload invalidates old own-player state.
-                OwnState own;
-                try { own = GsiState.Parse(root); }
-                catch { lock (gate) { latest = null; loadout = null; } if (diagnostics) Describe(root, false); throw; }
-                var hero = HeroLoadout.Parse(root);
-                lock (gate) { latest = (own, Environment.TickCount64); loadout = hero is null ? null : (hero, Environment.TickCount64); }
-                if (diagnostics) Describe(root, true);
-                return Results.Ok();
+                OwnState? own = null;
+                long order = Interlocked.Increment(ref farmDelivery);
+                long utc = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), received = Environment.TickCount64;
+                long? sourceTime = null;
+                MatchSample? candidate = null;
+                try {
+                    sourceTime = GsiState.PacketUnixMs(root, utc, MatchWitness.MaxAgeMs);
+                    if (sourceTime.HasValue) candidate = GsiState.ReadMatch(root);
+                } catch (Exception e) when (InvalidPacket(e)) { /* Malformed authenticated evidence withdraws the witness. */ }
+                long? packetTime = sourceTime is long stamp && utc - stamp < MinuteFarmContext.FreshMs ? stamp : null;
+                try { own = GsiState.Parse(root, participantStats: candidate?.Hero != null); }
+                catch (Exception e) when (InvalidPacket(e)) { /* Sparse verified lifecycle may not have a legacy OwnState. */ }
+                string? directory, probe;
+                lock (gate) {
+                    directory = farmInstall;
+                    probe = directory != null && matches.NeedsInstall(request, candidate, sourceTime, utc, received,
+                        Environment.TickCount64, MinuteFarmContext.Eligible(own)) ? directory : null;
+                }
+                // At most one bounded manifest read for both projections, off the capture lock. No
+                // file access on polls, untrusted views or isolated terminal packets; no cached positive.
+                var manifest = probe == null ? default : MinuteGsiStream.ReadInstall(probe);
+                var key = own?.Farm == null ? default : GsiState.ParticipantKey(root);
+                var heroLoadout = own == null ? null : HeroLoadout.Parse(root);
+                (GsiDiagnostics Info, SpectatorSnapshot? Snapshot)? debug = diagnostics ? Describe(root, own != null, received) : null;
+                bool? witnessed;
+                lock (gate) {
+                    // Commit the two projections of this delivery atomically. A directory/session reset
+                    // invalidates pending requests, including an old read of a subsequently reselected directory.
+                    witnessed = matches.Observe(request, candidate, sourceTime, utc, received, Environment.TickCount64,
+                        directory == farmInstall && !manifest.Conflict ? manifest.Build : null, out bool gap, out bool firstPostgame);
+                    if (witnessed == null) return own == null ? Results.BadRequest() : Results.Ok();
+                    // Re-pairing during an old terminal body read can seed the new outbox with the
+                    // last playing sample. Do not let a subsequent duplicate end relabel that old transition.
+                    if (witnessed == true && recipient != null && recipient == postgameRecipient &&
+                        (candidate!.Phase != "postgame" || firstPostgame)) {
+                        long tick = Environment.TickCount64;
+                        recipient.Observe(matches.Latest(tick), tick);
+                    }
+                    if (gap || order != farmHandled + 1) farm.Invalidate(null);
+                    bool mismatch = manifest.Conflict || manifest.Build is int b && b != MinuteFarmContext.SupportedBuild;
+                    if (witnessed == true && mismatch) incompatibleInstall = true;
+                    if (own == null) {
+                        farm.Invalidate(packetTime ?? utc / 1000 * 1000); latest = null;
+                    } else {
+                        if (witnessed == false && own.Stats != null) own = own with { Stats = null };
+                        if (order <= farmHandled || directory != farmInstall) own = own with { Farm = null };
+                        else if (own.Farm is { } telemetry) {
+                            if (manifest.Conflict || manifest.Build.HasValue) incompatibleInstall = mismatch;
+                            // A known conflicting build does not turn into a manual-confirmation fallback on an I/O error.
+                            own = own with { Farm = incompatibleInstall && manifest.Build == null ? null :
+                                telemetry with { InstalledBuild = manifest.Build } };
+                        }
+                        latest = (farm.Observe(own, packetTime, utc, received, key), received);
+                    }
+                    farmHandled = Math.Max(farmHandled, order);
+                    // Local overlays share the authenticated delivery fence. Full/Plus snapshots may be
+                    // described to the opt-in debug sink, never retained as a participant's minimap.
+                    loadout = heroLoadout == null ? null : (heroLoadout, received);
+                    if (debug is { } view) {
+                        LastDiagnostics = view.Info;
+                        units = own != null && view.Snapshot is { Mode: "player" } map ? (map, received) : null;
+                    }
+                }
+                if (debug is { } d) {
+                    try { Diagnostics?.Invoke(d.Info); } catch { /* Diagnostics must never change acceptance. */ }
+                    if (d.Snapshot != null) try { Snapshot?.Invoke(d.Snapshot); } catch { /* Likewise. */ }
+                }
+                return own != null || witnessed == true ? Results.Ok() : Results.BadRequest();
             }
-            catch (Exception e) when (e is JsonException or ArgumentException or InvalidOperationException or KeyNotFoundException)
+            catch (Exception e) when (InvalidPacket(e))
             { return Results.BadRequest(); }
+            finally { lock (gate) matches.FinishRequest(request); }
         });
+    }
+    /// <summary>GSI may outlive a pairing (e.g. the local practice display). Don't reuse another directory's build.</summary>
+    public void UseDotaInstall(string? directory)
+    {
+        lock (gate) {
+            if (string.Equals(farmInstall, directory, StringComparison.OrdinalIgnoreCase)) return;
+            matches.Reset(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            postgameRecipient?.Reset();
+            farmInstall = directory; incompatibleInstall = false; farm.Invalidate(DateTimeOffset.UtcNow.ToUnixTimeSeconds() * 1000);
+            if (latest is { } s) latest = (s.Value with { Farm = null, Stats = null }, s.At);
+        }
     }
     // A local flag only; do not extend the transmitted OwnState or accept a spectator's heroes.
     public static bool IsLunaDrill(JsonElement root, OwnState own) => DescribePractice(root, own).Enabled;
@@ -106,11 +183,39 @@ public sealed class GsiReceiver : IAsyncDisposable
     }
     public (OwnState? Player, int? AgeMs) Latest()
     {
-        lock (gate)
-        {
-            if (latest is not { } s || Environment.TickCount64 - s.At > 3000) return (null, null);
-            return (s.Value, (int)(Environment.TickCount64 - s.At));
+        lock (gate) return PlayerAt(Environment.TickCount64);
+    }
+    /// <summary>When sending both projections, sample once so a withdrawal/switch cannot pair another
+    /// raw packet's player with this witness. Either projection may independently be null.</summary>
+    public (OwnState? Player, int? AgeMs) Latest(out MatchWitness? match)
+    {
+        lock (gate) {
+            long now = Environment.TickCount64;
+            match = matches.Latest(now);
+            return PlayerAt(now);
         }
+    }
+    private (OwnState? Player, int? AgeMs) PlayerAt(long now)
+    {
+        if (latest is not { } s || now - s.At > 3000) return (null, null);
+        var own = s.Value;
+        int age = (int)(now - s.At);
+        if (own.Stats != null) {
+            if (matches.Age(now) is int sourceAge) age = Math.Max(age, sourceAge);
+            else own = own with { Stats = null }; // Expiry cannot turn fresh-by-receipt legacy data into participant evidence.
+        }
+        if (own.Farm is { Epoch: var epoch } && epoch != Guid.Empty) {
+            if (farm.Age(now) is int farmAge) return (own, Math.Max(age, farmAge));
+            // Expiring the stronger packet/clock evidence must not discard a legacy flat projection.
+            own = own with { Farm = null };
+        }
+        return (own, age);
+    }
+    /// <summary>Fresh authenticated participant lifecycle, independent of Latest()/Farm, death and pause.
+    /// Send AgeMs with the projection. Null (including silence/disconnect) is never a multiplayer end.</summary>
+    public MatchWitness? LatestMatch()
+    {
+        lock (gate) return matches.Latest(Environment.TickCount64);
     }
     /// <summary>
     /// The newest packet's minimap units (what the player's team sees) and own team; stays on this machine.
@@ -149,9 +254,15 @@ public sealed class GsiReceiver : IAsyncDisposable
           }
         }
         """;
-    public static async Task<GsiReceiver> Start(int port = 3219, CancellationToken cancellation = default, string? resumeToken = null, bool diagnostics = true)
+    // Keep both shipped four-argument signatures. New callers can combine the diagnostics opt-out and install directory.
+    public static Task<GsiReceiver> Start(int port, CancellationToken cancellation, string? resumeToken, string? installDirectory) =>
+        Start(port, cancellation, resumeToken, installDirectory, diagnostics: true);
+    public static Task<GsiReceiver> Start(int port, CancellationToken cancellation, string? resumeToken, bool diagnostics) =>
+        Start(port, cancellation, resumeToken, dotaInstall: null, diagnostics: diagnostics);
+    public static async Task<GsiReceiver> Start(int port = 3219, CancellationToken cancellation = default, string? resumeToken = null,
+        string? dotaInstall = null, bool diagnostics = true)
     {
-        var receiver = new GsiReceiver(port, resumeToken, diagnostics);
+        var receiver = new GsiReceiver(port, resumeToken, dotaInstall, diagnostics);
         try
         {
             await receiver.app.StartAsync(cancellation); receiver.Port = new Uri(receiver.app.Urls.Single()).Port;
@@ -161,7 +272,8 @@ public sealed class GsiReceiver : IAsyncDisposable
     }
     public async ValueTask DisposeAsync()
     {
-        lock (gate) { latest = null; units = null; loadout = null; }
+        lock (gate) { latest = null; units = null; loadout = null; farm.Invalidate(null); matches.Reset(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), stop: true);
+            postgameRecipient?.Close(); postgameRecipient = null; }
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3));
         try { await app.StopAsync(deadline.Token); } catch (OperationCanceledException) { }
         await app.DisposeAsync();

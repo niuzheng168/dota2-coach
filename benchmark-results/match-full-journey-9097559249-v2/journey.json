@@ -1,0 +1,61 @@
+{
+  "matchId": "9097559249",
+  "syntheticLive": {
+    "label": "Illustrative only; NOT observed in this match",
+    "source": "authenticated loopback GSI / paired TLS / synthetic Plus and scanner",
+    "events": 11,
+    "counts": {
+      "phase": 2,
+      "own-state": 2,
+      "team-sight": 1,
+      "ward-observed": 1,
+      "equipment": 1,
+      "ward-charges": 2,
+      "ward-estimate": 1,
+      "ward-alert": 1
+    },
+    "observedClock": 1485,
+    "knownAt": 1486,
+    "witnessedPostgameClock": 1487,
+    "bytes": 3649,
+    "sha256Before": "A64E483097C6BB7893F58BC60CA528142A2098A1D376912136154AE21458E906",
+    "sha256After": "A64E483097C6BB7893F58BC60CA528142A2098A1D376912136154AE21458E906"
+  },
+  "realReplay": {
+    "tools": ".tmp\\postgame-replay-v2",
+    "manifestSha256": "BFE9801AFB125616B5C9208DA9CBD47A3BE48F0A59172C74DA7279980629D783",
+    "dem": ".tmp\\farm742\\9097559249.dem",
+    "demBytes": 60760549,
+    "demSha256": "6479CC80DDB51DA5C4E7F8A98BF024509CD883CD2E83F2C083B23BB9629770EB",
+    "timelineBytes": 2037899,
+    "timelineSha256": "8BCD9CA84B345E8FF2FBAA54FAA714645D9B9BDA29D637AA9C2604FD42A69D9F",
+    "events": 3599,
+    "counts": {
+      "replay-hero": 3420,
+      "replay-ward": 119,
+      "replay-kill": 38,
+      "replay-objective": 21,
+      "replay-end": 1
+    },
+    "heroFrames": 342,
+    "farmRows": 3170,
+    "wardPlaced": 65,
+    "wardRemoved": 54,
+    "hiddenToOpponentAtPlacement": 55,
+    "startClock": -212.933,
+    "endClock": 1487.433,
+    "jobSeconds": 21.946
+  },
+  "nativeUi": {
+    "cursor": 1486,
+    "sampleClock": 1481.7,
+    "tick": 50944,
+    "radiantSlots": 5,
+    "direSlots": 5,
+    "foggedDireObserver": "669:356:4820",
+    "placedClock": -52.333,
+    "removedClock": 307.667,
+    "paidModelCalls": 0,
+    "screenshot": "comparison.png"
+  }
+}

@@ -9,10 +9,6 @@ int passed = 0;
 void Check(bool value, string name) { if (!value) throw new Exception(name); passed++; Console.WriteLine("PASS " + name); }
 if (args.Contains("--video-codec")) { VideoTests.Codec(Check); return; }
 if (args is ["--creep-scan", .. var scanFiles]) { CreepHealthTests.Eval(scanFiles); return; }
-if (args is ["--ward-eval", .. var wardFiles]) { WardEval.Run(wardFiles); return; }
-if (args is ["--ward-session", .. var sessionArgs] && sessionArgs.Where(a => a is not ("--as-scanned" or "--whole-seconds")).ToArray() is [var wardSession, var wardTruth]) {
-    WardSessionEval.Run(wardSession, wardTruth, sessionArgs.Contains("--as-scanned"), sessionArgs.Contains("--whole-seconds")); return;
-}
 if (args is ["--creep-bars", var barsOut, var barsSeconds, var barsGsi]) { CreepHealthTests.RecordBars(barsOut, double.Parse(barsSeconds), barsGsi); return; }
 if (args is ["--overlay-test", var overlayDir]) { CreepHealthTests.OverlayTest(overlayDir); return; }
 if (args is ["--lethal-preview", var previewFrame, var previewGsi, var previewOut]) { HeroAttackTests.Preview(previewFrame, previewGsi, previewOut); return; }
@@ -20,6 +16,37 @@ if (args.Contains("--last-hit")) { LastHitTests.Run(Check); return; }
 if (args is ["--lane-role-audit",var samplesFile]) { LaneRoleTests.Audit(samplesFile); return; }
 if (args.Contains("--last-hit-latency")) { LastHitLatencyReplay.Run(); return; }
 if (args.Contains("--last-hit-gpu-bench")) { LastHitGpuBenchmark.Run(); return; }
+if (args is ["--minute-farm"]) { await MinuteSuite(); return; }
+if (args is ["--copilot"]) {
+    await CopilotContractTests.Run(Check); Console.WriteLine($"Offline Copilot contract checks: {passed} passed."); return;
+}
+if (args is ["--team-intel"]) {
+    PlusAlertTests.Run(Check); WardTests.Run(Check); TeamViewEvidenceTests.Run(Check); await HeroScanTests.Run(Check);
+    Console.WriteLine($"Team evidence checks: {passed} passed."); return;
+}
+if (args is ["--ward-eval", .. var wardFiles]) { WardEval.Run(wardFiles); return; }
+if (args is ["--ward-session", .. var sessionArgs] &&
+    sessionArgs.Where(a => a is not ("--as-scanned" or "--whole-seconds")).ToArray() is [var wardSession, var wardTruth]) {
+    WardSessionEval.Run(wardSession, wardTruth, sessionArgs.Contains("--as-scanned"), sessionArgs.Contains("--whole-seconds")); return;
+}
+if (args is ["--match-history"]) { await MatchSuite(); return; }
+async Task MatchSuite()
+{
+    MatchArchiveTests.Run(Check);
+    await LiveMatchStateTests.Run(Check);
+    LiveResumeFenceTests.Run(Check);
+    LiveOnlyTests.Run(Check);
+    await AuthorizedBoardTests.Run(Check);
+    Console.WriteLine($"Match archive and projection checks passed; cumulative checks: {passed}.");
+}
+async Task MinuteSuite()
+{
+    MinuteFarmSimulationTests.Run(Check);
+    await MinuteFarmProtocolTests.Run(Check);
+    await MinuteFarmModelTests.Run(Check);
+    await MinuteFarmPipelineTests.Run(Check);
+    Console.WriteLine($"Minute farming checks passed; cumulative checks: {passed}.");
+}
 void Reject(Action action, string name)
 {
     bool rejected = false; try { action(); } catch (ArgumentException) { rejected = true; } catch (InvalidOperationException) { rejected = true; }
@@ -38,6 +65,7 @@ FrameMeta Meta(string session, Ticket ticket, long sequence, OwnState? player = 
     new(session, ticket.Id, sequence, player == null ? "diagnostic" : "dota2", 1280, 720, player, player == null ? null : 10);
 OwnState Own(string team = "radiant") => new("1234567890", "npc_dota_hero_luna", team, 700, true, 1200, 500, -2000, -3000,
     [new("item_power_treads", null, 0)], [new("luna_lucent_beam", 4, 0)]);
+MatchWitness BoardWitness(OwnState p) => new(p.MatchId, p.Team, p.Hero, p.Clock, "playing", false) { AgeMs = 10 };
 
 var valid = new Pairing(1, "https://127.0.0.1:38471/", new string('A', 64), new string('B', 64));
 Check(Pairing.Decode(valid.Encode()) == valid, "pairing roundtrip");
@@ -103,9 +131,12 @@ Reject(() => box.Accept(Meta(session, ticket, 1) with { SourceWidth = 1920 }, jp
 var statusBox = new CoachMailbox(() => clock);
 var statusSession = statusBox.Begin().SessionId;
 FrameMeta Status(long sequence, OwnState? player = null) => new(statusSession, "", sequence, "dota2", 3840, 2160, player, player == null ? null : 10);
-statusBox.AcceptStatus(Status(1, Own()));
-Check(statusBox.Latest() is { HasImage: false, Video: null, Jpeg.Length: 0 } latestStatus && !CloudCoach.Eligible(latestStatus, localBotOnly: false) &&
-    statusBox.Snapshot() is { Connected: true, Frames: 1, Bytes: 0, Player.Hero: "npc_dota_hero_luna" }, "a status keeps presence and GSI without a picture and is never model input");
+var rich = Own() with { Farm = new(true, true, false, InstalledBuild: MinuteFarmContext.SupportedBuild, Epoch: Guid.NewGuid()), Stats = new(Level: 9) };
+statusBox.AcceptStatus(Status(1, rich) with { MatchPhase = BoardWitness(rich) });
+Check(statusBox.Latest() is { HasImage: false, Video: null, Jpeg.Length: 0, Meta: { Player: { Farm: null, Stats: null }, MatchPhase: null } } latestStatus &&
+    TeamViewEvidence.Participant(latestStatus, clock) == null && !CloudCoach.Eligible(latestStatus, localBotOnly: false) &&
+    statusBox.Snapshot() is { Connected: true, Frames: 1, Bytes: 0, Player.Hero: "npc_dota_hero_luna" },
+    "legacy status keeps own GSI for subtitles but cannot promote participant, archive or model input even when the payload claims a build and witness");
 statusBox.SetReminder(statusSession, 1, "local-vision-observation", "剃刀 离开视野", null);
 Check(statusBox.Poll(statusSession) is { FrameSequence: 1, SourceWidth: 3840, SourceHeight: 2160 }, "a subtitle may be based on a status");
 Reject(() => statusBox.SetReminder(statusSession, 1, "visible-farming-advice", "model", null), "model advice cannot be based on a status");
@@ -152,7 +183,15 @@ await using (var host = await CoachHost.Start(IPAddress.Loopback, 0))
         "a Plus alert reaches the game client as a subtitle without a map mark");
     // The enemy panel and its icons have their own routes, polled about once a second.
     Check(await link.Enemies(default) == null, "no enemy panel until the coach publishes one");
-    host.Mailbox.SetEnemies(new([new("npc_dota_hero_razor", 12, ["item_blink", null, null, null, null, null], "item_pogo_stick", 3)]));
+    var participant = Own();
+    var panel = new EnemyBoard([new("npc_dota_hero_razor", 12, ["item_blink", null, null, null, null, null], "item_pogo_stick", 3)],
+        MatchId: participant.MatchId, Team: participant.Team);
+    host.Mailbox.SetEnemies(panel);
+    Check(await link.Enemies(default) == null, "diagnostic video cannot authorize even a match-labelled board");
+    t = await link.GetTicket(default);
+    await link.Upload(Meta(link.SessionId!, t, 2, participant) with { MatchPhase = BoardWitness(participant) },
+        jpeg, Environment.TickCount64, default);
+    host.Mailbox.SetEnemies(panel);
     Check(await link.Enemies(default) is { Heroes: [{ Hero: "npc_dota_hero_razor", Level: 12, Items: ["item_blink", null, null, null, null, null],
         Neutral: "item_pogo_stick" }] }, "the enemy panel reaches the game client over pinned TLS");
     byte[] Png(int width, int height) {
@@ -164,13 +203,16 @@ await using (var host = await CoachHost.Start(IPAddress.Loopback, 0))
         return png;
     }
     host.Mailbox.Icons = key => key switch { "item_blink" => Png(88, 64), "item_huge" => Png(4096, 4096), "item_text" => "not an image"u8.ToArray(), _ => null };
+    host.Mailbox.SetEnemies(panel with { Heroes = [panel.Heroes[0] with { Items = ["item_blink", "item_missing", "item_huge", "item_text", null, null] }] });
     Check(await link.Icon("item_blink", default) is { Length: 64 } && await link.Icon("item_missing", default) == null &&
           await link.Icon("item_huge", default) == null && await link.Icon("item_text", default) == null && await link.Icon("../secrets", default) == null,
         "icons are small PNGs by Dota name only; missing, oversized and non-PNG ones are not served");
-    await link.SendStatus(new(link.SessionId!, "", 2, "diagnostic", 1280, 720, null, null), default);
-    host.Mailbox.SetReminder(link.SessionId!, 2, "manual-link-test", "只传状态", null);
-    Check(host.Mailbox.Latest() is { HasImage: false, Meta.Sequence: 2 } && (await link.Poll(default)) is { Message: "只传状态", FrameSequence: 2 },
+    await link.SendStatus(new(link.SessionId!, "", 3, "diagnostic", 1280, 720, null, null), default);
+    host.Mailbox.SetReminder(link.SessionId!, 3, "manual-link-test", "只传状态", null);
+    Check(host.Mailbox.Latest() is { HasImage: false, Meta.Sequence: 3 } && (await link.Poll(default)) is { Message: "只传状态", FrameSequence: 3 },
         "video off: a status over pinned TLS carries a reminder back to the game client");
+    Check(await link.Enemies(default) == null && await link.Icon("item_blink", default) == null,
+        "a diagnostic status withdraws the previous participant board and its icon access");
     bool videoRefused = false;
     try { await link.OpenVideo(default); } catch (System.Net.WebSockets.WebSocketException) { videoRefused = true; }
     Check(videoRefused, "a coach without a video decoder (video off) refuses video streams");
@@ -189,7 +231,8 @@ await using (var host = await CoachHost.Start(IPAddress.Loopback, 0))
     using var badFrame = new HttpRequestMessage(HttpMethod.Post, "/v1/frame") { Content = new ByteArrayContent(jpeg) };
     badFrame.Content.Headers.ContentType = new("image/jpeg"); badFrame.Headers.Add("X-Frame-Meta", "bad-base64");
     Check((await client.SendAsync(badFrame)).StatusCode == HttpStatusCode.BadRequest, "malformed frame header handled without crashing host");
-    Check(host.Mailbox.Snapshot().Frames == 2, "malformed payload cannot overwrite latest frame");
+    Check(host.Mailbox.Snapshot() is { Frames: 3, Sequence: 3 } && host.Mailbox.Latest() is { HasImage: false },
+        "malformed payload cannot overwrite the latest accepted status");
     host.Revoke();
     await RejectAsync(() => link.Poll(default), "revoked pairing stops existing client");
     Check(host.Mailbox.Latest() == null, "revocation clears all capture state");
@@ -378,7 +421,10 @@ long lifeClock = 0;
 var lifeBox = new CoachMailbox(() => lifeClock);
 string lifeSession = lifeBox.Begin().SessionId;
 long lifeSequence = 0;
-void Feed() { var t = lifeBox.Issue(lifeSession); lifeBox.Accept(Meta(lifeSession, t, ++lifeSequence, Own()), jpeg); }
+void Feed() {
+    var t = lifeBox.Issue(lifeSession); var p = Own();
+    lifeBox.Accept(Meta(lifeSession, t, ++lifeSequence, p) with { MatchPhase = BoardWitness(p) }, jpeg);
+}
 Feed();
 for (int i = 0; i < 5; i++) { lifeClock += 3000; Feed(); } // a 15 s model call while video keeps arriving
 lifeBox.SetReminder(lifeSession, 1, "visible-farming-advice", "slow but valid", null, null, true, 3000);
@@ -411,13 +457,13 @@ Reject(() => lifeBox.SetReminder(lifeSession, lifeSequence, "manual-link-test", 
 EnemyHero Enemy(string hero = "npc_dota_hero_razor", int? level = 12, string?[]? items = null, double? age = 3) =>
     new(hero, level, items ?? ["item_blink", null, null, null, null, null], null, age);
 Feed();
-lifeBox.SetEnemies(new([Enemy(), new EnemyHero("npc_dota_hero_pudge", null, null, null, null)]));
+lifeBox.SetEnemies(new([Enemy(), new EnemyHero("npc_dota_hero_pudge", null, null, null, null)], MatchId: Own().MatchId, Team: Own().Team));
 lifeClock += 2000; Feed();
 Check(lifeBox.Enemies(lifeSession) is { Heroes: [{ Age: 5 }, { Level: null, Items: null, Age: null }] },
     "the enemy panel reaches the session with its ages grown by the time it waited");
 lifeClock += Wire.BoardLifetimeMs - 1999; Feed();
 Check(lifeBox.Enemies(lifeSession) == null, "an enemy panel the coach stops renewing disappears");
-lifeBox.SetEnemies(new([Enemy()]));
+lifeBox.SetEnemies(new([Enemy()], MatchId: Own().MatchId, Team: Own().Team));
 Reject(() => lifeBox.Enemies("not-the-session"), "another session cannot read the enemy panel");
 foreach (var (bad, why) in new (EnemyBoard, string)[] {
     (new(Enumerable.Range(0, 6).Select(i => Enemy("npc_dota_hero_h" + i)).ToArray()), "more than five enemies"),
@@ -576,11 +622,13 @@ await using (var gsiProbe = await GsiReceiver.Start(0)) {
 await SpectatorTests.Run(Check);
 LastHitTests.Run(Check);
 PlusAlertTests.Run(Check);
-WardTests.Run(Check);
+WardTests.Run(Check); TeamViewEvidenceTests.Run(Check); await HeroScanTests.Run(Check);
 OverlaySettingsTests.Run(Check);
 CreepHealthTests.Run(Check);
 HeroAttackTests.Run(Check);
-await HeroScanTests.Run(Check);
+await MinuteSuite();
+await MatchSuite();
+await CopilotContractTests.Run(Check);
 Console.WriteLine($"Two-PC protocol + real TLS + GSI + mocked model contracts: {passed} checks passed.");
 
 sealed class FakeCloudCoach(ModelAdvice advice) : HttpMessageHandler

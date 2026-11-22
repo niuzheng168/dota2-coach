@@ -9,23 +9,31 @@ public sealed class CalibratedMap
 {
     private readonly double left, top, span;
     public MapLandmark[] Landmarks { get; }
-    public CalibratedMap(string file)
+    // Only the explicit local-bot acceptance run may supply the historical 7.41f reference.
+    public static CalibratedMap LoadLive(string dataDirectory) =>
+        new(Path.Combine(dataDirectory, "dota2-coach-map.json"), live: true);
+    public CalibratedMap(string file) : this(file, live: false) { }
+    private CalibratedMap(string file, bool live)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(file));
         var root = doc.RootElement;
-        // 7.41f: the replay-checked reference (local bot E2E); 7.42: the coach map read from the installed client.
-        if (root.GetProperty("patch").GetString() is not ("7.41f" or "7.42")) throw new ArgumentException("Unreviewed map patch");
+        string? patch = root.GetProperty("patch").GetString();
+        if (patch != "7.42" && (live || patch != "7.41f")) throw new ArgumentException("Unreviewed map patch");
         var overview = root.GetProperty("overview");
         left = overview.GetProperty("posX").GetDouble(); top = overview.GetProperty("posY").GetDouble();
         span = overview.GetProperty("coordinateSpan").GetDouble();
         if (left != -9472 || top != 9472 || span != 18944) throw new ArgumentException("Unreviewed overview calibration");
-        Landmarks = root.GetProperty("camps").EnumerateArray().Select(c => new MapLandmark(
+        var camps = root.GetProperty("camps").EnumerateArray().Select(c => new MapLandmark(
             c.GetProperty("id").GetString()!, c.GetProperty("team").GetString()!, c.GetProperty("label").GetString()!,
-            c.GetProperty("kind").GetString()!, c.GetProperty("x").GetDouble(), c.GetProperty("y").GetDouble()))
-            .Concat(root.GetProperty("towers").EnumerateArray().Select(t => new MapLandmark(
-                t.GetProperty("name").GetString()!, t.GetProperty("team").GetString()!, t.GetProperty("name").GetString()!,
-                "tower-landmark", t.GetProperty("position")[0].GetDouble(), t.GetProperty("position")[1].GetDouble())))
-            .ToArray();
+            c.GetProperty("kind").GetString()!, c.GetProperty("x").GetDouble(), c.GetProperty("y").GetDouble()));
+        var towers = root.GetProperty("towers").EnumerateArray().Select(t => new MapLandmark(
+            t.GetProperty("name").GetString()!, t.GetProperty("team").GetString()!,
+            t.TryGetProperty("label", out var label) ? label.GetString()! : t.GetProperty("name").GetString()!,
+            "tower-landmark", t.GetProperty("position")[0].GetDouble(), t.GetProperty("position")[1].GetDouble()));
+        // Both actual tier-four towers share one Valve unit name. Offer each physical tower by a
+        // distinct stable ID, or the Responses enum is ambiguous and Project cannot resolve it.
+        Landmarks = camps.Concat(towers.GroupBy(t => t.Id).SelectMany(g => g.Count() == 1 ? g.AsEnumerable() :
+            g.OrderBy(t => t.X).ThenBy(t => t.Y).Select((t, i) => t with { Id = $"{t.Id}_{i + 1}", Label = $"{t.Label} {i + 1}" }))).ToArray();
     }
     public static bool Supports(FrameView frame) => frame.Meta.SourceWidth == 1280 && frame.Meta.SourceHeight == 720;
     public MapLandmark[] Candidates(string team) => Landmarks.Where(p => p.Team == team).ToArray();

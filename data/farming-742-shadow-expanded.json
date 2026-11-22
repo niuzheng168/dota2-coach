@@ -1,0 +1,3266 @@
+{
+  "source": {
+    "file": "data/farming-742-expanded.json",
+    "tier": "located-replays-only",
+    "upstreamSpatialAudit": {
+      "eligible": 101,
+      "verified": 16,
+      "original16": 16,
+      "newVerified": 0
+    },
+    "sha256": "86efb4d95145f6037647c6a24764339ac42edf1bea629c0d9030dd7fe2ba2b07"
+  },
+  "version": 2,
+  "scope": "offline-read-only-shadow",
+  "training": "empirical nearest-history votes; no weight training",
+  "task": "First body farming last-hit origin in (t,t+30s], not a chosen destination, clear, safety or outcome of advice.",
+  "parameters": {
+    "patch": "7.42",
+    "firstAnchor": 315,
+    "stepSec": 30,
+    "endSec": 1200,
+    "horizonSec": 30,
+    "freshSec": 3,
+    "freshMs": 5000,
+    "clockRadiusSec": 90,
+    "positionRadius": 2400,
+    "positionScale": 1200,
+    "k": 7,
+    "minAccounts": 2
+  },
+  "corpus": {
+    "matches": 16,
+    "focalTracks": 16,
+    "focalAccounts": 13,
+    "unknownEndMatches": 0,
+    "omittedNonspatialTrackIds": []
+  },
+  "definitions": {
+    "features": "Patch/hero/team, clock, last fresh alive self XY at/before t, positive own main-slot item sightings through t only. No event origin, death XY, tower/camp status, opponents, gold or winner.",
+    "nextFamily": "Primary coarse experiment: lane-of-origin vs own-spawn camp. Strict >1/2 of ALL historical votes/mass, minimum two accounts; otherwise abstain. No-action, opponent and unresolved stay in the voting denominator. Diagnostic only unless current user manually confirms an allowed target of that family; not evidence for a specific site.",
+    "censoring": "Complete horizon only, even when a hit is known before truncation; later points/timestamps bound observation end only. Missing/dead self abstains.",
+    "baseline": "Same train/hero/team, ±90s clock-only distribution, all accounts equally weighted; same min two accounts, no position/inventory.",
+    "coverage": "Nonempty historical ranking / all fully observed label horizons (includes dead and no-fresh-self); also conditional on fresh alive prefix.",
+    "accuracy": "Exact site among ranked windows with resolved truth. No-body-hit and opponent-camp count as misses. Unknown truth separately counted; top1HitsPerFullWindow includes all abstentions/unknowns as nonhits.",
+    "paired": "Both methods on precisely the same ranked/resolved windows. Signed retrieval minus clock-baseline top-1 rate.",
+    "interval": "Percentile bootstrap, 2000 replicates, seed 7611674; resample connected test match/account clusters, pool their windows. Null below two contributing clusters; small-n intervals can be degenerate. Conditional on this archive, not live generalization.",
+    "visibleDisplay": "Actual observer called without invented POV targets or canAct. Zero display on unannotated compact data is NOT an estimate of live coverage, safety or utility.",
+    "split": "Newest ceil(N/4) match IDs by start, include all cutoff ties. Remove whole earlier games sharing a held-out focal account or with unknown/end>=cutoff. end=start+ceil(game duration or recorded terminal clock), not a measured replay publication time.",
+    "rolling": "Secondary past-only leave-one-match-and-its-focal-accounts-out at each kickoff. Includes cold starts; earlier test games can become archive for later, unrelated accounts. Not independent of the fixed temporal test.",
+    "examples": "First rankable window per hero in chronological test order, selected without looking at correctness. All ranks and next-hit outcomes are retrospective, not observations of live visibility."
+  },
+  "frozenChronological": {
+    "split": {
+      "cutoffUnix": 1795220476,
+      "cutoffUTC": "2026-11-21T00:21:16.000Z",
+      "latestTrainEndUnix": 1795200149,
+      "trainMatchIds": [
+        "9096797937",
+        "9096845332",
+        "9097037811",
+        "9097330939",
+        "9097535245",
+        "9097559249",
+        "9097587313",
+        "9097801447",
+        "9098255705",
+        "9098360852",
+        "9098402606"
+      ],
+      "trainAccountIds": [
+        "176616331",
+        "177726018",
+        "189317657",
+        "200750168",
+        "220722971",
+        "244343035",
+        "365253927",
+        "56939869",
+        "85937380"
+      ],
+      "testMatchIds": [
+        "9098789898",
+        "9099209663",
+        "9099283649",
+        "9100049738"
+      ],
+      "testAccountIds": [
+        "257086687",
+        "81556657",
+        "916650633",
+        "93157994"
+      ],
+      "pastGamesExcludedForAccount": [
+        "9098472218"
+      ],
+      "pastGamesExcludedForUnknownOrOverlappingEnd": [],
+      "matchOverlap": 0,
+      "focalAccountOverlap": 0
+    },
+    "overall": {
+      "matches": 4,
+      "accounts": 4,
+      "gridWindows": 116,
+      "fullWindows": 116,
+      "rightCensored": 0,
+      "pastRecording": 0,
+      "freshAliveWindows": 108,
+      "selfStateOnFullWindows": {
+        "alive": 108,
+        "dead": 8
+      },
+      "outcomesOnFullWindows": {
+        "@no-body-hit": 7,
+        "lane-of-origin": 53,
+        "own-spawn-camp": 45,
+        "@unresolved": 6,
+        "@opponent-camp": 5
+      },
+      "nextFamily": {
+        "retrieval": {
+          "coverage": {
+            "numerator": 4,
+            "denominator": 116,
+            "rate": 0.034483,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.103448
+            ]
+          },
+          "top1": {
+            "numerator": 4,
+            "denominator": 4,
+            "rate": 1,
+            "clusters": 1,
+            "ci95": null
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 4,
+            "denominator": 116,
+            "rate": 0.034483,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.103448
+            ]
+          },
+          "issuedWithUnresolvedTruth": 0
+        },
+        "baseline": {
+          "coverage": {
+            "numerator": 20,
+            "denominator": 116,
+            "rate": 0.172414,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.517241
+            ]
+          },
+          "top1": {
+            "numerator": 9,
+            "denominator": 20,
+            "rate": 0.45,
+            "clusters": 1,
+            "ci95": null
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 9,
+            "denominator": 116,
+            "rate": 0.077586,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.232759
+            ]
+          },
+          "issuedWithUnresolvedTruth": 0
+        },
+        "disposition": {
+          "too-few-independent-neighbours": 93,
+          "dead": 8,
+          "no-strict-majority": 11,
+          "ranked": 4
+        },
+        "pairedTop1": {
+          "retrieval": {
+            "numerator": 2,
+            "denominator": 2,
+            "rate": 1,
+            "clusters": 1,
+            "ci95": null
+          },
+          "baseline": {
+            "numerator": 2,
+            "denominator": 2,
+            "rate": 1,
+            "clusters": 1,
+            "ci95": null
+          },
+          "difference": {
+            "numerator": 0,
+            "denominator": 2,
+            "rate": 0,
+            "clusters": 1,
+            "ci95": null
+          }
+        }
+      },
+      "retrievalDisposition": {
+        "too-few-independent-neighbours": 93,
+        "dead": 8,
+        "ranked": 15
+      },
+      "retrieval": {
+        "coverage": {
+          "numerator": 15,
+          "denominator": 116,
+          "rate": 0.12931,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.387931
+          ]
+        },
+        "coverageAmongFreshAlive": {
+          "numerator": 15,
+          "denominator": 108,
+          "rate": 0.138889,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.394737
+          ]
+        },
+        "issuedWithUnresolvedTruth": 1,
+        "top1": {
+          "numerator": 7,
+          "denominator": 14,
+          "rate": 0.5,
+          "clusters": 1,
+          "ci95": null
+        },
+        "top3": {
+          "numerator": 8,
+          "denominator": 14,
+          "rate": 0.571429,
+          "clusters": 1,
+          "ci95": null
+        },
+        "top1HitsPerFullWindow": {
+          "numerator": 7,
+          "denominator": 116,
+          "rate": 0.060345,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.181034
+          ]
+        }
+      },
+      "baseline": {
+        "coverage": {
+          "numerator": 29,
+          "denominator": 116,
+          "rate": 0.25,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.75
+          ]
+        },
+        "coverageAmongFreshAlive": {
+          "numerator": 29,
+          "denominator": 108,
+          "rate": 0.268519,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.763158
+          ]
+        },
+        "issuedWithUnresolvedTruth": 1,
+        "top1": {
+          "numerator": 11,
+          "denominator": 28,
+          "rate": 0.392857,
+          "clusters": 1,
+          "ci95": null
+        },
+        "top3": {
+          "numerator": 14,
+          "denominator": 28,
+          "rate": 0.5,
+          "clusters": 1,
+          "ci95": null
+        },
+        "top1HitsPerFullWindow": {
+          "numerator": 11,
+          "denominator": 116,
+          "rate": 0.094828,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.284483
+          ]
+        }
+      },
+      "pairedTop1": {
+        "retrieval": {
+          "numerator": 7,
+          "denominator": 14,
+          "rate": 0.5,
+          "clusters": 1,
+          "ci95": null
+        },
+        "baseline": {
+          "numerator": 6,
+          "denominator": 14,
+          "rate": 0.428571,
+          "clusters": 1,
+          "ci95": null
+        },
+        "difference": {
+          "numerator": 1,
+          "denominator": 14,
+          "rate": 0.071429,
+          "clusters": 1,
+          "ci95": null
+        }
+      },
+      "visibleDisplay": {
+        "displayed": 0,
+        "denominatorFullWindows": 116,
+        "rate": 0,
+        "targetPOVAnnotations": 0,
+        "canActAnnotations": 0,
+        "liveAccuracy": null
+      }
+    },
+    "byHero": {
+      "luna": {
+        "matches": 1,
+        "accounts": 1,
+        "gridWindows": 29,
+        "fullWindows": 29,
+        "rightCensored": 0,
+        "pastRecording": 0,
+        "freshAliveWindows": 29,
+        "selfStateOnFullWindows": {
+          "alive": 29
+        },
+        "outcomesOnFullWindows": {
+          "lane-of-origin": 13,
+          "@unresolved": 1,
+          "own-spawn-camp": 12,
+          "@opponent-camp": 3
+        },
+        "nextFamily": {
+          "retrieval": {
+            "coverage": {
+              "numerator": 4,
+              "denominator": 29,
+              "rate": 0.137931,
+              "clusters": 1,
+              "ci95": null
+            },
+            "top1": {
+              "numerator": 4,
+              "denominator": 4,
+              "rate": 1,
+              "clusters": 1,
+              "ci95": null
+            },
+            "top1HitsPerFullWindow": {
+              "numerator": 4,
+              "denominator": 29,
+              "rate": 0.137931,
+              "clusters": 1,
+              "ci95": null
+            },
+            "issuedWithUnresolvedTruth": 0
+          },
+          "baseline": {
+            "coverage": {
+              "numerator": 20,
+              "denominator": 29,
+              "rate": 0.689655,
+              "clusters": 1,
+              "ci95": null
+            },
+            "top1": {
+              "numerator": 9,
+              "denominator": 20,
+              "rate": 0.45,
+              "clusters": 1,
+              "ci95": null
+            },
+            "top1HitsPerFullWindow": {
+              "numerator": 9,
+              "denominator": 29,
+              "rate": 0.310345,
+              "clusters": 1,
+              "ci95": null
+            },
+            "issuedWithUnresolvedTruth": 0
+          },
+          "disposition": {
+            "no-strict-majority": 11,
+            "ranked": 4,
+            "too-few-independent-neighbours": 14
+          },
+          "pairedTop1": {
+            "retrieval": {
+              "numerator": 2,
+              "denominator": 2,
+              "rate": 1,
+              "clusters": 1,
+              "ci95": null
+            },
+            "baseline": {
+              "numerator": 2,
+              "denominator": 2,
+              "rate": 1,
+              "clusters": 1,
+              "ci95": null
+            },
+            "difference": {
+              "numerator": 0,
+              "denominator": 2,
+              "rate": 0,
+              "clusters": 1,
+              "ci95": null
+            }
+          }
+        },
+        "retrievalDisposition": {
+          "ranked": 15,
+          "too-few-independent-neighbours": 14
+        },
+        "retrieval": {
+          "coverage": {
+            "numerator": 15,
+            "denominator": 29,
+            "rate": 0.517241,
+            "clusters": 1,
+            "ci95": null
+          },
+          "coverageAmongFreshAlive": {
+            "numerator": 15,
+            "denominator": 29,
+            "rate": 0.517241,
+            "clusters": 1,
+            "ci95": null
+          },
+          "issuedWithUnresolvedTruth": 1,
+          "top1": {
+            "numerator": 7,
+            "denominator": 14,
+            "rate": 0.5,
+            "clusters": 1,
+            "ci95": null
+          },
+          "top3": {
+            "numerator": 8,
+            "denominator": 14,
+            "rate": 0.571429,
+            "clusters": 1,
+            "ci95": null
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 7,
+            "denominator": 29,
+            "rate": 0.241379,
+            "clusters": 1,
+            "ci95": null
+          }
+        },
+        "baseline": {
+          "coverage": {
+            "numerator": 29,
+            "denominator": 29,
+            "rate": 1,
+            "clusters": 1,
+            "ci95": null
+          },
+          "coverageAmongFreshAlive": {
+            "numerator": 29,
+            "denominator": 29,
+            "rate": 1,
+            "clusters": 1,
+            "ci95": null
+          },
+          "issuedWithUnresolvedTruth": 1,
+          "top1": {
+            "numerator": 11,
+            "denominator": 28,
+            "rate": 0.392857,
+            "clusters": 1,
+            "ci95": null
+          },
+          "top3": {
+            "numerator": 14,
+            "denominator": 28,
+            "rate": 0.5,
+            "clusters": 1,
+            "ci95": null
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 11,
+            "denominator": 29,
+            "rate": 0.37931,
+            "clusters": 1,
+            "ci95": null
+          }
+        },
+        "pairedTop1": {
+          "retrieval": {
+            "numerator": 7,
+            "denominator": 14,
+            "rate": 0.5,
+            "clusters": 1,
+            "ci95": null
+          },
+          "baseline": {
+            "numerator": 6,
+            "denominator": 14,
+            "rate": 0.428571,
+            "clusters": 1,
+            "ci95": null
+          },
+          "difference": {
+            "numerator": 1,
+            "denominator": 14,
+            "rate": 0.071429,
+            "clusters": 1,
+            "ci95": null
+          }
+        },
+        "visibleDisplay": {
+          "displayed": 0,
+          "denominatorFullWindows": 29,
+          "rate": 0,
+          "targetPOVAnnotations": 0,
+          "canActAnnotations": 0,
+          "liveAccuracy": null
+        }
+      },
+      "troll_warlord": {
+        "matches": 3,
+        "accounts": 3,
+        "gridWindows": 87,
+        "fullWindows": 87,
+        "rightCensored": 0,
+        "pastRecording": 0,
+        "freshAliveWindows": 79,
+        "selfStateOnFullWindows": {
+          "alive": 79,
+          "dead": 8
+        },
+        "outcomesOnFullWindows": {
+          "@no-body-hit": 7,
+          "lane-of-origin": 40,
+          "own-spawn-camp": 33,
+          "@unresolved": 5,
+          "@opponent-camp": 2
+        },
+        "nextFamily": {
+          "retrieval": {
+            "coverage": {
+              "numerator": 0,
+              "denominator": 87,
+              "rate": 0,
+              "clusters": 3,
+              "ci95": [
+                0,
+                0
+              ]
+            },
+            "top1": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null,
+              "clusters": 0,
+              "ci95": null
+            },
+            "top1HitsPerFullWindow": {
+              "numerator": 0,
+              "denominator": 87,
+              "rate": 0,
+              "clusters": 3,
+              "ci95": [
+                0,
+                0
+              ]
+            },
+            "issuedWithUnresolvedTruth": 0
+          },
+          "baseline": {
+            "coverage": {
+              "numerator": 0,
+              "denominator": 87,
+              "rate": 0,
+              "clusters": 3,
+              "ci95": [
+                0,
+                0
+              ]
+            },
+            "top1": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null,
+              "clusters": 0,
+              "ci95": null
+            },
+            "top1HitsPerFullWindow": {
+              "numerator": 0,
+              "denominator": 87,
+              "rate": 0,
+              "clusters": 3,
+              "ci95": [
+                0,
+                0
+              ]
+            },
+            "issuedWithUnresolvedTruth": 0
+          },
+          "disposition": {
+            "too-few-independent-neighbours": 79,
+            "dead": 8
+          },
+          "pairedTop1": {
+            "retrieval": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null,
+              "clusters": 0,
+              "ci95": null
+            },
+            "baseline": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null,
+              "clusters": 0,
+              "ci95": null
+            },
+            "difference": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null,
+              "clusters": 0,
+              "ci95": null
+            }
+          }
+        },
+        "retrievalDisposition": {
+          "too-few-independent-neighbours": 79,
+          "dead": 8
+        },
+        "retrieval": {
+          "coverage": {
+            "numerator": 0,
+            "denominator": 87,
+            "rate": 0,
+            "clusters": 3,
+            "ci95": [
+              0,
+              0
+            ]
+          },
+          "coverageAmongFreshAlive": {
+            "numerator": 0,
+            "denominator": 79,
+            "rate": 0,
+            "clusters": 3,
+            "ci95": [
+              0,
+              0
+            ]
+          },
+          "issuedWithUnresolvedTruth": 0,
+          "top1": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "top3": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 0,
+            "denominator": 87,
+            "rate": 0,
+            "clusters": 3,
+            "ci95": [
+              0,
+              0
+            ]
+          }
+        },
+        "baseline": {
+          "coverage": {
+            "numerator": 0,
+            "denominator": 87,
+            "rate": 0,
+            "clusters": 3,
+            "ci95": [
+              0,
+              0
+            ]
+          },
+          "coverageAmongFreshAlive": {
+            "numerator": 0,
+            "denominator": 79,
+            "rate": 0,
+            "clusters": 3,
+            "ci95": [
+              0,
+              0
+            ]
+          },
+          "issuedWithUnresolvedTruth": 0,
+          "top1": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "top3": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 0,
+            "denominator": 87,
+            "rate": 0,
+            "clusters": 3,
+            "ci95": [
+              0,
+              0
+            ]
+          }
+        },
+        "pairedTop1": {
+          "retrieval": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "baseline": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "difference": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          }
+        },
+        "visibleDisplay": {
+          "displayed": 0,
+          "denominatorFullWindows": 87,
+          "rate": 0,
+          "targetPOVAnnotations": 0,
+          "canActAnnotations": 0,
+          "liveAccuracy": null
+        }
+      }
+    },
+    "byHeroTeam": {
+      "luna/radiant": {
+        "matches": 1,
+        "accounts": 1,
+        "fullWindows": 29,
+        "freshAliveWindows": 29,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 4,
+            "denominator": 29,
+            "rate": 0.137931,
+            "clusters": 1,
+            "ci95": null
+          },
+          "retrievalTop1": {
+            "numerator": 4,
+            "denominator": 4,
+            "rate": 1,
+            "clusters": 1,
+            "ci95": null
+          },
+          "baselineCoverage": {
+            "numerator": 20,
+            "denominator": 29,
+            "rate": 0.689655,
+            "clusters": 1,
+            "ci95": null
+          },
+          "baselineTop1": {
+            "numerator": 9,
+            "denominator": 20,
+            "rate": 0.45,
+            "clusters": 1,
+            "ci95": null
+          },
+          "pairedTop1Difference": {
+            "numerator": 0,
+            "denominator": 2,
+            "rate": 0,
+            "clusters": 1,
+            "ci95": null
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 15,
+          "denominator": 29,
+          "rate": 0.517241,
+          "clusters": 1,
+          "ci95": null
+        },
+        "retrievalTop1": {
+          "numerator": 7,
+          "denominator": 14,
+          "rate": 0.5,
+          "clusters": 1,
+          "ci95": null
+        },
+        "baselineCoverage": {
+          "numerator": 29,
+          "denominator": 29,
+          "rate": 1,
+          "clusters": 1,
+          "ci95": null
+        },
+        "baselineTop1": {
+          "numerator": 11,
+          "denominator": 28,
+          "rate": 0.392857,
+          "clusters": 1,
+          "ci95": null
+        },
+        "pairedTop1Difference": {
+          "numerator": 1,
+          "denominator": 14,
+          "rate": 0.071429,
+          "clusters": 1,
+          "ci95": null
+        }
+      },
+      "luna/dire": {
+        "matches": 0,
+        "accounts": 0,
+        "fullWindows": 0,
+        "freshAliveWindows": 0,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "retrievalTop1": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "baselineCoverage": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "baselineTop1": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "pairedTop1Difference": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        },
+        "retrievalTop1": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        },
+        "baselineCoverage": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        },
+        "baselineTop1": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        },
+        "pairedTop1Difference": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        }
+      },
+      "troll_warlord/radiant": {
+        "matches": 0,
+        "accounts": 0,
+        "fullWindows": 0,
+        "freshAliveWindows": 0,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "retrievalTop1": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "baselineCoverage": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "baselineTop1": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "pairedTop1Difference": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        },
+        "retrievalTop1": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        },
+        "baselineCoverage": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        },
+        "baselineTop1": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        },
+        "pairedTop1Difference": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        }
+      },
+      "troll_warlord/dire": {
+        "matches": 3,
+        "accounts": 3,
+        "fullWindows": 87,
+        "freshAliveWindows": 79,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 0,
+            "denominator": 87,
+            "rate": 0,
+            "clusters": 3,
+            "ci95": [
+              0,
+              0
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "baselineCoverage": {
+            "numerator": 0,
+            "denominator": 87,
+            "rate": 0,
+            "clusters": 3,
+            "ci95": [
+              0,
+              0
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "pairedTop1Difference": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 0,
+          "denominator": 87,
+          "rate": 0,
+          "clusters": 3,
+          "ci95": [
+            0,
+            0
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        },
+        "baselineCoverage": {
+          "numerator": 0,
+          "denominator": 87,
+          "rate": 0,
+          "clusters": 3,
+          "ci95": [
+            0,
+            0
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        },
+        "pairedTop1Difference": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null,
+          "clusters": 0,
+          "ci95": null
+        }
+      }
+    },
+    "byClockMinutes": {
+      "5-10": {
+        "matches": 4,
+        "accounts": 4,
+        "fullWindows": 40,
+        "freshAliveWindows": 36,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 2,
+            "denominator": 40,
+            "rate": 0.05,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.15
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 2,
+            "denominator": 2,
+            "rate": 1,
+            "clusters": 1,
+            "ci95": null
+          },
+          "baselineCoverage": {
+            "numerator": 4,
+            "denominator": 40,
+            "rate": 0.1,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.3
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 1,
+            "denominator": 4,
+            "rate": 0.25,
+            "clusters": 1,
+            "ci95": null
+          },
+          "pairedTop1Difference": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 9,
+          "denominator": 40,
+          "rate": 0.225,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.675
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 7,
+          "denominator": 8,
+          "rate": 0.875,
+          "clusters": 1,
+          "ci95": null
+        },
+        "baselineCoverage": {
+          "numerator": 10,
+          "denominator": 40,
+          "rate": 0.25,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.75
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 7,
+          "denominator": 9,
+          "rate": 0.777778,
+          "clusters": 1,
+          "ci95": null
+        },
+        "pairedTop1Difference": {
+          "numerator": 1,
+          "denominator": 8,
+          "rate": 0.125,
+          "clusters": 1,
+          "ci95": null
+        }
+      },
+      "10-15": {
+        "matches": 4,
+        "accounts": 4,
+        "fullWindows": 40,
+        "freshAliveWindows": 38,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 2,
+            "denominator": 40,
+            "rate": 0.05,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.15
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 2,
+            "denominator": 2,
+            "rate": 1,
+            "clusters": 1,
+            "ci95": null
+          },
+          "baselineCoverage": {
+            "numerator": 9,
+            "denominator": 40,
+            "rate": 0.225,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.675
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 6,
+            "denominator": 9,
+            "rate": 0.666667,
+            "clusters": 1,
+            "ci95": null
+          },
+          "pairedTop1Difference": {
+            "numerator": 0,
+            "denominator": 2,
+            "rate": 0,
+            "clusters": 1,
+            "ci95": null
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 5,
+          "denominator": 40,
+          "rate": 0.125,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.375
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 0,
+          "denominator": 5,
+          "rate": 0,
+          "clusters": 1,
+          "ci95": null
+        },
+        "baselineCoverage": {
+          "numerator": 10,
+          "denominator": 40,
+          "rate": 0.25,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.75
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 2,
+          "denominator": 10,
+          "rate": 0.2,
+          "clusters": 1,
+          "ci95": null
+        },
+        "pairedTop1Difference": {
+          "numerator": 0,
+          "denominator": 5,
+          "rate": 0,
+          "clusters": 1,
+          "ci95": null
+        }
+      },
+      "15-20": {
+        "matches": 4,
+        "accounts": 4,
+        "fullWindows": 36,
+        "freshAliveWindows": 34,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 0,
+            "denominator": 36,
+            "rate": 0,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          },
+          "baselineCoverage": {
+            "numerator": 7,
+            "denominator": 36,
+            "rate": 0.194444,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.583333
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 2,
+            "denominator": 7,
+            "rate": 0.285714,
+            "clusters": 1,
+            "ci95": null
+          },
+          "pairedTop1Difference": {
+            "numerator": 0,
+            "denominator": 0,
+            "rate": null,
+            "clusters": 0,
+            "ci95": null
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 1,
+          "denominator": 36,
+          "rate": 0.027778,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.083333
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0,
+          "clusters": 1,
+          "ci95": null
+        },
+        "baselineCoverage": {
+          "numerator": 9,
+          "denominator": 36,
+          "rate": 0.25,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.75
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 2,
+          "denominator": 9,
+          "rate": 0.222222,
+          "clusters": 1,
+          "ci95": null
+        },
+        "pairedTop1Difference": {
+          "numerator": 0,
+          "denominator": 1,
+          "rate": 0,
+          "clusters": 1,
+          "ci95": null
+        }
+      }
+    },
+    "examples": [
+      {
+        "matchId": "9100049738",
+        "accountId": "916650633",
+        "hero": "luna",
+        "team": "radiant",
+        "t": 315,
+        "historicalRank": [
+          "good_2",
+          "lane:bot"
+        ],
+        "baselineRank": [
+          "lane:bot",
+          "good_2"
+        ],
+        "broad": null,
+        "broadBaseline": "lane",
+        "observedLater": "lane:bot",
+        "observedAtSec": 334.733,
+        "voters": [
+          {
+            "matchId": "9097587313",
+            "accountId": "176616331",
+            "timeSec": 375,
+            "label": "good_2",
+            "labelAtSec": 389.967
+          },
+          {
+            "matchId": "9097535245",
+            "accountId": "177726018",
+            "timeSec": 345,
+            "label": "lane:bot",
+            "labelAtSec": 347.567
+          }
+        ]
+      }
+    ]
+  },
+  "rollingOrigin": {
+    "splits": [
+      {
+        "matchId": "9096797937",
+        "startUnix": 1795100438,
+        "withheldAccountIds": [
+          "177726018"
+        ],
+        "trainMatches": 0,
+        "trainAccounts": 0,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": null
+      },
+      {
+        "matchId": "9096845332",
+        "startUnix": 1795102294,
+        "withheldAccountIds": [
+          "56939869"
+        ],
+        "trainMatches": 0,
+        "trainAccounts": 0,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": null
+      },
+      {
+        "matchId": "9097037811",
+        "startUnix": 1795110239,
+        "withheldAccountIds": [
+          "85937380"
+        ],
+        "trainMatches": 2,
+        "trainAccounts": 2,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795104208
+      },
+      {
+        "matchId": "9097330939",
+        "startUnix": 1795126154,
+        "withheldAccountIds": [
+          "200750168"
+        ],
+        "trainMatches": 3,
+        "trainAccounts": 3,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795111965
+      },
+      {
+        "matchId": "9097535245",
+        "startUnix": 1795149359,
+        "withheldAccountIds": [
+          "177726018"
+        ],
+        "trainMatches": 3,
+        "trainAccounts": 3,
+        "excludedPastForAccount": 1,
+        "latestTrainEndUnix": 1795129788
+      },
+      {
+        "matchId": "9097559249",
+        "startUnix": 1795152119,
+        "withheldAccountIds": [
+          "365253927"
+        ],
+        "trainMatches": 4,
+        "trainAccounts": 4,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795129788
+      },
+      {
+        "matchId": "9097587313",
+        "startUnix": 1795155244,
+        "withheldAccountIds": [
+          "176616331"
+        ],
+        "trainMatches": 6,
+        "trainAccounts": 5,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795153607
+      },
+      {
+        "matchId": "9097801447",
+        "startUnix": 1795172944,
+        "withheldAccountIds": [
+          "244343035"
+        ],
+        "trainMatches": 7,
+        "trainAccounts": 6,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795157492
+      },
+      {
+        "matchId": "9098255705",
+        "startUnix": 1795192226,
+        "withheldAccountIds": [
+          "244343035"
+        ],
+        "trainMatches": 7,
+        "trainAccounts": 6,
+        "excludedPastForAccount": 1,
+        "latestTrainEndUnix": 1795157492
+      },
+      {
+        "matchId": "9098360852",
+        "startUnix": 1795196440,
+        "withheldAccountIds": [
+          "189317657"
+        ],
+        "trainMatches": 9,
+        "trainAccounts": 7,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795194343
+      },
+      {
+        "matchId": "9098402606",
+        "startUnix": 1795198175,
+        "withheldAccountIds": [
+          "220722971"
+        ],
+        "trainMatches": 10,
+        "trainAccounts": 8,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795198173
+      },
+      {
+        "matchId": "9098472218",
+        "startUnix": 1795201094,
+        "withheldAccountIds": [
+          "93157994"
+        ],
+        "trainMatches": 11,
+        "trainAccounts": 9,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795200149
+      },
+      {
+        "matchId": "9098789898",
+        "startUnix": 1795220476,
+        "withheldAccountIds": [
+          "93157994"
+        ],
+        "trainMatches": 11,
+        "trainAccounts": 9,
+        "excludedPastForAccount": 1,
+        "latestTrainEndUnix": 1795200149
+      },
+      {
+        "matchId": "9099209663",
+        "startUnix": 1795254492,
+        "withheldAccountIds": [
+          "81556657"
+        ],
+        "trainMatches": 13,
+        "trainAccounts": 10,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795222235
+      },
+      {
+        "matchId": "9099283649",
+        "startUnix": 1795258502,
+        "withheldAccountIds": [
+          "257086687"
+        ],
+        "trainMatches": 14,
+        "trainAccounts": 11,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795256531
+      },
+      {
+        "matchId": "9100049738",
+        "startUnix": 1795288240,
+        "withheldAccountIds": [
+          "916650633"
+        ],
+        "trainMatches": 15,
+        "trainAccounts": 12,
+        "excludedPastForAccount": 0,
+        "latestTrainEndUnix": 1795260751
+      }
+    ],
+    "overall": {
+      "matches": 16,
+      "accounts": 13,
+      "gridWindows": 464,
+      "fullWindows": 464,
+      "rightCensored": 0,
+      "pastRecording": 0,
+      "freshAliveWindows": 426,
+      "selfStateOnFullWindows": {
+        "dead": 38,
+        "alive": 426
+      },
+      "outcomesOnFullWindows": {
+        "lane-of-origin": 182,
+        "@no-body-hit": 50,
+        "own-spawn-camp": 202,
+        "@unresolved": 12,
+        "@opponent-camp": 18
+      },
+      "nextFamily": {
+        "retrieval": {
+          "coverage": {
+            "numerator": 72,
+            "denominator": 464,
+            "rate": 0.155172,
+            "clusters": 13,
+            "ci95": [
+              0.062069,
+              0.245977
+            ]
+          },
+          "top1": {
+            "numerator": 40,
+            "denominator": 71,
+            "rate": 0.56338,
+            "clusters": 7,
+            "ci95": [
+              0.454545,
+              0.671642
+            ]
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 40,
+            "denominator": 464,
+            "rate": 0.086207,
+            "clusters": 13,
+            "ci95": [
+              0.034483,
+              0.14023
+            ]
+          },
+          "issuedWithUnresolvedTruth": 1
+        },
+        "baseline": {
+          "coverage": {
+            "numerator": 155,
+            "denominator": 464,
+            "rate": 0.334052,
+            "clusters": 13,
+            "ci95": [
+              0.168582,
+              0.517241
+            ]
+          },
+          "top1": {
+            "numerator": 60,
+            "denominator": 150,
+            "rate": 0.4,
+            "clusters": 7,
+            "ci95": [
+              0.340909,
+              0.45
+            ]
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 60,
+            "denominator": 464,
+            "rate": 0.12931,
+            "clusters": 13,
+            "ci95": [
+              0.0625,
+              0.206897
+            ]
+          },
+          "issuedWithUnresolvedTruth": 5
+        },
+        "disposition": {
+          "dead": 38,
+          "too-few-independent-neighbours": 299,
+          "no-strict-majority": 55,
+          "ranked": 72
+        },
+        "pairedTop1": {
+          "retrieval": {
+            "numerator": 29,
+            "denominator": 54,
+            "rate": 0.537037,
+            "clusters": 6,
+            "ci95": [
+              0.416667,
+              0.675676
+            ]
+          },
+          "baseline": {
+            "numerator": 26,
+            "denominator": 54,
+            "rate": 0.481481,
+            "clusters": 6,
+            "ci95": [
+              0.313433,
+              0.666667
+            ]
+          },
+          "difference": {
+            "numerator": 3,
+            "denominator": 54,
+            "rate": 0.055556,
+            "clusters": 6,
+            "ci95": [
+              0,
+              0.117647
+            ]
+          }
+        }
+      },
+      "retrievalDisposition": {
+        "dead": 38,
+        "too-few-independent-neighbours": 299,
+        "ranked": 126,
+        "only-nontarget-outcomes": 1
+      },
+      "retrieval": {
+        "coverage": {
+          "numerator": 126,
+          "denominator": 464,
+          "rate": 0.271552,
+          "clusters": 13,
+          "ci95": [
+            0.133621,
+            0.411638
+          ]
+        },
+        "coverageAmongFreshAlive": {
+          "numerator": 126,
+          "denominator": 426,
+          "rate": 0.295775,
+          "clusters": 13,
+          "ci95": [
+            0.147239,
+            0.44469
+          ]
+        },
+        "issuedWithUnresolvedTruth": 8,
+        "top1": {
+          "numerator": 49,
+          "denominator": 118,
+          "rate": 0.415254,
+          "clusters": 7,
+          "ci95": [
+            0.287037,
+            0.51145
+          ]
+        },
+        "top3": {
+          "numerator": 65,
+          "denominator": 118,
+          "rate": 0.550847,
+          "clusters": 7,
+          "ci95": [
+            0.431373,
+            0.65625
+          ]
+        },
+        "top1HitsPerFullWindow": {
+          "numerator": 49,
+          "denominator": 464,
+          "rate": 0.105603,
+          "clusters": 13,
+          "ci95": [
+            0.040948,
+            0.181034
+          ]
+        }
+      },
+      "baseline": {
+        "coverage": {
+          "numerator": 217,
+          "denominator": 464,
+          "rate": 0.467672,
+          "clusters": 13,
+          "ci95": [
+            0.23775,
+            0.709052
+          ]
+        },
+        "coverageAmongFreshAlive": {
+          "numerator": 217,
+          "denominator": 426,
+          "rate": 0.50939,
+          "clusters": 13,
+          "ci95": [
+            0.26253,
+            0.763341
+          ]
+        },
+        "issuedWithUnresolvedTruth": 9,
+        "top1": {
+          "numerator": 51,
+          "denominator": 208,
+          "rate": 0.245192,
+          "clusters": 7,
+          "ci95": [
+            0.179775,
+            0.31694
+          ]
+        },
+        "top3": {
+          "numerator": 85,
+          "denominator": 208,
+          "rate": 0.408654,
+          "clusters": 7,
+          "ci95": [
+            0.342697,
+            0.457692
+          ]
+        },
+        "top1HitsPerFullWindow": {
+          "numerator": 51,
+          "denominator": 464,
+          "rate": 0.109914,
+          "clusters": 13,
+          "ci95": [
+            0.050575,
+            0.182266
+          ]
+        }
+      },
+      "pairedTop1": {
+        "retrieval": {
+          "numerator": 49,
+          "denominator": 118,
+          "rate": 0.415254,
+          "clusters": 7,
+          "ci95": [
+            0.287037,
+            0.51145
+          ]
+        },
+        "baseline": {
+          "numerator": 36,
+          "denominator": 118,
+          "rate": 0.305085,
+          "clusters": 7,
+          "ci95": [
+            0.229008,
+            0.387097
+          ]
+        },
+        "difference": {
+          "numerator": 13,
+          "denominator": 118,
+          "rate": 0.110169,
+          "clusters": 7,
+          "ci95": [
+            0.011494,
+            0.203947
+          ]
+        }
+      },
+      "visibleDisplay": {
+        "displayed": 0,
+        "denominatorFullWindows": 464,
+        "rate": 0,
+        "targetPOVAnnotations": 0,
+        "canActAnnotations": 0,
+        "liveAccuracy": null
+      }
+    },
+    "byHero": {
+      "luna": {
+        "matches": 8,
+        "accounts": 6,
+        "gridWindows": 232,
+        "fullWindows": 232,
+        "rightCensored": 0,
+        "pastRecording": 0,
+        "freshAliveWindows": 214,
+        "selfStateOnFullWindows": {
+          "dead": 18,
+          "alive": 214
+        },
+        "outcomesOnFullWindows": {
+          "lane-of-origin": 80,
+          "@no-body-hit": 23,
+          "own-spawn-camp": 111,
+          "@unresolved": 4,
+          "@opponent-camp": 14
+        },
+        "nextFamily": {
+          "retrieval": {
+            "coverage": {
+              "numerator": 27,
+              "denominator": 232,
+              "rate": 0.116379,
+              "clusters": 6,
+              "ci95": [
+                0.012931,
+                0.245211
+              ]
+            },
+            "top1": {
+              "numerator": 18,
+              "denominator": 27,
+              "rate": 0.666667,
+              "clusters": 3,
+              "ci95": [
+                0.333333,
+                1
+              ]
+            },
+            "top1HitsPerFullWindow": {
+              "numerator": 18,
+              "denominator": 232,
+              "rate": 0.077586,
+              "clusters": 6,
+              "ci95": [
+                0.00431,
+                0.163793
+              ]
+            },
+            "issuedWithUnresolvedTruth": 0
+          },
+          "baseline": {
+            "coverage": {
+              "numerator": 61,
+              "denominator": 232,
+              "rate": 0.262931,
+              "clusters": 6,
+              "ci95": [
+                0.060345,
+                0.471264
+              ]
+            },
+            "top1": {
+              "numerator": 26,
+              "denominator": 61,
+              "rate": 0.42623,
+              "clusters": 3,
+              "ci95": [
+                0.285714,
+                0.481481
+              ]
+            },
+            "top1HitsPerFullWindow": {
+              "numerator": 26,
+              "denominator": 232,
+              "rate": 0.112069,
+              "clusters": 6,
+              "ci95": [
+                0.017241,
+                0.206897
+              ]
+            },
+            "issuedWithUnresolvedTruth": 0
+          },
+          "disposition": {
+            "dead": 18,
+            "too-few-independent-neighbours": 156,
+            "no-strict-majority": 31,
+            "ranked": 27
+          },
+          "pairedTop1": {
+            "retrieval": {
+              "numerator": 9,
+              "denominator": 12,
+              "rate": 0.75,
+              "clusters": 2,
+              "ci95": [
+                0.7,
+                1
+              ]
+            },
+            "baseline": {
+              "numerator": 9,
+              "denominator": 12,
+              "rate": 0.75,
+              "clusters": 2,
+              "ci95": [
+                0.7,
+                1
+              ]
+            },
+            "difference": {
+              "numerator": 0,
+              "denominator": 12,
+              "rate": 0,
+              "clusters": 2,
+              "ci95": [
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "retrievalDisposition": {
+          "dead": 18,
+          "too-few-independent-neighbours": 156,
+          "ranked": 57,
+          "only-nontarget-outcomes": 1
+        },
+        "retrieval": {
+          "coverage": {
+            "numerator": 57,
+            "denominator": 232,
+            "rate": 0.24569,
+            "clusters": 6,
+            "ci95": [
+              0.034483,
+              0.463054
+            ]
+          },
+          "coverageAmongFreshAlive": {
+            "numerator": 57,
+            "denominator": 214,
+            "rate": 0.266355,
+            "clusters": 6,
+            "ci95": [
+              0.038462,
+              0.488136
+            ]
+          },
+          "issuedWithUnresolvedTruth": 3,
+          "top1": {
+            "numerator": 27,
+            "denominator": 54,
+            "rate": 0.5,
+            "clusters": 3,
+            "ci95": [
+              0.285714,
+              0.545455
+            ]
+          },
+          "top3": {
+            "numerator": 35,
+            "denominator": 54,
+            "rate": 0.648148,
+            "clusters": 3,
+            "ci95": [
+              0.428571,
+              0.727273
+            ]
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 27,
+            "denominator": 232,
+            "rate": 0.116379,
+            "clusters": 6,
+            "ci95": [
+              0.008621,
+              0.233716
+            ]
+          }
+        },
+        "baseline": {
+          "coverage": {
+            "numerator": 111,
+            "denominator": 232,
+            "rate": 0.478448,
+            "clusters": 6,
+            "ci95": [
+              0.111111,
+              0.83908
+            ]
+          },
+          "coverageAmongFreshAlive": {
+            "numerator": 111,
+            "denominator": 214,
+            "rate": 0.518692,
+            "clusters": 6,
+            "ci95": [
+              0.123932,
+              0.893443
+            ]
+          },
+          "issuedWithUnresolvedTruth": 3,
+          "top1": {
+            "numerator": 25,
+            "denominator": 108,
+            "rate": 0.231481,
+            "clusters": 3,
+            "ci95": [
+              0.111111,
+              0.392857
+            ]
+          },
+          "top3": {
+            "numerator": 47,
+            "denominator": 108,
+            "rate": 0.435185,
+            "clusters": 3,
+            "ci95": [
+              0.296296,
+              0.5
+            ]
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 25,
+            "denominator": 232,
+            "rate": 0.107759,
+            "clusters": 6,
+            "ci95": [
+              0.012931,
+              0.216749
+            ]
+          }
+        },
+        "pairedTop1": {
+          "retrieval": {
+            "numerator": 27,
+            "denominator": 54,
+            "rate": 0.5,
+            "clusters": 3,
+            "ci95": [
+              0.285714,
+              0.545455
+            ]
+          },
+          "baseline": {
+            "numerator": 16,
+            "denominator": 54,
+            "rate": 0.296296,
+            "clusters": 3,
+            "ci95": [
+              0.142857,
+              0.428571
+            ]
+          },
+          "difference": {
+            "numerator": 11,
+            "denominator": 54,
+            "rate": 0.203704,
+            "clusters": 3,
+            "ci95": [
+              0.071429,
+              0.272727
+            ]
+          }
+        },
+        "visibleDisplay": {
+          "displayed": 0,
+          "denominatorFullWindows": 232,
+          "rate": 0,
+          "targetPOVAnnotations": 0,
+          "canActAnnotations": 0,
+          "liveAccuracy": null
+        }
+      },
+      "troll_warlord": {
+        "matches": 8,
+        "accounts": 7,
+        "gridWindows": 232,
+        "fullWindows": 232,
+        "rightCensored": 0,
+        "pastRecording": 0,
+        "freshAliveWindows": 212,
+        "selfStateOnFullWindows": {
+          "alive": 212,
+          "dead": 20
+        },
+        "outcomesOnFullWindows": {
+          "lane-of-origin": 102,
+          "own-spawn-camp": 91,
+          "@unresolved": 8,
+          "@no-body-hit": 27,
+          "@opponent-camp": 4
+        },
+        "nextFamily": {
+          "retrieval": {
+            "coverage": {
+              "numerator": 45,
+              "denominator": 232,
+              "rate": 0.193966,
+              "clusters": 7,
+              "ci95": [
+                0.068966,
+                0.310345
+              ]
+            },
+            "top1": {
+              "numerator": 22,
+              "denominator": 44,
+              "rate": 0.5,
+              "clusters": 4,
+              "ci95": [
+                0.4,
+                0.571429
+              ]
+            },
+            "top1HitsPerFullWindow": {
+              "numerator": 22,
+              "denominator": 232,
+              "rate": 0.094828,
+              "clusters": 7,
+              "ci95": [
+                0.039409,
+                0.157635
+              ]
+            },
+            "issuedWithUnresolvedTruth": 1
+          },
+          "baseline": {
+            "coverage": {
+              "numerator": 94,
+              "denominator": 232,
+              "rate": 0.405172,
+              "clusters": 7,
+              "ci95": [
+                0.128079,
+                0.704433
+              ]
+            },
+            "top1": {
+              "numerator": 34,
+              "denominator": 89,
+              "rate": 0.382022,
+              "clusters": 4,
+              "ci95": [
+                0.313953,
+                0.443299
+              ]
+            },
+            "top1HitsPerFullWindow": {
+              "numerator": 34,
+              "denominator": 232,
+              "rate": 0.146552,
+              "clusters": 7,
+              "ci95": [
+                0.045977,
+                0.258621
+              ]
+            },
+            "issuedWithUnresolvedTruth": 5
+          },
+          "disposition": {
+            "too-few-independent-neighbours": 143,
+            "dead": 20,
+            "ranked": 45,
+            "no-strict-majority": 24
+          },
+          "pairedTop1": {
+            "retrieval": {
+              "numerator": 20,
+              "denominator": 42,
+              "rate": 0.47619,
+              "clusters": 4,
+              "ci95": [
+                0.365385,
+                0.571429
+              ]
+            },
+            "baseline": {
+              "numerator": 17,
+              "denominator": 42,
+              "rate": 0.404762,
+              "clusters": 4,
+              "ci95": [
+                0.238095,
+                0.571429
+              ]
+            },
+            "difference": {
+              "numerator": 3,
+              "denominator": 42,
+              "rate": 0.071429,
+              "clusters": 4,
+              "ci95": [
+                0,
+                0.142857
+              ]
+            }
+          }
+        },
+        "retrievalDisposition": {
+          "too-few-independent-neighbours": 143,
+          "dead": 20,
+          "ranked": 69
+        },
+        "retrieval": {
+          "coverage": {
+            "numerator": 69,
+            "denominator": 232,
+            "rate": 0.297414,
+            "clusters": 7,
+            "ci95": [
+              0.090517,
+              0.463054
+            ]
+          },
+          "coverageAmongFreshAlive": {
+            "numerator": 69,
+            "denominator": 212,
+            "rate": 0.325472,
+            "clusters": 7,
+            "ci95": [
+              0.099057,
+              0.5
+            ]
+          },
+          "issuedWithUnresolvedTruth": 5,
+          "top1": {
+            "numerator": 22,
+            "denominator": 64,
+            "rate": 0.34375,
+            "clusters": 4,
+            "ci95": [
+              0.212121,
+              0.483871
+            ]
+          },
+          "top3": {
+            "numerator": 30,
+            "denominator": 64,
+            "rate": 0.46875,
+            "clusters": 4,
+            "ci95": [
+              0.365385,
+              0.548387
+            ]
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 22,
+            "denominator": 232,
+            "rate": 0.094828,
+            "clusters": 7,
+            "ci95": [
+              0.029557,
+              0.172414
+            ]
+          }
+        },
+        "baseline": {
+          "coverage": {
+            "numerator": 106,
+            "denominator": 232,
+            "rate": 0.456897,
+            "clusters": 7,
+            "ci95": [
+              0.137931,
+              0.802956
+            ]
+          },
+          "coverageAmongFreshAlive": {
+            "numerator": 106,
+            "denominator": 212,
+            "rate": 0.5,
+            "clusters": 7,
+            "ci95": [
+              0.145833,
+              0.848958
+            ]
+          },
+          "issuedWithUnresolvedTruth": 6,
+          "top1": {
+            "numerator": 26,
+            "denominator": 100,
+            "rate": 0.26,
+            "clusters": 4,
+            "ci95": [
+              0.173913,
+              0.333333
+            ]
+          },
+          "top3": {
+            "numerator": 38,
+            "denominator": 100,
+            "rate": 0.38,
+            "clusters": 4,
+            "ci95": [
+              0.333333,
+              0.42
+            ]
+          },
+          "top1HitsPerFullWindow": {
+            "numerator": 26,
+            "denominator": 232,
+            "rate": 0.112069,
+            "clusters": 7,
+            "ci95": [
+              0.034483,
+              0.206897
+            ]
+          }
+        },
+        "pairedTop1": {
+          "retrieval": {
+            "numerator": 22,
+            "denominator": 64,
+            "rate": 0.34375,
+            "clusters": 4,
+            "ci95": [
+              0.212121,
+              0.483871
+            ]
+          },
+          "baseline": {
+            "numerator": 20,
+            "denominator": 64,
+            "rate": 0.3125,
+            "clusters": 4,
+            "ci95": [
+              0.205128,
+              0.423077
+            ]
+          },
+          "difference": {
+            "numerator": 2,
+            "denominator": 64,
+            "rate": 0.03125,
+            "clusters": 4,
+            "ci95": [
+              -0.035088,
+              0.067797
+            ]
+          }
+        },
+        "visibleDisplay": {
+          "displayed": 0,
+          "denominatorFullWindows": 232,
+          "rate": 0,
+          "targetPOVAnnotations": 0,
+          "canActAnnotations": 0,
+          "liveAccuracy": null
+        }
+      }
+    },
+    "byHeroTeam": {
+      "luna/radiant": {
+        "matches": 4,
+        "accounts": 4,
+        "fullWindows": 116,
+        "freshAliveWindows": 106,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 14,
+            "denominator": 116,
+            "rate": 0.12069,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.258621
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 11,
+            "denominator": 14,
+            "rate": 0.785714,
+            "clusters": 2,
+            "ci95": [
+              0.7,
+              1
+            ]
+          },
+          "baselineCoverage": {
+            "numerator": 39,
+            "denominator": 116,
+            "rate": 0.336207,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.672414
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 20,
+            "denominator": 39,
+            "rate": 0.512821,
+            "clusters": 2,
+            "ci95": [
+              0.45,
+              0.578947
+            ]
+          },
+          "pairedTop1Difference": {
+            "numerator": 0,
+            "denominator": 11,
+            "rate": 0,
+            "clusters": 2,
+            "ci95": [
+              0,
+              0
+            ]
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 33,
+          "denominator": 116,
+          "rate": 0.284483,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.568966
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 18,
+          "denominator": 32,
+          "rate": 0.5625,
+          "clusters": 2,
+          "ci95": [
+            0.5,
+            0.611111
+          ]
+        },
+        "baselineCoverage": {
+          "numerator": 54,
+          "denominator": 116,
+          "rate": 0.465517,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.931034
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 16,
+          "denominator": 53,
+          "rate": 0.301887,
+          "clusters": 2,
+          "ci95": [
+            0.2,
+            0.392857
+          ]
+        },
+        "pairedTop1Difference": {
+          "numerator": 8,
+          "denominator": 32,
+          "rate": 0.25,
+          "clusters": 2,
+          "ci95": [
+            0.071429,
+            0.388889
+          ]
+        }
+      },
+      "luna/dire": {
+        "matches": 4,
+        "accounts": 4,
+        "fullWindows": 116,
+        "freshAliveWindows": 108,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 13,
+            "denominator": 116,
+            "rate": 0.112069,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.258621
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 7,
+            "denominator": 13,
+            "rate": 0.538462,
+            "clusters": 2,
+            "ci95": [
+              0.333333,
+              0.6
+            ]
+          },
+          "baselineCoverage": {
+            "numerator": 22,
+            "denominator": 116,
+            "rate": 0.189655,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.37931
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 6,
+            "denominator": 22,
+            "rate": 0.272727,
+            "clusters": 2,
+            "ci95": [
+              0.25,
+              0.285714
+            ]
+          },
+          "pairedTop1Difference": {
+            "numerator": 0,
+            "denominator": 1,
+            "rate": 0,
+            "clusters": 1,
+            "ci95": null
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 24,
+          "denominator": 116,
+          "rate": 0.206897,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.413793
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 9,
+          "denominator": 22,
+          "rate": 0.409091,
+          "clusters": 2,
+          "ci95": [
+            0.285714,
+            0.466667
+          ]
+        },
+        "baselineCoverage": {
+          "numerator": 57,
+          "denominator": 116,
+          "rate": 0.491379,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.982759
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 9,
+          "denominator": 55,
+          "rate": 0.163636,
+          "clusters": 2,
+          "ci95": [
+            0.111111,
+            0.214286
+          ]
+        },
+        "pairedTop1Difference": {
+          "numerator": 3,
+          "denominator": 22,
+          "rate": 0.136364,
+          "clusters": 2,
+          "ci95": [
+            0.133333,
+            0.142857
+          ]
+        }
+      },
+      "troll_warlord/radiant": {
+        "matches": 4,
+        "accounts": 4,
+        "fullWindows": 116,
+        "freshAliveWindows": 106,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 30,
+            "denominator": 116,
+            "rate": 0.258621,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.517241
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 14,
+            "denominator": 30,
+            "rate": 0.466667,
+            "clusters": 2,
+            "ci95": [
+              0.375,
+              0.571429
+            ]
+          },
+          "baselineCoverage": {
+            "numerator": 47,
+            "denominator": 116,
+            "rate": 0.405172,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.810345
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 18,
+            "denominator": 47,
+            "rate": 0.382979,
+            "clusters": 2,
+            "ci95": [
+              0.285714,
+              0.461538
+            ]
+          },
+          "pairedTop1Difference": {
+            "numerator": 2,
+            "denominator": 29,
+            "rate": 0.068966,
+            "clusters": 2,
+            "ci95": [
+              0,
+              0.133333
+            ]
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 39,
+          "denominator": 116,
+          "rate": 0.336207,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.672414
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 12,
+          "denominator": 38,
+          "rate": 0.315789,
+          "clusters": 2,
+          "ci95": [
+            0.2,
+            0.444444
+          ]
+        },
+        "baselineCoverage": {
+          "numerator": 51,
+          "denominator": 116,
+          "rate": 0.439655,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.87931
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 12,
+          "denominator": 50,
+          "rate": 0.24,
+          "clusters": 2,
+          "ci95": [
+            0.173913,
+            0.296296
+          ]
+        },
+        "pairedTop1Difference": {
+          "numerator": 2,
+          "denominator": 38,
+          "rate": 0.052632,
+          "clusters": 2,
+          "ci95": [
+            0.05,
+            0.055556
+          ]
+        }
+      },
+      "troll_warlord/dire": {
+        "matches": 4,
+        "accounts": 4,
+        "fullWindows": 116,
+        "freshAliveWindows": 106,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 15,
+            "denominator": 116,
+            "rate": 0.12931,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.258621
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 8,
+            "denominator": 14,
+            "rate": 0.571429,
+            "clusters": 2,
+            "ci95": [
+              0.571429,
+              0.571429
+            ]
+          },
+          "baselineCoverage": {
+            "numerator": 47,
+            "denominator": 116,
+            "rate": 0.405172,
+            "clusters": 4,
+            "ci95": [
+              0,
+              0.810345
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 16,
+            "denominator": 42,
+            "rate": 0.380952,
+            "clusters": 2,
+            "ci95": [
+              0.368421,
+              0.391304
+            ]
+          },
+          "pairedTop1Difference": {
+            "numerator": 1,
+            "denominator": 13,
+            "rate": 0.076923,
+            "clusters": 2,
+            "ci95": [
+              0,
+              0.166667
+            ]
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 30,
+          "denominator": 116,
+          "rate": 0.258621,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.517241
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 10,
+          "denominator": 26,
+          "rate": 0.384615,
+          "clusters": 2,
+          "ci95": [
+            0.230769,
+            0.538462
+          ]
+        },
+        "baselineCoverage": {
+          "numerator": 55,
+          "denominator": 116,
+          "rate": 0.474138,
+          "clusters": 4,
+          "ci95": [
+            0,
+            0.948276
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 14,
+          "denominator": 50,
+          "rate": 0.28,
+          "clusters": 2,
+          "ci95": [
+            0.173913,
+            0.37037
+          ]
+        },
+        "pairedTop1Difference": {
+          "numerator": 0,
+          "denominator": 26,
+          "rate": 0,
+          "clusters": 2,
+          "ci95": [
+            -0.076923,
+            0.076923
+          ]
+        }
+      }
+    },
+    "byClockMinutes": {
+      "5-10": {
+        "matches": 16,
+        "accounts": 13,
+        "fullWindows": 160,
+        "freshAliveWindows": 148,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 38,
+            "denominator": 160,
+            "rate": 0.2375,
+            "clusters": 13,
+            "ci95": [
+              0.086667,
+              0.392857
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 22,
+            "denominator": 38,
+            "rate": 0.578947,
+            "clusters": 7,
+            "ci95": [
+              0.352941,
+              0.711111
+            ]
+          },
+          "baselineCoverage": {
+            "numerator": 44,
+            "denominator": 160,
+            "rate": 0.275,
+            "clusters": 13,
+            "ci95": [
+              0.105882,
+              0.473333
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 17,
+            "denominator": 42,
+            "rate": 0.404762,
+            "clusters": 7,
+            "ci95": [
+              0.173913,
+              0.591837
+            ]
+          },
+          "pairedTop1Difference": {
+            "numerator": 1,
+            "denominator": 26,
+            "rate": 0.038462,
+            "clusters": 5,
+            "ci95": [
+              0,
+              0.111111
+            ]
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 62,
+          "denominator": 160,
+          "rate": 0.3875,
+          "clusters": 13,
+          "ci95": [
+            0.188235,
+            0.6
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 29,
+          "denominator": 58,
+          "rate": 0.5,
+          "clusters": 7,
+          "ci95": [
+            0.25,
+            0.675676
+          ]
+        },
+        "baselineCoverage": {
+          "numerator": 73,
+          "denominator": 160,
+          "rate": 0.45625,
+          "clusters": 13,
+          "ci95": [
+            0.230769,
+            0.694118
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 30,
+          "denominator": 69,
+          "rate": 0.434783,
+          "clusters": 7,
+          "ci95": [
+            0.272727,
+            0.590164
+          ]
+        },
+        "pairedTop1Difference": {
+          "numerator": 3,
+          "denominator": 58,
+          "rate": 0.051724,
+          "clusters": 7,
+          "ci95": [
+            -0.095238,
+            0.1625
+          ]
+        }
+      },
+      "10-15": {
+        "matches": 16,
+        "accounts": 13,
+        "fullWindows": 160,
+        "freshAliveWindows": 151,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 24,
+            "denominator": 160,
+            "rate": 0.15,
+            "clusters": 13,
+            "ci95": [
+              0.05,
+              0.25
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 13,
+            "denominator": 24,
+            "rate": 0.541667,
+            "clusters": 6,
+            "ci95": [
+              0.37037,
+              0.8
+            ]
+          },
+          "baselineCoverage": {
+            "numerator": 60,
+            "denominator": 160,
+            "rate": 0.375,
+            "clusters": 13,
+            "ci95": [
+              0.194444,
+              0.56875
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 25,
+            "denominator": 58,
+            "rate": 0.431034,
+            "clusters": 7,
+            "ci95": [
+              0.28,
+              0.558824
+            ]
+          },
+          "pairedTop1Difference": {
+            "numerator": 2,
+            "denominator": 20,
+            "rate": 0.1,
+            "clusters": 5,
+            "ci95": [
+              0,
+              0.227273
+            ]
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 43,
+          "denominator": 160,
+          "rate": 0.26875,
+          "clusters": 13,
+          "ci95": [
+            0.128571,
+            0.405263
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 14,
+          "denominator": 41,
+          "rate": 0.341463,
+          "clusters": 7,
+          "ci95": [
+            0.194444,
+            0.486486
+          ]
+        },
+        "baselineCoverage": {
+          "numerator": 78,
+          "denominator": 160,
+          "rate": 0.4875,
+          "clusters": 13,
+          "ci95": [
+            0.246667,
+            0.741176
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 15,
+          "denominator": 75,
+          "rate": 0.2,
+          "clusters": 7,
+          "ci95": [
+            0.155844,
+            0.258065
+          ]
+        },
+        "pairedTop1Difference": {
+          "numerator": 5,
+          "denominator": 41,
+          "rate": 0.121951,
+          "clusters": 7,
+          "ci95": [
+            0.044444,
+            0.214286
+          ]
+        }
+      },
+      "15-20": {
+        "matches": 16,
+        "accounts": 13,
+        "fullWindows": 144,
+        "freshAliveWindows": 127,
+        "nextFamily": {
+          "retrievalCoverage": {
+            "numerator": 10,
+            "denominator": 144,
+            "rate": 0.069444,
+            "clusters": 13,
+            "ci95": [
+              0.022222,
+              0.124183
+            ]
+          },
+          "retrievalTop1": {
+            "numerator": 5,
+            "denominator": 9,
+            "rate": 0.555556,
+            "clusters": 6,
+            "ci95": [
+              0.333333,
+              0.833333
+            ]
+          },
+          "baselineCoverage": {
+            "numerator": 51,
+            "denominator": 144,
+            "rate": 0.354167,
+            "clusters": 13,
+            "ci95": [
+              0.180556,
+              0.547009
+            ]
+          },
+          "baselineTop1": {
+            "numerator": 18,
+            "denominator": 50,
+            "rate": 0.36,
+            "clusters": 7,
+            "ci95": [
+              0.296296,
+              0.45
+            ]
+          },
+          "pairedTop1Difference": {
+            "numerator": 0,
+            "denominator": 8,
+            "rate": 0,
+            "clusters": 5,
+            "ci95": [
+              0,
+              0
+            ]
+          }
+        },
+        "retrievalCoverage": {
+          "numerator": 21,
+          "denominator": 144,
+          "rate": 0.145833,
+          "clusters": 13,
+          "ci95": [
+            0.055556,
+            0.25
+          ]
+        },
+        "retrievalTop1": {
+          "numerator": 6,
+          "denominator": 19,
+          "rate": 0.315789,
+          "clusters": 7,
+          "ci95": [
+            0.125,
+            0.5
+          ]
+        },
+        "baselineCoverage": {
+          "numerator": 66,
+          "denominator": 144,
+          "rate": 0.458333,
+          "clusters": 13,
+          "ci95": [
+            0.228758,
+            0.701754
+          ]
+        },
+        "baselineTop1": {
+          "numerator": 6,
+          "denominator": 64,
+          "rate": 0.09375,
+          "clusters": 7,
+          "ci95": [
+            0.042857,
+            0.152542
+          ]
+        },
+        "pairedTop1Difference": {
+          "numerator": 5,
+          "denominator": 19,
+          "rate": 0.263158,
+          "clusters": 7,
+          "ci95": [
+            0.058824,
+            0.454545
+          ]
+        }
+      }
+    },
+    "examples": [
+      {
+        "matchId": "9097037811",
+        "accountId": "85937380",
+        "hero": "luna",
+        "team": "dire",
+        "t": 315,
+        "historicalRank": [
+          "evil_6"
+        ],
+        "baselineRank": [
+          "evil_1",
+          "lane:top",
+          "evil_15"
+        ],
+        "broad": null,
+        "broadBaseline": null,
+        "observedLater": "evil_1",
+        "observedAtSec": 315.367,
+        "voters": [
+          {
+            "matchId": "9096845332",
+            "accountId": "56939869",
+            "timeSec": 405,
+            "label": "evil_6",
+            "labelAtSec": 422.567
+          },
+          {
+            "matchId": "9096797937",
+            "accountId": "177726018",
+            "timeSec": 405,
+            "label": "@no-body-hit",
+            "labelAtSec": null
+          }
+        ]
+      },
+      {
+        "matchId": "9098402606",
+        "accountId": "220722971",
+        "hero": "troll_warlord",
+        "team": "radiant",
+        "t": 315,
+        "historicalRank": [
+          "lane:bot"
+        ],
+        "baselineRank": [
+          "lane:bot"
+        ],
+        "broad": "lane",
+        "broadBaseline": "lane",
+        "observedLater": "lane:bot",
+        "observedAtSec": 316.7,
+        "voters": [
+          {
+            "matchId": "9097330939",
+            "accountId": "200750168",
+            "timeSec": 375,
+            "label": "lane:bot",
+            "labelAtSec": 375.7
+          },
+          {
+            "matchId": "9098360852",
+            "accountId": "189317657",
+            "timeSec": 345,
+            "label": "lane:bot",
+            "labelAtSec": 351.333
+          }
+        ]
+      }
+    ]
+  }
+}

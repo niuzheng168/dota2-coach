@@ -119,6 +119,14 @@ internal static class WardTests
         check(anchored is [{ Kind: "observer", After: 602.6, Before: 603.0, Unseen: 0, Candidates: [{ Rough: false, Share: 0.9 } at, ..] }] &&
               double.Hypot(at.X - (-3000 + 300 * 2.8 + 350), at.Y - 1000) < 60 && exact.Marks(610) is [{ Rank: 0 }, ..],
             "a drop between the entry's latest read and the next one's first, in sight: the mark is ahead of Lion halfway through");
+        check(exact.Active(602.99).Length == 0 && exact.Marks(602.99).Length == 0 && exact.Active(603).Length == 1,
+            "a sub-second placement window is not a known candidate before its first lower reading");
+        var overlap = new WardTracker(map, spots);
+        overlap.Readings("9000000001", 2, Reads(E(600.1, 600.5, 2)));
+        check(overlap.Readings("9000000001", 2, Reads(E(600.4, 600.7, 3))).Count == 0 &&
+              overlap.Readings("9000000001", 2, Reads(E(600.8, 600.9, 2))).Count == 0 &&
+              overlap.Readings("9000000001", 2, Reads(E(601, 601.1, 1))) is [{ After: 600.9, Before: 601 }],
+            "an overlapping change in a later receipt cannot invent a drop by poisoning the previous counts");
         // Out of sight, a common spot the friend team's eyes covered all along is unlikely, and so is one behind the
         // way the hero vanished.
         WardSpot[] twins = [new(0, 2000, 50, [10, 20, 20]), new(0, -2000, 50, [10, 20, 20])];
@@ -184,12 +192,34 @@ internal static class WardTests
             "ward marks are checked: kind, the minimap square, rank, time left, how many");
         long now = 1000;
         var mailbox = new CoachMailbox(() => now);
-        var hello = mailbox.Begin();
-        mailbox.AcceptStatus(new(hello.SessionId, "", 1, "dota2", 1920, 1080, null, null));
-        mailbox.SetEnemies(new([], [mark, mark with { Rank = 1, Left = 2 }]));
+        string session = mailbox.Begin().SessionId;
+        var actor = new OwnState("9000000001", "npc_dota_hero_luna", "radiant", 700, true, 1200, 500, -6000, -6000, [], []);
+        var hud = new MinimapLayout(1920, 1080, 1650, 800, 250); // explicitly confirmed, not the default HUD suggestion
+        void Participant(long sequence, double clock) {
+            var ticket = mailbox.Issue(session);
+            var phase = new MatchWitness(actor.MatchId, actor.Team, actor.Hero, clock, "playing", false) {
+                AgeMs = 10, InstalledBuild = MinuteFarmContext.SupportedBuild };
+            mailbox.AcceptMinuteState(new(session, ticket.Id, sequence, "dota2-gsi", hud.SourceWidth, hud.SourceHeight,
+                actor with { Clock = clock }, phase.AgeMs, phase), 300);
+        }
+        Participant(1, 700);
+        var unbound = new EnemyBoard([], [mark, mark with { Rank = 1, Left = 2 }]);
+        mailbox.SetEnemies(unbound);
+        check(mailbox.Enemies(session) == null, "valid marks alone are not authorization for the current participant");
+        var scoped = unbound with { MatchId = actor.MatchId, Team = actor.Team, Minimap = hud,
+            SessionId = session, FrameSequence = 1, RemainingMs = 2800 };
+        mailbox.SetEnemies(scoped with { Minimap = null });
+        check(mailbox.Enemies(session) == null, "an identified participant without confirmed HUD geometry does not receive ward marks");
+        mailbox.SetEnemies(scoped);
         now += 2500;
-        check(mailbox.Enemies(hello.SessionId) is { Heroes: [], Wards: [{ Age: 12.5, Left: 27.5 }] },
+        Participant(2, 702); // same actor and viewport; this fresh witness must not restart the publication lease
+        check(mailbox.Enemies(session) is { Heroes: [], Wards: [{ Rank: 0, Age: 12.5, Left: 27.5 }],
+                FrameSequence: 1, HeldMs: 2500, RemainingMs: 300 } boardAt && boardAt.SessionId == session && boardAt.Minimap == hud,
             "the game machine gets the marks aged by the time held, the expired one left out");
+        now += 299;
+        check(mailbox.Enemies(session)?.RemainingMs == 1, "re-polling the scoped board keeps the original TTL");
+        now++;
+        check(mailbox.Enemies(session) == null, "the board expires at the exact source deadline, even with a fresh participant");
         string json = JsonSerializer.Serialize(new { enemies = new EnemyBoard([], [mark]) }, Wire.Json);
         check(json.Contains("\"wards\":[{\"hero\":\"npc_dota_hero_lion\"") &&
               JsonSerializer.Deserialize<EnemyHero[]>("[{\"hero\":\"npc_dota_hero_lion\",\"wards\":[{\"clock\":1}]}]", Wire.Json)![0].Hero == Lion,
@@ -202,19 +232,41 @@ internal static class WardTests
             string file = Path.Combine(dir, "live.json");
             long unix = 1_800_000_000_000;
             object Row(string hero, object? reads) => new { hero, level = 9, age = 1.0, items = (string?[]?)null, neutral = (string?)null, wards = reads };
-            File.WriteAllText(file, JsonSerializer.Serialize(new { version = 2, run = "ab", written = unix / 1000.0, stopped = false, mode = "team-view",
-                matchId = "9000000001", ownTeam = 2, clock = 900, selecting = true, enemies = new[] {
+            void Write(double clock, object[] enemies, double? gsiAge = null) {
+                var packet = JsonSerializer.SerializeToNode(new { version = 2, run = "ab", written = unix / 1000.0, stopped = false,
+                    mode = "team-view", matchId = actor.MatchId, ownTeam = 2, clock, selecting = true, enemies })!.AsObject();
+                if (gsiAge is double age) packet["gsiAge"] = age;
+                File.WriteAllText(file, packet.ToJsonString());
+            }
+            Write(900, [
                     Row(Lion, new[] { new { clock = 601, observer = 2, sentry = 1, unknown = 0 }, new { clock = 609, observer = 1, sentry = 1, unknown = 0 } }),
                     Row("npc_dota_hero_pudge", new[] { new { clock = 601, observer = -1, sentry = 0, unknown = 0 } }),
                     Row("npc_dota_hero_razor", null),
                     Row("npc_dota_hero_lina", new[] { new { first = 600.25, clock = 604.5, observer = 1, sentry = 0, unknown = 0 } }),
-                    Row("npc_dota_hero_zuus", new[] { new { first = 605.5, clock = 604.5, observer = 1, sentry = 0, unknown = 0 } }) } }));
+                    Row("npc_dota_hero_zuus", new[] { new { first = 605.5, clock = 604.5, observer = 1, sentry = 0, unknown = 0 } })]);
             var (status, board, reads) = ScanFeed.Poll(file, "9000000001", unix);
             check(status.Running && board?.Heroes.Length == 5 && reads.Count == 2 &&
                   reads[Lion] is [{ Clock: 601, Observer: 2, Sentry: 1, Unknown: 0, First: null }, { Clock: 609, Observer: 1, Total: 2 }] &&
                   reads["npc_dota_hero_lina"] is [{ First: 600.25, Clock: 604.5 }],
                 "ward reads are taken per enemy from the live file, with the first read of each since 2026-11-22; a negative count " +
                 "or a first read after the latest drops that enemy's list only");
+
+            object[] withinSecond = [Row(Lion, new[] { new { first = 609.25, clock = 609.75, observer = 1, sentry = 0, unknown = 0 } })];
+            Write(609, withinSecond); // v0.4.8 has a whole-second envelope and no gsiAge
+            var legacy = ScanFeed.Poll(file, actor.MatchId, unix);
+            var plus = Snap(609);
+            var witness = new MatchWitness(actor.MatchId, actor.Team, actor.Hero, 609, "playing", false);
+            check(legacy.Status.Sample is { Clock: 609, WardClock: 609.75, GsiAgeMs: null } stamp &&
+                  !TeamScanCursor.Fits(stamp, witness, plus, plus.ReceivedAt, unix) &&
+                  TeamScanCursor.Fits(stamp, witness with { Clock = 610 }, plus, plus.ReceivedAt, unix),
+                "legacy sub-second counts survive but cannot be consumed before the participant clock catches up");
+            Write(609, withinSecond, gsiAge: 0); // current envelopes date the actual capture, including at a whole second
+            var precise = ScanFeed.Poll(file, actor.MatchId, unix);
+            check(precise is { Board: not null, Status.Sample.WardClock: 609 } && precise.Wards.Count == 0,
+                "a future count in a precise scan drops that list, not the independent equipment row");
+            Write(609.75, withinSecond, gsiAge: 0);
+            check(ScanFeed.Poll(file, actor.MatchId, unix).Wards[Lion] is [{ First: 609.25, Clock: 609.75 }],
+                "a read exactly at the sub-second capture boundary is retained");
         }
         finally { Directory.Delete(dir, true); }
 
@@ -229,7 +281,7 @@ internal static class WardTests
         }
         check(alerts is [{ Text: "razor 离开视野 · 最后在我方下路一塔大野" }], "a vision alert names the 7.42 camp it was last seen at");
 
-        // --- Where the game machine draws the marks.
+        // --- Local layout previews are independent of authorization to draw a live mark.
         var settings = new GameOverlaySettings();
         check(settings is { ShowWards: true, MinimapRight: false, MinimapSize: 100 } &&
               settings.Minimap(1920, 1080) == new MinimapLayout(1920, 1080, 0, 840, 240) &&

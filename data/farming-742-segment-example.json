@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic offline scenario, NOT a live match or evidence that good_2 currently contains centaurs. From good_1 to a supplied attack position for good_2. Verify sight, range, contact delay and living pack yourself.",
+  "patch": "7.42",
+  "mapBuild": 6989,
+  "departureGameSeconds": 610,
+  "from": { "x": 3978, "y": -5027 },
+  "attackPosition": { "x": 4649, "y": -3699 },
+  "effectiveMoveSpeed": 370,
+  "arrivalToFirstHitSeconds": 0.55,
+  "camp": {
+    "scope": "full-unstacked",
+    "policy": "uninterrupted-attacks",
+    "units": ["centaur_khan", "centaur_outrunner", "centaur_outrunner"],
+    "attacker": { "hero": "luna", "damage": [110, 116], "attackSpeed": 180, "weapon": "none", "glaives": 3 },
+    "formation": { "glaive": "all", "hopSeconds": 0 }
+  }
+}

@@ -1,0 +1,84 @@
+<UserControl x:Class="DotaCoach.TwoPc.MatchReviewPane" x:ClassModifier="internal"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:DotaCoach.TwoPc">
+    <Border Padding="12,8,12,10" Margin="0,0,3,0" Background="#192330" CornerRadius="5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="Heading" Foreground="#59DDBC" FontSize="18" FontWeight="SemiBold"/>
+            <TextBlock x:Name="Explanation" Grid.Row="1" Foreground="#C3D0DD" Margin="0,2,0,4" TextWrapping="Wrap"/>
+            <Expander x:Name="SnapshotBox" Grid.Row="2" Header="游标处的最后观察 · 本人 / 装备 / 眼位"
+                      Foreground="White" Margin="0,0,0,5">
+                <StackPanel>
+                    <DockPanel x:Name="RosterPicker" Visibility="Collapsed" Margin="0,3,0,3">
+                        <ComboBox x:Name="HeroSlot" Width="138" DockPanel.Dock="Right" AutomationProperties.Name="查看录像英雄槽位"/>
+                        <TextBlock x:Name="FrameCaption" Foreground="#D1DDE9" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                    </DockPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <StackPanel x:Name="SketchBox" Visibility="Collapsed" Margin="0,0,6,0">
+                            <local:MatchReviewMap x:Name="Sketch" Width="99" Height="99"
+                                ToolTip="北向上。绿：天辉；红：夜魇；数字：玩家槽；黄框：最近录像眼事件（+ 放置 / × 移除），不是现存眼列表。未知位置不画点。"/>
+                            <StackPanel x:Name="SketchLegend">
+                                <TextBlock Text="北 ↑　坐标示意" Foreground="#BDCAD7" HorizontalAlignment="Center" FontSize="11"/>
+                                <TextBlock Text="绿天辉 / 红夜魇" Foreground="#BDCAD7" HorizontalAlignment="Center" FontSize="10"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <TextBox x:Name="SnapshotText" Grid.Column="1" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="115"
+                                 VerticalScrollBarVisibility="Auto" AutomationProperties.Name="游标处的最后观察或录像英雄快照"/>
+                    </Grid>
+                </StackPanel>
+            </Expander>
+            <Grid Grid.Row="3">
+                <ListBox x:Name="Events" Background="#101822" BorderBrush="#394958" BorderThickness="1"
+                         HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                         AutomationProperties.Name="截至游标的事件">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bar" Padding="8,4" BorderBrush="#293644" BorderThickness="0,0,0,1">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bar" Property="Background" Value="#273849"/></Trigger>
+                                            <Trigger Property="IsSelected" Value="True"><Setter TargetName="Bar" Property="Background" Value="#314D60"/></Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <DockPanel>
+                                    <TextBlock Text="{Binding When}" Foreground="#BFD7F2" FontFamily="Consolas" Margin="0,0,10,0"/>
+                                    <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                </DockPanel>
+                                <TextBlock Text="{Binding Origin}" Foreground="#B9CDD9" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Preview}" Foreground="#E0E7EF" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock x:Name="EmptyText" Text="截至游标，此筛选下没有事件。" Foreground="#B6C4D3"
+                           Margin="12" TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False"/>
+            </Grid>
+            <DockPanel Grid.Row="4" Margin="0,4,0,3">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="Newer" Content="较新页"/><Button x:Name="Older" Content="较早页"/>
+                </StackPanel>
+                <TextBlock x:Name="PageText" Foreground="#C3D0DD" VerticalAlignment="Center" TextWrapping="Wrap"/>
+            </DockPanel>
+            <TextBox x:Name="DetailText" Grid.Row="5" Height="83" IsReadOnly="True" TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto" AutomationProperties.Name="选中事件的时间、来源和详情"/>
+        </Grid>
+    </Border>
+</UserControl>

@@ -15,16 +15,14 @@ internal static partial class Program
     private static int passed;
     [STAThread] public static void Main(string[] args)
     {
+        if (args.FirstOrDefault() == "-I") { ScannerStandIn(args); return; } // child fixture; no WPF, Python or Dota
         bool trial = args.Length == 3 && args[0] == "--panel-trial";
         // The trial draws over the real game like the shipped client: per-monitor DPI aware, hardware rendering.
         if (trial) SetProcessDpiAwarenessContext(-4);
         else RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         if (args is ["--game-controls"]) {
-            var game = new GameWindowUi(); // Inspect the logical tree without showing a window or connecting.
-            CheckGameControls(game);
-            if (Field<CancellationTokenSource?>(game,"active") != null || Field<GsiReceiver?>(game,"gsi") != null)
-                throw new Exception("Idle game client must not start a connection or GSI receiver");
-            Console.WriteLine("PASS idle client: normal controls and creep HP switch present; no video controls, lane controls or overlay worker");
+            CheckDefaultProfiles(); // No visible window, pairing, game or GSI installation.
+            Console.WriteLine("PASS fresh and v0.4.x profiles start in participant GSI mode with local HP off and no video or practice worker");
             return;
         }
         if (args is ["--offline-practice"]) { OfflinePractice(); return; }
@@ -34,7 +32,26 @@ internal static partial class Program
         app.Startup += async (_, _) => {
             try {
                 if (trial) { await PanelTrial(args[1], args[2]); Console.WriteLine($"Enemy panel trial on the real Dota window: {passed} checks passed."); }
-                else if (args.Contains("--real-dota")) { await RealDota(); Console.WriteLine($"Real Dota window pipeline: {passed} checks passed."); }
+                else if (args.FirstOrDefault() == "--match-full-journey") await MatchFullJourney.Run(args);
+                else if (args is ["--participant-board"]) { await ParticipantBoardChecks(); Console.WriteLine($"Participant board: {passed} checks passed."); }
+                else if (args.FirstOrDefault() == "--minute-route") {
+                    MinuteRouteChecks(args.ElementAtOrDefault(1) ?? ".tmp/minute-route-qa", args.ElementAtOrDefault(2));
+                    Console.WriteLine($"Off-screen minute route: {passed} checks passed.");
+                }
+                else if (args.FirstOrDefault() == "--minute-live-loop") { await MinuteLiveLoopTests(); Console.WriteLine($"WPF minute live loop: {passed} checks passed."); }
+                else if (args is ["--model-providers"]) { await ModelProviderChecks(); Console.WriteLine($"Offline WPF model providers: {passed} checks passed."); }
+                else if (args is ["--team-intel", var output]) {
+                    Directory.CreateDirectory(output);
+                    await SpectatorPanel(output, Assembly.Load("DotaCoach.CoachClient").GetType("DotaCoach.TwoPc.CoachWindow")!, isolated: true);
+                    Console.WriteLine($"Synthetic Plus receiver → coach → match state: {passed} checks passed.");
+                }
+                else if (args is ["--status-only", var statusOutput]) {
+                    await StatusOnly(statusOutput, Assembly.Load("DotaCoach.CoachClient").GetType("DotaCoach.TwoPc.CoachWindow")!, typeof(GameWindowUi), isolated: true);
+                    Console.WriteLine($"Offline legacy status: {passed} checks passed.");
+                }
+                else if (args is ["--real-dota"]) { await RealDota(); Console.WriteLine($"Real Dota window pipeline: {passed} checks passed."); }
+                else if (args.FirstOrDefault()?.StartsWith("--", StringComparison.Ordinal) == true)
+                    throw new ArgumentException("Unknown UI test option or missing arguments: " + args[0]);
                 else { await Run(args.FirstOrDefault() ?? ".tmp/twopc-ui"); Console.WriteLine($"Two native WPF clients: {passed} UI checks passed."); }
                 app.Shutdown(0);
             }
@@ -126,22 +143,38 @@ internal static partial class Program
     }
     private static void Click(Window w, string content) => Children(w).OfType<Button>()
         .Single(b => Equals(b.Content, content)).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    private static void SelectSource(Window game, string prefix)
+    {
+        var source = Field<ComboBox>(game, "source");
+        source.SelectedItem = source.Items.Cast<string>().Single(s => s.StartsWith(prefix, StringComparison.Ordinal));
+    }
+    private static void CheckDefaultProfiles()
+    {
+        var dir = Directory.CreateTempSubdirectory("game-controls-");
+        try {
+            var video = Path.Combine(dir.FullName, "game-video.json");
+            foreach (bool upgrade in new[] { false, true }) {
+                // The old file records encoder preferences, not consent to capture the next game.
+                if (upgrade) new GameVideoSettings { Fps = 120, Resolution = "native", Encoder = "software" }.Save(video);
+                var game = new GameWindowUi(null, dir.FullName, video, Path.Combine(dir.FullName, "overlay.json"));
+                try { CheckGameControls(game); } finally { game.Close(); }
+            }
+        } finally { dir.Delete(true); }
+    }
     private static void CheckGameControls(Window game)
     {
         var controls = Children(game).ToArray();
-        var sections = controls.OfType<Expander>().Select(e => e.Header as string).ToArray();
-        string settings = Features.VideoUpload ? "设置：画面来源、视频、Dota 目录" : "设置：Dota 目录";
-        // The creep HP numbers (CreepHpDisplay) are back as their own switch; the old lane overlay and its shortcuts are not.
-        if (!sections.SequenceEqual(new[]{"小兵血量：本机实时显示", "游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", settings, "Debug"}) ||
-            !controls.OfType<Button>().Any(b => Equals(b.Content,"连接")) ||
-            !controls.OfType<Button>().Any(b => Equals(b.Content,"显示小兵血量")) ||
-            controls.OfType<Button>().Any(b => b.Content is "停止显示血量" or "试算") ||
+        var source = Field<ComboBox>(game, "source");
+        if (!controls.OfType<Expander>().Select(e => e.Header as string).SequenceEqual([
+                "小兵血量：本机实时显示", "游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", "设置：画面来源、视频、Dota 目录", "Debug"]) ||
+            !controls.OfType<Button>().Any(b => Equals(b.Content, "连接")) || !controls.OfType<Button>().Any(b => Equals(b.Content, "显示小兵血量")) ||
+            controls.OfType<Button>().Any(b => b.Content is "试算" or "开始本机练习" or "停止显示血量") ||
             typeof(GameWindowUi).Assembly.GetType("DotaCoach.TwoPc.LastHitPractice") != null)
-            throw new Exception("Game client should ship only its normal controls and the creep HP switch, without the experimental lane overlay");
-        // Video off (the shipped default): no preview, picture source, video settings or transfer rates.
-        if (!Features.VideoUpload && new DependencyObject[] { Field<Grid>(game, "preview"), Field<ComboBox>(game, "source"),
-                Field<ComboBox>(game, "fpsChoice"), Field<TextBlock>(game, "metrics"), Field<TextBlock>(game, "videoNote") }.Any(controls.Contains))
-            throw new Exception("With video off the game client must not show any video control");
+            throw new Exception("The normal client must retain local creep HP but must not ship the experimental practice UI or worker");
+        if (!controls.Contains(source) || source.SelectedItem is not string mode || !mode.StartsWith("仅本人 GSI", StringComparison.Ordinal) ||
+            Field<Grid>(game, "preview").Visibility != Visibility.Collapsed || controls.Contains(Field<ComboBox>(game, "fpsChoice")) ||
+            Field<CancellationTokenSource?>(game, "active") != null || Field<GsiReceiver?>(game, "gsi") != null || Field<IAsyncDisposable?>(game, "creepHp") != null)
+            throw new Exception("The initial selection must be the v0.6.1 photo-free participant route, not video, basic status or a local screen scan");
     }
     private static CheckBox DebugSwitch(Window w) => Children(w).OfType<CheckBox>()
         .Single(c => Equals(c.Content, "开启 Debug 记录"));
@@ -183,26 +216,59 @@ internal static partial class Program
         else Console.WriteLine("SKIP visual pixel QA: Windows session returned a transparent render; no screenshot claimed.");
         w.Content = content;
     }
+    private static Window OfflineCoach(Type type, string settings, string debugRoot)
+    {
+        settings = Path.GetFullPath(settings);
+        string root = Path.GetDirectoryName(settings)!;
+        new LiveCoachSettings { FoundryEnvFile = Path.Combine(root, "absent-" + Guid.NewGuid().ToString("N") + ".env") }.Save(settings);
+        var w = (Window)Activator.CreateInstance(type, [null, false, settings, debugRoot,
+            (Func<HttpMessageHandler>)(() => throw new InvalidOperationException("No network provider in the offline UI fixture"))])!;
+        Set(w, "scanFile", Path.Combine(root, "no-scan", "live.json"));
+        return w;
+    }
+    private static async Task<CoachHost> FixtureListener(Window coach, int port)
+    {
+        if (port == 0) { // Isolated subcommand: kernel-assigned port; window takes ownership as in the other WPF fixtures.
+            var host = await CoachHost.Start(IPAddress.Loopback, 0);
+            string scan = Field<string>(coach, "scanFile");
+            host.Mailbox.Icons = key => ScanFeed.Icon(scan, key);
+            Set(coach, "host", host); return host;
+        }
+        Field<TextBox>(coach, "port").Text = port.ToString(); Click(coach, "启动接收");
+        await Wait(() => Field<CoachHost?>(coach, "host")?.Port == port && !Field<bool>(coach, "busy"), "coach starts its real loopback listener");
+        return Field<CoachHost>(coach, "host");
+    }
     private static async Task Run(string output)
     {
         Directory.CreateDirectory(output);
-        Features.VideoUpload = true; // the video path is switched off in the product but kept working; StatusOnly covers the default
-
+        CheckDefaultProfiles();
+        await ModelProviderChecks();
+        await LockedWriterUi(output);
+        MinuteRouteChecks(output);
+        await ParticipantBoardChecks();
+        await MinuteLiveLoopTests();
         var coachType = Assembly.Load("DotaCoach.CoachClient").GetType("DotaCoach.TwoPc.CoachWindow")!;
         var gameType = Assembly.Load("DotaCoach.GameClient").GetType("DotaCoach.TwoPc.GameWindowUi")!;
         string debugRoot = Path.GetFullPath(Path.Combine(output, "debug"));
-        var coach = (Window)Activator.CreateInstance(coachType, [null, false, Path.Combine(output, "coach-settings.json"), debugRoot])!;
-        Set(coach, "scanFile", Path.GetFullPath(Path.Combine(output, "no-scan", "live.json"))); // never the user's scanner output
+        var coach = OfflineCoach(coachType, Path.Combine(output, "coach-settings.json"), debugRoot);
         string videoSettings = Path.GetFullPath(Path.Combine(output, "game-video.json"));
         string overlaySettings = Path.GetFullPath(Path.Combine(output, "game-overlay.json"));
         File.Delete(overlaySettings);
         var game = (Window)Activator.CreateInstance(gameType, [null, debugRoot, videoSettings, overlaySettings])!;
-        // Exercise packaged UI handlers without desktop input, clipboard, real game capture or AI.
+        // Inspect the normal client's replacement for the retired practice pane. Opening local HP settings
+        // must not start a screen scan, GSI or a connection; the tower calculation lives in LastHitTests.
         coach.Show(); game.Show();
         await Wait(() => Children(coach).Concat(Children(game)).OfType<Expander>().All(e => !e.IsExpanded) &&
-            Children(coach).OfType<Expander>().Count() == 4 && Children(game).OfType<Expander>().Count() == 4,
-            "rarely used settings start collapsed (game: creep HP, in-game display, settings and Debug)");
+            Children(coach).OfType<Expander>().Select(e => e.Header as string).SequenceEqual(
+                ["模型设置", "小地图校准", "Plus 实时观战（实验）", "对局档案与复盘", "Debug"]),
+            "all settings, including the match review launcher, start collapsed");
         CheckGameControls(game);
+        var hp = Children(game).OfType<Expander>().Single(e => Equals(e.Header, "小兵血量：本机实时显示"));
+        hp.IsExpanded = true;
+        await Wait(() => Field<Button>(game, "creepHpButton").IsEnabled && Field<IAsyncDisposable?>(game, "creepHp") == null &&
+            Field<CancellationTokenSource?>(game, "active") == null && Field<GsiReceiver?>(game, "gsi") == null,
+            "opening the local creep HP controls does not start capture, pairing or GSI");
+        hp.IsExpanded = false;
         await Wait(() => DebugSwitch(coach).IsChecked != true && DebugSwitch(game).IsChecked != true &&
             !Directory.Exists(debugRoot), "Debug is opt-in and creates no recording directory while off");
         DebugSwitch(coach).IsChecked = true; DebugSwitch(game).IsChecked = true;
@@ -238,8 +304,8 @@ internal static partial class Program
         Click(coach, "发送测试提醒");
         await Wait(() => Field<TextBlock>(coach, "notice").Text.StartsWith("未发送"), "test reminder is refused before any frame arrives");
         Field<PasswordBox>(game, "pairing").Password = host.Pair(IPAddress.Loopback).Encode();
-        Field<ComboBox>(game, "source").SelectedIndex = 1;
-        await Wait(() => Field<ComboBox>(game, "fpsChoice").SelectedItem as string == "60 fps" &&
+        SelectSource(game, "诊断视频");
+        await Wait(() => Field<Grid>(game, "preview").Visibility == Visibility.Visible && Field<ComboBox>(game, "fpsChoice").SelectedItem as string == "60 fps" &&
             Field<ComboBox>(game, "resolutionChoice").SelectedIndex == 2 && Field<ComboBox>(game, "captureChoice").SelectedIndex == 0,
             "game UI defaults to 60 fps, 1080p and background-capable window capture");
         Field<TextBox>(game, "bitrateChoice").Text = "abc";
@@ -273,9 +339,7 @@ internal static partial class Program
         host.Mailbox.ClearReminder();
         await Wait(() => Field<Canvas>(game, "marks").Children.Count == 0 &&
             Field<TextBlock>(game, "caption").Text.Contains("无有效提醒"), "a cleared reminder clears game caption and marker");
-        Set(coach, "nextScanPoll", long.MaxValue); // the coach would replace the test's enemy panel with its own (none)
         await GameOverlay(output, game, host, overlaySettings);
-        Set(coach, "nextScanPoll", 0L);
         await Task.Delay(500);
         Click(coach, "发送测试提醒");
         await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("双机链路测试") &&
@@ -311,7 +375,7 @@ internal static partial class Program
             !recordedGame.Contains("frame-captured") && recordedCoach.Contains("reminder-published") && recordedCoach.Contains("frame-sampled") &&
             !recordedGame.Contains("\"ticket\"") && !recordedCoach.Contains("DCP1."),
             "Debug correlates received/published reminders without leaking pairing or capture tickets");
-        var emptyCoach = (Window)Activator.CreateInstance(coachType)!;
+        var emptyCoach = OfflineCoach(coachType, Path.Combine(output, "unused-profile", "settings.json"), debugRoot);
         var emptyGame = (Window)Activator.CreateInstance(gameType)!;
         emptyCoach.Show(); emptyGame.Show(); emptyCoach.Close(); emptyGame.Close();
         await Wait(() => !emptyGame.IsVisible && !emptyCoach.IsVisible, "unused clients close without reentrant-close errors");
@@ -320,53 +384,55 @@ internal static partial class Program
         await StatusOnly(output, coachType, gameType);
     }
 
-    /// <summary>
-    /// The shipped default, video off: the game client sends only its own GSI and window size. The coach still delivers
-    /// its link-test subtitle and the enemy panel; neither window shows video, model or calibration controls.
-    /// </summary>
-    private static async Task StatusOnly(string output, Type coachType, Type gameType)
+    /// <summary>Legacy status is still selectable and carries ordinary subtitles, not participant proof.
+    /// The default participant GSI transport and the positive board round trip are in ParticipantBoardChecks.</summary>
+    private static async Task StatusOnly(string output, Type coachType, Type gameType, bool isolated = false)
     {
-        Features.VideoUpload = false;
         string debugRoot = Path.GetFullPath(Path.Combine(output, "status-debug"));
-        var coach = (Window)Activator.CreateInstance(coachType, [null, false, Path.Combine(output, "status-coach.json"), debugRoot])!;
-        Set(coach, "scanFile", Path.GetFullPath(Path.Combine(output, "no-scan", "live.json")));
+        var coach = OfflineCoach(coachType, Path.Combine(output, "status-coach.json"), debugRoot);
         var game = (Window)Activator.CreateInstance(gameType, [null, debugRoot, Path.Combine(output, "status-video.json"),
             Path.Combine(output, "status-overlay.json")])!;
         coach.Show(); game.Show();
         CheckGameControls(game);
-        var coachControls = Children(coach).ToArray();
-        await Wait(() => coachControls.OfType<Expander>().Select(e => e.Header as string).SequenceEqual(["Plus 实时观战（实验）", "Debug"]) &&
-            !coachControls.Contains(Field<Grid>(coach, "preview")) && coachControls.Contains(Field<TextBox>(coach, "subtitleSeconds")),
-            "video off: no preview, video, model or calibration controls; the subtitle time moves to the Plus panel");
-        Field<TextBox>(coach, "port").Text = "38482"; Click(coach, "启动接收");
-        await Wait(() => Field<CoachHost?>(coach, "host") != null && !Field<bool>(coach, "busy"), "status-only coach starts its listener");
-        var host = Field<CoachHost>(coach, "host");
-        await Wait(() => host.Mailbox.VideoJpegEncoder == null && !Field<bool>(coach, "modelConfigured"),
-            "the coach has no video decoder (video streams are refused) and no model");
-        Field<PasswordBox>(game, "pairing").Password = host.Pair(IPAddress.Loopback).Encode();
+        SelectSource(game, "基础状态");
+        await Wait(() => Field<Grid>(game, "preview").Visibility == Visibility.Collapsed &&
+            Field<TextBlock>(game, "metrics").Visibility == Visibility.Collapsed && !Children(game).Contains(Field<ComboBox>(game, "fpsChoice")) &&
+            Field<Button>(game, "creepHpButton").IsEnabled, "basic status does not need video controls and does not start local creep recognition");
+        var host = await FixtureListener(coach, isolated ? 0 : 38482);
+        var pair = host.Pair(IPAddress.Loopback);
         if (DotaCoach.Desktop.GameWindow.Find(out _) == null) {
-            Click(game, "连接");
-            await Wait(() => Field<TextBlock>(game, "status").Text.Contains("等待 Dota 2 窗口") &&
-                host.Mailbox.Snapshot() is { SessionId: not null, Connected: false }, "without a Dota window the game client connects but reports nothing");
-            Click(game, "断开");
-            await Wait(() => Field<CancellationTokenSource?>(game, "active") == null && host.Mailbox.Snapshot().SessionId == null,
-                "disconnecting while waiting for Dota ends the session");
+            // Exercise the real no-window status loop, not Start(): nothing installs a cfg or opens the player's GSI port.
+            var runStatus = gameType.GetMethod("RunStatus", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .CreateDelegate<Func<Pairing, bool, CancellationToken, Task>>(game);
+            using var stop = new CancellationTokenSource();
+            var waiting = runStatus(pair, false, stop.Token);
+            try {
+                await Wait(() => Field<TextBlock>(game, "status").Text.Contains("等待 Dota 2 窗口") &&
+                    host.Mailbox.Snapshot() is { SessionId: not null, Connected: false, Frames: 0 },
+                    "without a Dota window basic status connects but sends nothing");
+            } finally { stop.Cancel(); await waiting; }
+            await Wait(() => host.Mailbox.Snapshot().SessionId == null, "disconnecting while waiting for Dota ends the session");
         }
-        Field<ComboBox>(game, "source").SelectedIndex = 1; // diagnostic: no Dota window needed
-        Click(game, "连接");
-        await Wait(() => host.Mailbox.Snapshot() is { Connected: true, Frames: >= 3, Bytes: 0 } && host.Mailbox.Latest() is { HasImage: false } &&
-            Field<TextBlock>(coach, "status").Text.Contains("不传画面") && Field<TextBlock>(game, "status").Text.StartsWith("已连接"),
-            "the game client connects and keeps reporting without sending any picture");
+        SelectSource(game, "诊断状态");
+        Field<PasswordBox>(game, "pairing").Password = pair.Encode(); Click(game, "连接");
+        await Wait(() => host.Mailbox.Snapshot() is { Connected: true, Frames: >= 3, Bytes: 0 } &&
+            host.Mailbox.Latest() is { HasImage: false, Jpeg.Length: 0, Video: null, Meta: { Player: null, MatchPhase: null } } &&
+            Field<TextBlock>(game, "status").Text.StartsWith("已连接") && Field<GsiReceiver?>(game, "gsi") == null &&
+            Field<Image>(coach, "image").Source == null && Field<Image>(game, "image").Source == null && Field<int>(coach, "modelCalls") == 0,
+            "diagnostic status keeps presence without GSI, pictures, preview or model attempts");
         Click(coach, "发送测试提醒");
         await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("双机链路测试") && Field<TextBlock>(coach, "notice").Text.StartsWith("已发送"),
             "the coach's test subtitle reaches the game client without video");
-        var plus = coachControls.OfType<Expander>().First();
+        var plus = Children(coach).OfType<Expander>().Single(e => Equals(e.Header, "Plus 实时观战（实验）"));
         plus.IsExpanded = true; Render(coach, Path.Combine(output, "coach-status-only.png")); plus.IsExpanded = false;
         Render(game, Path.Combine(output, "game-status-only.png"));
-        Set(coach, "nextScanPoll", long.MaxValue); // the coach would replace the test's enemy panel with its own (none)
-        host.Mailbox.SetEnemies(new([new("npc_dota_hero_razor", 12, ["item_blink", null, null, null, null, null], null, 3)]));
-        await Wait(() => Member<EnemyBoard?>(Field<AdviceOverlay>(game, "overlay"), "enemies") is { Heroes: [{ Level: 12 }] },
-            "the enemy panel reaches the game client without video");
+        var board = HudBoard(MinimapLayout.Suggest(1280, 720));
+        host.Mailbox.SetEnemies(board);
+        string session = host.Mailbox.Snapshot().SessionId!;
+        var overlay = Field<AdviceOverlay>(game, "overlay");
+        await Wait(() => host.Mailbox.Enemies(session) == null && host.Mailbox.Icon(session, "item_blink") == null &&
+            Member<EnemyBoard?>(overlay, "enemies") == null && overlay.BoardForDisplay == null,
+            "ordinary status subtitles confer no right to an equipment/ward board or its icons");
         Click(game, "断开");
         await Wait(() => host.Mailbox.Snapshot().SessionId == null && Field<CancellationTokenSource?>(game, "active") == null &&
             Field<TextBlock>(game, "status").Text.Contains("已断开"), "disconnecting ends the status session");
@@ -375,9 +441,8 @@ internal static partial class Program
     }
 
     /// <summary>
-    /// Game-side subtitle and enemy panel style through the real panel controls, the enemy panel and its icons through
-    /// the real client loop, then the overlay's own drawing code rendered off screen (the live overlay is excluded
-    /// from screen capture, so its pixels cannot be checked any other way).
+    /// Styles through the real controls, no board on diagnostic video, then the drawing code with fixture art
+    /// off screen. ParticipantBoardChecks exercises the real game-client poll on authenticated participant GSI.
     /// </summary>
     private static async Task GameOverlay(string output, Window game, CoachHost host, string file)
     {
@@ -400,13 +465,17 @@ internal static partial class Program
         host.Mailbox.ClearReminder();
         var icons = new Dictionary<string, byte[]> {
             ["npc_dota_hero_razor"] = SolidPng(Colors.Red, 32, 32), ["item_blink"] = SolidPng(Colors.Blue, 88, 64) };
-        host.Mailbox.Icons = key => icons.GetValueOrDefault(key);
+        int iconQueries = 0;
+        host.Mailbox.Icons = key => { Interlocked.Increment(ref iconQueries); return icons.GetValueOrDefault(key); };
         var board = new EnemyBoard([new("npc_dota_hero_razor", 12, ["item_blink", null, null, null, null, null], null, 3),
             new("npc_dota_hero_lion", 9, [null, null, null, null, null, null], null, 75), new("npc_dota_hero_pudge", null, null, null, null)]);
         host.Mailbox.SetEnemies(board);
-        await Wait(() => Member<EnemyBoard?>(overlay, "enemies") is { Heroes: [{ Level: 12 }, _, _] } && overlay.Icons.Count == 2 &&
-            overlay.Icons["item_blink"] is BitmapSource { PixelWidth: 88 },
-            "the game client fetches the enemy panel and its icons from the coach; a hero without an icon is retried later");
+        await Task.Delay(1000);
+        await Wait(() => host.Mailbox.Enemies(latest.Meta.SessionId) == null && Member<EnemyBoard?>(overlay, "enemies") == null &&
+            overlay.BoardForDisplay == null && Volatile.Read(ref iconQueries) == 0,
+            "diagnostic video cannot deliver an unbound synthetic board or probe scanner icons");
+        var styleIcons = new IconCache();
+        foreach (var (key, png) in icons) styleIcons.Add(key, png, 0); // Offscreen fixture, never a live board.
         // A release bundles the icons beside the program: those are never asked for; anything else still is.
         string bundle = Path.Combine(output, "bundled-icons");
         Directory.CreateDirectory(bundle);
@@ -417,33 +486,44 @@ internal static partial class Program
         await Wait(() => bundled["npc_dota_hero_lion"] is BitmapSource { PixelWidth: 32 } &&
             bundled.Missing(board, 0).SequenceEqual(["npc_dota_hero_razor", "npc_dota_hero_pudge"]) && bundled.Count == 2,
             "bundled icons load from the program folder; missing or broken ones are asked from the coach");
+
+        // A saved local preview ruler is NOT a calibration. Render the same four legacy estimate cases
+        // only on a match-labelled, confirmed HUD: even the best estimate is hollow, not a sighting.
         WardMark[] marks = [new("npc_dota_hero_lion", "observer", .25, .25, 0, .6, 20, 340), new("npc_dota_hero_lion", "observer", .75, .25, 1, .3, 20, 340),
             new("npc_dota_hero_lion", "sentry", .25, .75, 0, 1, 50, 370), new("npc_dota_hero_pudge", "ward", .75, .75, 0, 1, 380, 40, Rough: true)];
-        host.Mailbox.SetEnemies(new([], marks));
-        await Wait(() => Member<EnemyBoard?>(overlay, "enemies") is { Heroes: [], Wards: [{ Kind: "observer", Rank: 0 }, _, _, { Rough: true }] },
-            "ward guesses reach the game client without an enemy panel");
-        // The marks as the overlay draws them over a 300-unit minimap: a filled gold ring for the likeliest observer spot,
-        // a filled blue one for the sentry, dashed rings (no fill) for the second observer spot and the rough guess.
-        var minimap = AdviceOverlay.WardMarks(marks, 300, 1.5, outline: true);
+        var confirmed = new MinimapLayout(1280, 720, 10, 410, 300);
+        var wards = new EnemyBoard([], marks, BoardMatch, "radiant", confirmed, [new("sentry", "dire", 2368, -2368)]);
+        Canvas WardCanvas(EnemyBoard b) {
+            var c = new Canvas { Width = 1280, Height = 720 };
+            AdviceOverlay.Compose(c, null, panel.Current, 1.5, b, viewport: (1280, 720));
+            return c;
+        }
+        var minimap = WardCanvas(wards).Children.OfType<Canvas>().Single();
+        await Wait(() => Canvas.GetLeft(minimap) == confirmed.Left && Canvas.GetTop(minimap) == confirmed.Top &&
+            minimap.Width == confirmed.Size && WardCanvas(wards with { Minimap = null }).Children.Count == 0,
+            "the local right/120% preview preference neither moves the confirmed left HUD nor substitutes for missing calibration");
         minimap.Measure(new Size(300, 300)); minimap.Arrange(new Rect(0, 0, 300, 300)); minimap.UpdateLayout();
         var wardBitmap = new RenderTargetBitmap(300, 300, 96, 96, PixelFormats.Pbgra32);
         wardBitmap.Render(minimap);
-        var wardPixels = new byte[300 * 300 * 4];
-        wardBitmap.CopyPixels(wardPixels, 300 * 4, 0);
+        var wardPixels = new byte[300 * 300 * 4]; wardBitmap.CopyPixels(wardPixels, 300 * 4, 0);
         using (var stream = File.Create(Path.Combine(output, "ward-marks.png"))) {
             var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(wardBitmap)); encoder.Save(stream);
         }
-        byte[] Mark(double x, double y) { int i = ((int)y * 300 + (int)x) * 4; return wardPixels[i..(i + 4)]; }
-        await Wait(() => Mark(75, 75) is [< 60, > 70, > 90, > 100] && Mark(75, 225) is [> 90, > 60, < 60, > 100] &&
-            Mark(225, 75)[3] < 40 && Mark(225, 225)[3] < 40 && Enumerable.Range(100, 60).Any(x => Mark(x, 1)[0] > 150),
-            "ward marks: likeliest spots filled in the ward colour, other candidates and rough guesses as empty rings, the minimap outlined");
+        byte[] Pixel(int x, int y) { int i = (y * 300 + x) * 4; return wardPixels[i..(i + 4)]; }
+        bool Rim(int x, int y, Func<byte[], bool> color) => Enumerable.Range(x - 20, 41).Any(i =>
+            Enumerable.Range(y - 20, 41).Any(j => color(Pixel(i, j))));
+        bool Gold(byte[] p) => p is [< 60, > 75, > 100, > 100];
+        await Wait(() => new[] { (75, 75), (225, 75), (75, 225), (225, 225) }.All(v => Pixel(v.Item1, v.Item2)[3] == 0) &&
+            Rim(75, 75, Gold) && Rim(225, 75, Gold) && Rim(75, 225, p => p is [> 100, > 65, < 60, > 100]) &&
+            Rim(225, 225, p => p is [> 80, > 80, > 80, > 80]) && Pixel(187, 187) is [> 160, > 120, < 60, > 180],
+            "observer/sentry, lower-ranked and rough guesses have coloured rims and empty centres; only the observed sentry has a filled centre");
 
         const int W = 1280, H = 720;
         var alert = new Reminder("a", "s", 1, "local-vision-observation", "剃刀 离开视野 · 最后在中路；主宰 新装备 狂战斧", null, W, H, 3000);
         (Canvas Canvas, byte[] Pixels) Draw(GameOverlaySettings style, Reminder? r, string? png = null, EnemyBoard? enemies = null)
         {
             var canvas = new Canvas { Width = W, Height = H };
-            AdviceOverlay.Compose(canvas, r, style, 1, enemies, key => overlay.Icons[key]);
+            AdviceOverlay.Compose(canvas, r, style, 1, enemies, key => styleIcons[key]);
             canvas.Measure(new Size(W, H)); canvas.Arrange(new Rect(0, 0, W, H)); canvas.UpdateLayout();
             var bitmap = new RenderTargetBitmap(W, H, 96, 96, PixelFormats.Pbgra32);
             bitmap.Render(canvas);
@@ -644,8 +724,7 @@ internal static partial class Program
     {
         string env = Path.Combine(output, "fake-model.env");
         File.WriteAllText(env, "AOAI_ENDPOINT=https://unit-test.openai.azure.com/\nFOUNDRY_KEY=unit-test-only\n");
-        var w = (Window)Activator.CreateInstance(coachType, [null, false, Path.Combine(output, "live-settings.json"),
-            Path.Combine(output, "live-debug")])!;
+        var w = OfflineCoach(coachType, Path.Combine(output, "live-settings.json"), Path.Combine(output, "live-debug"));
         w.Show();
         DebugSwitch(w).IsChecked = true;
         string debugDirectory = Recorder(w)!.DirectoryPath;
@@ -672,7 +751,8 @@ internal static partial class Program
             var ticket = host.Mailbox.Issue(session);
             host.Mailbox.Accept(new(session, ticket.Id, ++sequence, "dota2", 3840, 2160,
                 new OwnState("9876543210", "npc_dota_hero_luna", "radiant", 720, true, 1200, 500, -2000, -3000,
-                    [new("item_power_treads", null, 0)], [new("luna_moon_glaive", 4, 0)]), 10), jpeg);
+                    [new("item_power_treads", null, 0)], [new("luna_moon_glaive", 4, 0)]), 10,
+                new MatchWitness("9876543210", "radiant", "npc_dota_hero_luna", 720, "playing", false)), jpeg);
         }
         Frame();
         await Wait(() => host.Mailbox.Poll(session)?.Kind == "visible-farming-advice",
@@ -752,10 +832,15 @@ internal static partial class Program
     }
 
     /// <summary>The real coach panel against a fake Dota folder and a synthetic Plus feed; never the user's cfg.</summary>
-    private static async Task SpectatorPanel(string output, Type coachType)
+    private static async Task SpectatorPanel(string output, Type coachType, bool isolated = false)
     {
-        var w = (Window)Activator.CreateInstance(coachType, [null, false, Path.Combine(output, "spectator-settings.json"),
-            Path.Combine(output, "spectator-debug")])!;
+        // This simulated match starts at 2:05 on Dire. The separate image-model fixture in the
+        // parent directory intentionally uses the same dummy ID at 12:00. Do not mix perspectives
+        // or reuse its durable high-water mark; a real archive must reject that rewind.
+        output = Directory.CreateDirectory(Path.Combine(output, "spectator-profile-" + Guid.NewGuid().ToString("N"))).FullName;
+        var w = OfflineCoach(coachType, Path.Combine(output, "spectator-settings.json"), Path.Combine(output, "spectator-debug"));
+        string live = Path.GetFullPath(Path.Combine(output, "scan-live.json"));
+        Set(w, "scanFile", live); // including the initial delay test: never poll the user's real live.json
         w.Show();
         string fakeInstall = Path.GetFullPath(Path.Combine(output, "fake-dota-coach"));
         Directory.CreateDirectory(Path.Combine(fakeInstall, "game/dota"));
@@ -785,17 +870,17 @@ internal static partial class Program
             t.Contains("夜魇") && t.Contains("视野内敌方英雄 1") && t.Contains("视野内野怪 1") && t.Contains("等待游戏机"),
             "panel shows the Plus view, its team, visible enemies/camps and waits for the game side");
         // Game side: own GSI clock riding on accepted frames; Plus side lags each second by ~150 ms.
-        Field<TextBox>(w, "port").Text = "38481"; Click(w, "启动接收");
-        await Wait(() => Field<CoachHost?>(w, "host") != null && !Field<bool>(w, "busy"), "coach listener for delay wiring test");
-        var host = Field<CoachHost>(w, "host");
+        var host = await FixtureListener(w, isolated ? 0 : 38481);
         string session = host.Mailbox.Begin().SessionId;
         var bitmap = BitmapSource.Create(1280, 720, 96, 96, PixelFormats.Bgr24, null, new byte[1280 * 720 * 3], 1280 * 3);
         var encoder = new JpegBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var jpegStream = new MemoryStream(); encoder.Save(jpegStream); byte[] jpeg = jpegStream.ToArray();
+        // Bare player strings were enough for the v0.4.x panel, but are not participant proof for a live archive.
+        static MatchWitness Witness(double c) => new("9876543210", "dire", "npc_dota_hero_luna", c, "playing", false) { AgeMs = 10 };
         for (int clock = 126; clock <= 133; clock++) {
             var ticket = host.Mailbox.Issue(session);
             host.Mailbox.Accept(new(session, ticket.Id, clock, "dota2", 3840, 2160, new OwnState("9876543210", "npc_dota_hero_luna",
-                "dire", clock, true, 1200, 500, 1, 2, [], []), 10), jpeg);
+                "dire", clock, true, 1200, 500, 1, 2, [], []), 10, Witness(clock)), jpeg);
             await Task.Delay(150);
             await http.PostAsync("/spectator", new StringContent(body.Replace("\"clock_time\":125", $"\"clock_time\":{clock}")));
             await Task.Delay(150);
@@ -806,15 +891,13 @@ internal static partial class Program
             "real window measures Plus lag from game-machine frames on the coach clock");
         // Plus alerts: an enemy seen 4 s and then gone, and an item change from the scanner's live file, become the
         // game machine's subtitle. The live file is a test copy, never the user's scanner output.
-        string live = Path.GetFullPath(Path.Combine(output, "scan-live.json"));
-        Set(w, "scanFile", live);
         string without = body.Replace(",\"o1\":{\"xpos\":3,\"ypos\":4,\"team\":2,\"unitname\":\"npc_dota_hero_razor\",\"image\":\"minimap_enemyicon\",\"visionrange\":1800}", "");
         if (without == body) throw new InvalidOperationException("test body layout changed");
         long sequence = 134;
         for (int step = 0; step < 18; step++) {
             var ticket = host.Mailbox.Issue(session);
             host.Mailbox.Accept(new(session, ticket.Id, sequence++, "dota2", 3840, 2160, new OwnState("9876543210", "npc_dota_hero_luna",
-                "dire", 134 + step / 2, true, 1200, 500, 1, 2, [], []), 10), jpeg);
+                "dire", 134 + step / 2, true, 1200, 500, 1, 2, [], []), 10, Witness(134 + step / 2)), jpeg);
             await http.PostAsync("/spectator", new StringContent((step < 8 ? body : without).Replace("\"clock_time\":125", $"\"clock_time\":{134 + step / 2}")));
             await Task.Delay(500);
         }
@@ -822,14 +905,14 @@ internal static partial class Program
             r.Message.Contains("离开视野 · 最后在中路") && Field<TextBlock>(w, "alertStatus").Text.Contains("已推送"),
             "an enemy leaving the friend team's vision is pushed as a subtitle with its last area");
         File.WriteAllText(live, JsonSerializer.Serialize(new { version = 2, run = "a1", written = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0,
-            stopped = false, mode = "team-view", matchId = "9876543210", ownTeam = 3, clock = 143, selecting = true,
+            stopped = false, mode = "team-view", matchId = "9876543210", ownTeam = 3, clock = 143, gsiAge = 0, selecting = true,
             enemies = new[] { new { hero = "npc_dota_hero_razor", level = 11, age = 1.5,
                 items = new string?[] { "item_blink", null, null, null, null, null }, neutral = (string?)null } } }));
         Directory.CreateDirectory(Path.Combine(output, "icons"));
         File.WriteAllBytes(Path.Combine(output, "icons", "item_blink.png"), SolidPng(Colors.Blue, 88, 64));
         var keepAlive = host.Mailbox.Issue(session);
         host.Mailbox.Accept(new(session, keepAlive.Id, sequence++, "dota2", 3840, 2160, new OwnState("9876543210", "npc_dota_hero_luna",
-            "dire", 143, true, 1200, 500, 1, 2, [], []), 10), jpeg);
+            "dire", 143, true, 1200, 500, 1, 2, [], []), 10, Witness(143)), jpeg);
         await Wait(() => host.Mailbox.Enemies(session) is { Heroes: [{ Hero: "npc_dota_hero_razor", Level: 11 }] } &&
             host.Mailbox.Icon(session, "item_blink") is { Length: > 0 } && host.Mailbox.Icon(session, "item_bfury") == null &&
             Field<TextBlock>(w, "alertStatus").Text.Contains("已推送 1 名敌方英雄"),
@@ -838,38 +921,11 @@ internal static partial class Program
         await Wait(() => host.Mailbox.Enemies(session) == null && Field<TextBlock>(w, "alertStatus").Text.Contains("对手面板已关") &&
             LiveCoachSettings.Load(Path.Combine(output, "spectator-settings.json")).EnemyPanel == false,
             "switching the enemy panel off hides it on the game machine and is saved");
-        // 启动视觉扫描 with a stand-in scanner (the real one needs Dota); never the user's scanner files.
-        Set(w, "scanFile", Path.GetFullPath(Path.Combine(output, "scan-button", "live.json")));
-        string? repo = HeroScanProcess.FindFolder(AppContext.BaseDirectory), python = repo == null ? null : HeroScanProcess.FindPython(repo);
-        await Wait(() => Field<TextBox>(w, "scanFolder").Text == (repo ?? "") && Field<TextBox>(w, "scanPython").Text == (python ?? ""),
-            "run from a checkout, the scan's folder and Python are filled in");
-        Field<TextBox>(w, "scanFolder").Text = fakeInstall;
-        Click(w, "启动视觉扫描");
-        await Wait(() => Field<TextBlock>(w, "scanState").Text.Contains(@"scripts\vision\hero_scan.py") && Field<HeroScanProcess?>(w, "scan") == null,
-            "the scan button explains a folder without the scanner and starts nothing");
-        string fakeScanner = Path.GetFullPath(Path.Combine(output, "fake-scanner"));
-        if (python != null) {
-            Directory.CreateDirectory(Path.Combine(fakeScanner, "scripts", "vision"));
-            File.WriteAllText(Path.Combine(fakeScanner, HeroScanProcess.Script), "import sys  # scan --stop-with-stdin\nif sys.argv[1] == 'setup':\n" +
-                "    print('Wrote cfg - restart Dota once so it is loaded.')\n    sys.exit(0)\n" +
-                "print('Waiting for the Dota window...', flush=True)\nsys.stdin.buffer.read()\nopen('stopped.txt', 'a').write('stopped\\n')\n");
-            Field<TextBox>(w, "scanFolder").Text = fakeScanner;
-            Click(w, "启动视觉扫描");
-            await Wait(() => Field<TextBlock>(w, "scanState").Text is { } t && t.Contains("等待本机 Dota 启动") && t.Contains("完全退出再启动") &&
-                Equals(Field<Button>(w, "scanButton").Content, "停止视觉扫描") &&
-                LiveCoachSettings.Load(Path.Combine(output, "spectator-settings.json")) is { ScanFolder: var saved, ScanPython: var savedPython } &&
-                saved == fakeScanner && savedPython == python, "the scan button runs setup, then the scan, shows its state and remembers the paths");
-            Click(w, "停止视觉扫描");
-            await Wait(() => Field<TextBlock>(w, "scanState").Text == "视觉扫描：已停止" && File.Exists(Path.Combine(fakeScanner, "stopped.txt")) &&
-                Equals(Field<Button>(w, "scanButton").Content, "启动视觉扫描"), "the button stops the scan through its standard input");
-            Click(w, "启动视觉扫描");
-            await Wait(() => Field<TextBlock>(w, "scanState").Text.Contains("等待本机 Dota 启动"), "the scan starts again");
-        }
-        else Console.WriteLine("SKIP scan button process checks: no .tmp\\vision-tools Python in this checkout.");
+        await TeamIntelWithDeliveryOff(w, host, session, live, http, token, sequence);
+        string fakeScanner = await ScanLauncherChecks(w, output, fakeInstall);
         w.Close(); await Wait(() => !w.IsVisible && Field<SpectatorReceiver?>(w, "spectator") == null, "closing releases the spectator port");
-        if (File.Exists(Path.Combine(fakeScanner, "stopped.txt")))
-            await Wait(() => File.ReadAllLines(Path.Combine(fakeScanner, "stopped.txt")).Length == 2 && Field<HeroScanProcess?>(w, "scan") == null,
-                "closing the coach client stops the scan it started");
+        await Wait(() => File.ReadAllLines(Path.Combine(fakeScanner, "stopped.txt")).Length == 2 && Field<HeroScanProcess?>(w, "scan") == null,
+            "closing the coach client stops the second scan it started");
         string realState = GsiSetup.StateDirectoryFor("Coach");
         await Wait(() => File.Exists(Path.Combine(state, "installed-spectator-gsi.json")) &&
             (!File.Exists(Path.Combine(realState, "dota-install.txt")) ||

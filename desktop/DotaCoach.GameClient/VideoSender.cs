@@ -52,9 +52,15 @@ internal sealed class VideoSender
     }
     public void Renew(Ticket ticket) => Volatile.Write(ref lease, new(ticket, Environment.TickCount64));
 
+    public Task StartCapture(Func<IVideoSource> open, bool diagnostic, Func<long> nextSequence,
+        Func<(OwnState? Player, int? AgeMs)> ownState, CancellationToken cancellation) =>
+        StartCapture(open, diagnostic, nextSequence, () => {
+            var own = ownState(); return new GameGsiSample(own.Player, own.AgeMs, null);
+        }, cancellation);
+
     /// <summary>Runs the capture loop on its own MTA thread (D3D/WGC objects live and die there).</summary>
     public Task StartCapture(Func<IVideoSource> open, bool diagnostic, Func<long> nextSequence,
-        Func<(OwnState? Player, int? AgeMs)> ownState, CancellationToken cancellation)
+        Func<GameGsiSample> ownState, CancellationToken cancellation)
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() => {
@@ -67,7 +73,7 @@ internal sealed class VideoSender
         return done.Task;
     }
     private void CaptureLoop(Func<IVideoSource> open, bool diagnostic, Func<long> nextSequence,
-        Func<(OwnState? Player, int? AgeMs)> ownState, CancellationToken cancellation)
+        Func<GameGsiSample> ownState, CancellationToken cancellation)
     {
         using var source = open();
         sourceName = source.Name;
@@ -79,15 +85,16 @@ internal sealed class VideoSender
             var currentLease = Volatile.Read(ref lease);
             if (Environment.TickCount64 - currentLease.ReceivedAt > 1500) throw new InvalidOperationException("Video lease renewal stalled");
             // GSI snapshot and the monotonic capture instant precede the pixels they describe.
-            var own = diagnostic ? (Player: (OwnState?)null, AgeMs: (int?)null) : ownState();
             long capturedAt = Environment.TickCount64;
+            long sequence = diagnostic ? 0 : nextSequence(); // A terminal is ordered after this participant sample even if Grab blocks.
+            var own = diagnostic ? default : ownState();
             var pixels = source.Grab();
             if (source.Ended) return;
             if (pixels != null) {
                 long time = Math.Max(lastTime + 1, (started - start) * 10_000_000 / Stopwatch.Frequency);
                 lastTime = time;
-                var meta = new FrameMeta(currentLease.Ticket.SessionId, currentLease.Ticket.Id, nextSequence(),
-                    diagnostic ? "diagnostic" : "dota2", source.SourceWidth, source.SourceHeight, own.Player, own.AgeMs);
+                var meta = new FrameMeta(currentLease.Ticket.SessionId, currentLease.Ticket.Id, diagnostic ? nextSequence() : sequence,
+                    diagnostic ? "diagnostic" : "dota2", source.SourceWidth, source.SourceHeight, own.Player, own.AgeMs, own.Phase);
                 var frame = new CapturedVideo(meta, pixels, capturedAt, time);
                 Volatile.Write(ref latest, frame);
                 Interlocked.Add(ref captureTicks, Stopwatch.GetTimestamp() - started);

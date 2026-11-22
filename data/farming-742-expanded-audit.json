@@ -1,0 +1,3314 @@
+{
+  "version": 1,
+  "eligibleSha256": "2c0a424a21f1e9d321215426a9727826733420e74c0058250b3b6de5373ef5c9",
+  "originalSha256": "23d8b9c99095d4ff1d9da077dbb844a573720fd3c95f61e59c61b6f4d3ad7bc2",
+  "patchEvidenceRoot": ".tmp/farm742-more",
+  "buildsRoot": ".tmp/farm742-more",
+  "minimumMatchMmr": 7000,
+  "progressSha256": "d37bb6475db05da84e75f43cdffbee875463452297354054b9fd2044dfe75b96",
+  "updatedAt": "2026-11-22T07:02:21.945Z",
+  "studySha256": "86efb4d95145f6037647c6a24764339ac42edf1bea629c0d9030dd7fe2ba2b07",
+  "counts": {
+    "eligible": 101,
+    "verified": 16,
+    "original16": 16,
+    "newVerified": 0,
+    "full10to20": 16,
+    "short": 0,
+    "acquisitionFailed": 85,
+    "verificationRejected": 0,
+    "pending": 0
+  },
+  "sources": [
+    {
+      "heroId": 48,
+      "url": "https://dota2protracker.com/api/hero-matches?hero_id=48&position=pos+1&sort_by=mmr",
+      "checkedAt": "2026-11-22T06:56:36.018270+00:00",
+      "refreshError": null,
+      "freshFile": "catalog-48.json",
+      "sha256": "17ad3c64dac383c3b8b06ac926c37ff273a99e7db8dd4b03f358e7b51eaebcb9",
+      "previousSha256": "030ff306cd2737eb1a5f75e1f1f219efb61df0d33777b9a46375614030ef0b3d",
+      "freshRows": 108,
+      "previousRows": 108,
+      "unionPatchRankedRows": 81
+    },
+    {
+      "heroId": 95,
+      "url": "https://dota2protracker.com/api/hero-matches?hero_id=95&position=pos+1&sort_by=mmr",
+      "checkedAt": "2026-11-22T06:56:36.018160+00:00",
+      "refreshError": null,
+      "freshFile": "catalog-95.json",
+      "sha256": "d0909176cb9efe48c87dda3c92d1251ae434b5ea05d1a2c0d64977fd5672e64a",
+      "previousSha256": "35c29abb8d7df60f9e4186294d7f4ebde8e5c466a9ca655049acb9ad9f22107d",
+      "freshRows": 45,
+      "previousRows": 45,
+      "unionPatchRankedRows": 44
+    }
+  ],
+  "rows": [
+    {
+      "row": {
+        "match_id": 9097037811,
+        "hero_id": 48,
+        "account_id": 85937380,
+        "name": "4dr",
+        "mmr": 8335,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 467,
+        "duration": 1724,
+        "activate_time": 1795110239,
+        "is_pro": 1
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "4597a6d8697d34bf203679d8e275556b4edb0010314deb80b3ffee5a1ce31639",
+        "acquisitionSha256": "17cafaf7e3820bb7cb6a4736e4b67c58e7c59ab5e88cdb6d45a5b9eaa6f055b5",
+        "archiveSha256": "b9961529d312c06692711d73b198876cb54901cb8d3b9a74ec41c5f71f089418",
+        "demSha256": "92bdac754eaf2f7641605518c11318175263a3da7dfaa75675de14c3a98a104c",
+        "metadataSha256": "9595da343d53e0490684dfef1adbe82e0f151e899286e22f762281a87715f738",
+        "extractionScope": "full",
+        "postGameTick": 59152
+      }
+    },
+    {
+      "row": {
+        "match_id": 9100049738,
+        "hero_id": 48,
+        "account_id": 916650633,
+        "name": "23savage (smurf)",
+        "mmr": 8315,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 498,
+        "duration": 2038,
+        "activate_time": 1795288240,
+        "is_pro": 1
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "82d021b4166b45d2e7d3afd3128c28fabf61629852161a1eea6bd0bd670cf62e",
+        "acquisitionSha256": "52bd831a04cff3310ed1b5a0f5747f6a8278f0080d715a4a507ea7f24f362ce6",
+        "archiveSha256": "d33e628764d98551b1582e2b6059925b80d4d07fcccc96d16830ecf388bea03b",
+        "demSha256": "ab169c50752d5e8902d2a3b3c042d9a6b5596ca3decc3d5a00b68c4aae684660",
+        "metadataSha256": "131591d90abb499f426f89d043aac1a0e6ad8d269d074d8fc7b6f6c633538b83",
+        "extractionScope": "full",
+        "postGameTick": 68004
+      }
+    },
+    {
+      "row": {
+        "match_id": 9096845332,
+        "hero_id": 48,
+        "account_id": 56939869,
+        "name": "Gorgc",
+        "mmr": 8233,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 445,
+        "duration": 1913,
+        "activate_time": 1795102294,
+        "is_pro": 1
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "df88d5b44dfd9015b4bff28ed491f8399f9b27af185d1439f70424e4b0bf96c8",
+        "acquisitionSha256": "019541279b03a270cc4b0b9d43fb507c33048e0e849aff7314414b89846e783a",
+        "archiveSha256": "24630a6e3bebab3e439c23d072f270ea66942cc60281b9e28efff89a255b6aa7",
+        "demSha256": "7a3cd5202984d0e82038d865598b01a8c124fbac7499bbc7eeb081b033a14e6e",
+        "metadataSha256": "643c9096f799a6b0e41b8ad306417635a20a8e33b2af2a3c8b8794dc52550f5c",
+        "extractionScope": "full",
+        "postGameTick": 64042
+      }
+    },
+    {
+      "row": {
+        "match_id": 9097587313,
+        "hero_id": 48,
+        "account_id": 176616331,
+        "name": "Quinn",
+        "mmr": 8201,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 423,
+        "duration": 2247,
+        "activate_time": 1795155244,
+        "is_pro": 1
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "e3205b8a569e806592f73837eff60f67671b045f4e2ad13957ea8a670795ee3e",
+        "acquisitionSha256": "b4e3309684c4dec1ba6a9122e936f1b3de5da7db94c06c78eb113bfad403b612",
+        "archiveSha256": "bd49e98179f45e273d3ceb8e4b3781d07b56f5193121769339e281016784724b",
+        "demSha256": "6db74582e7687fbd1da3e720785559bbcba25b05b49e804c49bd83d1f58b9645",
+        "metadataSha256": "fbb43bc299ff8b44205d860e80f5ebdfe16f579cca77e9b56c45fb249505ba5c",
+        "extractionScope": "full",
+        "postGameTick": 73780
+      }
+    },
+    {
+      "row": {
+        "match_id": 9097575041,
+        "hero_id": 48,
+        "account_id": 176616331,
+        "name": "Quinn",
+        "mmr": 8172,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 196,
+        "duration": 1079,
+        "activate_time": 1795153889,
+        "is_pro": 1
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:00.628Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097535245,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 8090,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 622,
+        "duration": 2793,
+        "activate_time": 1795149359,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "8679aa0cea05aa4203338d6d050ff042349af2bd031f5c25f85161ccbbc76aec",
+        "acquisitionSha256": "bd340186d7abcfd94c5c2209b042e001b220eb603ee1b4131e3275e13cec39b1",
+        "archiveSha256": "332497e394d5cd4b217dcbbeda7f519981b15639eb6a4f3469a8b69890c96642",
+        "demSha256": "c038e46d9c5845acfd27d46f6b6e18c970ab3c3ecbe185f66bfc99d008ab643f",
+        "metadataSha256": "c175aa8554ec23621a2a1c9422c50e8bd8a3ef0cc1cba48350b98e2f55d967a2",
+        "extractionScope": "full",
+        "postGameTick": 90336
+      }
+    },
+    {
+      "row": {
+        "match_id": 9097801447,
+        "hero_id": 48,
+        "account_id": 244343035,
+        "name": "春雨",
+        "mmr": 8064,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 209,
+        "duration": 1600,
+        "activate_time": 1795172944,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "8c4d89ed1b7bb999e512835e507658152e5404f2b121b68e0d07b6ee4d3fece8",
+        "acquisitionSha256": "e60ce20d17cde0ff6d25ebe2cd71feac9ef8e568ab2993854e3b907573477a0a",
+        "archiveSha256": "ef5ed6db30acf5231abe0b1334ec538d5070d88627a51f81817fc938fcbf6ebc",
+        "demSha256": "4c2c951f32f495b3c9c2b075a38a3530cc6b1ad2f53b3efcf5cf2d58cc71b51e",
+        "metadataSha256": "5135438b4e99b348625eb008f922b58b7fadaf08953b41a184faf14f7155bfd3",
+        "extractionScope": "full",
+        "postGameTick": 56044
+      }
+    },
+    {
+      "row": {
+        "match_id": 9100200135,
+        "hero_id": 48,
+        "account_id": 244343035,
+        "name": "春雨",
+        "mmr": 8053,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 430,
+        "duration": 2086,
+        "activate_time": 1795294938,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:07.376Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096510129,
+        "hero_id": 48,
+        "account_id": 153125655,
+        "name": "Alex",
+        "mmr": 8032,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 362,
+        "duration": 2235,
+        "activate_time": 1795088010,
+        "is_pro": 1
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:06.564Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096935284,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 7962,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 299,
+        "duration": 1406,
+        "activate_time": 1795105940,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:10.581Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096797937,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 7951,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 596,
+        "duration": 2744,
+        "activate_time": 1795100438,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "832a29f565f57758e1b5e63e762355a6a50e1b1fb0d354fed44615da4fd2d665",
+        "acquisitionSha256": "ca3bf09480f48735168c007474314a8c02c3f2f5129e61760abef459ea4b287f",
+        "archiveSha256": "47ca9314f3ac9bf1af31a5c359f956e71c66c76f879b07360afa0d48f57088d2",
+        "demSha256": "2246941330cd7e95bc2284c1f582bbcdec39dfb887cfecf213def83ade9c0ba7",
+        "metadataSha256": "5ffb2bc5fdcaeaa6c2c61b90c981fdce93935f17fda1332166747e7169093ccc",
+        "extractionScope": "full",
+        "postGameTick": 90978
+      }
+    },
+    {
+      "row": {
+        "match_id": 9096436284,
+        "hero_id": 48,
+        "account_id": 244343035,
+        "name": "春雨",
+        "mmr": 7912,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 212,
+        "duration": 1382,
+        "activate_time": 1795083434,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T06:58:47.178Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098255705,
+        "hero_id": 48,
+        "account_id": 244343035,
+        "name": "春雨",
+        "mmr": 7843,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 455,
+        "duration": 2116,
+        "activate_time": 1795192226,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "67bc46155d8ea655040830927683f4e7605bda26ee16386a24839acdc1de9988",
+        "acquisitionSha256": "36b9da11693341a4caa88bdf14c6780354df695c04d0de1ba36e7469bd52cadc",
+        "archiveSha256": "2b2dd658ab2c7cf0dd74333d7fd93e1aa9b31ed4f5f9a8e44f361285fc96bc90",
+        "demSha256": "e3691b9a919dc75cc13b8b5e1426c942744090febee7db887c22f08f6fe463f9",
+        "metadataSha256": "6050edc11407dbe92c19c058b4713aea30a4cd707b26fbca3e42eeb950d78fde",
+        "extractionScope": "full",
+        "postGameTick": 69840
+      }
+    },
+    {
+      "row": {
+        "match_id": 9096446554,
+        "hero_id": 48,
+        "account_id": 161380932,
+        "name": "сакаеш кок",
+        "mmr": 7823,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 335,
+        "duration": 1682,
+        "activate_time": 1795084140,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:32.382Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9100023352,
+        "hero_id": 48,
+        "account_id": 157231117,
+        "name": "Xyesos",
+        "mmr": 7790,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 98,
+        "duration": 924,
+        "activate_time": 1795287052,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:08.533Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096292331,
+        "hero_id": 48,
+        "account_id": 434736589,
+        "name": "Капибара Prime",
+        "mmr": 7770,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 303,
+        "duration": 1298,
+        "activate_time": 1795071429,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:09.604Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9099626198,
+        "hero_id": 48,
+        "account_id": 244343035,
+        "name": "春雨",
+        "mmr": 7743,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 360,
+        "duration": 1930,
+        "activate_time": 1795272138,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:13.313Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9099870673,
+        "hero_id": 48,
+        "account_id": 244343035,
+        "name": "春雨",
+        "mmr": 7708,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 352,
+        "duration": 2024,
+        "activate_time": 1795281023,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:14.612Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096847541,
+        "hero_id": 48,
+        "account_id": 434736589,
+        "name": "Капибара Prime",
+        "mmr": 7696,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 264,
+        "duration": 1339,
+        "activate_time": 1795102385,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T06:58:57.329Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098189198,
+        "hero_id": 48,
+        "account_id": 244343035,
+        "name": "春雨",
+        "mmr": 7690,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 529,
+        "duration": 1923,
+        "activate_time": 1795189616,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:17.615Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097590173,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 7683,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 131,
+        "duration": 1312,
+        "activate_time": 1795155549,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T06:58:59.828Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097745286,
+        "hero_id": 48,
+        "account_id": 434736589,
+        "name": "Капибара Prime",
+        "mmr": 7663,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 200,
+        "duration": 1381,
+        "activate_time": 1795169269,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:33.416Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097462510,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 7655,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 261,
+        "duration": 1228,
+        "activate_time": 1795141143,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:34.175Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097627514,
+        "hero_id": 48,
+        "account_id": 434736589,
+        "name": "Капибара Prime",
+        "mmr": 7651,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 223,
+        "duration": 1092,
+        "activate_time": 1795159324,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T06:59:16.893Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096289757,
+        "hero_id": 48,
+        "account_id": 161380932,
+        "name": "сакаеш кок",
+        "mmr": 7637,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 447,
+        "duration": 2446,
+        "activate_time": 1795071169,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:49.595Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9100129536,
+        "hero_id": 48,
+        "account_id": 244343035,
+        "name": "春雨",
+        "mmr": 7618,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 533,
+        "duration": 2613,
+        "activate_time": 1795291622,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:50.106Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097332353,
+        "hero_id": 48,
+        "account_id": 161380932,
+        "name": "сакаеш кок",
+        "mmr": 7566,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 283,
+        "duration": 1827,
+        "activate_time": 1795126269,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T06:59:32.859Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9095989108,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 7563,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 460,
+        "duration": 2507,
+        "activate_time": 1795039174,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:58.354Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097567238,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 7511,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 559,
+        "duration": 2020,
+        "activate_time": 1795153018,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:02.837Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096863416,
+        "hero_id": 48,
+        "account_id": 157231117,
+        "name": "Xyesos",
+        "mmr": 7495,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 490,
+        "duration": 2450,
+        "activate_time": 1795103025,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T06:59:46.110Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097032617,
+        "hero_id": 48,
+        "account_id": 434736589,
+        "name": "Капибара Prime",
+        "mmr": 7490,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 505,
+        "duration": 2473,
+        "activate_time": 1795109999,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:05.758Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096156248,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 7458,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 369,
+        "duration": 1538,
+        "activate_time": 1795056547,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:08.311Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096942000,
+        "hero_id": 48,
+        "account_id": 157231117,
+        "name": "Xyesos",
+        "mmr": 7450,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 549,
+        "duration": 2513,
+        "activate_time": 1795106214,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:09.679Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096377771,
+        "hero_id": 48,
+        "account_id": 271994812,
+        "name": "я зaпepт нa этoм ocтpoвe иззa ин",
+        "mmr": 7443,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 342,
+        "duration": 1731,
+        "activate_time": 1795079008,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T06:59:52.357Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9099972966,
+        "hero_id": 48,
+        "account_id": 271994812,
+        "name": "я зaпepт нa этoм ocтpoвe иззa ин",
+        "mmr": 7394,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 541,
+        "duration": 3078,
+        "activate_time": 1795284968,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:33.862Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096707284,
+        "hero_id": 48,
+        "account_id": 271994812,
+        "name": "я зaпepт нa этoм ocтpoвe иззa ин",
+        "mmr": 7391,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 389,
+        "duration": 2210,
+        "activate_time": 1795096884,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:34.668Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097274079,
+        "hero_id": 48,
+        "account_id": 161380932,
+        "name": "сакаеш кок",
+        "mmr": 7357,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 358,
+        "duration": 1864,
+        "activate_time": 1795121905,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:49.148Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096099474,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 7347,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 554,
+        "duration": 2678,
+        "activate_time": 1795050042,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:50.389Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098797839,
+        "hero_id": 48,
+        "account_id": 161380932,
+        "name": "сакаеш кок",
+        "mmr": 7334,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 650,
+        "duration": 3094,
+        "activate_time": 1795221286,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:00:33.129Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096595144,
+        "hero_id": 48,
+        "account_id": 790105779,
+        "name": "900",
+        "mmr": 7331,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 326,
+        "duration": 1694,
+        "activate_time": 1795092175,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:54.146Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098830709,
+        "hero_id": 48,
+        "account_id": 161380932,
+        "name": "сакаеш кок",
+        "mmr": 7299,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 543,
+        "duration": 2246,
+        "activate_time": 1795224862,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:55.391Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098684179,
+        "hero_id": 48,
+        "account_id": 1049288007,
+        "name": "Infinite Tsukuyomi",
+        "mmr": 7244,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 411,
+        "duration": 2129,
+        "activate_time": 1795211635,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:20.420Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096177391,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 7241,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 663,
+        "duration": 2507,
+        "activate_time": 1795058698,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:21.672Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098630049,
+        "hero_id": 48,
+        "account_id": 1049288007,
+        "name": "Infinite Tsukuyomi",
+        "mmr": 7239,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 371,
+        "duration": 2010,
+        "activate_time": 1795208549,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:22.872Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096589149,
+        "hero_id": 48,
+        "account_id": 161380932,
+        "name": "сакаеш кок",
+        "mmr": 7236,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 756,
+        "duration": 3173,
+        "activate_time": 1795091899,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:01:05.661Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098232226,
+        "hero_id": 48,
+        "account_id": 271994812,
+        "name": "я зaпepт нa этoм ocтpoвe иззa ин",
+        "mmr": 7226,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 250,
+        "duration": 1435,
+        "activate_time": 1795191304,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:34.106Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096824828,
+        "hero_id": 48,
+        "account_id": 790105779,
+        "name": "900",
+        "mmr": 7225,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 625,
+        "duration": 2254,
+        "activate_time": 1795101490,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:01:16.397Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9100534365,
+        "hero_id": 48,
+        "account_id": 436852102,
+        "name": "yonnest",
+        "mmr": 7217,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 540,
+        "duration": 2395,
+        "activate_time": 1795320558,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:40.151Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9099100460,
+        "hero_id": 48,
+        "account_id": 271994812,
+        "name": "я зaпepт нa этoм ocтpoвe иззa ин",
+        "mmr": 7217,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 564,
+        "duration": 3293,
+        "activate_time": 1795247912,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:01:22.912Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098599323,
+        "hero_id": 48,
+        "account_id": 271994812,
+        "name": "я зaпepт нa этoм ocтpoвe иззa ин",
+        "mmr": 7205,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 387,
+        "duration": 2462,
+        "activate_time": 1795206805,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:43.315Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096535592,
+        "hero_id": 48,
+        "account_id": 790105779,
+        "name": "900",
+        "mmr": 7205,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 220,
+        "duration": 1191,
+        "activate_time": 1795089349,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:44.622Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9100099991,
+        "hero_id": 48,
+        "account_id": 1049288007,
+        "name": "Infinite Tsukuyomi",
+        "mmr": 7179,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 243,
+        "duration": 1230,
+        "activate_time": 1795290312,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:45.952Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9099114808,
+        "hero_id": 48,
+        "account_id": 175310463,
+        "name": "почемумнегрустно",
+        "mmr": 7158,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 642,
+        "duration": 2996,
+        "activate_time": 1795248847,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:01:31.179Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096602585,
+        "hero_id": 48,
+        "account_id": 175310463,
+        "name": "почемумнегрустно",
+        "mmr": 7158,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 534,
+        "duration": 2418,
+        "activate_time": 1795092494,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:01:48.932Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096467194,
+        "hero_id": 48,
+        "account_id": 175310463,
+        "name": "почемумнегрустно",
+        "mmr": 7140,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 476,
+        "duration": 2082,
+        "activate_time": 1795085489,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:18.169Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096676727,
+        "hero_id": 48,
+        "account_id": 175310463,
+        "name": "почемумнегрустно",
+        "mmr": 7109,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 452,
+        "duration": 1794,
+        "activate_time": 1795095664,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:32.248Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9099292515,
+        "hero_id": 48,
+        "account_id": 436852102,
+        "name": "yonnest",
+        "mmr": 7097,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 584,
+        "duration": 2492,
+        "activate_time": 1795258942,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:32.966Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9100570099,
+        "hero_id": 48,
+        "account_id": 436852102,
+        "name": "yonnest",
+        "mmr": 7087,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 562,
+        "duration": 2281,
+        "activate_time": 1795323633,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:34.214Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096128257,
+        "hero_id": 48,
+        "account_id": 177726018,
+        "name": "Ares`",
+        "mmr": 7085,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 430,
+        "duration": 1904,
+        "activate_time": 1795053591,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:35.474Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098231164,
+        "hero_id": 48,
+        "account_id": 157231117,
+        "name": "Xyesos",
+        "mmr": 7080,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 282,
+        "duration": 1471,
+        "activate_time": 1795191260,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:36.720Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9100504239,
+        "hero_id": 48,
+        "account_id": 175310463,
+        "name": "почемумнегрустно",
+        "mmr": 7079,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 548,
+        "duration": 2193,
+        "activate_time": 1795317883,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:37.968Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9100329920,
+        "hero_id": 48,
+        "account_id": 1049288007,
+        "name": "Infinite Tsukuyomi",
+        "mmr": 7057,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 496,
+        "duration": 2149,
+        "activate_time": 1795302297,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:02:21.945Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097765395,
+        "hero_id": 48,
+        "account_id": 175310463,
+        "name": "почемумнегрустно",
+        "mmr": 7051,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 648,
+        "duration": 2678,
+        "activate_time": 1795170674,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:52.561Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096218201,
+        "hero_id": 48,
+        "account_id": 175310463,
+        "name": "почемумнегрустно",
+        "mmr": 7030,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 373,
+        "duration": 1551,
+        "activate_time": 1795063164,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:53.817Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098009518,
+        "hero_id": 48,
+        "account_id": 175310463,
+        "name": "почемумнегрустно",
+        "mmr": 7009,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 312,
+        "duration": 1910,
+        "activate_time": 1795182829,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:56.325Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098402606,
+        "hero_id": 95,
+        "account_id": 220722971,
+        "name": "jumpstyle",
+        "mmr": 8270,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 358,
+        "duration": 1973,
+        "activate_time": 1795198175,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "d7359e42843ef46ff18f08a0707c3bb58fbf2c8afc97095e1faec3f3b59cc512",
+        "acquisitionSha256": "8a52dac5bbaf9f3e5d91d195bec11f6a6741cbca7caf2ac0e3cceffc5fb3ad3f",
+        "archiveSha256": "48cad9f8bdc6fb30e01062dd96f888703ae0dce8b33f32709a90a7ae397e0a3b",
+        "demSha256": "3636481d3091e2ab19f5d1f7c1a0d9c8e0a02727efb24894694fe0f616bbd597",
+        "metadataSha256": "264a6d327e6a96c23ac0f8d6aa9d0a1b00f35d7abd06127526e97ac886686a4c",
+        "extractionScope": "full",
+        "postGameTick": 66276
+      }
+    },
+    {
+      "row": {
+        "match_id": 9098136719,
+        "hero_id": 95,
+        "account_id": 220722971,
+        "name": "jumpstyle",
+        "mmr": 8256,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 400,
+        "duration": 1895,
+        "activate_time": 1795187696,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:00.011Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098789898,
+        "hero_id": 95,
+        "account_id": 93157994,
+        "name": "PoE waiting room",
+        "mmr": 8166,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 257,
+        "duration": 1758,
+        "activate_time": 1795220476,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "e8ff43c8757cc31543c31f8b39db1929857e97ba841f8655a67900e6307b104b",
+        "acquisitionSha256": "992367c4cf29c01ba73a2d425c89103a8284a83d04164710a7b3a4dbadc4ab40",
+        "archiveSha256": "d73a6263c878192c1cf8574d81062ceedc76fee95457b7cb5abecd0f93606a03",
+        "demSha256": "79ea11c8bb38165ad29dafc7b4ffe060c9ea1a057f30f1e74bf2fc0e038b8d40",
+        "metadataSha256": "94906beba94aeb1e6ca0a8af7b7ac0dbbda31a26945de4541b3fce9eeb225e76",
+        "extractionScope": "full",
+        "postGameTick": 59440
+      }
+    },
+    {
+      "row": {
+        "match_id": 9098472218,
+        "hero_id": 95,
+        "account_id": 93157994,
+        "name": "PoE waiting room",
+        "mmr": 8148,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 185,
+        "duration": 1515,
+        "activate_time": 1795201094,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "c72297c18b5fb63b1f183706f47a4a84ca99e7598d714986f269f086dffd0b89",
+        "acquisitionSha256": "c986a846e112c35f8c5ee616b108b52c761179cad4e20c6fd08611b80cb5e993",
+        "archiveSha256": "ed60f5e5a66d212ec434d02a862debd239264835b51083f1e6730346be08ab5c",
+        "demSha256": "aed3c0ab9407d2760977c11c0b02638da80fb75f61ab43d5ad0ce573cd348cc2",
+        "metadataSha256": "39acd21ae2075aaa5cb2e961f4a2b59dce5acb31c54b10037f226f42c5ed5fa9",
+        "extractionScope": "full",
+        "postGameTick": 51970
+      }
+    },
+    {
+      "row": {
+        "match_id": 9098360852,
+        "hero_id": 95,
+        "account_id": 189317657,
+        "name": "faceforeveryoung",
+        "mmr": 8072,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 310,
+        "duration": 1732,
+        "activate_time": 1795196440,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "9e66e1df5d8307e6a512aa288bee5414bc80b960559dad2f59ff5d36831c71de",
+        "acquisitionSha256": "96b7dd9f3f1618ff4580a6e9d5a0b7409adf0e0ee666847d9d6b187b2d996136",
+        "archiveSha256": "15ad33dee95bf0b8993f87ab13e08e8edcb7568319bb36b65da077bd30e8c8b5",
+        "demSha256": "68aa8c557a5a45b7e5cca9f4449f5a1a9ca229d48fa9417d986aae2499db2434",
+        "metadataSha256": "f7cbcffe50f045712d97e405ce956ea66b3f9f41ab958b5c9a4e4de55523b6f0",
+        "extractionScope": "full",
+        "postGameTick": 59082
+      }
+    },
+    {
+      "row": {
+        "match_id": 9099209663,
+        "hero_id": 95,
+        "account_id": 81556657,
+        "name": "cucuzza",
+        "mmr": 7932,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 396,
+        "duration": 2038,
+        "activate_time": 1795254492,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "dbe8b568af9d99e6323791e20d36de7fb6f77ed5c52da36dce51a1f4f176a666",
+        "acquisitionSha256": "e403bbc82e7c6d69ea2311681a2f3f216ea9b125a0c97d3a8e6f66d7ec0b104f",
+        "archiveSha256": "33c83ca44af1b875934e5c0cd839453e8557c0caf53d154f3e4a77459d74f2ca",
+        "demSha256": "c7da18d32a4346c8c8d50101623f20e4c542b43397f6b33fb2b66104ae9538b6",
+        "metadataSha256": "9326d8f10a2e777571aa60773a206fab16686cc439d10ef83c3d58fe55dba07f",
+        "extractionScope": "full",
+        "postGameTick": 67756
+      }
+    },
+    {
+      "row": {
+        "match_id": 9097330939,
+        "hero_id": 95,
+        "account_id": 200750168,
+        "name": "🐉I have sex with dragons🐉",
+        "mmr": 7870,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 522,
+        "duration": 3633,
+        "activate_time": 1795126154,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "98677ab582cb1d03f7e1865f0089bff393ba020257f8b78ddbaf018bcc91408f",
+        "acquisitionSha256": "fd4de87195f29a8d4e1c66d23c3b7d5345096772580f3911fca5227436e8c494",
+        "archiveSha256": "5ec43b8712f6a49f0fbc81c06f34967e68f32f51f18e62f8297357781e55d120",
+        "demSha256": "1a78b37bcc86a8c34e1b473c51b6cac4054a74db273db114c7d11e7a05b27444",
+        "metadataSha256": "4c02dd23691ae8d55c508a1bbf648e92ab5aabee44b1c08c2595f77617fdc23d",
+        "extractionScope": "full",
+        "postGameTick": 116118
+      }
+    },
+    {
+      "row": {
+        "match_id": 9099283649,
+        "hero_id": 95,
+        "account_id": 257086687,
+        "name": "Jastiss",
+        "mmr": 7865,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 453,
+        "duration": 2248,
+        "activate_time": 1795258502,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "627f95ac5e4d0e75a41bf5864b55bc30fb12d53d0fe7d26ecf10bc66027b8eb7",
+        "acquisitionSha256": "36603ea9260bd4bc373f3a91b164b481f4c8265783c71d3d6eb7328348b5a324",
+        "archiveSha256": "af6fa949e9078fcae8caafaf1f4edc5a0687423ee0aa4f3f3d24ff46433e5d62",
+        "demSha256": "17c8b1bc11e5d8b09b4ecfb0d3909623bb69f1ded3e4773a314b7a07c09788c3",
+        "metadataSha256": "28cf9c342303f8d65d70bb9e2d6174c3c16effc8858804577cc3c32aa4f258a0",
+        "extractionScope": "full",
+        "postGameTick": 75666
+      }
+    },
+    {
+      "row": {
+        "match_id": 9097559249,
+        "hero_id": 95,
+        "account_id": 365253927,
+        "name": "все нормально",
+        "mmr": 7814,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 187,
+        "duration": 1487,
+        "activate_time": 1795152119,
+        "is_pro": 0
+      },
+      "legacy16": true,
+      "acquisition": {
+        "status": "reused",
+        "root": ".tmp/farm742",
+        "error": null
+      },
+      "status": "verified",
+      "evidence": {
+        "factsSha256": "0960121e6515106f1f7d4fd0f452a5fa63c470355a3dee94a0e10d08f616f5d2",
+        "acquisitionSha256": "887a67ea261e9279991fd1e29ad8b16ff50c6a0d8ac32d8bbfa81a8b6d845646",
+        "archiveSha256": "5da1aa9438f2cb17a751d3e262b2624180f8680b534d5831716a6705e70c3fa6",
+        "demSha256": "6479cc80ddb51da5c4e7f8a98bf024509cd883cd2e83f2c083b23bb9629770eb",
+        "metadataSha256": "e2ac064ff07949fbd78585aae8c2c00561ebf4a3b2d6703ce1e1c0e6db38fce9",
+        "extractionScope": "full",
+        "postGameTick": 51116
+      }
+    },
+    {
+      "row": {
+        "match_id": 9099029966,
+        "hero_id": 95,
+        "account_id": 257086687,
+        "name": "Jastiss",
+        "mmr": 7769,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 586,
+        "duration": 3114,
+        "activate_time": 1795242931,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:10.868Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9100003788,
+        "hero_id": 95,
+        "account_id": 93157994,
+        "name": "PoE waiting room",
+        "mmr": 7748,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 374,
+        "duration": 2708,
+        "activate_time": 1795286237,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:58:12.063Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096785784,
+        "hero_id": 95,
+        "account_id": 910218432,
+        "name": "Vanari",
+        "mmr": 7559,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 385,
+        "duration": 2574,
+        "activate_time": 1795099934,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:05.149Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9100307736,
+        "hero_id": 95,
+        "account_id": 93157994,
+        "name": "PoE waiting room",
+        "mmr": 7515,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 325,
+        "duration": 1960,
+        "activate_time": 1795300799,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:00.342Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096655887,
+        "hero_id": 95,
+        "account_id": 910218432,
+        "name": "Vanari",
+        "mmr": 7497,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 525,
+        "duration": 2615,
+        "activate_time": 1795094794,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:03.305Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098722985,
+        "hero_id": 95,
+        "account_id": 93157994,
+        "name": "PoE waiting room",
+        "mmr": 7477,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 389,
+        "duration": 2147,
+        "activate_time": 1795214269,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:07.120Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096736290,
+        "hero_id": 95,
+        "account_id": 910218432,
+        "name": "Vanari",
+        "mmr": 7424,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 127,
+        "duration": 1334,
+        "activate_time": 1795098035,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:18.889Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096263379,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7407,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 455,
+        "duration": 2320,
+        "activate_time": 1795068413,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:00:00.907Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098686451,
+        "hero_id": 95,
+        "account_id": 1874254680,
+        "name": "AMERICAN HERO",
+        "mmr": 7384,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 458,
+        "duration": 2097,
+        "activate_time": 1795211784,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:00:17.387Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096293720,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7376,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 202,
+        "duration": 1231,
+        "activate_time": 1795071573,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:47.157Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097161541,
+        "hero_id": 95,
+        "account_id": 910218432,
+        "name": "Vanari",
+        "mmr": 7362,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 240,
+        "duration": 2006,
+        "activate_time": 1795115959,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:47.903Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9100488946,
+        "hero_id": 95,
+        "account_id": 194818271,
+        "name": "< blank >",
+        "mmr": 7332,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 433,
+        "duration": 2209,
+        "activate_time": 1795316523,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T06:59:52.883Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096616876,
+        "hero_id": 95,
+        "account_id": 286103736,
+        "name": "))",
+        "mmr": 7296,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 380,
+        "duration": 2418,
+        "activate_time": 1795093129,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:00:38.135Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096181456,
+        "hero_id": 95,
+        "account_id": 1874254680,
+        "name": "AMERICAN HERO",
+        "mmr": 7273,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 270,
+        "duration": 1508,
+        "activate_time": 1795059118,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:00:42.911Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097987988,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7262,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 190,
+        "duration": 2074,
+        "activate_time": 1795181969,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:18.426Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097558826,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7249,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 297,
+        "duration": 1801,
+        "activate_time": 1795152078,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:19.156Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097082559,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7221,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 260,
+        "duration": 1507,
+        "activate_time": 1795112154,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:39.637Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097605437,
+        "hero_id": 95,
+        "account_id": 376006338,
+        "name": "Trauma Laykas",
+        "mmr": 7169,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 237,
+        "duration": 1867,
+        "activate_time": 1795157099,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:47.192Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096004727,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7159,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 369,
+        "duration": 2075,
+        "activate_time": 1795040400,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:00:48.440Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096732297,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7158,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 235,
+        "duration": 1684,
+        "activate_time": 1795097884,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:06.711Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097153701,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7148,
+        "is_radiant": 1,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 213,
+        "duration": 1347,
+        "activate_time": 1795115589,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:17.400Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096587725,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7130,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 327,
+        "duration": 1900,
+        "activate_time": 1795091824,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:19.399Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096316121,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7120,
+        "is_radiant": 0,
+        "won": 0,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 409,
+        "duration": 2449,
+        "activate_time": 1795073669,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:02:02.166Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097580384,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7119,
+        "is_radiant": 1,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 288,
+        "duration": 1814,
+        "activate_time": 1795154469,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "The operation was aborted due to timeout",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "The operation was aborted due to timeout",
+            "at": "2026-11-22T07:02:04.923Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9097170436,
+        "hero_id": 95,
+        "account_id": 286103736,
+        "name": "))",
+        "mmr": 7078,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 332,
+        "duration": 2013,
+        "activate_time": 1795116375,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:39.226Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9096896212,
+        "hero_id": 95,
+        "account_id": 1673518995,
+        "name": "eva killer",
+        "mmr": 7057,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 334,
+        "duration": 1850,
+        "activate_time": 1795104335,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:52.042Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    },
+    {
+      "row": {
+        "match_id": 9098731197,
+        "hero_id": 95,
+        "account_id": 376006338,
+        "name": "Trauma Laykas",
+        "mmr": 7023,
+        "is_radiant": 0,
+        "won": 1,
+        "patch": "7.42",
+        "position": "pos 1",
+        "lobby_type": 7,
+        "last_hits": 351,
+        "duration": 2222,
+        "activate_time": 1795214874,
+        "is_pro": 0
+      },
+      "legacy16": false,
+      "acquisition": {
+        "status": "failed",
+        "failureStage": "download",
+        "error": "OpenDota HTTP 520",
+        "failures": [
+          {
+            "stage": "download",
+            "error": "OpenDota HTTP 520",
+            "at": "2026-11-22T07:01:55.071Z"
+          }
+        ]
+      },
+      "status": "acquisition-failed"
+    }
+  ]
+}

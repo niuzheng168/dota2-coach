@@ -1,0 +1,209 @@
+{
+  "startedUtc": "2026-11-22T10:57:44.110Z",
+  "node": "v24.14.1",
+  "codey": "0.3.43",
+  "upstream": "loopback HTTP mock",
+  "listeners": [
+    {
+      "gateway": "http://127.0.0.1:54275/v1",
+      "upstream": "http://127.0.0.1:54273"
+    },
+    {
+      "gateway": "http://127.0.0.1:54289/v1",
+      "upstream": "http://127.0.0.1:54273"
+    },
+    {
+      "gateway": "http://127.0.0.1:54297/v1",
+      "upstream": "http://127.0.0.1:54273"
+    },
+    {
+      "gateway": "http://127.0.0.1:54302/v1",
+      "upstream": "http://127.0.0.1:54273"
+    },
+    {
+      "gateway": "http://127.0.0.1:54311/v1",
+      "upstream": "http://127.0.0.1:54273"
+    }
+  ],
+  "csharp": {
+    "happy": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200",
+        "POST /v1/responses 200",
+        "POST /v1/responses 200",
+        "GET /v1/models 200",
+        "POST /v1/responses 200",
+        "POST /v1/responses 200"
+      ],
+      "upstream": [
+        "POST /responses gpt-6.2-astra text minute_farm_choice",
+        "POST /responses gpt-6.2-astra image visible_farming_advice",
+        "POST /responses gpt-6.2-sol text minute_farm_choice",
+        "POST /responses gpt-6.2-sol image visible_farming_advice"
+      ]
+    },
+    "wrong-echo": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200",
+        "POST /v1/responses 200",
+        "POST /v1/responses 200"
+      ],
+      "upstream": [
+        "POST /responses gpt-6.2-astra text minute_farm_choice",
+        "POST /responses gpt-6.2-astra image visible_farming_advice"
+      ]
+    },
+    "foreign-provider": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200"
+      ],
+      "upstream": [
+        "GET /alternate/v1/models"
+      ]
+    },
+    "no-vision": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200",
+        "POST /v1/responses 200"
+      ],
+      "upstream": [
+        "POST /responses gpt-6.2-sol text minute_farm_choice"
+      ]
+    },
+    "non-native-endpoint": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200"
+      ],
+      "upstream": []
+    },
+    "image-size-edge": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200"
+      ],
+      "upstream": []
+    },
+    "image-cap-minus-one": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200"
+      ],
+      "upstream": []
+    },
+    "image-cap-exact": {
+      "passed": true,
+      "front": [
+        "GET /v1/models 200",
+        "POST /v1/responses 200"
+      ],
+      "upstream": [
+        "POST /responses gpt-6.2-astra image visible_farming_advice"
+      ]
+    }
+  },
+  "clientAssemblySha256": "9e17baf18d153c9ee14a4528587862c32d615d3e1c719c1c4566bccc1448f69b",
+  "bundle": "server-BotZPvTv.js",
+  "sha256": "be7dcb0d52d6571317dd27c08282141152742022dee5c224550f412e56904f2b",
+  "mapSha256": "f1d176b487945336860e8d1fb519f229ca2389cebb7812e2228855a21cca4f3f",
+  "catalog": [
+    [
+      "gpt-6.2-astra",
+      "GPT-6.2 Astra (github-copilot)",
+      [
+        "/responses"
+      ],
+      true
+    ],
+    [
+      "gpt-6.2-sol",
+      "GPT-6.2 Sol (github-copilot)",
+      [
+        "/responses"
+      ],
+      true
+    ]
+  ],
+  "alternateAstra": [
+    [
+      "GPT-6.2 Astra (codey-extra-smoke)",
+      [
+        "/responses"
+      ],
+      true
+    ]
+  ],
+  "limitedCatalog": [
+    [
+      "gpt-6.2-astra",
+      [
+        "/v1/responses"
+      ],
+      true
+    ],
+    [
+      "gpt-6.2-sol",
+      [
+        "/responses"
+      ],
+      false
+    ]
+  ],
+  "fixtureJpeg": {
+    "rawBytes": 1585,
+    "dataUrlChars": 2139,
+    "gatewayEstimateBytes": 1604,
+    "sha256": "7ae4b48d86a4f23d66d74ca7c8656441c7b8838f5f9f5630d6ff4400e1196008"
+  },
+  "imageBounds": [
+    {
+      "cap": 1585,
+      "observedAtMock": "96x32 PNG, detail=low"
+    },
+    {
+      "cap": 1603,
+      "observedAtMock": "96x32 PNG, detail=low"
+    },
+    {
+      "cap": 1604,
+      "observedAtMock": "original JPEG, detail=high"
+    }
+  ],
+  "passed": true,
+  "userAgents": [
+    "DotaCoach/0.6.1"
+  ],
+  "frontAuthAndEgressChecksPassed": true,
+  "front": {
+    "GET /v1/models 401": 1,
+    "GET /v1/models 200": 15,
+    "POST /v1/responses 400": 2,
+    "POST /v1/responses 200": 13
+  },
+  "mockCalls": [
+    "GET /models",
+    "POST /responses gpt-6.2-astra text probe",
+    "POST /responses gpt-6.2-sol image probe",
+    "POST /responses gpt-6.2-astra text minute_farm_choice",
+    "POST /responses gpt-6.2-astra image visible_farming_advice",
+    "POST /responses gpt-6.2-sol text minute_farm_choice",
+    "POST /responses gpt-6.2-sol image visible_farming_advice",
+    "POST /responses gpt-6.2-astra text minute_farm_choice",
+    "POST /responses gpt-6.2-astra image visible_farming_advice",
+    "GET /alternate/v1/models",
+    "GET /alternate/v1/models",
+    "GET /models",
+    "POST /responses gpt-6.2-sol text minute_farm_choice",
+    "GET /models",
+    "POST /responses gpt-6.2-astra image probe REDACTED_PNG",
+    "GET /models",
+    "POST /responses gpt-6.2-astra image probe REDACTED_PNG",
+    "GET /models",
+    "POST /responses gpt-6.2-astra image probe",
+    "POST /responses gpt-6.2-astra image visible_farming_advice"
+  ]
+}

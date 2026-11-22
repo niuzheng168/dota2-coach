@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace DotaCoach.TwoPc;
 
@@ -55,21 +54,30 @@ public sealed class VisionLossTracker
     public int GoneMs { get; init; } = 3000;
     public int CooldownMs { get; init; } = 20000;
     /// <summary>The 7.42 map for place names (camps, towers, objectives); without it the coarse <see cref="MapArea"/>.</summary>
-    public CoachMap? Map { get; init; }
+    public CoachMap? Map { get; set; }
     private sealed class Sighting { public long RunStart, LastVisible, LastAlert = long.MinValue / 2; public double X, Y; public bool Announced; }
     private readonly Dictionary<string, Sighting> heroes = new(StringComparer.Ordinal);
     private string? match;
     private int ownTeam;
+    private long? lastReceipt;
+
+    public void Clear() { heroes.Clear(); match = null; ownTeam = 0; lastReceipt = null; }
 
     public List<PlusAlert> Update(SpectatorSnapshot s, HeroNames names)
     {
         var alerts = new List<PlusAlert>();
-        if (s.Mode != "team-view" || s.OwnTeam is not (2 or 3) || !s.Running || s.Paused) return alerts;
-        if (s.MatchId != match || s.OwnTeam != ownTeam) { heroes.Clear(); match = s.MatchId; ownTeam = s.OwnTeam.Value; }
         long now = s.ReceivedAt;
+        if (now < lastReceipt) return alerts;
+        if (!TeamViewEvidence.IsTeamView(s)) { Clear(); return alerts; }
+        // Missing packets are not evidence that a previously visible enemy walked into fog.
+        if (s.MatchId != match || s.OwnTeam != ownTeam || now - lastReceipt >= TeamViewEvidence.FreshMs) heroes.Clear();
+        match = s.MatchId; ownTeam = s.OwnTeam!.Value; lastReceipt = now;
         // Illusions and clones share the hero's name; the first entry stands for it, as on the scan page.
-        foreach (var unit in s.Heroes.Where(u => u.Team is 2 or 3 && u.Team != ownTeam && u.Vision > 0).GroupBy(u => u.Name).Select(g => g.First())) {
-            if (!heroes.TryGetValue(unit.Name, out var h)) heroes[unit.Name] = h = new() { RunStart = now };
+        foreach (var unit in TeamViewEvidence.VisibleHeroes(s).Where(u => u.Team != ownTeam)) {
+            if (!heroes.TryGetValue(unit.Name, out var h)) {
+                if (heroes.Count >= 10) continue;
+                heroes[unit.Name] = h = new() { RunStart = now };
+            }
             else if (h.Announced || now - h.LastVisible >= GoneMs) { h.RunStart = now; h.Announced = false; }
             h.LastVisible = now; h.X = unit.X; h.Y = unit.Y;
         }
@@ -84,7 +92,22 @@ public sealed class VisionLossTracker
     }
 }
 
-public sealed record ScanStatus(bool Running, string Text);
+/// <summary>Source time, never the time at which the coach happened to poll the file.</summary>
+public sealed record ScanStamp(string Run, long WrittenMs, string MatchId, int OwnTeam, double Clock)
+{
+    // Some v0.4.8 files use a whole second for equipment and a later fraction of the same second for counts.
+    public double WardClock { get; init; } = Clock;
+    // Age of the scanner's GSI at this write. Keep it separate from the write identity: multiple
+    // sub-second HUD reads can legitimately follow the same GSI packet. Absent on legacy v2 files.
+    public double? GsiAgeMs { get; init; }
+    public bool FreshAt(long unixMs)
+    {
+        long held = unixMs - WrittenMs;
+        return unixMs >= WrittenMs && held is >= 0 and < TeamViewEvidence.FreshMs &&
+            (GsiAgeMs is not double age || age >= 0 && held + age < TeamViewEvidence.FreshMs);
+    }
+}
+public sealed record ScanStatus(bool Running, string Text, ScanStamp? Sample = null);
 
 /// <summary>
 /// The enemy panel found by scripts/vision/hero_scan.py on this machine, read from its live file: enemy levels
@@ -107,29 +130,48 @@ public static class ScanFeed
             // Shared for delete: the scanner replaces the file every half second and must not find it locked.
             using var stream = Shared(path);
             if (stream.Length > MaxFileBytes) return (new(false, "视觉扫描文件异常（过大），已忽略"), null, none);
-            using var doc = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 8 });
+            using var doc = JsonDocument.Parse(stream, new JsonDocumentOptions { MaxDepth = 8, AllowDuplicateProperties = false });
             var root = doc.RootElement;
             if (root.GetProperty("version").GetInt32() != 2) return (new(false, "视觉扫描版本不符（请更新 hero_scan.py），已忽略"), null, none);
-            long written = (long)(root.GetProperty("written").GetDouble() * 1000);
-            if (root.TryGetProperty("stopped", out var stopped) && stopped.ValueKind == JsonValueKind.True)
+            double wall = Math.Round(root.GetProperty("written").GetDouble() * 1000);
+            if (root.GetProperty("stopped").GetBoolean())
                 return (new(false, "视觉扫描已停止"), null, none);
-            if (nowUnixMs - written > StaleMs) return (new(false, "视觉扫描未运行（文件已过期）"), null, none);
+            // The writer is local. A timestamp from the future is not a fresh file either.
+            if (!Wire.Finite(wall, nowUnixMs - StaleMs, nowUnixMs)) return (new(false, "视觉扫描未运行（文件时间无效或已过期）"), null, none);
+            long written = (long)wall;
             string? scanMatch = root.TryGetProperty("matchId", out var m) && m.ValueKind == JsonValueKind.String ? m.GetString() : null;
             if (root.GetProperty("mode").GetString() != "team-view")
                 return (new(true, "视觉扫描运行中，但不是 Plus 队伍视角：不显示对手面板"), null, none);
-            if (scanMatch == null || scanMatch != matchId)
+            if (!TeamViewEvidence.RealMatch(scanMatch) || scanMatch != matchId)
                 return (new(true, "视觉扫描运行中，但对局与观战 GSI 不一致：不显示对手面板"), null, none);
+            bool hasGsiAge = root.TryGetProperty("gsiAge", out var age); // absent on the v0.4.8 whole-second envelope
+            if (!root.TryGetProperty("ownTeam", out var side) || side.GetInt32() is not (2 or 3) ||
+                !root.TryGetProperty("clock", out var time) || !Wire.Finite(time.GetDouble(), -300, 43_200) ||
+                root.GetProperty("run").GetString() is not { Length: > 0 and <= 64 } run ||
+                string.IsNullOrWhiteSpace(run) || hasGsiAge && age.ValueKind != JsonValueKind.Number)
+                return (new(true, "视觉扫描缺少新鲜的队伍视角或游戏时间"), null, none);
+            double clock = time.GetDouble();
+            var stamp = new ScanStamp(run, written, scanMatch!, side.GetInt32(), clock) { GsiAgeMs = hasGsiAge ? age.GetDouble() * 1000 : null };
+            if (!stamp.FreshAt(nowUnixMs)) return (new(true, "视觉扫描运行中，但源数据已过期或时间无效"), null, none);
             var enemies = root.GetProperty("enemies");
-            var board = new EnemyBoard(enemies.Deserialize<EnemyHero[]>(Wire.Json) ?? []);
+            if (enemies.ValueKind != JsonValueKind.Array || enemies.GetArrayLength() > 5)
+                return (new(true, "视觉扫描的对手数据无效，已忽略"), null, none);
+            var board = new EnemyBoard(enemies.Deserialize<EnemyHero[]>(Wire.Json)!);
             if (!Wire.ValidBoard(board)) return (new(true, "视觉扫描的对手数据无效，已忽略"), null, none);
-            return (new(true, "视觉扫描运行中"), board, Wards(enemies));
+            // v0.4.8 stamps the envelope in whole GSI seconds, but individual reads within that second are precise.
+            var wards = Wards(enemies, !hasGsiAge && clock == Math.Floor(clock) ? Math.Min(43_200, clock + .99) : clock);
+            // A roster without a single HUD read is a running scanner, not an available empty inventory.
+            if (!board.Heroes.Any(h => h.Level != null || h.Items != null || h.Neutral != null) && !wards.Values.Any(r => r.Length != 0))
+                return (new(true, "视觉扫描运行中，等待读取可见敌方英雄"), null, none);
+            double observed = wards.Values.SelectMany(rs => rs).Select(r => r.Clock).Append(clock).Max();
+            return (new(true, "视觉扫描运行中", stamp with { WardClock = observed }), board, wards);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException or
                                    InvalidOperationException or FormatException)
         { return (new(false, "视觉扫描文件暂不可读"), null, none); }
     }
     /// <summary>The "wards" reads of each enemy row; a malformed list is left out rather than trusted.</summary>
-    private static Dictionary<string, WardReading[]> Wards(JsonElement enemies)
+    private static Dictionary<string, WardReading[]> Wards(JsonElement enemies, double latest)
     {
         var result = new Dictionary<string, WardReading[]>(StringComparer.Ordinal);
         foreach (var row in enemies.EnumerateArray()) {
@@ -140,9 +182,13 @@ public static class ScanFeed
             static double? First(JsonElement r, double clock) => !r.TryGetProperty("first", out var f) ? null
                 : f.GetDouble() is var v && Wire.Finite(v, -300, clock) ? v : throw new FormatException();
             try {
-                result[row.GetProperty("hero").GetString()!] = reads.EnumerateArray().Select(r =>
-                    r.GetProperty("clock").GetDouble() is var c && Wire.Finite(c, -300, 43_200)
+                var list = reads.EnumerateArray().Select(r =>
+                    r.GetProperty("clock").GetDouble() is var c && Wire.Finite(c, -300, latest)
                         ? new WardReading(c, Count(r, "observer"), Count(r, "sentry"), Count(r, "unknown"), First(r, c)) : throw new FormatException()).ToArray();
+                // A change can't start before the preceding counts were last read.
+                for (int i = 1; i < list.Length; i++)
+                    if ((list[i].First ?? list[i].Clock) <= list[i - 1].Clock) throw new FormatException();
+                result[row.GetProperty("hero").GetString()!] = list;
             } catch (Exception e) when (e is FormatException or InvalidOperationException or KeyNotFoundException) { }
         }
         return result;

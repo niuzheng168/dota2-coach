@@ -7,12 +7,19 @@ using System.Net.WebSockets;
 namespace DotaCoach.TwoPc;
 
 /// <summary>Game machine: TLS transport only. No model client, API keys, game orders or inference.</summary>
-public sealed class GameLink : IDisposable
+public sealed partial class GameLink : IDisposable
 {
     private readonly HttpClient http;
     private readonly Func<long> now;
     private readonly Dictionary<long, (long At, FrameMeta Meta)> captures = new();
     private readonly Queue<long> captureOrder = new();
+    private readonly MinuteFarmWindow minuteWindow = new();
+    private readonly BoardWindow boardWindow = new();
+    private (EnemyBoard Receipt, EnemyBoard Value, long At, double AgeClock)? activeBoard;
+    private long boardPoll, lastBoardSequence;
+    private (Reminder Plan, FrameMeta Origin, long At, long Until)? activeMinute;
+    private long lastMinuteAccepted;
+    private FrameMeta? currentCapture;
     private readonly object gate = new();
     private readonly Pairing pairing;
     private ClientWebSocket? video;
@@ -20,8 +27,9 @@ public sealed class GameLink : IDisposable
     private SemaphoreSlim? window;
     private readonly Queue<long> unacknowledged = new();
     private Exception? ackFailure;
-    // A reminder may be shown until its source frame is FrameLifetime + MaxReminder old; keep that much metadata.
-    private const long CaptureRetentionMs = Wire.FrameLifetimeMs + Wire.MaxReminderMs;
+    // Longer history is metadata only. It must not extend ordinary reminders or the initial origin-age check.
+    private const int LegacyRetentionMs = Wire.FrameLifetimeMs + Wire.MaxReminderMs;
+    private const int CaptureRetentionMs = MinuteFarmContext.MaxDisplayMs;
     public string? SessionId { get; private set; }
     public GameLink(Pairing pairing, Func<long>? clock = null)
     {
@@ -31,7 +39,7 @@ public sealed class GameLink : IDisposable
         var handler = new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false };
         handler.ServerCertificateCustomValidationCallback = (_, cert, _, _) =>
             cert != null && Wire.EqualSecret(cert.GetCertHashString(HashAlgorithmName.SHA256), pairing.Fingerprint.ToUpperInvariant());
-        http = new(handler) { BaseAddress = new Uri(pairing.Address), Timeout = TimeSpan.FromSeconds(4) };
+        http = new(handler) { BaseAddress = new Uri(pairing.Address), Timeout = TimeSpan.FromSeconds(4), MaxResponseContentBufferSize = 65536 };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", pairing.Token);
     }
     private HttpRequestMessage Request(HttpMethod method, string path)
@@ -61,6 +69,7 @@ public sealed class GameLink : IDisposable
     }
     public async Task Connect(CancellationToken cancellation)
     {
+        DropPostgame();
         using var request = Request(HttpMethod.Post, "/v1/session");
         using var response = await http.SendAsync(request, cancellation);
         var hello = await Json<SessionHello>(response, cancellation);
@@ -68,7 +77,8 @@ public sealed class GameLink : IDisposable
             throw new InvalidOperationException("Protocol version mismatch");
         SessionId = hello.SessionId; videoProtocol = hello.VideoProtocol; ClearCaptures();
     }
-    private void ClearCaptures() { lock (gate) { captures.Clear(); captureOrder.Clear(); } }
+    private void ClearCaptures() { lock (gate) { captures.Clear(); captureOrder.Clear(); currentCapture = null;
+        minuteWindow.Clear(); activeMinute = null; lastMinuteAccepted = 0; boardWindow.Clear(); activeBoard = null; lastBoardSequence = 0; boardPoll++; } }
     // Ticket round-trip precedes capture: both sides can bound frame age without synchronised wall clocks.
     public async Task<Ticket> GetTicket(CancellationToken cancellation)
     {
@@ -133,14 +143,24 @@ public sealed class GameLink : IDisposable
                 slots.Release();
             }
         } catch (Exception e) {
-            lock (gate) if (window == slots) ackFailure = e;
+            lock (gate) if (window == slots) { ackFailure = e; minuteWindow.Clear(); activeMinute = null; boardWindow.Withdraw(); activeBoard = null; }
             socket.Abort(); // Any pending send fails promptly instead of waiting for its timeout.
         }
     }
-    public void AbortVideo() { video?.Abort(); }
+    public void AbortVideo() { DropPostgame(); lock (gate) { minuteWindow.Clear(); activeMinute = null; boardWindow.Withdraw(); activeBoard = null; } video?.Abort(); }
     private void Remember(FrameMeta meta, long at)
     {
         lock (gate) {
+            // The wire names for v0.4 status and a real image overlap. Don't keep an origin across
+            // that boundary, even if a stale/older coach returns it after switching back to video.
+            if (currentCapture != null && (currentCapture.IsLegacyStatus || meta.IsLegacyStatus) && meta.BreaksReminderScope(currentCapture)) {
+                captures.Clear(); captureOrder.Clear();
+            }
+            currentCapture = meta;
+            boardWindow.Observe(meta, at, now());
+            if (activeBoard is { } b && !boardWindow.Admits(b.Value, now())) activeBoard = null;
+            minuteWindow.Observe(meta, at, now());
+            PruneMinute(now());
             captures[meta.Sequence] = (at, meta); captureOrder.Enqueue(meta.Sequence);
             // Sequences only increase, so the queue front is always the oldest capture.
             while (captureOrder.TryPeek(out long oldest) && (captures.Count > Wire.HistoryLimit ||
@@ -161,10 +181,12 @@ public sealed class GameLink : IDisposable
         if (!response.IsSuccessStatusCode) throw new HttpRequestException(
             "画面被拒绝或会话已失效，请重新连接。", null, response.StatusCode);
     }
-    /// <summary>Video off: own GSI and window size, no picture. Reminders may then be based on its sequence.</summary>
+    /// <summary>v0.4 compatibility: flat own fields and window size only; no pixels, witness, farm telemetry or board authority.</summary>
     public async Task SendStatus(FrameMeta meta, CancellationToken cancellation)
     {
-        if (meta.SessionId != SessionId) throw new InvalidOperationException("Old session");
+        if (SessionId == null || meta.SessionId != SessionId) throw new InvalidOperationException("Old session");
+        meta = meta.ForLegacyStatus(); // Strip new fields BEFORE serialization as well as before remembering a local origin.
+        CoachMailbox.ValidateMeta(meta, meta.SourceWidth, meta.SourceHeight);
         using var request = Request(HttpMethod.Post, "/v1/status");
         request.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(meta, Wire.Json));
         request.Content.Headers.ContentType = new("application/json");
@@ -181,17 +203,30 @@ public sealed class GameLink : IDisposable
         using var response = await http.SendAsync(request, cancellation);
         var result = await Json<ReminderEnvelope>(response, cancellation);
         var r = result.Reminder;
-        if (r == null) return null;
         lock (gate)
         {
+            long instant = now(), elapsed = instant - started;
+            if (r?.Kind != MinuteFarmContext.Kind) activeMinute = null;
+            if (r == null) return null;
+            bool minute = r.Kind == MinuteFarmContext.Kind;
+            long statusUntil = long.MaxValue;
+            if (currentCapture is { IsLegacyStatus: true } status) {
+                if (!Wire.StatusSubtitle(r.Kind, r.Marker, r.Minimap, r.Route, r.NextSteps) || status.Player?.Alive == false ||
+                    !captures.TryGetValue(status.Sequence, out var latest) || instant < latest.At ||
+                    (statusUntil = latest.At + Wire.PresenceLifetimeMs) <= instant) return null;
+            }
             if (r.SessionId != SessionId || !captures.TryGetValue(r.FrameSequence, out var captured) ||
-                now() - captured.At >= CaptureRetentionMs || r.RemainingMs <= now() - started ||
-                r.RemainingMs > Wire.MaxReminderMs || r.Message.Length is < 1 or > 120 ||
+                captured.Meta.SessionId != r.SessionId || instant < captured.At || elapsed < 0 ||
+                instant - captured.At >= (minute ? CaptureRetentionMs : LegacyRetentionMs) || r.RemainingMs <= elapsed ||
+                r.RemainingMs > (minute ? MinuteFarmContext.MaxDisplayMs : Wire.MaxReminderMs) ||
+                string.IsNullOrWhiteSpace(r.Message) || r.Message.Length > 120 || minute != r.FarmMinute.HasValue ||
+                !minute && (captured.Meta.Source == "dota2-gsi" || currentCapture?.Source == "dota2-gsi") ||
+                captured.Meta.IsLegacyStatus != (currentCapture?.IsLegacyStatus == true) ||
                 !Wire.ValidRoute(r.Route, r.Marker) || !Wire.ValidSteps(r.NextSteps) ||
-                (r.Route != null && r.Kind is not ("visible-farming-advice" or "experimental-bot-advice")) ||
+                (r.Route != null && !minute && r.Kind is not ("visible-farming-advice" or "experimental-bot-advice")) ||
                 (r.Kind == "visible-farming-advice" && r.Route != null && (r.Minimap == null || r.Route.Any(p => !r.Minimap.Contains(p)))) ||
                 r.SourceWidth != captured.Meta.SourceWidth || r.SourceHeight != captured.Meta.SourceHeight ||
-                r.Kind is not ("manual-link-test" or "local-vision-observation" or "experimental-bot-advice" or "visible-farming-advice") ||
+                !minute && r.Kind is not ("manual-link-test" or "local-vision-observation" or "experimental-bot-advice" or "visible-farming-advice") ||
                 (r.Kind == "experimental-bot-advice" && (captured.Meta.Source != "dota2" ||
                     captured.Meta.Player is not { MatchId: "0", Alive: true } ||
                     (r.Route ?? (r.Marker == null ? [] : [r.Marker])).Any(p => !Wire.Finite(p.X, 0, .20) || !Wire.Finite(p.Y, .65, 1)))) ||
@@ -200,30 +235,132 @@ public sealed class GameLink : IDisposable
                     r.Marker != null && (r.Minimap == null || !r.Minimap.IsValidFor(r.SourceWidth, r.SourceHeight) ||
                                         !r.Minimap.Contains(r.Marker)))) ||
                 (r.Marker != null && (r.Kind == "local-vision-observation" ||
-                    !Wire.Finite(r.Marker.X, 0, 1) || !Wire.Finite(r.Marker.Y, 0, 1)))) return null;
-            int remaining = (int)Math.Min(r.RemainingMs - (now() - started), CaptureRetentionMs - (now() - captured.At));
+                    !Wire.Finite(r.Marker.X, 0, 1) || !Wire.Finite(r.Marker.Y, 0, 1)))) { activeMinute = null; return null; }
+            long until = started + r.RemainingMs; // Charge the entire request round trip; no synchronized wall clocks.
+            if (minute) {
+                PruneMinute(instant);
+                if (string.IsNullOrWhiteSpace(r.Id) || r.Id.Length > 64 ||
+                    !MinuteFarmContext.Shape(r.FarmMinute, r.Marker, r.Route, r.NextSteps, r.Minimap, r.SourceWidth, r.SourceHeight) ||
+                    ackFailure != null ||
+                    (until = Math.Min(until, minuteWindow.Deadline(captured.Meta, captured.At, r.FarmMinute, instant))) <= instant) {
+                    activeMinute = null; return null;
+                }
+                if (activeMinute is { } held && r.Id == held.Plan.Id && r.FrameSequence == held.Origin.Sequence) {
+                    // An old origin may keep displaying the admitted plan, not supply a replacement under its ID.
+                    if (r.Message != held.Plan.Message || r.Minimap != held.Plan.Minimap || r.ShowSubtitle != held.Plan.ShowSubtitle ||
+                        !r.Route!.SequenceEqual(held.Plan.Route!) || !r.NextSteps!.SequenceEqual(held.Plan.NextSteps!)) {
+                        activeMinute = null; return null;
+                    }
+                    until = Math.Min(until, held.Until);
+                } else if (r.FrameSequence <= lastMinuteAccepted || captured.Meta.GsiAgeMs == null ||
+                    instant - captured.At + captured.Meta.GsiAgeMs.Value >= Wire.FrameLifetimeMs) { activeMinute = null; return null; }
+                lastMinuteAccepted = r.FrameSequence;
+                activeMinute = (r with { Route = r.Route!.ToArray(), NextSteps = r.NextSteps!.ToArray() }, captured.Meta, captured.At, until);
+            } else until = Math.Min(until, Math.Min(statusUntil, captured.At + LegacyRetentionMs));
             // Age measured on THIS machine's clock from the original capture; never taken from the coach.
-            return r with { RemainingMs = remaining, SourceAgeMs = (int)(now() - captured.At) };
+            return r with { RemainingMs = (int)(until - instant), SourceAgeMs = (int)(instant - captured.At) };
         }
     }
-    /// <summary>The coach's enemy panel, or null: none published, or a coach without one (404).</summary>
+    private void PruneMinute(long instant)
+    {
+        if (activeMinute is not { } r) return;
+        long until = Math.Min(r.Until, minuteWindow.Deadline(r.Origin, r.At, r.Plan.FarmMinute, instant));
+        activeMinute = until <= instant ? null : (r.Plan, r.Origin, r.At, until);
+    }
+    /// <summary>Recheck on every local render, not just when a network request or capture finishes.
+    /// own/age must come directly from this machine's current receiver, never from a coach frame.</summary>
+    public bool CanRenderMinuteRoute(Reminder r, OwnState? own, int? gsiAgeMs)
+    {
+        lock (gate) {
+            long instant = now();
+            PruneMinute(instant);
+            if (activeMinute is not { } held || r.Kind != MinuteFarmContext.Kind || r.Id != held.Plan.Id ||
+                r.FrameSequence != held.Origin.Sequence || r.FarmMinute != held.Plan.FarmMinute || r.SessionId != SessionId) return false;
+            if (ackFailure != null || gsiAgeMs is null or < 0 or >= MinuteFarmContext.FreshMs || !MinuteFarmContext.Eligible(own) ||
+                !MinuteFarmContext.Continues(held.Origin.Player!, own!) ||
+                !MinuteFarmContext.Continues(minuteWindow.Current!.Player!, own!)) { activeMinute = null; return false; }
+            long until = Math.Min(held.Until, instant - gsiAgeMs.Value + MinuteFarmContext.RemainderMs(own!));
+            if (until <= instant) { activeMinute = null; return false; }
+            activeMinute = (held.Plan, held.Origin, held.At, until);
+            return true;
+        }
+    }
+    /// <summary>Only boards tied to our own fresh authenticated capture may be admitted. A v0.4.8 scanner DTO
+    /// remains readable, but an unbound reply (or a coach without this endpoint) cannot authorize a game overlay.</summary>
     public async Task<EnemyBoard?> Enemies(CancellationToken cancellation)
     {
+        long order, started = now();
+        lock (gate) order = ++boardPoll;
         using var request = Request(HttpMethod.Get, "/v1/enemies");
-        using var response = await http.SendAsync(request, cancellation);
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
-        var board = (await Json<BoardEnvelope>(response, cancellation)).Enemies;
-        return Wire.ValidBoard(board) ? board : null;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        timeout.CancelAfter(http.Timeout);
+        EnemyBoard? board = null;
+        try {
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            if (response.IsSuccessStatusCode)
+                board = BoardDelivery.Read(await Body(response, 65536, timeout.Token));
+            else if (response.StatusCode != System.Net.HttpStatusCode.NotFound) response.EnsureSuccessStatusCode();
+        } catch (Exception e) when (e is JsonException or InvalidOperationException) { /* Malformed/oversized: withdraw. */ }
+        catch {
+            // Lost pin/token, cancelled poll or transport failure: don't leave a previous receipt drawable.
+            lock (gate) if (order == boardPoll) activeBoard = null;
+            throw;
+        }
+        lock (gate) {
+            if (order != boardPoll) return null;
+            activeBoard = null;
+            long instant = now(), elapsed = instant - started;
+            if (board == null || board.SessionId != SessionId || ackFailure != null || elapsed < 0 ||
+                board.RemainingMs is < 1 or > Wire.BoardLifetimeMs || !boardWindow.Admits(board, instant) ||
+                board.FrameSequence < lastBoardSequence || !captures.TryGetValue(board.FrameSequence, out var origin) ||
+                origin.Meta.SessionId != SessionId || origin.Meta.MatchPhase == null) return null;
+            // Charge the full poll RTT, cap at our own original capture and never draw through a stalled poller.
+            double baseClock = origin.Meta.MatchPhase.Clock + board.HeldMs / 1000d;
+            long advance = BoardDelivery.ElapsedMs(elapsed, baseClock, boardWindow.Clock);
+            long remaining = Math.Min(Math.Min(board.RemainingMs, MatchWitness.MaxAgeMs) - advance, origin.At + Wire.BoardLifetimeMs - instant);
+            if (remaining <= 0) return null;
+            var value = BoardDelivery.Age(boardWindow.Calibrated(board), advance, (int)remaining);
+            if (BoardDelivery.Empty(value)) return null;
+            var receipt = BoardDelivery.Age(value, 0, value.RemainingMs);
+            activeBoard = (receipt, value, instant, baseClock + advance / 1000d); lastBoardSequence = board.FrameSequence;
+            return receipt;
+        }
     }
-    /// <summary>One icon of the enemy panel as PNG bytes, or null when the coach has none.</summary>
+    /// <summary>Revalidates on every render, including a cached drawing. Pass this machine's latest participant
+    /// witness and the actual viewport, never the coach's expectation or the minute-route verdict.</summary>
+    public EnemyBoard? DisplayEnemies(EnemyBoard receipt, MatchWitness? local, int width, int height)
+    {
+        lock (gate) {
+            if (activeBoard is not { } b || !ReferenceEquals(receipt, b.Receipt)) return null;
+            long instant = now();
+            if (!boardWindow.Local(local, width, height, instant)) { boardWindow.Withdraw(); activeBoard = null; return null; }
+            long advance = BoardDelivery.ElapsedMs(instant - b.At, b.AgeClock, local!.Clock);
+            if (ackFailure != null || !boardWindow.Admits(b.Value, instant) || instant < b.At || advance >= b.Value.RemainingMs) {
+                activeBoard = null; return null;
+            }
+            var result = BoardDelivery.Age(boardWindow.Calibrated(b.Value), advance, b.Value.RemainingMs - (int)advance);
+            return BoardDelivery.Empty(result) ? null : result;
+        }
+    }
+    private bool MayReadIcon(string key)
+    {
+        lock (gate) {
+            long instant = now();
+            return activeBoard is { } b && ackFailure == null && boardWindow.Admits(b.Value, instant) && instant >= b.At &&
+                BoardDelivery.ElapsedMs(instant - b.At, b.AgeClock, boardWindow.Clock) < b.Value.RemainingMs && BoardDelivery.HasIcon(b.Value, key);
+        }
+    }
+    /// <summary>Only icons on the currently admitted equipment panel, even when paired with an older coach.</summary>
     public async Task<byte[]?> Icon(string key, CancellationToken cancellation)
     {
-        if (!Wire.ValidIconKey(key)) return null;
+        if (!Wire.ValidIconKey(key) || !MayReadIcon(key)) return null;
         using var request = Request(HttpMethod.Get, "/v1/icon/" + key);
-        using var response = await http.SendAsync(request, cancellation);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        timeout.CancelAfter(http.Timeout);
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         if (!response.IsSuccessStatusCode) return null;
-        var data = await Body(response, Wire.MaxIconBytes, cancellation);
-        return Wire.IsIcon(data) ? data : null;
+        var data = await Body(response, Wire.MaxIconBytes, timeout.Token);
+        return Wire.IsIcon(data) && MayReadIcon(key) ? data : null;
     }
     public async Task End(CancellationToken cancellation)
     {
@@ -238,10 +375,11 @@ public sealed class GameLink : IDisposable
     }
     private void CloseVideo()
     {
-        lock (gate) { window = null; unacknowledged.Clear(); }
+        DropPostgame();
+        lock (gate) { window = null; unacknowledged.Clear(); minuteWindow.Clear(); activeMinute = null; ackFailure = null;
+            boardWindow.Clear(); activeBoard = null; boardPoll++; }
         video?.Abort(); video?.Dispose(); video = null;
     }
     public void Dispose() { CloseVideo(); http.Dispose(); ClearCaptures(); }
     private sealed record ReminderEnvelope(Reminder? Reminder);
-    private sealed record BoardEnvelope(EnemyBoard? Enemies);
 }

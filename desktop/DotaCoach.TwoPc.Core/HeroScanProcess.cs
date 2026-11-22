@@ -5,8 +5,8 @@ using System.Text;
 namespace DotaCoach.TwoPc;
 
 /// <summary>
-/// scripts/vision/hero_scan.py run by the coach client from a repository folder (its scripts and .tmp/vision-assets)
-/// with the Python that has the vision packages. The scan reads a pipe as standard input and ends when it closes:
+/// Bundled scripts/vision/hero_scan.py run with the user's local vision Python, art and calibration.
+/// The scan reads a pipe as standard input and ends when it closes:
 /// on the stop button, and also when the client exits or crashes.
 /// </summary>
 public sealed class HeroScanProcess : IAsyncDisposable
@@ -38,10 +38,13 @@ public sealed class HeroScanProcess : IAsyncDisposable
             if (File.Exists(Path.Combine(dir.FullName, Script))) return dir.FullName;
         return null;
     }
-    /// <summary>Whether the folder's scanner can be run by the coach client: older checkouts lack --stop-with-stdin and exit at once.</summary>
+    /// <summary>The launcher requires both a stoppable scanner and a team-view-only capture mode.</summary>
     public static bool Supported(string folder)
     {
-        try { return File.ReadAllText(Path.Combine(folder, Script)).Contains("--stop-with-stdin", StringComparison.Ordinal); }
+        try {
+            string script = File.ReadAllText(Path.Combine(folder, Script));
+            return script.Contains("--stop-with-stdin", StringComparison.Ordinal) && script.Contains("--team-view-only", StringComparison.Ordinal);
+        }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
     }
     /// <summary>The vision venv (.tmp/vision-tools) of the folder, or of the main checkout when the folder is a git worktree.</summary>
@@ -50,6 +53,20 @@ public sealed class HeroScanProcess : IAsyncDisposable
         foreach (var root in new[] { folder, MainCheckout(folder) }.OfType<string>()) {
             string python = Path.Combine(root, ".tmp", "vision-tools", "Scripts", "python.exe");
             if (File.Exists(python)) return python;
+        }
+        return null;
+    }
+    /// <summary>Find local art and HUD calibration. A development worktree can share the main checkout's
+    /// assets just like its venv, without changing which bundled scanner code the launcher executes.</summary>
+    public static string? FindWorkspace(string start)
+    {
+        static bool Calibrated(string root) {
+            string assets = Path.Combine(root, ".tmp", "vision-assets");
+            return File.Exists(Path.Combine(assets, "manifest.json")) && File.Exists(Path.Combine(assets, "hud-1080.npz"));
+        }
+        for (var d = new DirectoryInfo(start); d != null; d = d.Parent) {
+            if (Calibrated(d.FullName)) return d.FullName;
+            if (MainCheckout(d.FullName) is { } main && Calibrated(main)) return main;
         }
         return null;
     }
@@ -79,11 +96,14 @@ public sealed class HeroScanProcess : IAsyncDisposable
     }
 
     /// <summary>Starts the scan, writing <paramref name="live"/> for the coach client; every line it prints also goes to <paramref name="logFile"/>.</summary>
-    public static HeroScanProcess Start(string python, string folder, string live, string? logFile)
+    public static HeroScanProcess Start(string python, string folder, string live, string? logFile, string? workspace = null)
     {
         // A day: the scanner's own default ends after an hour, while the coach client runs for many matches.
         var scan = new HeroScanProcess();
-        scan.process.StartInfo = Info(python, folder, "scan", "--stop-with-stdin", "--duration", "86400",
+        string assets = Path.Combine(workspace ?? folder, ".tmp", "vision-assets");
+        scan.process.StartInfo = Info(python, folder, "scan", "--stop-with-stdin", "--team-view-only", "--duration", "86400",
+            "--assets", assets, "--calibration", Path.Combine(assets, "hud-1080.npz"),
+            "--out", Path.Combine(Path.GetDirectoryName(Path.GetFullPath(live))!, "sessions"),
             "--live", Path.GetFullPath(live), "--secrets", SecretsBeside(live));
         scan.process.OutputDataReceived += (_, e) => scan.Line(e.Data, error: false);
         scan.process.ErrorDataReceived += (_, e) => scan.Line(e.Data, error: true);
@@ -129,8 +149,8 @@ public sealed class HeroScanProcess : IAsyncDisposable
             RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8,
         };
-        // -I: nothing from the environment or the working folder is imported; -X utf8: tracebacks in UTF-8 too; -u: lines arrive as printed.
-        foreach (var arg in new[] { "-I", "-X", "utf8", "-u", Script }.Concat(args)) info.ArgumentList.Add(arg);
+        // Isolate imports; don't write bytecode into bundled scripts or a shared vision venv. Keep output UTF-8 and unbuffered.
+        foreach (var arg in new[] { "-I", "-B", "-X", "utf8", "-u", Script }.Concat(args)) info.ArgumentList.Add(arg);
         return info;
     }
 

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="farm-shadow-bridge-origin" content="__BRIDGE_LOOPBACK_ORIGIN__">
+  <title>本地影子输入桥 · 7.42</title><link rel="stylesheet" href="/farm-shadow-bridge.css">
+  <script src="/farm-shadow-bridge.js" defer></script>
+</head>
+<body>
+<main>
+  <header><p class="eyebrow">DOTA 2 / 本机输入检查</p><h1>7.42 影子输入桥</h1>
+    <p>仅限自定义局或本人视角复盘演练。没有桌面叠加，不替你移动、施法或点击。<strong>目标在己方可见区域，不等于去那里的路径安全。</strong></p></header>
+  <section><h2>接入本次进程</h2>
+    <form id="login" autocomplete="off"><label>Operator token（不是 GSI token）
+      <input id="token" type="password" required maxlength="64" autocomplete="off" spellcheck="false" disabled></label>
+      <button id="connect" disabled>连接</button><button id="disconnect" type="button" disabled>断开页面</button>
+      <button id="stop" type="button" class="warn" disabled>终止桥接</button></form>
+    <p id="message" role="status">尚未连接。token 只保存在本页内存中。</p>
+  </section>
+  <section><h2>当前本人输入 <span id="mode" class="badge">未连接</span></h2>
+    <p id="status">没有有效帧。</p>
+    <pre id="own">—</pre>
+  </section>
+  <div class="columns">
+    <section><h2>1 · 核对本局</h2>
+      <form id="confirm"><fieldset id="confirmFields" disabled>
+        <label>本局 Client/Server build（未知留空）<input id="build" type="number" min="1" max="10000000" placeholder="不是 provider.version"></label>
+        <label>本局实际开局 Unix 秒（未知留空）<input id="start" type="number" min="1" placeholder="不可用当前时间或倒推代替"></label>
+        <label class="check"><input id="ownView" type="checkbox" required>我已核对上方局号、阵营和英雄。这是指定演练中的本人视角；已填的元数据来自本局。</label>
+        <button>确认本局</button>
+      </fieldset></form><p id="meta" class="sub">等待本人 GSI。</p>
+    </section>
+    <section><h2>2 · 替换当前目击</h2>
+      <form id="observe"><fieldset id="observeFields" disabled>
+        <label>亲眼所见的目标（留空＝撤回目标）<input id="target" list="sites" maxlength="12" placeholder="例如 lane:bot 或 good_1" spellcheck="false"></label>
+        <datalist id="sites"><option>lane:bot</option><option>lane:mid</option><option>lane:top</option><option>good_1</option><option>good_2</option><option>evil_1</option><option>evil_2</option></datalist>
+        <label>目标状态<select id="presence"><option value="unknown">不清楚 / 看不到</option><option value="present">此刻看见兵或野怪</option><option value="empty">看得见，现场确实为空</option></select></label>
+        <label>目标所在的局部区域<select id="area"><option value="unknown">未核对</option><option value="own">此刻亲见为己方活动段</option><option value="enemy">对方区域</option></select></label>
+        <label>本人视野中的危险<select id="danger"><option value="unknown">未核对</option><option value="not-seen">此刻未看到危险（不保证安全）</option><option value="seen">看到了危险</option></select></label>
+        <label class="check"><input id="visibleNow" type="checkbox" required>此刻仍是本人画面，且与上方游戏时钟相符。不是看录像全图所得。</label>
+        <button>提交当前目击</button><button id="threat" type="button" class="warn">看到危险，立即撤回</button>
+      </fieldset></form>
+    </section>
+  </div>
+  <section><h2>当前目击与影子对照</h2><pre id="visible">—</pre>
+    <p id="shadow">无当前影子结果。</p>
+    <p class="sub">历史频次不是成功率或金币预测。空地与不可见分开；没有当前依据就不显示候选。此页始终不发游戏操作。</p>
+  </section>
+</main>
+</body></html>

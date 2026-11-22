@@ -1,0 +1,401 @@
+{
+  "version": 1,
+  "patch": "7.42",
+  "build": 6989,
+  "holdout": [
+    9099209663,
+    9099283649,
+    9100049738
+  ],
+  "provenance": "VPK-derived routing; untouched full matches. Past 1.2 s XY speed estimate, NEVER future length/time or the base field.",
+  "q": "nearest rank",
+  "inputs": {
+    "mapVpk": "7fc24ff13fcbe6840e5b9d76beb23f681368ecd2aa8b32a1e31e3cda959bd304",
+    "gnv": "5451e230fb49372a3dde42588cc3a330caaad8ceef280d0c4093ae73cae64588",
+    "trm": "c7cddfcdd891634dbbb32939f18c4251f3ed74a398c00b27e7c4018362984701",
+    "surface": "30d8080a1926af96e1b7e4be053e4803bf0faa2af906c4e6571ead336faa42d6",
+    "clips": "abffe61967920d97be83f7117f20744d2e95bb678035a2349f365f9e42e4c0e2",
+    "policy": {
+      "halfHull": 24,
+      "treeReserve": 32,
+      "maxCenterGrade": 1,
+      "shortcutCells": 12,
+      "structureReserves": {
+        "SMALL": 48,
+        "FILLER": 144,
+        "TOWER": 160,
+        "BUILDING": 320,
+        "BARRACKS": 320,
+        "UNSPECIFIED": 320
+      },
+      "notEngineRadii": true
+    }
+  },
+  "tracePayloads": [
+    [
+      9099209663,
+      "2e8f5288d7ab8f8aa55b6e9aa33946d87d44f1238188125cafd0de994cb8210c"
+    ],
+    [
+      9099283649,
+      "54a63875d7f6696b0cc471e50c61c7dfdae4b3aa82ca9ce20ef747ea948d2260"
+    ],
+    [
+      9100049738,
+      "f01e0978203fc672c3e41854bf738e96bbb97d5c3f2efc7c54877ab4201a5e84"
+    ]
+  ],
+  "geometry": {
+    "alive": 19619,
+    "repeatedClockDiscardedInCapture": 259,
+    "rawGnvOpen": 19619,
+    "fullEnvelopeSupported": 18792,
+    "pointStates": {
+      "open": 18792,
+      "hull-near-blocked-cell": 353,
+      "standing-tree-reserve": 251,
+      "structure-reserve": 223
+    },
+    "centerZVsNetworkZ": {
+      "n": 19619,
+      "meanAbs": 0.666,
+      "medianAbs": 0,
+      "p90Abs": 0,
+      "p99Abs": 13.563,
+      "maxAbs": 349.781,
+      "over32": 29
+    }
+  },
+  "uninterrupted": {
+    "n": 137,
+    "meanAbsS": 0.561,
+    "medianAbsS": 0.173,
+    "p90AbsS": 1.859,
+    "maxAbsS": 6.697,
+    "meanSignedS": -0.367,
+    "observedMedianS": 4,
+    "observedMaxS": 10,
+    "observedMinS": 2,
+    "avgModelMinusObservedUnits": -152.1,
+    "chordDiagnosticMaeS": 0.752,
+    "speedShiftOver10Pct": 15,
+    "observedPolylineSupported": 55,
+    "refusals": {
+      "end-blocked": 5,
+      "start-blocked": 5
+    },
+    "blockedChord": {
+      "n": 105,
+      "meanAbsS": 0.544,
+      "medianAbsS": 0.165,
+      "p90AbsS": 1.325,
+      "maxAbsS": 6.697,
+      "meanSignedS": -0.305,
+      "observedMedianS": 4.533,
+      "observedMaxS": 10,
+      "observedMinS": 2,
+      "avgModelMinusObservedUnits": -132.242,
+      "chordDiagnosticMaeS": 0.794,
+      "speedShiftOver10Pct": 12,
+      "observedPolylineSupported": 29
+    },
+    "betweenDistinctCampVicinity": {
+      "n": 3,
+      "meanAbsS": 0.198,
+      "medianAbsS": 0.18,
+      "p90AbsS": 0.395,
+      "maxAbsS": 0.395,
+      "meanSignedS": -0.065,
+      "observedMedianS": 4.933,
+      "observedMaxS": 7.733,
+      "observedMinS": 2.533,
+      "avgModelMinusObservedUnits": -5.785,
+      "chordDiagnosticMaeS": 0.507,
+      "speedShiftOver10Pct": 0,
+      "observedPolylineSupported": 1
+    }
+  },
+  "scheduled": {
+    "candidates": 270,
+    "categories": {
+      "mixed": 68,
+      "no-moving-speed-prefix": 182,
+      "start-blocked": 3,
+      "walk": 9,
+      "end-blocked": 4,
+      "dead-gap-or-jump": 4
+    },
+    "walking": {
+      "n": 9,
+      "meanAbsS": 0.44,
+      "medianAbsS": 0.102,
+      "p90AbsS": 2.696,
+      "maxAbsS": 2.696,
+      "meanSignedS": -0.35,
+      "observedMedianS": 3.067,
+      "observedMaxS": 6.933,
+      "observedMinS": 2.933,
+      "avgModelMinusObservedUnits": -122.167,
+      "chordDiagnosticMaeS": 0.56,
+      "speedShiftOver10Pct": 0,
+      "observedPolylineSupported": 3
+    },
+    "mixed": {
+      "n": 68,
+      "meanAbsS": 2.304,
+      "medianAbsS": 1.99,
+      "p90AbsS": 4.382,
+      "maxAbsS": 5.898,
+      "meanSignedS": -2.304,
+      "observedMedianS": 4.933,
+      "observedMaxS": 7.067,
+      "observedMinS": 2.933,
+      "avgModelMinusObservedUnits": -245.414,
+      "chordDiagnosticMaeS": 2.466,
+      "speedShiftOver10Pct": 55,
+      "observedPolylineSupported": 42
+    }
+  },
+  "matches": [
+    {
+      "id": 9099209663,
+      "hero": "troll_warlord",
+      "team": "dire",
+      "totalSamples": 6780,
+      "repeatedClock": 0,
+      "alive": 6510,
+      "gnvOpen": 6510,
+      "supported": 5932,
+      "heightP90Abs": 0,
+      "heightMaxAbs": 349.781,
+      "movementBouts": 289,
+      "boutsTooShort": 246,
+      "walking": {
+        "n": 39,
+        "meanAbsS": 0.475,
+        "medianAbsS": 0.225,
+        "p90AbsS": 1.621,
+        "maxAbsS": 2.479,
+        "meanSignedS": -0.23,
+        "observedMedianS": 4,
+        "observedMaxS": 10,
+        "observedMinS": 2,
+        "avgModelMinusObservedUnits": -119.334,
+        "chordDiagnosticMaeS": 0.571,
+        "speedShiftOver10Pct": 4,
+        "observedPolylineSupported": 13,
+        "refusals": {
+          "end-blocked": 3,
+          "start-blocked": 2
+        },
+        "blockedChord": {
+          "n": 28,
+          "meanAbsS": 0.5,
+          "medianAbsS": 0.225,
+          "p90AbsS": 1.621,
+          "maxAbsS": 2.479,
+          "meanSignedS": -0.189,
+          "observedMedianS": 4.533,
+          "observedMaxS": 10,
+          "observedMinS": 2,
+          "avgModelMinusObservedUnits": -113.85,
+          "chordDiagnosticMaeS": 0.632,
+          "speedShiftOver10Pct": 3,
+          "observedPolylineSupported": 4
+        },
+        "betweenDistinctCampVicinity": {
+          "n": 1,
+          "meanAbsS": 0.395,
+          "medianAbsS": 0.395,
+          "p90AbsS": 0.395,
+          "maxAbsS": 0.395,
+          "meanSignedS": -0.395,
+          "observedMedianS": 2.533,
+          "observedMaxS": 2.533,
+          "observedMinS": 2.533,
+          "avgModelMinusObservedUnits": -128.37,
+          "chordDiagnosticMaeS": 0.425,
+          "speedShiftOver10Pct": 0,
+          "observedPolylineSupported": 0
+        }
+      }
+    },
+    {
+      "id": 9099283649,
+      "hero": "troll_warlord",
+      "team": "dire",
+      "totalSamples": 7039,
+      "repeatedClock": 259,
+      "alive": 6359,
+      "gnvOpen": 6359,
+      "supported": 6225,
+      "heightP90Abs": 0,
+      "heightMaxAbs": 32.844,
+      "movementBouts": 319,
+      "boutsTooShort": 270,
+      "walking": {
+        "n": 46,
+        "meanAbsS": 0.495,
+        "medianAbsS": 0.108,
+        "p90AbsS": 1.859,
+        "maxAbsS": 3.868,
+        "meanSignedS": -0.239,
+        "observedMedianS": 3.334,
+        "observedMaxS": 10,
+        "observedMinS": 2,
+        "avgModelMinusObservedUnits": -104.209,
+        "chordDiagnosticMaeS": 0.727,
+        "speedShiftOver10Pct": 8,
+        "observedPolylineSupported": 21,
+        "refusals": {
+          "end-blocked": 2,
+          "start-blocked": 1
+        },
+        "blockedChord": {
+          "n": 38,
+          "meanAbsS": 0.457,
+          "medianAbsS": 0.108,
+          "p90AbsS": 1.859,
+          "maxAbsS": 3.868,
+          "meanSignedS": -0.148,
+          "observedMedianS": 3.466,
+          "observedMaxS": 10,
+          "observedMinS": 2,
+          "avgModelMinusObservedUnits": -65.431,
+          "chordDiagnosticMaeS": 0.738,
+          "speedShiftOver10Pct": 8,
+          "observedPolylineSupported": 15
+        },
+        "betweenDistinctCampVicinity": {
+          "n": 0,
+          "meanAbsS": null,
+          "medianAbsS": null,
+          "p90AbsS": null,
+          "maxAbsS": null,
+          "meanSignedS": null,
+          "observedMedianS": null,
+          "observedMaxS": null,
+          "observedMinS": null,
+          "avgModelMinusObservedUnits": null,
+          "chordDiagnosticMaeS": null,
+          "speedShiftOver10Pct": 0,
+          "observedPolylineSupported": 0
+        }
+      }
+    },
+    {
+      "id": 9100049738,
+      "hero": "luna",
+      "team": "radiant",
+      "totalSamples": 6780,
+      "repeatedClock": 0,
+      "alive": 6750,
+      "gnvOpen": 6750,
+      "supported": 6635,
+      "heightP90Abs": 0,
+      "heightMaxAbs": 193.781,
+      "movementBouts": 361,
+      "boutsTooShort": 307,
+      "walking": {
+        "n": 52,
+        "meanAbsS": 0.683,
+        "medianAbsS": 0.192,
+        "p90AbsS": 1.923,
+        "maxAbsS": 6.697,
+        "meanSignedS": -0.582,
+        "observedMedianS": 4.4,
+        "observedMaxS": 10,
+        "observedMinS": 2.133,
+        "avgModelMinusObservedUnits": -219.039,
+        "chordDiagnosticMaeS": 0.909,
+        "speedShiftOver10Pct": 3,
+        "observedPolylineSupported": 21,
+        "refusals": {
+          "start-blocked": 2
+        },
+        "blockedChord": {
+          "n": 39,
+          "meanAbsS": 0.661,
+          "medianAbsS": 0.18,
+          "p90AbsS": 1.202,
+          "maxAbsS": 6.697,
+          "meanSignedS": -0.542,
+          "observedMedianS": 4.933,
+          "observedMaxS": 10,
+          "observedMinS": 2.133,
+          "avgModelMinusObservedUnits": -210.544,
+          "chordDiagnosticMaeS": 0.964,
+          "speedShiftOver10Pct": 1,
+          "observedPolylineSupported": 10
+        },
+        "betweenDistinctCampVicinity": {
+          "n": 2,
+          "meanAbsS": 0.1,
+          "medianAbsS": 0.02,
+          "p90AbsS": 0.18,
+          "maxAbsS": 0.18,
+          "meanSignedS": 0.1,
+          "observedMedianS": 4.933,
+          "observedMaxS": 7.733,
+          "observedMinS": 4.933,
+          "avgModelMinusObservedUnits": 55.507,
+          "chordDiagnosticMaeS": 0.548,
+          "speedShiftOver10Pct": 0,
+          "observedPolylineSupported": 1
+        }
+      }
+    }
+  ],
+  "worst": {
+    "id": 9100049738,
+    "gameStart": 463.533,
+    "gameEnd": 473.533,
+    "from": [
+      6466.46875,
+      -5861.59375
+    ],
+    "to": [
+      6017.34375,
+      -6720.25
+    ],
+    "observedS": 10,
+    "predictedS": 3.303,
+    "errorS": -6.697,
+    "prefixSpeed": 338.833,
+    "recordedBase": 325,
+    "observedSpeed": 362.973,
+    "chordBlocked": true,
+    "chordLength": 969.022,
+    "modelLength": 1119.188,
+    "observedLength": 3629.728,
+    "observedPolylineSupported": false,
+    "campA": null,
+    "campB": null
+  },
+  "longestCampExample": {
+    "id": 9100049738,
+    "gameStart": 936.6,
+    "gameEnd": 944.333,
+    "from": [
+      4390.53125,
+      -5424.46875
+    ],
+    "to": [
+      6358.40625,
+      -7361.0625
+    ],
+    "observedS": 7.733,
+    "predictedS": 7.913,
+    "errorS": 0.18,
+    "prefixSpeed": 406.652,
+    "recordedBase": 325,
+    "observedSpeed": 399.243,
+    "chordBlocked": true,
+    "chordLength": 2760.965,
+    "modelLength": 3217.752,
+    "observedLength": 3087.343,
+    "observedPolylineSupported": false,
+    "campA": "good_1",
+    "campB": "good_20"
+  }
+}

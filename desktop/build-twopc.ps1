@@ -1,7 +1,9 @@
 param(
-    [string]$OutputDirectory = ""
+    [string]$OutputDirectory = "",
+    [string]$ReplayToolsDirectory = ""
 )
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'verify-match-release.ps1') -LoadPackageRules
 $dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
 $dotnet = if ($dotnetCommand) { $dotnetCommand.Source } else { Join-Path $env:ProgramFiles "dotnet/dotnet.exe" }
 if (!(Test-Path -LiteralPath $dotnet)) { throw ".NET 10 SDK is required for building." }
@@ -16,8 +18,32 @@ $output = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $output) {
     throw "Output already exists. Choose a fresh OutputDirectory; published packages are not overwritten."
 }
+# Only the coach ships the audited portable DEM reader. The game binary gets no worker or history.
+if (!$ReplayToolsDirectory) { $ReplayToolsDirectory = Join-Path $PSScriptRoot "../.tmp/postgame-replay-v2" }
+$ReplayToolsDirectory = (Resolve-Path -LiteralPath $ReplayToolsDirectory -ErrorAction Stop).Path
+$pinSource = Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $PSScriptRoot "DotaCoach.CoachClient/ReplayToolPin.cs")
+$pin = [regex]::Match($pinSource, 'ManifestSha256\s*=\s*"([A-Fa-f0-9]{64})"').Groups[1].Value
+$manifestFile = Join-Path $ReplayToolsDirectory "sha256.json"
+if (!$pin -or (Get-FileHash -LiteralPath $manifestFile -Algorithm SHA256).Hash -ne $pin) {
+    throw "Postgame worker manifest differs from the coach pin. Build the audited tools with scripts/replays/postgame/build_windows.py."
+}
+$files = (Get-Content -Raw -Encoding UTF8 -LiteralPath $manifestFile | ConvertFrom-Json).PSObject.Properties
+$stageItems = @(Get-ChildItem -LiteralPath $ReplayToolsDirectory -Recurse -Force)
+if (@($stageItems | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count -or
+    @($stageItems | Where-Object { !$_.PSIsContainer }).Count -ne @($files).Count + 1) { throw "Unexpected portable worker tree." }
+$workerMembers = @{'replay-tools/sha256.json' = $true}
+foreach ($entry in $files) {
+    $workerMembers['replay-tools/' + $entry.Name.Replace('\','/')] = $true
+    $file = [IO.Path]::GetFullPath((Join-Path $ReplayToolsDirectory $entry.Name))
+    if (!$file.StartsWith($ReplayToolsDirectory + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
+        (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ne $entry.Value) { throw "Worker payload does not match its pin." }
+}
 & $dotnet run --project (Join-Path $PSScriptRoot "DotaCoach.TwoPc.Tests") -c Release
 if ($LASTEXITCODE -ne 0) { throw "Two-PC protocol tests failed." }
+& $dotnet run --file (Join-Path $PSScriptRoot "../tests/match-witness.test.cs") -c Release
+if ($LASTEXITCODE -ne 0) { throw "Participant GSI lifecycle tests failed." }
+& $dotnet run --project (Join-Path $PSScriptRoot "DotaCoach.MatchReview.Tests") -c Release -- --bundle $ReplayToolsDirectory
+if ($LASTEXITCODE -ne 0) { throw "Match review and packaged replay worker tests failed." }
 $uiOutput = Join-Path $PSScriptRoot ("../.tmp/twopc-release-ui-" + [Guid]::NewGuid().ToString("N"))
 & $dotnet run --project (Join-Path $PSScriptRoot "DotaCoach.TwoPc.UiTests") -c Release -- $uiOutput
 if ($LASTEXITCODE -ne 0) { throw "Two-PC native UI tests failed." }
@@ -54,21 +80,39 @@ foreach ($role in @("Game", "Coach")) {
         --self-contained true -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false -o $destination
     if ($LASTEXITCODE -ne 0) { throw "Publish failed: $name" }
     if ($role -eq "Game") { $panelIcons = Copy-PanelIcons $destination }
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v048.md") -Destination (Join-Path $destination "README.md")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v043.md") -Destination (Join-Path $destination "USAGE.md")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-status-only.md") -Destination (Join-Path $destination "NO-VIDEO.md")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/game-creep-hp.md") -Destination (Join-Path $destination "CREEP-HP.md")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-plus-alerts.md") -Destination (Join-Path $destination "PLUS-ALERTS.md")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-enemy-wards.md") -Destination (Join-Path $destination "ENEMY-WARDS.md")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-game-overlay.md") -Destination (Join-Path $destination "GAME-OVERLAY.md")
+    if ($role -eq "Coach") {
+        Copy-Item -LiteralPath $ReplayToolsDirectory -Destination (Join-Path $destination "replay-tools") -Recurse
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../benchmark-results/match-full-journey-9097559249-v2/comparison.png") -Destination (Join-Path $destination "MATCH-REVIEW-EXAMPLE.png")
+    }
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-match-information.md") -Destination (Join-Path $destination "README.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-model-providers.md") -Destination (Join-Path $destination "MODEL-PROVIDERS.md")
+    Add-Content -LiteralPath (Join-Path $destination "README.md") -Encoding UTF8 -Value "`n[v$version - Foundry / Codey (GitHub Copilot)](MODEL-PROVIDERS.md)"
+    # Keep the no-video, local HP, enemy HUD and ward guides introduced in v0.4.3–8 alongside the new live/review guide.
+    $guides = [ordered]@{
+        'twopc-v043.md' = 'USAGE.md'; 'twopc-status-only.md' = 'NO-VIDEO.md'; 'game-creep-hp.md' = 'CREEP-HP.md'
+        'twopc-plus-alerts.md' = 'PLUS-ALERTS.md'; 'twopc-enemy-wards.md' = 'ENEMY-WARDS.md'; 'twopc-game-overlay.md' = 'GAME-OVERLAY.md'
+    }
+    foreach ($guide in $guides.GetEnumerator()) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot ("../docs/" + $guide.Key)) -Destination (Join-Path $destination $guide.Value)
+    }
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-minute-farm-742.md") -Destination (Join-Path $destination "MINUTE-FARM.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../benchmark-results/minute-farm-742-overlay-example.png") -Destination (Join-Path $destination "MINUTE-OVERLAY-EXAMPLE.png")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v042-ui.md") -Destination (Join-Path $destination "CLIENT-UI.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v040.md") -Destination (Join-Path $destination "VIDEO-v040.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v021-debug.md") -Destination (Join-Path $destination "DEBUG-DETAILS.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v031-plus.md") -Destination (Join-Path $destination "PLUS-SPECTATOR.md")
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "../docs/twopc-v041-minimap.md") -Destination (Join-Path $destination "PLAYER-MINIMAP.md")
-    $unexpected = Get-ChildItem -LiteralPath $destination -Recurse -File | Where-Object {
-        $_.Name -match '^\.env|\.env$|\.(dem|pfx|pem|key|cfg|secret|jsonl|dpapi)$|^(coach-settings|installed-gsi|session|summary)\.json$|^(model-frame|overlay-screen)-' -or
-        $_.FullName -match '[\\/]frames[\\/]'
+    # Apply the same name-only privacy checks before compression and to the final ZIP. Include hidden files.
+    $sdk = Get-Item -LiteralPath (Join-Path $destination "$name.deps.json")
+    if (($sdk.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $sdk.Length -gt 4MB) { throw "Invalid staged SDK inventory." }
+    $runtimeDlls = Get-PublicClientDlls (Get-Content -Raw -Encoding UTF8 -LiteralPath $sdk.FullName) $name
+    foreach ($staged in Get-ChildItem -LiteralPath $destination -Recurse -Force) {
+        if ($staged.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Package must not contain links to local files." }
+        if ($staged.PSIsContainer) { continue }
+        $member = $staged.FullName.Substring($destination.Length + 1).Replace('\','/')
+        Assert-PublicClientMember $member $name $runtimeDlls
+        if ($member -like 'replay-tools/*' -and !$workerMembers.ContainsKey($member)) { throw "Unexpected staged worker member." }
     }
-    if ($unexpected) { throw "Unexpected private/configuration files in package." }
     $archive = Join-Path $output "$name-v$version-win-x64.zip"
     Compress-Archive -Path (Join-Path $destination "*") -DestinationPath $archive
     $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -78,9 +122,14 @@ foreach ($role in @("Game", "Coach")) {
 }
 $manifest = [ordered]@{
     version = $version; builtAt = [DateTimeOffset]::UtcNow.ToString("o"); artifacts = $artifacts;
-    # Video upload is off (Features.VideoUpload): the video fields below describe the kept, switched-off path.
-    protocol = "paired-https-gsi-status"; videoUpload = $false; automaticFarmingEnabled = $false
-    ordinaryMatchAdvice = $false; mapMarkersRequireConfirmedCalibration = $false
+    protocol = "paired-wss-h264-v3"; automaticFarmingEnabled = $true
+    defaultConnectionMode = "participant-gsi"; videoUploadDefault = $false
+    connectionModes = @("participant-gsi", "participant-gsi-local-hp", "basic-status-local-hp", "diagnostic-status", "dota-video", "diagnostic-video")
+    modelProviders = Get-PublicModelProviders
+    minuteFarm = [ordered]@{ patch = "7.42"; map = "dota"; build = 6989; defaultOn = $false;
+        requiresMatchConfirmation = $true; requiresConfirmedMinimap = $true; modelInput = "frozen-match-state-and-simulated-options";
+        schedule = "one-attempt-per-in-game-minute"; heroes = @("luna", "troll_warlord"); maximumStops = 3 }
+    ordinaryMatchAdvice = $true; mapMarkersRequireConfirmedCalibration = $false
     maximumEncodedImage = "4096x2304"; defaultEncodedHeight = 1080; modelImageMaximum = "1600x900"; supports4kSource = $true
     videoFrameRates = @(30, 60, 90, 120); defaultVideoFps = 60; videoBitrate = "auto-or-manual"; videoCapture = "Windows.Graphics.Capture-window"
     videoScaling = "D3D11-video-processor"; videoEncoder = "GPU-MFT-with-Windows-software-fallback"; videoProtocol = "dota-h264-v3"
@@ -89,6 +138,10 @@ $manifest = [ordered]@{
     defaultSubtitleSeconds = 3; defaultModelTimeoutSeconds = 15; automaticMinimapLayout = $true; modelRouteMaxStops = 3
     debugRecordingOptIn = $true; debugMaximumBytes = 2L * 1024 * 1024 * 1024; debugMaximumMinutes = 120
     plusSpectatorObservationOnly = $true; plusSpectatorPort = 3220
+    matchArchive = [ordered]@{ live = "participant-and-matched-team-vision"; clock = "event-and-first-known";
+        wardEvidence = @("seen", "inferred", "postgame-replay"); gameProjection = "selected-equipment-and-wards";
+        extraTeamContextForModelDefault = $false; replayCanReachLive = $false }
+    postgameReplay = [ordered]@{ package = "coach-only"; portableWorkerManifestSha256 = $pin; requiresVerifiedEnd = $true }
     playerMinimapDebugIntervalMs = 1000; playerMinimapObservationOnly = $true
     enemyPanel = $true; bundledPanelIcons = $panelIcons; panelIconFallback = "coach"
     enemyWardGuesses = "coach-guess-game-minimap"; coachMapPatch = "7.42"
@@ -101,4 +154,5 @@ $manifest = [ordered]@{
     sourceDirty = [bool](& git -C (Join-Path $PSScriptRoot "..") status --porcelain)
 }
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $output "manifest.json") -Encoding utf8
+& (Join-Path $PSScriptRoot 'verify-match-release.ps1') -Directory $output
 Write-Output "Unsigned self-contained two-PC packages: $output"

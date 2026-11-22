@@ -7,7 +7,8 @@ public sealed record MinimapUnit(string Name, int Team, double X, double Y, doub
 /// <summary>
 /// One GSI packet from this coach machine's own Dota while it spectates. Mode "team-view" is Dota Plus
 /// live spectating (friend team's vision, player-mode layout); "full-spectator" is delayed spectating
-/// with teamN/playerN groups. Observations only: not admitted to the automatic coach.
+/// with teamN/playerN groups. Only a matched team-view projection may enter the live archive;
+/// the raw snapshot and full-spectator feeds are never model inputs.
 /// </summary>
 public sealed record SpectatorSnapshot(long ReceivedAt, string Mode, double? Clock, string? GameState, bool Paused,
     string? MatchId, int? OwnTeam, int GroupedPlayers, MinimapUnit[] Minimap, string[] BuildingTeams, string[] EventTypes)
@@ -18,8 +19,10 @@ public sealed record SpectatorSnapshot(long ReceivedAt, string Mode, double? Clo
 
 public static class SpectatorGsi
 {
-    private static readonly Regex Name = new("^[a-z0-9_]{1,100}$", RegexOptions.CultureInvariant);
-    private static readonly Regex Icon = new("^minimap_[a-z0-9_]{1,60}$", RegexOptions.CultureInvariant);
+    private static readonly Regex Name = new(@"\A[a-z0-9_]{1,100}\z", RegexOptions.CultureInvariant);
+    private static readonly Regex Icon = new(@"\Aminimap_[a-z0-9_]{1,60}\z", RegexOptions.CultureInvariant);
+    private static readonly Regex TeamGroup = new(@"\Ateam[0-9]+\z", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    private static readonly Regex PlayerGroup = new(@"\Aplayer[0-9]+\z", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
     public const int MaxUnits = 2000;
     private static JsonElement? Obj(JsonElement e, string key) =>
         e.ValueKind == JsonValueKind.Object && e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Object ? v : null;
@@ -32,17 +35,37 @@ public static class SpectatorGsi
     {
         if (section is not { } s) return 0;
         int n = 0;
-        foreach (var team in s.EnumerateObject().Where(p => Regex.IsMatch(p.Name, @"^team\d$") && p.Value.ValueKind == JsonValueKind.Object))
-            n += team.Value.EnumerateObject().Count(p => Regex.IsMatch(p.Name, @"^player\d{1,2}$"));
+        foreach (var team in s.EnumerateObject()) {
+            if (TeamGroup.IsMatch(team.Name))
+                n += Math.Max(1, team.Value.ValueKind == JsonValueKind.Object ?
+                    team.Value.EnumerateObject().Count(p => PlayerGroup.IsMatch(p.Name)) : 0);
+            else if (PlayerGroup.IsMatch(team.Name) || team.Name.Equals("allplayers", StringComparison.OrdinalIgnoreCase)) n++;
+        }
         return n;
     }
+    // A flat player.team_name does not override full-view groups, even a sparse group in a change envelope.
+    // Deltas can veto the live view; they never supply its match, side, clock or observed units.
+    private static int Groups(JsonElement e) => Math.Max(e.TryGetProperty("allplayers", out _) ? 1 : 0,
+        Math.Max(Math.Max(Grouped(Obj(e, "player")), Grouped(Obj(e, "hero"))),
+                 Math.Max(Grouped(Obj(e, "items")), Grouped(Obj(e, "abilities")))));
+    private static bool NonLive(JsonElement? section) => section is { } e && e.EnumerateObject().Any(p =>
+        (p.Name is "replay" or "is_replay" or "in_replay" or "watching_replay" or "is_watching_replay" or
+            "playing_demo" or "is_playing_demo" or "omniscient" or "worldsnapshots" or "full_spectator") &&
+            p.Value.ValueKind != JsonValueKind.False);
+    private static bool NonLiveView(JsonElement e) => NonLive(e) || NonLive(Obj(e, "map")) || NonLive(Obj(e, "player")) || NonLive(Obj(e, "provider"));
     public static SpectatorSnapshot Parse(JsonElement root, long receivedAt)
     {
-        var map = Obj(root, "map"); var player = Obj(root, "player"); var hero = Obj(root, "hero");
-        int grouped = Math.Max(Grouped(player), Math.Max(Grouped(hero), Grouped(Obj(root, "items"))));
+        var map = Obj(root, "map"); var player = Obj(root, "player");
+        int grouped = Groups(root);
+        bool nonLive = NonLiveView(root);
+        foreach (var key in new[] { "previously", "added", "removed" }) if (Obj(root, key) is { } delta) {
+            grouped = Math.Max(grouped, Groups(delta));
+            nonLive |= NonLiveView(delta);
+        }
         string? teamName = player is { } p ? Text(p, "team_name") : null;
-        bool playing = teamName is "radiant" or "dire" && hero is { } h && Text(h, "name") is { Length: > 0 };
-        string mode = map == null ? "menu" : grouped > 0 ? "full-spectator" : playing ? "player" : "team-view";
+        int? playingSide = teamName switch { "radiant" or "DOTA_TEAM_GOODGUYS" => 2, "dire" or "DOTA_TEAM_BADGUYS" => 3, _ => null };
+        string mode = map == null ? "menu" : nonLive ? "unknown" : grouped > 0 ? "full-spectator" : playingSide != null ? "player" :
+            teamName == "spectator" ? "team-view" : "unknown";
         var units = new List<MinimapUnit>();
         if (Obj(root, "minimap") is { } minimap) {
             int entries = 0;
@@ -50,7 +73,7 @@ public static class SpectatorGsi
                 if (++entries > MaxUnits) throw new ArgumentException("Too many minimap units");
                 var e = entry.Value;
                 if (e.ValueKind != JsonValueKind.Object || Number(e, "xpos", 20000) is not double x ||
-                    Number(e, "ypos", 20000) is not double y || Number(e, "team", 16) is not double team) continue;
+                    Number(e, "ypos", 20000) is not double y || Number(e, "team", 16) is not double team || team != Math.Truncate(team)) continue;
                 // A unit coming into sight sits at 0,0 (mid lane) for a packet or two before its position arrives: heroes,
                 // creeps and wards in the 2026-11-17 and 11-21 Plus games. Such a hero put a ward guess in mid lane.
                 if (x == 0 && y == 0) continue;
@@ -61,16 +84,17 @@ public static class SpectatorGsi
         }
         string[] buildings = Obj(root, "buildings") is { } b ? b.EnumerateObject().Select(t => t.Name)
             .Where(t => t is "radiant" or "dire").ToArray() : [];
-        int? ownTeam = playing ? (teamName == "radiant" ? 2 : 3) :
-            units.FirstOrDefault(u => u.Image == "minimap_herocircle_self")?.Team is int self and (2 or 3) ? self :
-            buildings.Length == 1 ? (buildings[0] == "radiant" ? 2 : 3) : null;
+        var sides = units.Where(u => u.Image == "minimap_herocircle_self" && u.Name.StartsWith("npc_dota_hero_") && u.Team is 2 or 3)
+            .Select(u => u.Team).Concat(buildings.Select(t => t == "radiant" ? 2 : 3)).Distinct().ToArray();
+        int? ownTeam = playingSide ?? (sides is [var side] ? side : null);
         string[] events = root.TryGetProperty("events", out var list) && list.ValueKind == JsonValueKind.Array
             ? list.EnumerateArray().Take(200).Where(e => e.ValueKind == JsonValueKind.Object)
                 .Select(e => Text(e, "event_type") is { } t && Name.IsMatch(t) ? t : "?").Distinct().ToArray() : [];
-        string? match = map is { } m && m.TryGetProperty("matchid", out var id) && id.ToString() is { Length: > 0 and <= 24 } s &&
-            s.All(char.IsAsciiDigit) && s != "0" ? s : null;
+        string? match = map is { } m && m.TryGetProperty("matchid", out var id) && TeamViewEvidence.RealMatch(id.ToString()) ? id.ToString() : null;
+        bool paused = map is { } mp && (mp.TryGetProperty("paused", out var a) && a.ValueKind != JsonValueKind.False ||
+            mp.TryGetProperty("is_paused", out var bPause) && bPause.ValueKind != JsonValueKind.False);
         return new(receivedAt, mode, map is { } mc ? Number(mc, "clock_time", 43200) : null,
-            map is { } ms ? Text(ms, "game_state") : null, map is { } mp && mp.TryGetProperty("paused", out var paused) && paused.ValueKind == JsonValueKind.True,
+            map is { } ms ? Text(ms, "game_state") : null, paused,
             match, ownTeam, grouped, units.ToArray(), buildings, events);
     }
 }

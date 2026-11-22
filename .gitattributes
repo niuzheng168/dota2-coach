@@ -1,0 +1,5 @@
+# These inputs are compared byte-for-byte against recorded evidence, including on Windows.
+/data/farming-742-*.json text eol=lf
+/scripts/client/engine-*-probe.lua text eol=lf
+/docs/twopc-model-providers.md text eol=lf
+/data/dota2-hero-attack.json text eol=lf

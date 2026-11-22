@@ -6,8 +6,8 @@ the name label), not assumed from the selection. Where each hero was last seen c
 client's GSI minimap.
 
 Selection: `keys` posts the spectator hotkeys (SpectatorCameraFocusPlayer1-10, 1-0 by default) to
-the Dota window. Dota acts on them only while it is the foreground window, so the scanner brings it to
-the front once at start and otherwise just watches; posted keys never reach another program. `console`
+the Dota window. Dota acts on them only while it is the foreground window. Standalone scans try bringing
+it to the front once; the coach launcher waits instead. In the background the scanner just watches; posted keys never reach another program. `console`
 sends `dota_camera_focus_player <id>` through -netconport, which Dota opens only with -insecure: for
 local replays, not for live spectating.
 
@@ -29,8 +29,9 @@ follow each other without a pause.
 Recognition runs in parallel on the GPU, on a HUD band that Windows.Graphics.Capture (wgc.py) crops on
 the GPU.
 
-The coach client's 启动视觉扫描 button runs `scan --stop-with-stdin` from the repository folder (after
-`setup` when this tool's GSI config is missing) and stops it by closing standard input.
+The coach client's 启动视觉扫描 button runs `scan --stop-with-stdin --team-view-only` with local assets.
+It stops by closing standard input. In this mode only the bounded live file goes to the coach, which
+checks the participant before archiving. The standalone session files below are for offline evaluation.
 
 `setup` writes this tool's GSI config (read by Dota at start) and prints the launch options. Each run
 records a session folder: timeline.jsonl (a snapshot every --timeline-every seconds, shown by the
@@ -77,6 +78,7 @@ ITEM_SETTLE = 0.13
 STREAM_TAIL = 0.07  # after the last streamed selection: its switch shows within ~2 refreshes
 RETRY_UNKNOWN = 2.0  # seconds between attempts at a player whose hero is still unknown
 STREAM_MISSED = 1.0  # a streamed hero not read for this long gets its own visit next cycle
+FRESH_GSI = 3.0
 # Ends the run early (--stop-with-stdin): the coach client starts the scanner with a pipe as standard input
 # and closes it to stop the scan; the pipe also closes when the client exits or crashes.
 STOP = threading.Event()
@@ -154,10 +156,13 @@ class GsiFeed(http.server.ThreadingHTTPServer):
     leave static radius-0 entries). Full-spectator packets also carry every hero's data; that is
     kept only as evaluation truth (`truth`)."""
 
-    def __init__(self, port: int, token: str, keep_truth: bool):
+    def __init__(self, port: int, token: str, keep_truth: bool, team_view_only: bool = False):
         self.token, self.keep_truth, self.lock = token, keep_truth, threading.Lock()
+        self.team_view_only = team_view_only
         self.clock = self.state = self.match_id = self.own_team = None
         self.mode, self.packets, self.received = "none", 0, 0.0
+        self.epoch, self.live_ready, self.ended_match = 0, False, None
+        self.views = collections.deque(maxlen=64)  # sight at capture time, not at OCR completion
         self.ticks = collections.deque(maxlen=64)  # (arrival, clock) of each packet that brought a new clock
         self.seen: dict[str, dict] = {}  # hero -> last sighting
         self.visible: set[str] = set()
@@ -174,7 +179,7 @@ class GsiFeed(http.server.ThreadingHTTPServer):
                     payload = json.loads(body)
                 except ValueError:
                     return
-                if isinstance(payload, dict) and (payload.get("auth") or {}).get("token") == feed.token:
+                if isinstance(payload, dict) and isinstance(payload.get("auth"), dict) and payload["auth"].get("token") == feed.token:
                     feed.update(payload, time.perf_counter())
 
             def log_message(self, *_):
@@ -184,40 +189,70 @@ class GsiFeed(http.server.ThreadingHTTPServer):
         threading.Thread(target=self.serve_forever, daemon=True).start()
 
     def update(self, p: dict, now: float):
+        # A malformed authenticated packet must withdraw the previous view, not leave it live until timeout.
+        malformed = any(key in p and not isinstance(p[key], dict)
+                        for key in ("map", "player", "hero", "items", "abilities", "buildings", "minimap"))
+        if malformed:
+            p = {}
         game = p.get("map") or {}
         player = p.get("player") or {}
-        grouped = any(re.fullmatch(r"team\d", k) for k in player)
-        mode = "menu" if not game else "full-spectator" if grouped else \
-            "player" if player.get("team_name") in ("radiant", "dire") else "team-view"
-        units = [u for u in (p.get("minimap") or {}).values() if isinstance(u, dict)
-                 and str(u.get("unitname", "")).startswith("npc_dota_hero_")]
+        grouped = "allplayers" in p or any(re.fullmatch(r"team\d+|player\d+|allplayers", k)
+                    for section in ("player", "hero", "items", "abilities") for k in (p.get(section) or {}))
+        mode = "unknown" if malformed else "menu" if not game else "full-spectator" if grouped else \
+            "player" if player.get("team_name") in ("radiant", "dire") else \
+            "team-view" if player.get("team_name") == "spectator" else "unknown"
+        units = [] if self.team_view_only and mode != "team-view" else [u for u in (p.get("minimap") or {}).values() if isinstance(u, dict)
+                 and re.fullmatch(r"npc_dota_hero_[a-z0-9_]{1,60}", str(u.get("unitname", ""))) and u.get("team") in (2, 3)]
+        def located(u):
+            return all(type(u.get(k)) in (int, float) and -12000 <= u[k] <= 12000 for k in ("xpos", "ypos")) and (u["xpos"], u["ypos"]) != (0, 0)
+        sides = {u["team"] for u in units if u.get("image") == "minimap_herocircle_self" and located(u)}
+        sides.update(i for i, name in ((2, "radiant"), (3, "dire")) if name in (p.get("buildings") or {}))
+        own = {"radiant": 2, "dire": 3}.get(player.get("team_name")) if mode == "player" else next(iter(sides)) if len(sides) == 1 else None
+        match = str(game.get("matchid"))
+        match = match if re.fullmatch(r"[1-9][0-9]{0,19}", match) and int(match) < 2**64 else None
+        clock = game.get("clock_time")
+        clock = clock if type(clock) in (float, int) and -300 <= clock <= 43200 else None
+        ready = (mode == "team-view" and match is not None and own in (2, 3) and clock is not None
+                 and game.get("paused", False) is False and game.get("game_state") in
+                 ("DOTA_GAMERULES_STATE_PRE_GAME", "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS"))
         with self.lock:
-            if game.get("matchid") != self.match_id:
-                self.seen, self.teams, self.own_team = {}, {}, None
-                self.ticks.clear()
-            if game.get("clock_time") != self.clock or game.get("paused"):
-                self.ticks.append((now, game.get("clock_time")))
-            self.match_id, self.clock, self.state = game.get("matchid"), game.get("clock_time"), game.get("game_state")
+            if now < self.received:
+                return
+            # A terminal is purely a fence. Never adopt its roster/HUD, or a late playing echo of that match.
+            if mode == "team-view" and match and own in (2, 3) and game.get("game_state") == "DOTA_GAMERULES_STATE_POST_GAME":
+                self.ended_match = match
+            ready = ready and match != self.ended_match
+            if self.team_view_only and not ready:
+                units, game = [], {}
+                match = own = clock = None
+            if ((match, mode, own, ready) != (self.match_id, self.mode, self.own_team, self.live_ready)
+                    or now - self.received >= FRESH_GSI
+                    or clock is not None and self.clock is not None and clock < self.clock):
+                self.epoch += 1
+                self.seen, self.teams = {}, {}
+                self.views.clear(); self.ticks.clear(); self.truth.clear()
+            if not self.ticks or clock != self.clock or game.get("paused"):
+                self.ticks.append((now, clock))
+            self.match_id, self.clock, self.state = match, clock, game.get("game_state")
+            self.own_team, self.live_ready = own, ready
             self.mode, self.packets, self.received = mode, self.packets + 1, now
             visible = collections.defaultdict(list)
             for u in units:
                 self.teams[u["unitname"]] = u.get("team")
-                if u.get("image") == "minimap_herocircle_self" and u.get("team") in (2, 3):
-                    self.own_team = u["team"]
-                if (u.get("visionrange") or 0) > 0:
+                if located(u) and type(u.get("visionrange")) in (int, float) and 0 < u["visionrange"] <= 10000:
                     visible[u["unitname"]].append([u.get("xpos"), u.get("ypos")])
-            if mode == "player":
-                self.own_team = {"radiant": 2, "dire": 3}[player["team_name"]]
-            elif self.own_team is None and mode == "team-view" and len(p.get("buildings") or {}) == 1:
-                self.own_team = 2 if "radiant" in p["buildings"] else 3
             for hero, spots in visible.items():
-                # A unit coming into sight sits at 0,0 for a packet or two before its position arrives.
-                if spots := [s for s in spots if s != [0, 0]]:
-                    self.seen[hero] = {"x": spots[0][0], "y": spots[0][1], **({"others": spots[1:]} if len(spots) > 1 else {}),
-                                       "clock": self.clock, "at": now}
+                self.seen[hero] = {"x": spots[0][0], "y": spots[0][1], **({"others": spots[1:]} if len(spots) > 1 else {}),
+                                   "clock": self.clock, "at": now}
             self.visible = set(visible)
-            if self.keep_truth and grouped:
+            self.views.append((now, clock, self.visible, ready))
+            if self.keep_truth and grouped and not self.team_view_only:
                 self.truth.append((now, truth_of(p)))
+
+    def view_at(self, at: float):
+        """Called under lock. Never promote an old HUD frame into a new view, or a stale GSI ping into sight."""
+        view = next((v for v in reversed(self.views) if v[0] <= at), None)
+        return view if view and at - view[0] < FRESH_GSI and (self.mode != "team-view" or self.live_ready and view[3]) else None
 
     def game_time(self, at: float) -> float | None:
         """Game time at perf-counter time `at`, to a fraction of a second: GSI clocks are whole seconds, so the arrival
@@ -311,15 +346,20 @@ class ItemSlots:
     def __init__(self, items: dict):
         self.recipes = {k for k, v in items.items() if v.get("recipe")} | {"item_recipe"}
         self.shown: dict[str, tuple] = {}  # hero -> (slot0..slot5, neutral0)
+        self.shown_time: dict[str, float] = {}  # game clock of last complete inventory, not the latest fast level read
         self.wards: dict[str, collections.deque] = {}  # hero -> recent {"first", "clock", "observer", "sentry", "unknown"}
 
     def read(self, hero: str, slots: dict):
-        current = tuple(slots.get(f"slot{i}") for i in range(6)) + (slots.get("neutral0"),)
-        if "?" not in current:
+        # The recognizer explicitly emits None for an empty slot. An absent key is an unread slot.
+        current = tuple(slots.get(f"slot{i}", "?") for i in range(6)) + (slots.get("neutral0", "?"),)
+        time_ = slots.get("time")
+        if "?" not in current and (hero not in self.shown_time or time_ is not None and time_ > self.shown_time[hero]):
             self.shown[hero] = tuple(None if n in self.recipes else n for n in current)
+            if time_ is not None:
+                self.shown_time[hero] = time_
         # The backpack counts too: a ward moved there is still carried.
-        counts, time_ = slots.get("wards"), slots.get("time")
-        if counts is not None and time_ is not None and "?" not in current + tuple(slots.get(f"slot{i}") for i in range(6, 9)):
+        counts = slots.get("wards")
+        if counts is not None and time_ is not None and "?" not in current + tuple(slots.get(f"slot{i}", "?") for i in range(6, 9)):
             reads = self.wards.setdefault(hero, collections.deque(maxlen=self.WARD_READS))
             if reads and time_ <= reads[-1]["clock"]:
                 return
@@ -358,7 +398,7 @@ class Scanner:
         self.tried: dict[int, float] = {}
         self.heroes: dict[str, dict] = {}  # hero -> {"status": newest reading, "items": newest settled reading}
         self.shown: str | None = None  # hero the HUD showed last
-        self.match_id = None
+        self.epoch = -1
         self.missed: set[int] = set()
         # player -> when an item read of it was queued: the worker records it a little later, and the
         # next cycle must not pick the same hero again meanwhile
@@ -370,8 +410,10 @@ class Scanner:
         self.read_ms: list[float] = []
         self.cycle_s: list[float] = []
         self.refresh_s: list[float] = []  # time between two status readings of the same hero
-        self.log = open(args.out / "scan.jsonl", "a", encoding="utf-8")
-        self.timeline = open(args.out / "timeline.jsonl", "a", encoding="utf-8")
+        # Only the coach can bind this source to a participant. Don't keep an unbound parallel
+        # archive (including frames from a different game) in the packaged live launcher.
+        self.log = open(os.devnull if args.team_view_only else args.out / "scan.jsonl", "a", encoding="utf-8")
+        self.timeline = open(os.devnull if args.team_view_only else args.out / "timeline.jsonl", "a", encoding="utf-8")
         names = lambda kind: {k: v.get("nameZh") for k, v in hud.manifest[kind].items() if v.get("nameZh")}
         self.timeline.write(json.dumps({"type": "header", "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "slots": list(SLOTS),
                                         "truth": args.truth, "every": args.timeline_every, "names": {"heroes": names("heroes"), "items": names("items")}},
@@ -419,17 +461,22 @@ class Scanner:
             time.sleep(0.25)
         return False
 
+    def bind_view(self, epoch: int):
+        """With the scanner lock held. Full spectator → team view of the SAME game must clear all HUD/slot state too."""
+        if epoch != self.epoch:
+            self.epoch, self.player_hero, self.heroes, self.shown = epoch, {}, {}, None
+            self.tried, self.missed, self.items_queued = {}, set(), {}
+            self.item_slots = ItemSlots(self.hud.manifest["items"])
+
     def plan(self, now: float) -> list[tuple[int, bool]]:
         """One cycle: (player, item visit) for every hero that can be selected now. The heroes whose
         items were read longest ago (at most --item-visits) stay long enough for their items."""
-        with self.feed.lock:
+        with self.feed.lock, self.lock:
             mode, own, visible, teams = self.feed.mode, self.feed.own_team, set(self.feed.visible), dict(self.feed.teams)
-            match_id = self.feed.match_id
-        with self.lock:
-            if match_id != self.match_id:  # another match: nothing known carries over
-                self.match_id, self.player_hero, self.heroes, self.shown = match_id, {}, {}, None
-                self.items_queued = {}
-                self.item_slots = ItemSlots(self.hud.manifest["items"])
+            self.bind_view(self.feed.epoch)
+            if (not 0 <= now - self.feed.received < FRESH_GSI or mode == "team-view" and not self.feed.live_ready
+                    or self.args.team_view_only and mode != "team-view"):
+                return []
             players = dict(self.player_hero)
             items_at = {h: (r.get("items") or {}).get("at", -1e9) for h, r in self.heroes.items()}
             status_at = {h: (r.get("status") or {}).get("at", -1e9) for h, r in self.heroes.items()}
@@ -492,7 +539,7 @@ class Scanner:
             if got is not None:
                 previous, frame = frame, got
                 if (stream or tail or not self.selecting) and self.changed(frame[1], previous[1]) > SWITCH_MAD:
-                    self.work.put((None, True, False, now, frame[1]))  # the frame says whose HUD it is
+                    self.work.put((None, True, False, *frame))  # stamp the actual capture, not the polling loop
                     self.stats["streamFrames"] += 1
                     if tail:
                         tail["switched"] = now
@@ -505,10 +552,10 @@ class Scanner:
                     visit["switched"] = now
                     self.switch_ms.append((now - visit["sent"]) * 1000)
                     if not visit["items"]:
-                        self.work.put((visit["player"], True, False, now, frame[1]))
+                        self.work.put((visit["player"], True, False, *frame))
                         visit = None
                 if visit and visit["switched"] is not None and now - visit["switched"] >= ITEM_SETTLE:
-                    self.work.put((visit["player"], True, True, now, frame[1]))
+                    self.work.put((visit["player"], True, True, *frame))
                     self.items_queued[visit["player"]] = now
                     visit = None
             if tail and not stream and tail["items"] is None:
@@ -516,14 +563,14 @@ class Scanner:
             elif tail and not stream and now - tail["sent"] > STREAM_TAIL and now - tail["switched"] >= ITEM_SETTLE:
                 # The last streamed selection has had time to show. Its hero is the one due for items:
                 # it stays on screen until the item slots have stopped fading.
-                self.work.put((tail["items"], False, True, now, frame[1]))
+                self.work.put((tail["items"], False, True, *frame))
                 self.items_queued[tail["items"]] = now
                 tail = None
             if visit and visit["switched"] is None and now - visit["sent"] > SWITCH_TIMEOUT:
                 # Unchanged: the command had no effect, or the hero was already shown. The frame is
                 # still read (it has been still for the timeout, so items too); it tells whose HUD it is.
                 self.stats["unchanged"] += 1
-                self.work.put((visit["player"], False, True, now, frame[1]))
+                self.work.put((visit["player"], False, True, *frame))
                 self.items_queued[visit["player"]] = now
                 visit = None
             if self.selecting and visit is None and tail is None and self.work.qsize() < 3:
@@ -574,6 +621,11 @@ class Scanner:
         self.work.put(None)
 
     def select(self, player: int, now: float):
+        # Also check already queued selections if the view changes halfway through a sweep.
+        with self.feed.lock:
+            if (not 0 <= now - self.feed.received < FRESH_GSI
+                    or not (self.feed.live_ready or self.feed.mode == "full-spectator" and not self.args.team_view_only)):
+                return
         self.tried[player] = now
         self.selector.select(player)
 
@@ -589,15 +641,22 @@ class Scanner:
             if self.canvas.shape[1] != width:
                 self.canvas = np.zeros((1080, width, 3), np.uint8)
             self.canvas[BAND_TOP:] = bgr
-            with self.feed.lock:
-                clock, mode, roster = self.feed.clock, self.feed.mode, set(self.feed.teams)
-                own, teams, visible = self.feed.own_team, dict(self.feed.teams), set(self.feed.visible)
+            with self.feed.lock, self.lock:
+                view = self.feed.view_at(at)
+                if (view is None or not 0 <= t0 - at < FRESH_GSI or self.feed.mode not in ("team-view", "full-spectator")
+                        or self.args.team_view_only and self.feed.mode != "team-view"):
+                    continue
+                _, clock, visible, _ = view
+                epoch, mode, own, teams = self.feed.epoch, self.feed.mode, self.feed.own_team, dict(self.feed.teams)
+                self.bind_view(epoch)
+                roster = set(teams)
                 game_time = self.feed.game_time(at)
+                if mode == "team-view" and game_time is None:
+                    continue
+                expected = self.player_hero.get(player) or leftover(roster, self.player_hero, player)
             out = self.hud.read(self.canvas, roster, full=settled)
             self.read_ms.append((time.perf_counter() - t0) * 1000)
             hero = out.get("hero")
-            with self.lock:
-                expected = self.player_hero.get(player) or leftover(roster, self.player_hero, player)
             match = out.get("heroMatch") or {}
             if hero is None and changed and expected and out.get("hud") and (
                     match.get("best") == expected or match.get("blank")):
@@ -613,7 +672,7 @@ class Scanner:
                     cv2.imwrite(str(self.args.out / f"{kind}-{self.stats[kind]:03d}.png"), self.canvas[BAND_TOP:])
                 self.log.write(json.dumps(entry, ensure_ascii=False) + "\n")
                 continue
-            status = {"at": at, "clock": clock, "level": out["level"], "alive": out["alive"],
+            status = {"at": at, "clock": clock, "time": game_time, "level": out["level"], "alive": out["alive"],
                       "health": out["health"], "mana": out["mana"]}
             items = settled and {"at": at, "clock": clock, "time": game_time,
                                  **{s: (i and (i["name"] or "?")) for s, i in out["items"].items()},
@@ -623,8 +682,10 @@ class Scanner:
             # In Plus team view an enemy can stay on the HUD after the friend team loses sight of it (on 2026-11-21 Ancient
             # Apparition for 8 s): that is its last sighting, not now. Such reads would date the panel and the ward counts
             # the coach compares as current, so they only name the hero.
-            unseen = mode == "team-view" and own in (2, 3) and teams.get(hero) not in (None, own) and hero not in visible
-            with self.lock:
+            unseen = mode == "team-view" and (hero not in visible or teams.get(hero) not in (2, 3))
+            with self.feed.lock, self.lock:
+                if epoch != self.feed.epoch:  # view changed during GPU recognition; never relabel the result
+                    continue
                 # A changed frame that still shows the previous hero (a HUD change other than the
                 # switch) must not teach the player's hero, nor one of the other team or another player's.
                 if player is not None and changed and hero != self.shown and fits(player, hero, teams, self.player_hero):
@@ -636,19 +697,16 @@ class Scanner:
                     record["status"] = status
                     if items:
                         record["items"] = items
-            self.shown = hero
+                        if mode == "team-view" and teams[hero] != own:
+                            self.item_slots.read(hero, items)
+                self.shown = hero
             if unseen:
                 self.stats["unseen"] += 1
                 self.log.write(json.dumps(entry | {"unseen": True, "mode": mode}, ensure_ascii=False) + "\n")
                 continue
-            # Plus team view only: there the enemies are the heroes outside the friend team, and they are read
-            # only while that team sees them. Full-spectator data never reaches the game machine.
-            if items and mode == "team-view" and own in (2, 3) and teams.get(hero) not in (None, own):
-                with self.lock:
-                    self.item_slots.read(hero, items)
             self.stats["readings"] += 1
             self.stats["itemReadings"] += bool(items)
-            entry |= {k: v for k, v in status.items() if k not in ("at", "clock")}
+            entry |= {k: v for k, v in status.items() if k not in ("at", "clock", "time")}
             if items:
                 entry["items"] = {k: v for k, v in items.items() if k not in ("at", "clock", "time")}
                 entry["time"] = items["time"]
@@ -661,14 +719,23 @@ class Scanner:
     def snapshot(self) -> dict:
         """The match as this spectator knows it now. Ages are seconds since the reading or sighting;
         item lists follow hud_recognizer.SLOTS."""
-        now = time.perf_counter()
-        with self.feed.lock:
+        with self.feed.lock, self.lock:
+            now = time.perf_counter()
+            self.bind_view(self.feed.epoch)
+            scan_clock = self.feed.game_time(now)
+            gsi_age = round(now - self.feed.received, 3) if self.feed.packets else None
+            # The coach must not compare charges across an interruption, even within this same scanner process.
             feed = {"mode": self.feed.mode, "clock": self.feed.clock, "matchId": self.feed.match_id, "selecting": self.selecting,
-                    "ownTeam": self.feed.own_team, "gsiAge": round(now - self.feed.received, 2) if self.feed.packets else None}
+                    "ownTeam": self.feed.own_team, "gsiAge": gsi_age, "run": f"{self.run_id}-{self.epoch}",
+                    "scanClock": scan_clock, "sampledUnix": round(time.time(), 3),
+                    "liveReady": self.feed.live_ready and scan_clock is not None and gsi_age is not None and 0 <= gsi_age < FRESH_GSI
+                                 and not self.args.truth and self.args.select != "console"}
             seen, visible, teams = dict(self.feed.seen), set(self.feed.visible), dict(self.feed.teams)
             truth = self.feed.truth[-1][1] if self.args.truth and self.feed.truth else None
-        with self.lock:
             heroes, players = {h: dict(r) for h, r in self.heroes.items()}, dict(self.player_hero)
+            shown = dict(self.item_slots.shown)
+            item_ages = {h: round(max(0, scan_clock - at), 2) for h, at in self.item_slots.shown_time.items()} if scan_clock is not None else {}
+            wards = {h: [dict(e) for e in r] for h, r in self.item_slots.wards.items()}
         age = lambda r: round(now - r["at"], 2)
         out = {}
         for hero in sorted(set(heroes) | set(seen) | set(teams)):
@@ -677,37 +744,45 @@ class Scanner:
             out[hero] = {
                 "team": team, "ally": None if feed["ownTeam"] is None or team is None else team == feed["ownTeam"],
                 "status": st and {"level": st["level"], "alive": st["alive"], "health": pair(st["health"]),
-                                  "mana": pair(st["mana"]), "clock": st["clock"], "age": age(st)},
+                                  "mana": pair(st["mana"]), "clock": st["clock"], "time": st["time"], "age": age(st)},
                 "items": it and {"slots": [it[s] for s in SLOTS], **({"alt": it["alt"]} if it["alt"] else {}),
                                  "clock": it["clock"], "age": age(it)},
                 "seen": s and {"x": s["x"], "y": s["y"], **({"others": s["others"]} if "others" in s else {}),
                                "visible": hero in visible, "clock": s["clock"], "age": age(s)},
                 **({"truth": truth[hero]} if truth and hero in truth else {}),
             }
-        return {**feed, "players": {str(p): h for p, h in sorted(players.items())}, "heroes": out}
+        snap = {**feed, "players": {str(p): h for p, h in sorted(players.items())}, "heroes": out}
+        snap["enemies"] = self.enemies(snap, shown, item_ages, wards)
+        return snap
 
     def write_state(self, snap: dict):
+        if self.args.team_view_only:
+            return
         path = self.args.out / "state.json"
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(snap, ensure_ascii=False, indent=1), encoding="utf-8")
         os.replace(tmp, path)
 
-    def enemies(self, snap: dict) -> list[dict]:
+    @staticmethod
+    def enemies(snap: dict, shown: dict, item_ages: dict, wards: dict) -> list[dict]:
         """The enemy panel on the game machine (Plus team view only), in player order: level and items as
         last read while the friend team saw the hero, and the age of that reading in seconds. Never-read
         enemies are listed with nulls."""
-        if snap["mode"] != "team-view" or snap["ownTeam"] not in (2, 3):
+        if (snap["mode"] != "team-view" or snap["ownTeam"] not in (2, 3) or not snap["liveReady"]
+                or snap["gsiAge"] is None or not 0 <= snap["gsiAge"] < FRESH_GSI):
             return []
         order = {hero: int(player) for player, hero in snap["players"].items()}
         heroes = sorted((h for h, s in snap["heroes"].items() if s["team"] in (2, 3) and s["team"] != snap["ownTeam"]),
                         key=lambda h: (order.get(h, 99), h))[:5]
-        with self.lock:
-            shown = dict(self.item_slots.shown)
-            wards = {h: [dict(e) for e in r] for h, r in self.item_slots.wards.items()}
         out = []
         for hero in heroes:
-            status, slots = snap["heroes"][hero]["status"], shown.get(hero)
-            out.append({"hero": hero, "level": status and status["level"], "age": status and status["age"],
+            status = snap["heroes"][hero]["status"]
+            slots = shown.get(hero) if hero in item_ages else None
+            level = status and status["level"]
+            age = round(max(0, snap["scanClock"] - status["time"]), 2) if level is not None else None
+            if slots is not None:
+                age = max(age or 0, item_ages[hero])  # a fast level read doesn't make the older gear fresh
+            out.append({"hero": hero, "level": level, "age": age,
                         "items": slots and list(slots[:6]), "neutral": slots and slots[6],
                         **({"wards": wards[hero]} if hero in wards else {})})
         return out
@@ -731,10 +806,13 @@ class Scanner:
         """Scanner status and the enemy panel for the coach client, replaced atomically."""
         if not self.args.live:
             return
-        enemies = [] if stopped else self.enemies(snap)
+        mode = snap["mode"]
+        if mode == "team-view" and (not snap["liveReady"] or snap["gsiAge"] is None or not 0 <= snap["gsiAge"] < FRESH_GSI):
+            mode = "waiting"
+        enemies = snap["enemies"] if not stopped and mode == "team-view" else []
         self.export_icons(enemies)
-        live = {"version": 2, "run": self.run_id, "written": round(time.time(), 3), "stopped": stopped, "mode": snap["mode"],
-                "matchId": snap["matchId"], "ownTeam": snap["ownTeam"], "clock": snap["clock"], "selecting": snap["selecting"],
+        live = {"version": 2, "run": snap["run"], "written": snap["sampledUnix"], "stopped": stopped, "mode": mode, "gsiAge": snap["gsiAge"],
+                "matchId": snap["matchId"], "ownTeam": snap["ownTeam"], "clock": snap["scanClock"], "selecting": snap["selecting"],
                 "enemies": enemies}
         self.args.live.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.args.live.with_suffix(".tmp")
@@ -749,6 +827,8 @@ class Scanner:
                 time.sleep(0.02)
 
     def record(self, snap: dict):
+        if self.args.team_view_only:
+            return
         snap = {"type": "snapshot", "t": round(time.perf_counter() - self.started, 2), "cycle": self.cycle_now(), **snap}
         self.timeline.write(json.dumps(snap, ensure_ascii=False, separators=(",", ":")) + "\n")
         self.timeline.flush()
@@ -808,7 +888,9 @@ def setup(args):
     body = (f'"coach_hero_scan"\n{{\n "uri" "http://127.0.0.1:{args.gsi_port}/"\n "timeout" "5.0"\n "buffer" "0.0"\n'
             f' "throttle" "0.1"\n "heartbeat" "1.0"\n "auth" {{ "token" "{data["gsiToken"]}" }}\n "data"\n {{\n'
             + "".join(f'  "{k}" "1"\n' for k in ("provider", "map", "player", "hero", "items", "buildings", "minimap")) + " }\n}\n")
-    if path.exists() and path.read_text(encoding="utf-8") == body:
+    if path.exists():
+        if path.read_text(encoding="utf-8") != body:
+            raise SystemExit(f"Existing scanner GSI config differs; back it up and resolve it manually: {path}")
         print("GSI config already current:", path)
     else:
         path.write_text(body, encoding="utf-8")
@@ -842,6 +924,7 @@ def main():
     ap.add_argument("--item-visits", type=int, default=1, help="heroes per cycle that stay long enough for items")
     ap.add_argument("--allies", action="store_true",
                     help="in Plus team view also select the friend team's heroes (by default only enemies are scanned)")
+    ap.add_argument("--team-view-only", action="store_true", help="coach launcher: only Plus live output, no unbound session archive")
     ap.add_argument("--save-misses", type=int, default=0, help="save this many HUD bands that could not be read")
     ap.add_argument("--no-stream", action="store_true", help="wait for every switch instead of one selection per frame")
     ap.add_argument("--items-every", type=float, default=3.0,
@@ -854,6 +937,12 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
     if args.command == "setup":
         return setup(args)
+    if args.team_view_only:
+        if args.truth or args.select == "console":
+            ap.error("--team-view-only cannot be combined with replay/evaluation modes")
+        args.save_misses = 0
+    elif args.truth or args.select == "console":
+        args.live = None  # a replay/evaluation must not even replace the live scanner's file
     if args.stop_with_stdin:
         threading.Thread(target=stop_when_stdin_closes, daemon=True).start()
     data = load_secrets(args.secrets, create=False)
@@ -861,16 +950,17 @@ def main():
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", session):
         raise SystemExit("Session names use letters, digits, - and _")
     args.out = args.out / session
-    args.out.mkdir(parents=True, exist_ok=True)
+    if not args.team_view_only:
+        args.out.mkdir(parents=True, exist_ok=True)
     from hud_recognizer import HudRecognizer
     hud = HudRecognizer(args.assets, args.calibration)
-    feed = GsiFeed(args.gsi_port, data["gsiToken"], args.truth)
+    feed = GsiFeed(args.gsi_port, data["gsiToken"], args.truth, args.team_view_only)
     if args.select == "console":
         selector = lambda window: ConsoleSelect(data["consolePassword"], args.console_port)
     else:
         def selector(window):
             keys = KeySelect(window, args.keys)
-            if not keys.ready() and not keys.front():
+            if not keys.ready() and (args.team_view_only or not keys.front()):
                 print("Dota is not in the foreground: watching only until it is.", flush=True)
             return keys
     announced = False
@@ -903,9 +993,13 @@ def main():
         scanner.write_live(snap, stopped=True)
         scanner.capture.close()
         feed.shutdown()
-        summary = json.dumps(scanner.summary(), ensure_ascii=False)
-        (args.out / "summary.json").write_text(summary, encoding="utf-8")
-        print(summary, flush=True)
+        scanner.log.close(); scanner.timeline.close()
+        if args.team_view_only:
+            print("Vision scan stopped.", flush=True)
+        else:
+            summary = json.dumps(scanner.summary(), ensure_ascii=False)
+            (args.out / "summary.json").write_text(summary, encoding="utf-8")
+            print(summary, flush=True)
 
 
 if __name__ == "__main__":

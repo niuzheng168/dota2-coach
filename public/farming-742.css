@@ -1,0 +1,40 @@
+body { max-width: 1140px; }
+.set-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.set-nav a { padding: 6px 12px; border: 1px solid var(--line); border-radius: 4px; }
+.set-nav a[aria-current="page"] { border-color: var(--mint); background: var(--panel); font-weight: 600; }
+#layer-picker:not([hidden]) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+#layer-picker button { text-align: left; white-space: normal; padding: 10px 14px; }
+#layer-picker button[aria-pressed="true"] { border-color: var(--mint); }
+#layer-picker button span, #layer-picker button strong { display: block; }
+#layer-picker button span, #tempo-meta, #tempo-status, #tempo-route-info { color: var(--muted); }
+#layer-picker button strong { font-size: 16px; margin-top: 2px; }
+#layer-picker button small { margin-top: 4px; }
+#tempo-panel { max-width: 740px; border: 1px solid var(--line); border-radius: 6px; padding: 16px; background: var(--panel); }
+#tempo-match { max-width: 100%; }
+#tempo-meta { overflow-wrap: anywhere; }
+.minute-lh { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-block: 1px solid var(--line); padding: 12px 0; }
+.minute-lh dt { color: var(--muted); font-size: 12px; }
+.minute-lh dd { margin: 4px 0 0; color: var(--mint); font: 19px ui-monospace, monospace; }
+#window-coverage, #trace-coverage { color: var(--muted); font-size: 12px; }
+#trace-coverage { margin: 0 0 8px; font-variant-numeric: tabular-nums; }
+#match-detail[hidden] { display: none; }
+#replay-player { overflow-wrap: anywhere; }
+#route-map { background: var(--panel); cursor: default; touch-action: auto; }
+#towers { fill: #83939c; }
+#body-trace { fill: none; stroke: var(--mint); stroke-width: 2px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+#sample-marker { fill: white; stroke: var(--bg); stroke-width: 1.5px; vector-effect: non-scaling-stroke; pointer-events: none; }
+#camps g { fill: var(--gold); cursor: pointer; }
+#camps circle { stroke: transparent; stroke-width: 12px; vector-effect: non-scaling-stroke; pointer-events: all; }
+#camps text { font: 275px ui-monospace, monospace; paint-order: stroke; stroke: var(--panel); stroke-width: 50px; }
+#camps g:is(:hover, :focus) { fill: white; }
+#camp-info { font-size: 11px; letter-spacing: normal; color: var(--gold); }
+#sample-info { display: block; font-variant-numeric: tabular-nums; }
+.route-metrics { grid-template-columns: 1fr 1fr; }
+@media (max-width: 520px) {
+  #camps text { font-size: 380px; }
+  .map-heading { flex-wrap: wrap; }
+  .match-control { width: 100%; }
+  #replay-match { flex: 1; max-width: none; }
+  #layer-picker button { padding: 8px; }
+  #tempo-match { width: 100%; }
+}

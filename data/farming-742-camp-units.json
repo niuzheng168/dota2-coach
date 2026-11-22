@@ -1,0 +1,1754 @@
+{
+  "schema": 1,
+  "patch": "7.42",
+  "installedBuild": 6989,
+  "upstream": "https://raw.githubusercontent.com/SteamDatabase/GameTracking-Dota2/{commit}/game/dota/",
+  "builds": [
+    {
+      "build": 6983,
+      "commit": "7bf93721e36b447fa6d4128be329a006628d8d94",
+      "steamInfSha256": "d5b66d82a6e6885670a4c4b8ea8d46e9fab3d3bc5a7e3fa04d9ffda25aa7e40a"
+    },
+    {
+      "build": 6985,
+      "commit": "ff61ff289521d66a629f19fe502d3920ce08557d",
+      "steamInfSha256": "13654f32f11b961fff1f191637fc57a315e5b64c62b4e17bd1783548931b0f4e"
+    },
+    {
+      "build": 6986,
+      "commit": "547c99cf2c81c2c6a4e34a16fc635b682d5838d3",
+      "steamInfSha256": "7b86b99bec3630eff0a2698ddb956bc2b688943b1679ad0feeda13232d7e8601"
+    },
+    {
+      "build": 6988,
+      "commit": "8c9915dadb50c83c5427846d554fb3da84c18d7e",
+      "steamInfSha256": "e5cd5ec3806caa98463f48062d4168f8d66399d1f2b80c397b591855dd5d53a7"
+    },
+    {
+      "build": 6989,
+      "commit": "76ab89451c1384c2e106b676258c6e9f72787e11",
+      "steamInfSha256": "e5a14b290a771c54148039dd4ca7d2e23c730cbd4a08b972c6e01cea24b03843"
+    }
+  ],
+  "commonFileSha256": {
+    "scripts/npc/npc_units.txt": "1a8e4f01480630cfb9aa1daa2eb1bc348d7793c0ae4ced6869f1e552b63d6596",
+    "scripts/npc/npc_abilities.txt": "e9f8111f0d11df939ac0246ad58e10b4df9fa4cf7e05d75e004199975ba7f7c4",
+    "scripts/npc/items.txt": "3aa970ea2b1e5fa025731a98748329b4ebfb3a40db63bf63c7b928f5110345af",
+    "scripts/npc/heroes/npc_dota_hero_base.txt": "e30554bae64770783695fd868fb1c4bed8f33b1e7340bb09a41bbc2b1eeecf86",
+    "scripts/npc/heroes/npc_dota_hero_luna.txt": "82ebaf8770330f0f3ddfd2b25924d53f26e3679272529cbc32ae8342b07b46a8",
+    "scripts/npc/heroes/npc_dota_hero_troll_warlord.txt": "8d9a261be8cb387c5ef29e19506facf39003b0c62a9c79c0f6c765a2d4400611",
+    "resource/localization/abilities_english.txt": "ab9538148306540fbf4282e7e184380b516ee0954dd0e465adb449e87025388d"
+  },
+  "note": "All seven file bytes identical on the five fixed commits; installed build 6989 matches after CRLF to LF only. Unit definitions are NOT a spawn table.",
+  "heroes": {
+    "luna": {
+      "id": 48,
+      "baseAttack": [
+        26,
+        32
+      ],
+      "baseAttackSpeed": 100,
+      "bat": 1.7,
+      "attackPoint": 0.35,
+      "range": 330,
+      "projectileSpeed": 900,
+      "primary": "DOTA_ATTRIBUTE_AGILITY",
+      "agility": 24,
+      "agilityGain": 3.2
+    },
+    "troll_warlord": {
+      "id": 95,
+      "baseAttack": [
+        27,
+        35
+      ],
+      "baseAttackSpeed": 100,
+      "bat": 1.7,
+      "attackPoint": 0.3,
+      "range": 500,
+      "projectileSpeed": 1200,
+      "primary": "DOTA_ATTRIBUTE_AGILITY",
+      "agility": 24,
+      "agilityGain": 3.3
+    }
+  },
+  "mechanics": {
+    "neutral_upgrade": {
+      "max_level": "30",
+      "increase_time": "450",
+      "increase_damage": "3",
+      "increase_aspd": "5",
+      "increase_health": "30",
+      "increase_armor": "0.5",
+      "increase_gold": "1",
+      "increase_xp": "4"
+    },
+    "neutral_gold_upgrade_ability": {
+      "damage_pct": "200",
+      "hp_pct": "200",
+      "xp_bounty_pct": "200",
+      "gold_bounty_pct": "200",
+      "model_scale": "1.4"
+    },
+    "mud_golem_rock_destroy": {
+      "radius": "250",
+      "duration": "2",
+      "movespeed": "-25",
+      "shard_health": "250 280 310 370",
+      "shard_damage": "12 16 20 28",
+      "shard_duration": "60",
+      "shard_amount": "2 2 3 3"
+    },
+    "granite_golem_hp_aura": {
+      "bonus_hp": {
+        "value": "16 17 18 19"
+      },
+      "radius": {
+        "value": "1200",
+        "affected_by_aoe_increase": "1"
+      }
+    },
+    "enraged_wildkin_toughness_aura": {
+      "bonus_armor": {
+        "value": "3"
+      },
+      "radius": {
+        "value": "1200",
+        "affected_by_aoe_increase": "1"
+      }
+    },
+    "black_dragon_dragonhide_aura": {
+      "bonus_armor": {
+        "value": "3"
+      },
+      "radius": {
+        "value": "1200",
+        "affected_by_aoe_increase": "1"
+      }
+    },
+    "satyr_hellcaller_unholy_aura": {
+      "health_regen": {
+        "value": "3.0 5.0 7.0 11.0"
+      },
+      "radius": {
+        "value": "1200",
+        "affected_by_aoe_increase": "1"
+      }
+    },
+    "luna_moon_glaive": {
+      "range": {
+        "value": "500",
+        "affected_by_aoe_increase": "1"
+      },
+      "bounces": "3 4 5 6",
+      "damage_reduction_percent": {
+        "value": "50 45 40 35",
+        "special_bonus_unique_luna_7": "-5"
+      },
+      "effectiveness_reduction_percent": "40"
+    },
+    "luna_lunar_blessing": {
+      "radius": {
+        "value": "1200",
+        "affected_by_aoe_increase": "1"
+      },
+      "bonus_damage": {
+        "hero_levelup": "+1",
+        "special_bonus_unique_luna_3": "+25"
+      },
+      "self_bonus_damage": {
+        "hero_levelup": "+2",
+        "special_bonus_unique_luna_3": "+50"
+      },
+      "bonus_night_vision": {
+        "value": "225",
+        "hero_levelup": "+25"
+      }
+    },
+    "troll_warlord_switch_stance": {
+      "bonus_range": "350",
+      "base_attack_time": "1.4",
+      "armor_per_interval": "1.0",
+      "attack_speed_interval": "30",
+      "armor_bonus_tooltip": {
+        "dynamic_value": "true"
+      }
+    },
+    "troll_warlord_fervor": {
+      "attack_speed": {
+        "value": "15 20 25 30",
+        "special_bonus_unique_troll_warlord_5": "+4"
+      },
+      "max_stacks": {
+        "value": "10"
+      },
+      "stack_limit_during_battle_trance": {
+        "value": "0",
+        "special_bonus_facet_troll_warlord_bad_influence": "+12"
+      },
+      "extra_attack_chance_per_stack": {
+        "special_bonus_shard": "3"
+      },
+      "base_chance": {
+        "special_bonus_shard": "16"
+      },
+      "armor_per_stack": {
+        "special_bonus_facet_troll_warlord_insensitive": "+1.0"
+      },
+      "range_buffer": {
+        "special_bonus_shard": "=175"
+      }
+    },
+    "troll_warlord_berserkers_rage": {
+      "bonus_move_speed": {
+        "value": "15 25 35 45",
+        "special_bonus_unique_troll_warlord_2": "+20"
+      },
+      "bonus_armor": {
+        "var_type": "FIELD_INTEGER",
+        "value": "0"
+      },
+      "bonus_range": "350",
+      "base_attack_time": "1.4",
+      "ensnare_chance": "20",
+      "ensnare_duration": "0.8 1.2 1.6 2.0",
+      "maim_chance": "20",
+      "maim_duration": "0.8 1.2 1.6 2.0",
+      "maim_slow": "8 16 24 32",
+      "maim_attack_slow": "8 16 24 32",
+      "maim_damage": {
+        "value": "10 15 20 25",
+        "CalculateSpellDamageTooltip": "0"
+      }
+    },
+    "item_quelling_blade": {
+      "damage_bonus": "8",
+      "damage_bonus_ranged": "4",
+      "quelling_range_tooltip": "350"
+    },
+    "item_bfury": {
+      "bonus_damage": "50",
+      "bonus_health_regen": "7.5",
+      "bonus_mana_regen": "2.75",
+      "cleave_damage_percent": "60",
+      "cleave_damage_percent_creep": "40",
+      "quelling_bonus": "10",
+      "quelling_bonus_ranged": "5",
+      "cleave_starting_width": {
+        "value": "150",
+        "affected_by_aoe_increase": "1"
+      },
+      "cleave_ending_width": {
+        "value": "360",
+        "affected_by_aoe_increase": "1"
+      },
+      "cleave_distance": "650",
+      "upgraded_cleave_bonus": "25",
+      "upgraded_damage_bonus": "15"
+    },
+    "item_mask_of_madness": {
+      "bonus_damage": "15",
+      "bonus_attack_speed": "10",
+      "lifesteal_percent": "22",
+      "berserk_bonus_attack_speed": "100",
+      "berserk_bonus_movement_speed_melee": "12",
+      "berserk_bonus_movement_speed": "6",
+      "berserk_armor_reduction": "7",
+      "berserk_slow_resist_melee": "30",
+      "berserk_slow_resist": "15",
+      "berserk_duration": "6.0"
+    },
+    "item_power_treads": {
+      "bonus_movement_speed_ranged": "45",
+      "bonus_movement_speed_melee": "55",
+      "bonus_stat": "10",
+      "bonus_attack_speed": "25",
+      "bonus_damage": "0"
+    },
+    "item_wraith_band": {
+      "bonus_agility": "5",
+      "bonus_strength": "2",
+      "bonus_intellect": "2",
+      "bonus_attack_speed": "10",
+      "bonus_armor": "1.75"
+    },
+    "item_gloves": {
+      "bonus_attack_speed": "20"
+    },
+    "item_yasha": {
+      "bonus_agility": "16",
+      "bonus_attack_speed": "15",
+      "movement_speed_percent_bonus": "6"
+    },
+    "item_manta": {
+      "bonus_strength": "10",
+      "bonus_agility": "26",
+      "bonus_intellect": "10",
+      "bonus_attack_speed": "15",
+      "bonus_movement_speed": "6",
+      "images_count": "2",
+      "illusion_effectiveness": "35",
+      "illusion_duration": "18",
+      "images_do_damage_percent_melee": "-67",
+      "tooltip_damage_outgoing_melee": "33",
+      "images_take_damage_percent": "200",
+      "tooltip_damage_incoming_total_pct": "300",
+      "images_do_damage_percent_ranged": "-75",
+      "tooltip_damage_outgoing_ranged": "25",
+      "invuln_duration": "0.1",
+      "vision_radius": "1000"
+    },
+    "item_sange_and_yasha": {
+      "bonus_strength": "16",
+      "bonus_agility": "16",
+      "status_resistance": "16",
+      "bonus_attack_speed": "20",
+      "movement_speed_percent_bonus_melee": "10",
+      "movement_speed_percent_bonus": "10",
+      "hp_regen_amp": "20",
+      "slow_resistance": "30"
+    },
+    "item_enhancement_alert": {
+      "bonus_attack_speed": "8 18 28",
+      "bonus_night_vision": "0 150 200",
+      "bonus_attack_range": "0 0 80",
+      "bonus_attack_range_melee": "0 0 40"
+    },
+    "item_enhancement_brawny": {
+      "health_bonus": "110 170 230",
+      "health_regen": "0 4 8",
+      "lifesteal": "0 0 16"
+    },
+    "item_enhancement_tough": {
+      "bonus_damage": "6 11 16",
+      "armor": "0 5 7",
+      "knockback_resist": "0 0 40"
+    },
+    "item_enhancement_quickened": {
+      "movement_speed": "14 22 30",
+      "max_mana": "0 130 200",
+      "evasion": "0 0 15"
+    },
+    "item_weighted_dice": {
+      "roll_count": "2",
+      "bonus_max_damage": "8"
+    },
+    "item_possessed_mask": {
+      "primary_attribute": "0",
+      "lifesteal": "7"
+    },
+    "item_stonefeather_satchel": {
+      "knockback_resistance": {
+        "value": "30",
+        "apply_curio_bonus": "1"
+      },
+      "feather_movespeed": "15",
+      "rocks_armor": "5"
+    },
+    "item_metamorphic_mandible": {
+      "duration": {
+        "value": "5",
+        "apply_curio_bonus": "1"
+      },
+      "bonus_magic_resistance": "40",
+      "bonus_movespeed": "15",
+      "size_decrease": "20",
+      "armor_decrease": "30"
+    }
+  },
+  "units": {
+    "npc_dota_neutral_kobold": {
+      "hp": 280,
+      "regen": 0.5,
+      "armor": 0,
+      "magicResistPct": 0,
+      "gold": [
+        6,
+        8
+      ],
+      "xp": 18,
+      "attack": [
+        18,
+        19
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 200,
+      "ancient": false,
+      "abilities": [
+        "kobold_tunneler_prospecting",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_kobold_tunneler": {
+      "hp": 325,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        11,
+        13
+      ],
+      "xp": 17,
+      "attack": [
+        22,
+        23
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 200,
+      "ancient": false,
+      "abilities": [
+        "kobold_disarm",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_kobold_taskmaster": {
+      "hp": 400,
+      "regen": 0.5,
+      "armor": 2,
+      "magicResistPct": 0,
+      "gold": [
+        19,
+        21
+      ],
+      "xp": 30,
+      "attack": [
+        24,
+        26
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 200,
+      "ancient": false,
+      "abilities": [
+        "kobold_taskmaster_speed_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_centaur_outrunner": {
+      "hp": 350,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        16,
+        18
+      ],
+      "xp": 32,
+      "attack": [
+        18,
+        20
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "mudgolem_cloak_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_centaur_khan": {
+      "hp": 1100,
+      "regen": 1,
+      "armor": 4,
+      "magicResistPct": 0,
+      "gold": [
+        49,
+        54
+      ],
+      "xp": 90,
+      "attack": [
+        49,
+        55
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": false,
+      "abilities": [
+        "centaur_khan_war_stomp",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_fel_beast": {
+      "hp": 400,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        16,
+        18
+      ],
+      "xp": 26,
+      "attack": [
+        14,
+        15
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": false,
+      "abilities": [
+        "fel_beast_haunt",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_polar_furbolg_champion": {
+      "hp": 700,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 0,
+      "gold": [
+        30,
+        38
+      ],
+      "xp": 66,
+      "attack": [
+        39,
+        44
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": false,
+      "abilities": [
+        "centaur_khan_endurance_aura",
+        "furbolg_enrage_attack_speed",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_polar_furbolg_ursa_warrior": {
+      "hp": 950,
+      "regen": 1,
+      "armor": 4,
+      "magicResistPct": 0,
+      "gold": [
+        62,
+        66
+      ],
+      "xp": 90,
+      "attack": [
+        49,
+        55
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": false,
+      "abilities": [
+        "polar_furbolg_ursa_warrior_thunder_clap",
+        "furbolg_enrage_damage",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_warpine_raider": {
+      "hp": 850,
+      "regen": 2.5,
+      "armor": 6,
+      "magicResistPct": 30,
+      "gold": [
+        43,
+        45
+      ],
+      "xp": 76,
+      "attack": [
+        39,
+        41
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "warpine_raider_seed_shot",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_mud_golem": {
+      "hp": 750,
+      "regen": 0.5,
+      "armor": 0,
+      "magicResistPct": 30,
+      "gold": [
+        19,
+        21
+      ],
+      "xp": 32,
+      "attack": [
+        24,
+        26
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "mud_golem_hurl_big_boulder",
+        "mud_golem_rock_destroy",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_radigull": {
+      "hp": 800,
+      "regen": 0.5,
+      "armor": 0,
+      "magicResistPct": 30,
+      "gold": [
+        34,
+        36
+      ],
+      "xp": 62,
+      "attack": [
+        30,
+        32
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "radigull_eggstremism",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_mud_golem_split": {
+      "hp": 250,
+      "regen": 0.5,
+      "armor": 0,
+      "magicResistPct": 33,
+      "gold": [
+        6,
+        10
+      ],
+      "xp": 18,
+      "attack": [
+        10,
+        14
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "mud_golem_hurl_boulder",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_mud_golem_split_doom": {
+      "hp": 250,
+      "regen": 0.5,
+      "armor": 0,
+      "magicResistPct": 33,
+      "gold": [
+        6,
+        10
+      ],
+      "xp": 18,
+      "attack": [
+        10,
+        14
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "mud_golem_hurl_boulder",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_ogre_mauler": {
+      "hp": 800,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        22,
+        26
+      ],
+      "xp": 32,
+      "attack": [
+        22,
+        24
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "ogre_bruiser_ogre_smash",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_ogre_magi": {
+      "hp": 600,
+      "regen": 0.5,
+      "armor": 0,
+      "magicResistPct": 0,
+      "gold": [
+        28,
+        32
+      ],
+      "xp": 48,
+      "attack": [
+        18,
+        20
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "ogre_magi_frost_armor",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_giant_wolf": {
+      "hp": 500,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        18,
+        22
+      ],
+      "xp": 40,
+      "attack": [
+        15,
+        17
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "giant_wolf_intimidate",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_alpha_wolf": {
+      "hp": 600,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 0,
+      "gold": [
+        32,
+        34
+      ],
+      "xp": 60,
+      "attack": [
+        27,
+        29
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "alpha_wolf_critical_strike",
+        "alpha_wolf_command_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_wildkin": {
+      "hp": 350,
+      "regen": 0.5,
+      "armor": 2,
+      "magicResistPct": 0,
+      "gold": [
+        16,
+        18
+      ],
+      "xp": 26,
+      "attack": [
+        18,
+        20
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "enraged_wildkin_tornado",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_enraged_wildkin": {
+      "hp": 950,
+      "regen": 0.5,
+      "armor": 4,
+      "magicResistPct": 0,
+      "gold": [
+        52,
+        58
+      ],
+      "xp": 90,
+      "attack": [
+        50,
+        56
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "enraged_wildkin_hurricane",
+        "enraged_wildkin_toughness_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_satyr_soulstealer": {
+      "hp": 600,
+      "regen": 0.5,
+      "armor": 2,
+      "magicResistPct": 0,
+      "gold": [
+        16,
+        18
+      ],
+      "xp": 40,
+      "attack": [
+        21,
+        23
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "satyr_soulstealer_mana_burn",
+        "forest_troll_high_priest_mana_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_satyr_hellcaller": {
+      "hp": 1100,
+      "regen": 1,
+      "armor": 2,
+      "magicResistPct": 0,
+      "gold": [
+        60,
+        66
+      ],
+      "xp": 90,
+      "attack": [
+        49,
+        55
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "satyr_hellcaller_shockwave",
+        "satyr_hellcaller_unholy_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_jungle_stalker": {
+      "hp": 1600,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 50,
+      "gold": [
+        36,
+        49
+      ],
+      "xp": 95,
+      "attack": [
+        46,
+        64
+      ],
+      "bat": 1.35,
+      "baseAttackSpeed": 100,
+      "ancient": true,
+      "abilities": []
+    },
+    "npc_dota_neutral_elder_jungle_stalker": {
+      "hp": 2000,
+      "regen": 0.5,
+      "armor": 5,
+      "magicResistPct": 50,
+      "gold": [
+        108,
+        121
+      ],
+      "xp": 124,
+      "attack": [
+        56,
+        78
+      ],
+      "bat": 1.35,
+      "baseAttackSpeed": 100,
+      "ancient": true,
+      "abilities": []
+    },
+    "npc_dota_neutral_prowler_acolyte": {
+      "hp": 750,
+      "regen": 0.5,
+      "armor": 11,
+      "magicResistPct": 0,
+      "gold": [
+        37,
+        43
+      ],
+      "xp": 95,
+      "attack": [
+        33,
+        38
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": true,
+      "abilities": [
+        "spawnlord_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_prowler_shaman": {
+      "hp": 1400,
+      "regen": 0.5,
+      "armor": 12,
+      "magicResistPct": 0,
+      "gold": [
+        76,
+        80
+      ],
+      "xp": 124,
+      "attack": [
+        59,
+        65
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": true,
+      "abilities": [
+        "spawnlord_master_stomp",
+        "spawnlord_master_freeze",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_eimermole": {
+      "hp": 700,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 0,
+      "gold": [
+        30,
+        38
+      ],
+      "xp": 66,
+      "attack": [
+        39,
+        44
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": false,
+      "abilities": [
+        "eimermole_miners_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_eimermole_foreman": {
+      "hp": 950,
+      "regen": 1,
+      "armor": 4,
+      "magicResistPct": 0,
+      "gold": [
+        62,
+        66
+      ],
+      "xp": 90,
+      "attack": [
+        49,
+        55
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": false,
+      "abilities": [
+        "eimermole_miners_slam",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_odobenus_footman": {
+      "hp": 500,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        18,
+        22
+      ],
+      "xp": 40,
+      "attack": [
+        16,
+        18
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "odobenus_blight",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_odobenus_frostmage": {
+      "hp": 600,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 0,
+      "gold": [
+        32,
+        34
+      ],
+      "xp": 60,
+      "attack": [
+        26,
+        30
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "warpine_raider_seed_shot",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_rock_golem": {
+      "hp": 800,
+      "regen": 0.5,
+      "armor": 4,
+      "magicResistPct": 30,
+      "gold": [
+        33,
+        39
+      ],
+      "xp": 95,
+      "attack": [
+        22,
+        24
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": true,
+      "abilities": [
+        "ancient_rock_golem_weakening_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_granite_golem": {
+      "hp": 1500,
+      "regen": 1.5,
+      "armor": 8,
+      "magicResistPct": 30,
+      "gold": [
+        68,
+        72
+      ],
+      "xp": 124,
+      "attack": [
+        80,
+        84
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": true,
+      "abilities": [
+        "granite_golem_hp_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_ice_shaman": {
+      "hp": 1500,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 30,
+      "gold": [
+        76,
+        80
+      ],
+      "xp": 124,
+      "attack": [
+        58,
+        62
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": true,
+      "abilities": [
+        "ice_shaman_incendiary_bomb",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_frostbitten_golem": {
+      "hp": 900,
+      "regen": 2,
+      "armor": 7,
+      "magicResistPct": 30,
+      "gold": [
+        37,
+        43
+      ],
+      "xp": 95,
+      "attack": [
+        29,
+        31
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": true,
+      "abilities": [
+        "frostbitten_golem_time_warp_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_big_thunder_lizard": {
+      "hp": 1700,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 30,
+      "gold": [
+        68,
+        72
+      ],
+      "xp": 124,
+      "attack": [
+        60,
+        65
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 120,
+      "ancient": true,
+      "abilities": [
+        "big_thunder_lizard_slam",
+        "big_thunder_lizard_frenzy",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_ogre_seal": {
+      "hp": 1700,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 30,
+      "gold": [
+        68,
+        72
+      ],
+      "xp": 124,
+      "attack": [
+        60,
+        65
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 120,
+      "ancient": true,
+      "abilities": [
+        "ogre_seal_flop",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_ogre_seal_pup": {
+      "hp": 800,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 50,
+      "gold": [
+        38,
+        44
+      ],
+      "xp": 95,
+      "attack": [
+        32,
+        34
+      ],
+      "bat": 1.8,
+      "baseAttackSpeed": 100,
+      "ancient": true,
+      "abilities": [
+        "ogre_seal_pup_disapproval_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_small_thunder_lizard": {
+      "hp": 800,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 50,
+      "gold": [
+        38,
+        44
+      ],
+      "xp": 95,
+      "attack": [
+        32,
+        34
+      ],
+      "bat": 1.8,
+      "baseAttackSpeed": 100,
+      "ancient": true,
+      "abilities": [
+        "big_thunder_lizard_wardrums_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_gnoll_assassin": {
+      "hp": 400,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        16,
+        18
+      ],
+      "xp": 30,
+      "attack": [
+        25,
+        27
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "gnoll_assassin_envenomed_weapon",
+        "creep_piercing",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_ghost": {
+      "hp": 500,
+      "regen": 0.5,
+      "armor": 2,
+      "magicResistPct": 0,
+      "gold": [
+        23,
+        25
+      ],
+      "xp": 42,
+      "attack": [
+        38,
+        43
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 165,
+      "ancient": false,
+      "abilities": [
+        "ghost_frost_attack",
+        "creep_piercing",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_dark_troll": {
+      "hp": 500,
+      "regen": 0.5,
+      "armor": 0,
+      "magicResistPct": 0,
+      "gold": [
+        17,
+        19
+      ],
+      "xp": 42,
+      "attack": [
+        24,
+        27
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "dark_troll_warlord_ensnare",
+        "creep_piercing",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_dark_troll_warlord": {
+      "hp": 1100,
+      "regen": 0.5,
+      "armor": 4,
+      "magicResistPct": 0,
+      "gold": [
+        40,
+        46
+      ],
+      "xp": 90,
+      "attack": [
+        40,
+        45
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "dark_troll_warlord_raise_dead",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_satyr_trickster": {
+      "hp": 300,
+      "regen": 0.5,
+      "armor": 0,
+      "magicResistPct": 0,
+      "gold": [
+        15,
+        17
+      ],
+      "xp": 30,
+      "attack": [
+        10,
+        12
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "satyr_trickster_purge",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_forest_troll_berserker": {
+      "hp": 500,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        16,
+        18
+      ],
+      "xp": 28,
+      "attack": [
+        28,
+        37
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "creep_piercing",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_forest_troll_high_priest": {
+      "hp": 450,
+      "regen": 0.5,
+      "armor": 0,
+      "magicResistPct": 0,
+      "gold": [
+        16,
+        18
+      ],
+      "xp": 28,
+      "attack": [
+        28,
+        34
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "forest_troll_high_priest_heal",
+        "forest_troll_high_priest_heal_amp_aura",
+        "creep_piercing",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_harpy_scout": {
+      "hp": 400,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        14,
+        16
+      ],
+      "xp": 26,
+      "attack": [
+        28,
+        34
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "harpy_scout_take_off",
+        "creep_piercing",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_harpy_storm": {
+      "hp": 500,
+      "regen": 0.5,
+      "armor": 2,
+      "magicResistPct": 0,
+      "gold": [
+        25,
+        27
+      ],
+      "xp": 42,
+      "attack": [
+        30,
+        36
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "harpy_storm_chain_lightning",
+        "creep_piercing",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_black_drake": {
+      "hp": 950,
+      "regen": 0.5,
+      "armor": 2,
+      "magicResistPct": 25,
+      "gold": [
+        37,
+        43
+      ],
+      "xp": 95,
+      "attack": [
+        20,
+        22
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 120,
+      "ancient": true,
+      "abilities": [
+        "black_drake_magic_amplification_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_black_dragon": {
+      "hp": 2000,
+      "regen": 2,
+      "armor": 4,
+      "magicResistPct": 30,
+      "gold": [
+        76,
+        80
+      ],
+      "xp": 124,
+      "attack": [
+        62,
+        68
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": true,
+      "abilities": [
+        "black_dragon_fireball",
+        "black_dragon_splash_attack",
+        "black_dragon_dragonhide_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_dark_troll_warlord_skeleton_warrior": {
+      "hp": 250,
+      "regen": 0,
+      "armor": 0,
+      "magicResistPct": 0,
+      "gold": [
+        2,
+        4
+      ],
+      "xp": 4,
+      "attack": [
+        11,
+        13
+      ],
+      "bat": 1,
+      "baseAttackSpeed": 100,
+      "ancient": false,
+      "abilities": [
+        "hill_troll_rally",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_tadpole": {
+      "hp": 400,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        17,
+        19
+      ],
+      "xp": 30,
+      "attack": [
+        19,
+        21
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "frogmen_riverborn_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_froglet": {
+      "hp": 700,
+      "regen": 0.5,
+      "armor": 2,
+      "magicResistPct": 0,
+      "gold": [
+        25,
+        29
+      ],
+      "xp": 42,
+      "attack": [
+        22,
+        24
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "frogmen_arm_of_the_deep",
+        "frogmen_riverborn_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_grown_frog": {
+      "hp": 900,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 0,
+      "gold": [
+        37,
+        41
+      ],
+      "xp": 55,
+      "attack": [
+        41,
+        46
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": false,
+      "abilities": [
+        "frogmen_tendrils_of_the_deep",
+        "frogmen_riverborn_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_ancient_frog": {
+      "hp": 1250,
+      "regen": 2,
+      "armor": 5,
+      "magicResistPct": 30,
+      "gold": [
+        53,
+        56
+      ],
+      "xp": 104,
+      "attack": [
+        60,
+        64
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": true,
+      "abilities": [
+        "frogmen_congregation_of_the_deep",
+        "frogmen_riverborn_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_froglet_mage": {
+      "hp": 700,
+      "regen": 0.5,
+      "armor": 2,
+      "magicResistPct": 0,
+      "gold": [
+        25,
+        29
+      ],
+      "xp": 42,
+      "attack": [
+        24,
+        27
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "frogmen_water_bubble_small",
+        "frogmen_riverborn_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_grown_frog_mage": {
+      "hp": 900,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 0,
+      "gold": [
+        37,
+        41
+      ],
+      "xp": 55,
+      "attack": [
+        40,
+        45
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "frogmen_water_bubble_medium",
+        "frogmen_riverborn_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_ancient_frog_mage": {
+      "hp": 1250,
+      "regen": 2,
+      "armor": 5,
+      "magicResistPct": 30,
+      "gold": [
+        53,
+        56
+      ],
+      "xp": 104,
+      "attack": [
+        58,
+        62
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": true,
+      "abilities": [
+        "frogmen_water_bubble_large",
+        "frogmen_riverborn_aura",
+        "neutral_upgrade"
+      ]
+    },
+    "npc_dota_neutral_kobold_tunneler_gold": {
+      "hp": 325,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        12,
+        14
+      ],
+      "xp": 17,
+      "attack": [
+        22,
+        23
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 200,
+      "ancient": false,
+      "abilities": [
+        "kobold_disarm",
+        "neutral_upgrade",
+        "neutral_gold_upgrade_ability"
+      ]
+    },
+    "npc_dota_neutral_gnoll_assassin_gold": {
+      "hp": 400,
+      "regen": 0.5,
+      "armor": 1,
+      "magicResistPct": 0,
+      "gold": [
+        16,
+        18
+      ],
+      "xp": 30,
+      "attack": [
+        25,
+        27
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 125,
+      "ancient": false,
+      "abilities": [
+        "gnoll_assassin_envenomed_weapon",
+        "creep_piercing",
+        "neutral_upgrade",
+        "neutral_gold_upgrade_ability"
+      ]
+    },
+    "npc_dota_neutral_alpha_wolf_gold": {
+      "hp": 600,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 0,
+      "gold": [
+        32,
+        34
+      ],
+      "xp": 60,
+      "attack": [
+        27,
+        29
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "alpha_wolf_critical_strike",
+        "alpha_wolf_command_aura",
+        "neutral_upgrade",
+        "neutral_gold_upgrade_ability"
+      ]
+    },
+    "npc_dota_neutral_mud_golem_gold": {
+      "hp": 750,
+      "regen": 0.5,
+      "armor": 0,
+      "magicResistPct": 30,
+      "gold": [
+        19,
+        21
+      ],
+      "xp": 32,
+      "attack": [
+        24,
+        26
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "mud_golem_hurl_big_boulder",
+        "mud_golem_rock_destroy",
+        "neutral_upgrade",
+        "neutral_gold_upgrade_ability"
+      ]
+    },
+    "npc_dota_neutral_enraged_wildkin_gold": {
+      "hp": 950,
+      "regen": 0.5,
+      "armor": 4,
+      "magicResistPct": 0,
+      "gold": [
+        58,
+        64
+      ],
+      "xp": 90,
+      "attack": [
+        50,
+        56
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 150,
+      "ancient": false,
+      "abilities": [
+        "enraged_wildkin_hurricane",
+        "enraged_wildkin_toughness_aura",
+        "neutral_upgrade",
+        "neutral_gold_upgrade_ability"
+      ]
+    },
+    "npc_dota_neutral_polar_furbolg_champion_gold": {
+      "hp": 700,
+      "regen": 0.5,
+      "armor": 3,
+      "magicResistPct": 0,
+      "gold": [
+        30,
+        38
+      ],
+      "xp": 66,
+      "attack": [
+        39,
+        44
+      ],
+      "bat": 2,
+      "baseAttackSpeed": 135,
+      "ancient": false,
+      "abilities": [
+        "centaur_khan_endurance_aura",
+        "furbolg_enrage_attack_speed",
+        "neutral_upgrade",
+        "neutral_gold_upgrade_ability"
+      ]
+    }
+  }
+}

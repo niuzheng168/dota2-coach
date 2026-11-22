@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -13,26 +14,21 @@ using DotaCoach.Desktop;
 
 namespace DotaCoach.TwoPc;
 
-internal sealed class AdviceOverlay : Window
+internal sealed partial class AdviceOverlay : Window
 {
     private readonly Canvas canvas = new() { IsHitTestVisible = false };
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private Reminder? reminder;
-    private long until, lastFrame, previewUntil, enemiesAt;
+    private long until, lastFrame, previewUntil;
     private EnemyBoard? enemies;
-    // What the canvas shows. The window spans the whole game and is redrawn only when this changes: repainting a
-    // full-screen layered window costs frames. It is hidden while there is no subtitle.
+    private bool boardSession;
+    // Only a reminder needs the full game area. The small equipment/ward HWNDs have independent lifetimes.
     private string? drawn;
-    // The enemy panel stays up for the whole match: it has its own window of just its size, redrawn only when what it
-    // shows changes, so a change repaints the panel and not a transparent layer over the whole game.
-    internal PanelWindow Panel { get; } = new();
-    private string? panelDrawn;
-    private Rect panelBox;
-    // Possible enemy wards: a window just over Dota's minimap, likewise redrawn only when the marks change.
-    internal PanelWindow Wards { get; } = new("双机教练 · 可能眼位");
-    private string? wardsDrawn;
     /// <summary>The player's local subtitle and enemy panel style; applied from the next redraw on.</summary>
     public GameOverlaySettings Settings { get; set; } = new();
+    /// <summary>Game-side GSI/session guard, rechecked even when the visual is cached. No guard, no live minute route.</summary>
+    public Func<Reminder, bool>? MinuteRouteValid { get; set; }
+    internal Func<EnemyBoard, int, int, EnemyBoard?>? BoardForDisplay { get; set; }
     public IconCache Icons { get; } = new(System.IO.Path.Combine(AppContext.BaseDirectory, "icons"));
     private IntPtr handle;
     private readonly E2ERun? e2e;
@@ -52,17 +48,7 @@ internal sealed class AdviceOverlay : Window
             Passive(handle, e2e?.CaptureOverlayEvidence == true && localBot ? 0u : 0x11u);
         };
         timer.Tick += (_, _) => Draw(); timer.Start();
-        Closed += (_, _) => { timer.Stop(); Panel.Close(); Wards.Close(); };
-    }
-    /// <summary>Click-through, never activated, not in Alt-Tab; excluded from screen capture unless asked otherwise.</summary>
-    internal static void Passive(IntPtr window, uint affinity)
-    {
-        SetWindowLongPtr(window, -20, new IntPtr(GetWindowLongPtr(window, -20).ToInt64() | 0x20 | 0x80 | 0x08000000 | 0x80000));
-        SetWindowDisplayAffinity(window, affinity);
-        HwndSource.FromHwnd(window)?.AddHook((IntPtr h, int m, IntPtr w, IntPtr l, ref bool handled) => {
-            if (m is 0x21 or 0x84) { handled = true; return new IntPtr(m == 0x21 ? 3 : -1); }
-            return IntPtr.Zero;
-        });
+        Closed += (_, _) => { timer.Stop(); equipmentWindow?.Close(); wardWindow?.Close(); };
     }
     public void FrameArrived(bool isLocalBot = false)
     {
@@ -81,7 +67,12 @@ internal sealed class AdviceOverlay : Window
     /// <summary>The coach's enemy panel, renewed about once a second; null hides it.</summary>
     public void Enemies(EnemyBoard? board)
     {
-        enemies = board; enemiesAt = Environment.TickCount64;
+        enemies = board;
+        if (board == null) HideBoards();
+    }
+    internal void SetBoardSession(bool active)
+    {
+        boardSession = active; previewUntil = 0; Enemies(null);
     }
     /// <summary>Shows a sample subtitle and enemy panel over Dota for a while (live ones still win), to tune the style.</summary>
     public void Preview(int ms)
@@ -102,23 +93,13 @@ internal sealed class AdviceOverlay : Window
     }
     private void Blank()
     {
-        drawn = null; canvas.Children.Clear();
+        if (drawn != null) { drawn = null; canvas.Children.Clear(); }
         if (IsVisible) Hide();
-        HidePanel(); HideWards();
-    }
-    private void HidePanel()
-    {
-        panelDrawn = null; Panel.View.Children.Clear();
-        if (Panel.IsVisible) Panel.Hide();
-    }
-    private void HideWards()
-    {
-        wardsDrawn = null; Wards.View.Children.Clear();
-        if (Wards.IsVisible) Wards.Hide();
     }
     /// <summary>Caption heading: what produced the text and how old the picture behind it is.</summary>
     public static string Label(Reminder r) =>
         r.Kind == "manual-link-test" ? "链路测试 · 非AI" :
+        r.Kind == MinuteFarmContext.Kind ? (r.FarmMinute is int m ? $"{m}:00" : "本分钟") + " · 打钱候选点" :
         r.Kind is "experimental-bot-advice" or "visible-farming-advice"
             ? "AI打钱路线" + (r.SourceAgeMs is int age && age >= 1500 ? $" · 依据约{Math.Round(age / 1000.0)}秒前画面" : "") + " · 非最优保证"
             : "视觉观察 · 未经核验";
@@ -127,29 +108,22 @@ internal sealed class AdviceOverlay : Window
         var game = GameWindow.Find(out _);
         long now = Environment.TickCount64;
         if (reminder is { } live && (now >= until || now - lastFrame > Wire.PresenceLifetimeMs ||
-            game == null || game.Width != live.SourceWidth || game.Height != live.SourceHeight)) DropReminder();
+            game == null || game.Width != live.SourceWidth || game.Height != live.SourceHeight ||
+            !AuthorizedForDraw(live, MinuteRouteValid))) DropReminder();
         bool previewing = now < previewUntil, sample = reminder == null;
         var r = reminder ?? (previewing && game != null ? new Reminder("caption-preview", "", 0, "local-vision-observation",
             "预览：剃刀 离开视野 · 最后在中路", null, game.Width, game.Height, 0) : null);
-        // A panel the coach stopped renewing (disconnected, scanner stopped) disappears within 3 s. Switched off, no
-        // sample either: the switch shows its effect at once.
-        var current = now - enemiesAt <= 3000 ? enemies : null;
-        var board = !Settings.ShowEnemies ? null : current is { Heroes.Length: > 0 } ? current : previewing ? SampleBoard : null;
-        var wards = !Settings.ShowWards ? null : current?.Wards is { Length: > 0 } marks ? marks : previewing ? SampleWards : null;
-        if (game == null || r == null && board == null && wards == null) { Blank(); return; }
-        // Never float over other applications: hide while Dota is behind them, keep the reminder until it expires.
-        // A preview also shows while this client is in front, so the style can be tuned from a second screen.
-        if (!GameWindow.IsForeground(game) && !(previewing && OwnWindowInFront())) {
-            if (IsVisible) Hide();
-            if (Panel.IsVisible) Panel.Hide();
-            if (Wards.IsVisible) Wards.Hide();
-            return;
-        }
-        // The sample is shown whatever kinds are switched off: it previews the style, not a reminder.
-        var style = sample ? Settings with { ShowAlerts = true } : Settings;
-        if (board == null) HidePanel(); else DrawPanel(game, board, style);
-        if (wards == null) HideWards(); else DrawWards(game, wards, outline: previewing);
-        if (r == null) { drawn = null; canvas.Children.Clear(); if (IsVisible) Hide(); return; }
+        var liveBoard = enemies == null ? null : BoardForDisplay?.Invoke(enemies, game?.Width ?? 0, game?.Height ?? 0);
+        if (liveBoard == null) enemies = null;
+        bool foreground = game != null && GameWindow.IsForeground(game);
+        if (game == null || !foreground && !(previewing && OwnWindowInFront())) { HideBoards(); Blank(); return; }
+        // The manual, offline STYLE preview never supplies a ward. No synthetic rows during a real session;
+        // no live board or route over a different foreground app, even while the settings preview is open.
+        var board = foreground ? liveBoard : null;
+        if (!boardSession && previewing && board == null) board = SampleBoard;
+        DrawBoards(game, board);
+        if (!foreground && !sample) r = null; // Only the labelled style sample may appear with the settings window in front.
+        if (r == null) { Blank(); return; }
         if (!IsVisible) Show();
         double scale = Math.Max(96, GetDpiForWindow(handle)) / 96.0;
         double unit = DisplayGeometry.OverlayUnit(game.Height, scale);
@@ -161,6 +135,8 @@ internal sealed class AdviceOverlay : Window
             DropReminder(); Blank(); return;
         }
         canvas.Width = game.Width / scale; canvas.Height = game.Height / scale;
+        // The sample is shown whatever kinds are switched off: it previews the style, not a reminder.
+        var style = sample ? Settings with { ShowAlerts = true } : Settings;
         string content = string.Join("|", r.Id, Label(r), style, canvas.Width, canvas.Height, unit);
         if (content != drawn) { Compose(canvas, r, style, unit); drawn = content; }
         if (sample) return; // A preview leaves no Debug or E2E receipt.
@@ -182,76 +158,24 @@ internal sealed class AdviceOverlay : Window
             }));
         }
     }
-    /// <summary>The enemy panel window over the game's left edge; its content is rebuilt only when what it shows changes.</summary>
-    private void DrawPanel(GameSurface game, EnemyBoard board, GameOverlaySettings style)
-    {
-        if (!Panel.IsVisible) Panel.Show();
-        double scale = Math.Max(96, GetDpiForWindow(Panel.Handle)) / 96.0;
-        double unit = DisplayGeometry.OverlayUnit(game.Height, scale), height = game.Height / scale;
-        string content = string.Join("|", Describe(board), style, Icons.Count, height, unit);
-        if (content != panelDrawn) {
-            var (view, left, top) = EnemyPanel(board, style, unit, height, key => Icons[key]);
-            Panel.View.Children.Clear(); Panel.View.Children.Add(view);
-            panelBox = new Rect(left, top, view.DesiredSize.Width, view.DesiredSize.Height);
-            panelDrawn = content;
-        }
-        if (!SetWindowPos(Panel.Handle, new IntPtr(-1), game.Left + (int)Math.Round(panelBox.X * scale), game.Top + (int)Math.Round(panelBox.Y * scale),
-                (int)Math.Ceiling(panelBox.Width * scale), (int)Math.Ceiling(panelBox.Height * scale), 0x0010))
-            debug?.Invoke()?.Error("panel-position", new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()));
-    }
-    /// <summary>The ward window over Dota's minimap (as placed in the settings); rebuilt only when the marks or their fading change.</summary>
-    private void DrawWards(GameSurface game, WardMark[] marks, bool outline)
-    {
-        if (!Wards.IsVisible) Wards.Show();
-        double scale = Math.Max(96, GetDpiForWindow(Wards.Handle)) / 96.0;
-        var map = Settings.Minimap(game.Width, game.Height);
-        double side = map.Size / scale, unit = DisplayGeometry.OverlayUnit(game.Height, scale) * Settings.MinimapSize / 100;
-        string content = string.Join("|", DescribeWards(marks), outline, side, unit);
-        if (content != wardsDrawn) {
-            Wards.View.Children.Clear();
-            Wards.View.Children.Add(WardMarks(marks, side, unit, outline));
-            wardsDrawn = content;
-        }
-        if (!SetWindowPos(Wards.Handle, new IntPtr(-1), game.Left + (int)Math.Round(map.Left), game.Top + (int)Math.Round(map.Top),
-                (int)Math.Ceiling(map.Size), (int)Math.Ceiling(map.Size), 0x0010))
-            debug?.Invoke()?.Error("wards-position", new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()));
-    }
-    /// <summary>
-    /// Possible enemy wards on a minimap <paramref name="side"/> WPF units square: a ring per candidate in the ward's colour
-    /// (observer gold, sentry blue, unknown white), the likeliest of each guess filled, the others dashed and smaller, a
-    /// rough guess (no common spot fitted) as a wide dashed ring. The last minute before a ward would expire is dimmed.
-    /// </summary>
-    internal static Canvas WardMarks(WardMark[] marks, double side, double unit, bool outline)
-    {
-        var view = new Canvas { Width = side, Height = side, IsHitTestVisible = false };
-        if (outline) view.Children.Add(new Rectangle { Width = side, Height = side, Stroke = Brushes.DeepSkyBlue, StrokeThickness = 1.5 * unit,
-            StrokeDashArray = new DoubleCollection { 4, 3 } });
-        foreach (var m in marks.OrderByDescending(m => m.Rank)) {
-            var color = m.Kind switch { "observer" => Color.FromRgb(255, 215, 0), "sentry" => Color.FromRgb(79, 195, 247), _ => Color.FromRgb(240, 240, 240) };
-            double size = (m.Rough ? 20 : m.Rank == 0 ? 11 : 8) * unit;
-            var ring = new Ellipse {
-                Width = size, Height = size, Stroke = new SolidColorBrush(color), StrokeThickness = (m.Rank == 0 ? 2.2 : 1.5) * unit,
-                Fill = m.Rank == 0 && !m.Rough ? new SolidColorBrush(Color.FromArgb(120, color.R, color.G, color.B)) : Brushes.Transparent,
-                StrokeDashArray = m.Rank == 0 && !m.Rough ? null : new DoubleCollection { 2, 1.5 },
-                Opacity = (m.Rank == 0 ? 1 : .75) * (m.Left < 60 ? .5 : 1),
-                Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 2 * unit, ShadowDepth = 0, Opacity = .9 },
-            };
-            Canvas.SetLeft(ring, m.X * side - size / 2); Canvas.SetTop(ring, m.Y * side - size / 2);
-            view.Children.Add(ring);
-        }
-        return view;
-    }
-    private static string DescribeWards(WardMark[] marks) => string.Join(";", marks.Select(m =>
-        $"{m.Kind},{m.X:F3},{m.Y:F3},{m.Rank},{m.Rough},{m.Left < 60}"));
-    private static readonly WardMark[] SampleWards = [
-        new("npc_dota_hero_lion", "observer", .62, .36, 0, .6, 20, 340), new("npc_dota_hero_lion", "observer", .55, .44, 1, .3, 20, 340),
-        new("npc_dota_hero_lion", "sentry", .33, .58, 0, 1, 50, 370), new("npc_dota_hero_pudge", "ward", .78, .72, 0, 1, 100, 40, Rough: true)];
-    /// <summary>Draws a reminder and the enemy panel onto a canvas already sized to the game area, in WPF units.</summary>
+    /// <summary>Compose the same layers off screen. Source sizes are physical client pixels, canvas sizes are DIPs.</summary>
     internal static void Compose(Canvas canvas, Reminder? r, GameOverlaySettings style, double unit,
-        EnemyBoard? board = null, Func<string, ImageSource?>? icon = null)
+        EnemyBoard? board = null, Func<string, ImageSource?>? icon = null, (int Width, int Height)? viewport = null)
     {
         canvas.Children.Clear();
-        if (board != null) DrawEnemies(canvas, board, style, unit, icon ?? (_ => null));
+        if (board != null && Wire.ValidBoard(board)) {
+            if (style.ShowEnemies && board.Heroes.Length > 0) {
+                var panel = EnemyPanel(board, style, unit, icon ?? (_ => null));
+                Canvas.SetLeft(panel, 4 * unit); Canvas.SetTop(panel, style.EnemyTop(canvas.Height, panel.DesiredSize.Height));
+                canvas.Children.Add(panel);
+            }
+            var (w, h) = viewport ?? (r?.SourceWidth ?? 0, r?.SourceHeight ?? 0);
+            if (style.ShowWards && WardLayout(board, w, h) is { } layout) {
+                var layer = WardLayer(board, layout.Size * canvas.Width / w, layout.Size * canvas.Height / h, unit);
+                Canvas.SetLeft(layer, layout.Left * canvas.Width / w); Canvas.SetTop(layer, layout.Top * canvas.Height / h);
+                canvas.Children.Add(layer);
+            }
+        }
         if (r == null) return;
         if (r.ShowSubtitle && style.Shows(r.Kind))
         {
@@ -273,6 +197,7 @@ internal sealed class AdviceOverlay : Window
             var (left, top) = style.Place(canvas.Width, canvas.Height, box.DesiredSize.Width, box.DesiredSize.Height);
             Canvas.SetLeft(box, left); Canvas.SetTop(box, top); canvas.Children.Add(box);
         }
+        if (r.Kind == MinuteFarmContext.Kind) { DrawMinuteRoute(canvas, r, unit); return; }
         if (r.Marker is { } mark)
         {
             var points = (r.Route ?? [mark]).Select(p => new Point(p.X * canvas.Width, p.Y * canvas.Height)).ToArray();
@@ -297,6 +222,107 @@ internal sealed class AdviceOverlay : Window
             canvas.Children.Add(arrow);
         }
     }
+
+    internal static bool AuthorizedForDraw(Reminder r, Func<Reminder, bool>? minuteValid) =>
+        r.Kind != MinuteFarmContext.Kind || minuteValid?.Invoke(r) == true;
+    // These are the explicit condition suffixes in NextSteps, not observations of creeps. A missing or
+    // unfamiliar step gets a neutral pin; in particular the last stop isn't necessarily a lane return.
+    private const string Camp = "有野再打", Lane = "有线再收", UnknownStop = "待确认";
+    private static string Condition(string? step) => step?.EndsWith(Camp, StringComparison.Ordinal) == true ? Camp :
+        step?.EndsWith(Lane, StringComparison.Ordinal) == true ? Lane : UnknownStop;
+    private static Brush PinColor(string condition) => condition switch {
+        Camp => Brushes.Gold, Lane => Brushes.PaleTurquoise, _ => Brushes.Gainsboro };
+
+    private static void DrawMinuteRoute(Canvas canvas, Reminder r, double unit)
+    {
+        if (r.Minimap is not { } layout || !layout.IsValidFor(r.SourceWidth, r.SourceHeight) ||
+            r.Marker is not { } first || !Wire.ValidRoute(r.Route, first)) return;
+        var route = r.Route ?? [first];
+        if (!route.All(layout.Contains)) return; // Never guess a HUD corner or draw a partial, renumbered route.
+
+        double sx = canvas.Width / r.SourceWidth, sy = canvas.Height / r.SourceHeight;
+        double left = layout.Left * sx, top = layout.Top * sy;
+        var map = new Canvas { Width = layout.Size * sx, Height = layout.Size * sy, ClipToBounds = true, IsHitTestVisible = false };
+        Canvas.SetLeft(map, left); Canvas.SetTop(map, top); canvas.Children.Add(map);
+        var points = route.Select(p => new Point(p.X * canvas.Width - left, p.Y * canvas.Height - top)).ToArray();
+        var conditions = points.Select((_, i) => Condition(r.NextSteps is { } steps && steps.Length == points.Length ? steps[i] : null)).ToArray();
+        double u = Math.Min(unit, Math.Min(map.Width, map.Height) / 88);
+        var dark = Brush("#081018", 94);
+        double radius = 2.5 * u;
+        var anchors = points.Select(p => new Rect(p.X - radius, p.Y - radius, 2 * radius, 2 * radius)).ToArray();
+        var badges = new List<Rect>();
+        void Place(FrameworkElement element, Rect box) {
+            Canvas.SetLeft(element, box.X); Canvas.SetTop(element, box.Y); map.Children.Add(element);
+        }
+        static double Overlap(Rect a, Rect b) { var hit = Rect.Intersect(a, b); return hit.IsEmpty ? 0 : hit.Width * hit.Height; }
+
+        for (int i = 0; i < points.Length; i++) {
+            var accent = PinColor(conditions[i]);
+            var p = points[i];
+            // Only the number can move: its pip stays at the exact calibrated destination. Choose a
+            // neighbouring badge position away from the other numbers and pips, including at HUD edges.
+            double size = (i == 0 ? 17 : 15) * u;
+            var locations = from extra in new[] { 0d, size / 2, size } let offset = size / 2 + radius + extra
+                from dx in new[] { 0, 1, -1 } from dy in new[] { -1, 0, 1 } where dx != 0 || dy != 0
+                select new Rect(Math.Clamp(p.X + dx * offset - size / 2, 0, map.Width - size),
+                    Math.Clamp(p.Y + dy * offset - size / 2, 0, map.Height - size), size, size);
+            var at = locations.OrderBy(b => badges.Sum(other => Overlap(Rect.Inflate(other, u, u), b)))
+                .ThenBy(b => anchors.Sum(dot => Overlap(dot, b)))
+                .ThenBy(b => (new Point(b.X + size / 2, b.Y + size / 2) - p).LengthSquared).First();
+            badges.Add(at);
+            // In a crowd the badge may not touch its pip. Give just that badge a short tapered tip to its
+            // own coordinate. No geometry is ever constructed from one destination to the next.
+            var edge = new Point(Math.Clamp(p.X, at.Left, at.Right), Math.Clamp(p.Y, at.Top, at.Bottom));
+            if ((edge - p).Length > radius * 1.5) {
+                var center = new Point(at.X + size / 2, at.Y + size / 2);
+                var v = center - p; v.Normalize();
+                var normal = new Vector(-v.Y, v.X) * (size / 3);
+                var tip = new Polygon { Fill = accent, Points = new() { p, center + normal, center - normal } };
+                Panel.SetZIndex(tip, -1); map.Children.Add(tip);
+            }
+            Place(new Ellipse { Width = radius * 2, Height = radius * 2, Fill = accent, Stroke = dark, StrokeThickness = u }, anchors[i]);
+            Place(new Border {
+                Width = size, Height = size, CornerRadius = new(conditions[i] == Lane ? 2 * u : size / 2),
+                BorderBrush = accent, BorderThickness = new(1.3 * u), Background = i == 0 ? accent : dark,
+                Child = new TextBlock { Text = (i + 1).ToString(), FontSize = (i == 0 ? 12 : 11) * u, FontWeight = FontWeights.Bold,
+                    Foreground = i == 0 ? dark : accent, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            }, at);
+        }
+
+        // One key, not a caption (or three landmark names) across the playfield. Keep whole groups together
+        // on narrow custom maps. Match numbers as well as colours, so reading the key doesn't rely on colour.
+        var groups = new WrapPanel();
+        void Token(string text, Brush ink) => groups.Children.Add(new TextBlock { Text = text, Foreground = ink,
+            FontSize = 11 * u, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2 * u, 0, 2 * u, 0) });
+        if (r.FarmMinute is int minute) Token($"{minute}′", Brushes.White);
+        foreach (var group in Enumerable.Range(0, points.Length).GroupBy(i => conditions[i]))
+            Token(string.Join("·", group.Select(i => i + 1)) + " " + group.Key, PinColor(group.Key));
+        double pad = 2 * u;
+        var key = new Border { Child = groups, Background = dark, CornerRadius = new(3 * u), Padding = new Thickness(u),
+            MaxWidth = map.Width - 2 * pad };
+        var ink = badges.Concat(anchors).ToArray();
+        bool PlaceKey() {
+            key.Measure(new Size(key.MaxWidth, double.PositiveInfinity));
+            double farX = map.Width - key.DesiredSize.Width - pad, bottom = map.Height - key.DesiredSize.Height - pad;
+            var edges = layout.Left < r.SourceWidth / 2.0 ? new[] { pad, farX } : [farX, pad];
+            foreach (double y in new[] { pad, bottom }.Concat(ink.Select(b => b.Bottom + pad))) {
+                if (y < pad || y > bottom) continue;
+                foreach (double x in edges) {
+                    var box = new Rect(new Point(x, y), key.DesiredSize);
+                    if (ink.Any(b => Rect.Inflate(b, u, u).IntersectsWith(box))) continue;
+                    Place(key, box); return true;
+                }
+            }
+            return false;
+        }
+        if (!PlaceKey() && r.FarmMinute.HasValue) {
+            // On very small custom HUDs, give the condition words the space before sacrificing any destination.
+            groups.Children.RemoveAt(0);
+            key.InvalidateMeasure();
+            PlaceKey();
+        }
+    }
+
     private static readonly EnemyBoard SampleBoard = new([
         new("npc_dota_hero_razor", 12, ["item_power_treads", "item_black_king_bar", "item_blink", "item_magic_wand", null, null], null, 2),
         new("npc_dota_hero_juggernaut", 14, ["item_phase_boots", "item_bfury", "item_manta", null, null, null], null, 35),
@@ -304,17 +330,9 @@ internal sealed class AdviceOverlay : Window
         new("npc_dota_hero_pudge", null, null, null, null)]);
     /// <summary>
     /// The enemy panel at the game's left edge, one row per enemy: head icon, level, the six item slots and the
-    /// neutral item, and how long ago they were read (shown from 10 s; rows a minute old are dimmed).
+    /// neutral item, and how long ago they were read (shown from 30 s; rows a minute old are dimmed).
     /// </summary>
-    private static void DrawEnemies(Canvas canvas, EnemyBoard board, GameOverlaySettings style, double unit, Func<string, ImageSource?> icon)
-    {
-        var (panel, left, top) = EnemyPanel(board, style, unit, canvas.Height, icon);
-        Canvas.SetLeft(panel, left); Canvas.SetTop(panel, top);
-        canvas.Children.Add(panel);
-    }
-    /// <summary>The enemy panel, measured, and where it goes over a game area <paramref name="height"/> WPF units high.</summary>
-    private static (StackPanel Panel, double Left, double Top) EnemyPanel(EnemyBoard board, GameOverlaySettings style, double unit,
-        double height, Func<string, ImageSource?> icon)
+    private static StackPanel EnemyPanel(EnemyBoard board, GameOverlaySettings style, double unit, Func<string, ImageSource?> icon)
     {
         double u = unit * style.EnemySize / 100, row = 14 * u, slot = row * 88 / 64;
         var panel = new StackPanel { Opacity = style.EnemyOpacity / 100.0 };
@@ -338,24 +356,38 @@ internal sealed class AdviceOverlay : Window
             level.MinWidth = 11 * u; level.TextAlignment = TextAlignment.Center;
             line.Children.Add(level);
             if (hero.Items is { } items)
-            {
                 foreach (var name in items) line.Children.Add(Slot(name, slot));
+            if (hero.Items != null || hero.Neutral != null) {
                 var neutral = Slot(hero.Neutral, slot);
                 neutral.Margin = new Thickness(3 * u, 0, .5 * u, 0);
                 line.Children.Add(neutral);
             }
             string age = Age(hero.Age);
+            if (age.Length == 0 && board.MatchId != null) age = "刚读"; // A last read, never an assertion of current inventory.
             if (age.Length > 0) line.Children.Add(Text(age, 9 * u, Brushes.LightGray));
             if (hero.Age >= 60) line.Opacity = .7;
             panel.Children.Add(line);
+            // A minimal installation may not have all the PNGs. Don't turn a known item or hero into a
+            // meaningless grey rectangle while waiting for art. Keep the source slot, never reorder equipment.
+            if (board.MatchId != null) {
+                var missing = new List<string>();
+                if (icon(hero.Hero) == null) missing.Add(hero.Hero["npc_dota_hero_".Length..].Replace('_', ' '));
+                void Missing(string slotName, string? name) {
+                    if (name != null && icon(name) == null) missing.Add($"{slotName} {name["item_".Length..].Replace('_', ' ')}");
+                }
+                if (hero.Items is { } slots) for (int i = 0; i < slots.Length; i++) Missing((i + 1).ToString(), slots[i]);
+                Missing("中立", hero.Neutral);
+                if (missing.Count > 0) {
+                    var fallback = Text(string.Join(" · ", missing), 10 * u, Brushes.White);
+                    fallback.MaxWidth = 195 * u; fallback.TextWrapping = TextWrapping.Wrap;
+                    fallback.Background = Brush("#081018", 90); panel.Children.Add(fallback);
+                }
+            }
         }
         panel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        return (panel, 4 * unit, style.EnemyTop(height, panel.DesiredSize.Height));
+        return panel;
     }
-    /// <summary>
-    /// How old a row's reading is: nothing under 30 s, then "30秒前" and whole minutes. The panel repaints only when
-    /// a level, item or one of these labels changes, so a ticking age must not change it every few seconds.
-    /// </summary>
+    /// <summary>Bucket last-read ages at 30 s and then by minute; each GSI tick need not repaint the equipment HWND.</summary>
     private static string Age(double? seconds) => seconds switch {
         null => "未见", < 30 => "", < 60 => "30秒前", var s => $"{(int)(s / 60)}分前" };
     private static string Describe(EnemyBoard? board) => board == null ? "" : string.Join(";", board.Heroes.Select(h =>
@@ -376,20 +408,4 @@ internal sealed class AdviceOverlay : Window
     [DllImport("user32.dll")] private static extern bool SetWindowDisplayAffinity(IntPtr h, uint affinity);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int width, int height, uint flags);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr h);
-}
-
-/// <summary>A small window of its own (the enemy panel, the ward marks): passive like the subtitle window and sized by its owner.</summary>
-internal sealed class PanelWindow : Window
-{
-    public Canvas View { get; } = new() { IsHitTestVisible = false };
-    public IntPtr Handle { get; }
-    public PanelWindow(string title = "双机教练 · 对手面板")
-    {
-        Title = title;
-        WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
-        ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false; ShowActivated = false; Topmost = true;
-        Focusable = false; IsHitTestVisible = false; Content = View;
-        SourceInitialized += (_, _) => AdviceOverlay.Passive(new WindowInteropHelper(this).Handle, 0x11);
-        Handle = new WindowInteropHelper(this).EnsureHandle();
-    }
 }

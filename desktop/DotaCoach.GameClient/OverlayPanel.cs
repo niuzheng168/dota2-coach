@@ -24,7 +24,7 @@ internal sealed class OverlayPanel : StackPanel
     private readonly string path;
     private readonly AdviceOverlay overlay;
     private readonly CheckBox advice = Check("AI 打钱建议"), alerts = Check("对手提醒（离开视野、插眼，Plus 观战）"), title = Check("标题行（来源与“未经核验”）"),
-        enemies = Check("显示对手面板"), wards = Check("小地图标出可能眼位"), minimapRight = Check("小地图在右侧");
+        enemies = Check("显示对手面板"), wards = Check("显示已授权的目击与推测眼位"), minimapRight = Check("预览框在右侧");
     private readonly Slider x = Range(0, 100), y = Range(0, 100),
         size = Range(GameOverlaySettings.MinSize, GameOverlaySettings.MaxSize), width = Range(GameOverlaySettings.MinWidth, GameOverlaySettings.MaxWidth),
         textOpacity = Range(GameOverlaySettings.MinTextOpacity, 100), backgroundOpacity = Range(0, 100),
@@ -54,22 +54,22 @@ internal sealed class OverlayPanel : StackPanel
             Cell("字号", size, v => v + "%"), Cell("最大宽度", width, v => v + "% 画面宽")));
         Children.Add(Ui.Columns(Labeled("文字颜色", textColor), Labeled("标题颜色", titleColor), Labeled("背景颜色", backgroundColor),
             Cell("文字不透明度", textOpacity, v => v + "%"), Cell("背景不透明度", backgroundOpacity, v => v == 0 ? "全透明" : v + "%")));
-        Children.Add(Ui.Label("对手面板：Plus 观战时敌方英雄的等级和装备，一直显示在游戏左侧（数据来自教练端的视觉扫描）"));
+        Children.Add(Ui.Label("对手面板：教练端授权的队伍视野中上次读到的等级和装备，显示在游戏左侧。未见不补猜。"));
         var shown = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; shown.Children.Add(enemies);
         Children.Add(Ui.Columns(shown,
             Cell("上下位置", enemyY, v => v switch { 0 => "最上", 50 => "正中", 100 => "最下", _ => v + "%" }),
             Cell("大小", enemySize, v => v + "%"), Cell("不透明度", enemyOpacity, v => v + "%")));
-        Children.Add(Ui.Label("可能眼位：教练端发现对手守卫数变少时，在 Dota 小地图上圈出可能的眼位（金色假眼、蓝色真眼、白色种类不明；实心为最可能处，虚线大圈只知道大致区域）"));
+        Children.Add(Ui.Label("眼位：◆ 表示队伍视角实际目击（绿边己方、红边敌方）；虚线圈和 ? 只表示推测区域。金色侦察、蓝色岗哨，和装备、分钟路线分别显示。"));
         var mapChecks = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         mapChecks.Children.Add(wards); mapChecks.Children.Add(minimapRight);
-        Children.Add(Ui.Columns(mapChecks, Cell("小地图大小", minimapSize, v => v == 100 ? "默认" : v + "%")));
+        Children.Add(Ui.Columns(mapChecks, Cell("离线预览框大小", minimapSize, v => v == 100 ? "默认" : v + "%")));
         Children.Add(Ui.Row(status,
             Ui.Button("预览 8 秒", (_, _) => { overlay.Preview(PreviewMs); status.Text = PreviewNote(); }),
             Ui.Button("恢复默认", (_, _) => { Fill(new()); Changed(); })));
         Children.Add(Ui.Text("改动立即生效并保存在本机。调整时示例字幕和对手面板会在 Dota 画面上显示 8 秒：Dota 用无边框窗口，" +
             "放在另一块屏幕上调最方便（本窗口在前台时也会显示预览）。只隐藏字幕，地图路线圈照常显示。" +
-            "对手面板的图标由教练端发来，还没收到的显示成灰色方块。预览时小地图上有一个蓝色虚线框：" +
-            "它应正好框住 Dota 的小地图，对不上就调“小地图在右侧”和“小地图大小”（Dota 里开了超大小地图要调大）。", 11, Brushes.LightGray));
+            "装备缺图时显示上次读到的名字与栏位。本机左右、大小偏好只调整未连接时的蓝色虚线参考框；" +
+            "实战眼位和路线必须在教练端按游戏实际 HUD 校准，不用此框代替。", 11, Brushes.LightGray));
         Fill(Current);
         overlay.Settings = Current;
         saver.Tick += (_, _) => Flush();

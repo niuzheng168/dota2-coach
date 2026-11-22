@@ -47,6 +47,7 @@ export function createSandboxServer(seed = 741, sessionToken?: string) {
       '/simulator.js':'simulator.js','/simulator.css':'simulator.css',
       '/simulator-icons.js':'simulator-icons.js',
       '/farming-replays':'farming-replays.html','/farming-replays.js':'farming-replays.js','/farming-replays.css':'farming-replays.css',
+      '/farming-742':'farming-742.html','/farming-742.js':'farming-742.js','/farming-742.css':'farming-742.css',
       '/minimap/manifest.json':'minimap/manifest.json','/minimap/minimap-sheet.png':'minimap/minimap-sheet.png','/minimap/luna.png':'minimap/luna.png',
       '/sandbox': 'sandbox.html', '/sandbox.js': 'sandbox.js', '/sandbox.css': 'sandbox.css',
       '/map-audit': 'map-audit.html', '/map-audit.js': 'map-audit.js', '/map-audit.css': 'map-audit.css',
@@ -65,6 +66,20 @@ export function createSandboxServer(seed = 741, sessionToken?: string) {
     const expected = Buffer.from(token);
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected))
       return json(401, { error: '需要本次沙盒会话 token（不是 Foundry 密钥）' });
+    if (url.pathname === '/api/farming-742') {
+      if (req.method !== 'GET') {
+        res.setHeader('Allow', 'GET');
+        return json(405, { error: '7.42 复盘只支持 GET' });
+      }
+      // Keep the unqualified GET compatible with readers of the original snapshot.
+      const set = url.searchParams.get('set') ?? '16';
+      const snapshots = { expanded: ['farming-742-expanded.json', '本轮坐标包'], tempo: ['farming-742-tempo.json', '分钟名册'],
+        '16': ['farming-742-routes.json', '原 16 场归档'] } as const;
+      if (set !== 'expanded' && set !== 'tempo' && set !== '16') return json(404, { error: '没有这个 7.42 样本集' });
+      const [file, label] = snapshots[set];
+      try { return json(200, JSON.parse(await fs.readFile(new URL(`../../data/${file}`, import.meta.url), 'utf8'))); }
+      catch { return json(503, { error: `7.42 ${label}不可用` }); }
+    }
     if(req.method==='GET'&&url.pathname==='/api/sim/state')return json(200,simulator().snapshot());
     if(req.method==='GET'&&url.pathname==='/api/farming-replays'){
       try{return json(200,JSON.parse(await fs.readFile(new URL('../../data/luna-farming-routes.json',import.meta.url),'utf8')));}
