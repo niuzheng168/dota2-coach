@@ -17,14 +17,15 @@ observed state with its age. Allies are not selected there unless --allies: noth
 the enemies come round sooner. Delayed or replay spectating shows both teams in full and scans all ten;
 the state file says so in "mode", and live coaching must not use such data.
 
-Ward counts (observer, sentry, or unknown kind for grey icons) are read with every item read and the last
-few go to the live file with the read's game clock: the coach client guesses where a ward went when an
-enemy's count drops.
+Ward counts (observer, sentry, or unknown kind for grey icons) are read with every item read; the last few
+changes of each enemy's counts go to the live file with the game time of the first and latest read of each,
+to a fraction of a second: the coach client guesses where a ward went when an enemy's count drops.
 
 Speed: heroes already matched to their player are selected one per captured frame; Dota shows a new
 selection about every 20 ms, at 60 Hz and 144 Hz alike, so a sweep of ten heroes takes ~0.2 s. A hero
-whose items were read --items-every seconds ago (3 by default) stays ~0.13 s at the end of a sweep, as
-item slots cross-fade after a switch; sweeps without one follow each other without a pause.
+whose items were read --items-every seconds ago (3 by default; an enemy carrying wards --ward-items-every,
+0.4) stays ~0.13 s at the end of a sweep, as item slots cross-fade after a switch; sweeps without one
+follow each other without a pause.
 Recognition runs in parallel on the GPU, on a HUD band that Windows.Graphics.Capture (wgc.py) crops on
 the GPU.
 
@@ -157,6 +158,7 @@ class GsiFeed(http.server.ThreadingHTTPServer):
         self.token, self.keep_truth, self.lock = token, keep_truth, threading.Lock()
         self.clock = self.state = self.match_id = self.own_team = None
         self.mode, self.packets, self.received = "none", 0, 0.0
+        self.ticks = collections.deque(maxlen=64)  # (arrival, clock) of each packet that brought a new clock
         self.seen: dict[str, dict] = {}  # hero -> last sighting
         self.visible: set[str] = set()
         self.teams: dict[str, int] = {}  # hero -> 2 radiant / 3 dire
@@ -192,6 +194,9 @@ class GsiFeed(http.server.ThreadingHTTPServer):
         with self.lock:
             if game.get("matchid") != self.match_id:
                 self.seen, self.teams, self.own_team = {}, {}, None
+                self.ticks.clear()
+            if game.get("clock_time") != self.clock or game.get("paused"):
+                self.ticks.append((now, game.get("clock_time")))
             self.match_id, self.clock, self.state = game.get("matchid"), game.get("clock_time"), game.get("game_state")
             self.mode, self.packets, self.received = mode, self.packets + 1, now
             visible = collections.defaultdict(list)
@@ -213,6 +218,15 @@ class GsiFeed(http.server.ThreadingHTTPServer):
             self.visible = set(visible)
             if self.keep_truth and grouped:
                 self.truth.append((now, truth_of(p)))
+
+    def game_time(self, at: float) -> float | None:
+        """Game time at perf-counter time `at`, to a fraction of a second: GSI clocks are whole seconds, so the arrival
+        of the packet that brought the second places `at` within it, as the coach client does for its own packets.
+        Call with the lock held."""
+        tick = next((t for t in reversed(self.ticks) if t[0] <= at), None)
+        if tick is None or not isinstance(tick[1], (int, float)):
+            return None
+        return round(tick[1] + min(max(at - tick[0], 0.0), 0.99), 2)
 
     def truth_at(self, t: float, hero: str) -> dict | None:
         with self.lock:
@@ -287,26 +301,37 @@ class ItemSlots:
     Replayed against full-spectator truth, the latest read was right more often than waiting for two
     reads to agree, which lags behind every purchase.
 
-    Also the ward counts of the last few complete reads (game clock of the read; observer, sentry and unknown kind):
-    the coach client compares them to guess where a ward went when the count drops."""
+    Also each enemy's last few ward counts from complete reads (observer, sentry and unknown kind), one entry per
+    change: "first" the game time of the first read with these counts and "clock" of the latest, to a fraction of a
+    second. The coach client guesses where a ward went when the count drops: it went down between the "clock" of one
+    entry and the "first" of the next. (Clients before 2026-11-22 know only "clock", which then still ends the window.)"""
 
     WARD_READS = 4
 
     def __init__(self, items: dict):
         self.recipes = {k for k, v in items.items() if v.get("recipe")} | {"item_recipe"}
         self.shown: dict[str, tuple] = {}  # hero -> (slot0..slot5, neutral0)
-        self.wards: dict[str, collections.deque] = {}  # hero -> recent {"clock", "observer", "sentry", "unknown"}
+        self.wards: dict[str, collections.deque] = {}  # hero -> recent {"first", "clock", "observer", "sentry", "unknown"}
 
     def read(self, hero: str, slots: dict):
         current = tuple(slots.get(f"slot{i}") for i in range(6)) + (slots.get("neutral0"),)
         if "?" not in current:
             self.shown[hero] = tuple(None if n in self.recipes else n for n in current)
         # The backpack counts too: a ward moved there is still carried.
-        counts, clock = slots.get("wards"), slots.get("clock")
-        if counts is not None and clock is not None and "?" not in current + tuple(slots.get(f"slot{i}") for i in range(6, 9)):
+        counts, time_ = slots.get("wards"), slots.get("time")
+        if counts is not None and time_ is not None and "?" not in current + tuple(slots.get(f"slot{i}") for i in range(6, 9)):
             reads = self.wards.setdefault(hero, collections.deque(maxlen=self.WARD_READS))
-            if not reads or reads[-1]["clock"] != clock:
-                reads.append({"clock": clock, **counts})
+            if reads and time_ <= reads[-1]["clock"]:
+                return
+            if reads and all(reads[-1][k] == v for k, v in counts.items()):
+                reads[-1]["clock"] = time_
+            else:
+                reads.append({"first": time_, "clock": time_, **counts})
+
+    def carrying(self, hero: str) -> bool:
+        """Whether the newest ward read of this enemy had any: only a carrier can place one."""
+        reads = self.wards.get(hero)
+        return bool(reads) and reads[-1]["observer"] + reads[-1]["sentry"] + reads[-1]["unknown"] > 0
 
 
 def dota_window() -> int:
@@ -413,8 +438,13 @@ class Scanner:
         out = selectable(mode, own, visible, teams, players, lambda p: now - self.tried.get(p, -1e9) >= RETRY_UNKNOWN,
                          self.args.allies)
         self.missed = {p for p in out if p in players and now - status_at.get(players[p], -1e9) > STREAM_MISSED}
+        with self.lock:
+            carriers = {p for p in out if p in players and self.item_slots.carrying(players[p])}
+        # An enemy carrying wards is due for items sooner: the sooner its count is read again after it places one, the
+        # closer the coach knows where it stood then.
         stale = sorted((max(items_at.get(players[p], -1e9), self.items_queued.get(p, -1e9)), p) for p in out if p in players)
-        slow = {p for at, p in stale[:self.args.item_visits] if now - at >= self.args.items_every}
+        due = [p for at, p in stale if now - at >= (self.args.ward_items_every if p in carriers else self.args.items_every)]
+        slow = set(due[:self.args.item_visits])
         return [(p, p in slow) for p in out]
 
     def changed(self, band: np.ndarray, reference: np.ndarray) -> float:
@@ -562,6 +592,7 @@ class Scanner:
             with self.feed.lock:
                 clock, mode, roster = self.feed.clock, self.feed.mode, set(self.feed.teams)
                 own, teams, visible = self.feed.own_team, dict(self.feed.teams), set(self.feed.visible)
+                game_time = self.feed.game_time(at)
             out = self.hud.read(self.canvas, roster, full=settled)
             self.read_ms.append((time.perf_counter() - t0) * 1000)
             hero = out.get("hero")
@@ -584,7 +615,8 @@ class Scanner:
                 continue
             status = {"at": at, "clock": clock, "level": out["level"], "alive": out["alive"],
                       "health": out["health"], "mana": out["mana"]}
-            items = settled and {"at": at, "clock": clock, **{s: (i and (i["name"] or "?")) for s, i in out["items"].items()},
+            items = settled and {"at": at, "clock": clock, "time": game_time,
+                                 **{s: (i and (i["name"] or "?")) for s, i in out["items"].items()},
                                  # items drawn with the same icon (Dagon levels): the name is one of these
                                  "alt": {s: i["sameIcon"] for s, i in out["items"].items() if i and i.get("sameIcon")},
                                  "wards": out["wards"]}
@@ -618,7 +650,8 @@ class Scanner:
             self.stats["itemReadings"] += bool(items)
             entry |= {k: v for k, v in status.items() if k not in ("at", "clock")}
             if items:
-                entry["items"] = {k: v for k, v in items.items() if k not in ("at", "clock")}
+                entry["items"] = {k: v for k, v in items.items() if k not in ("at", "clock", "time")}
+                entry["time"] = items["time"]
             if self.args.truth:
                 entry["truth"] = self.feed.truth_at(at, hero)
             entry["mode"] = mode
@@ -670,7 +703,7 @@ class Scanner:
                         key=lambda h: (order.get(h, 99), h))[:5]
         with self.lock:
             shown = dict(self.item_slots.shown)
-            wards = {h: list(r) for h, r in self.item_slots.wards.items()}
+            wards = {h: [dict(e) for e in r] for h, r in self.item_slots.wards.items()}
         out = []
         for hero in heroes:
             status, slots = snap["heroes"][hero]["status"], shown.get(hero)
@@ -813,6 +846,8 @@ def main():
     ap.add_argument("--no-stream", action="store_true", help="wait for every switch instead of one selection per frame")
     ap.add_argument("--items-every", type=float, default=3.0,
                     help="seconds between item reads of the same hero; each read holds the HUD ~0.15 s")
+    ap.add_argument("--ward-items-every", type=float, default=0.4,
+                    help="the same for an enemy carrying wards (Plus team view), so a ward it places is timed closely")
     ap.add_argument("--stop-with-stdin", action="store_true",
                     help="end the scan when standard input closes (how the coach client starts and stops it)")
     args = ap.parse_args()

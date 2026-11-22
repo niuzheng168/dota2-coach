@@ -1,5 +1,6 @@
 """Pure-logic tests for the HUD recognizer and hero scanner; run in the isolated .tmp/vision-tools venv:
 .tmp/vision-tools/Scripts/python.exe -I tests/hud-vision.test.py (no GPU or game needed)."""
+import collections
 import sys
 import unittest
 from pathlib import Path
@@ -204,19 +205,54 @@ class Items(unittest.TestCase):
 
     def test_ward_reads_are_kept_from_complete_reads(self):
         slots, hero = hero_scan.ItemSlots(self.MANIFEST), "npc_dota_hero_lion"
-        wards = lambda o, clock: {"wards": {"observer": o, "sentry": 0, "unknown": 0}, "clock": clock}
-        slots.read(hero, self.read("item_boots") | wards(2, 600))
-        slots.read(hero, self.read("item_boots") | wards(2, 600))
-        slots.read(hero, self.read("item_boots", "?") | wards(1, 603))
-        slots.read(hero, self.read("item_boots") | {"wards": None, "clock": 606})
-        self.assertEqual(list(slots.wards[hero]), [{"clock": 600, "observer": 2, "sentry": 0, "unknown": 0}],
-                         "one entry per read clock; reads with an unknown slot or unread counts are left out")
+        wards = lambda o, time: {"wards": {"observer": o, "sentry": 0, "unknown": 0}, "time": time}
+        slots.read(hero, self.read("item_boots") | wards(2, 600.15))
+        slots.read(hero, self.read("item_boots") | wards(2, 600.45))
+        slots.read(hero, self.read("item_boots") | wards(2, 600.3))
+        slots.read(hero, self.read("item_boots", "?") | wards(1, 603.2))
+        slots.read(hero, self.read("item_boots") | {"wards": None, "time": 606.2})
+        self.assertEqual(list(slots.wards[hero]), [{"first": 600.15, "clock": 600.45, "observer": 2, "sentry": 0, "unknown": 0}],
+                         "one entry per change of the counts, first and latest read; reads out of order, with an unknown slot "
+                         "or unread counts are left out")
+        self.assertTrue(slots.carrying(hero) and not slots.carrying("npc_dota_hero_pudge"))
         backpack_unknown = self.read("item_boots") | {"slot7": "?"} | wards(1, 609)
         slots.read(hero, backpack_unknown)
         self.assertEqual(len(slots.wards[hero]), 1, "an unknown backpack slot could hide a ward")
-        for clock in range(612, 640, 3):
-            slots.read(hero, self.read("item_boots") | wards(1, clock))
-        self.assertEqual([r["clock"] for r in slots.wards[hero]], [630, 633, 636, 639], "the last few reads only")
+        slots.read(hero, self.read("item_boots") | wards(1, 612.6))
+        self.assertEqual(slots.wards[hero][-1], {"first": 612.6, "clock": 612.6, "observer": 1, "sentry": 0, "unknown": 0},
+                         "a ward went down between 600.45 and 612.6")
+        for i, n in enumerate([0, 2, 1, 0, 3]):
+            slots.read(hero, self.read("item_boots") | wards(n, 620 + i))
+        self.assertEqual([(r["first"], r["observer"]) for r in slots.wards[hero]], [(621, 2), (622, 1), (623, 0), (624, 3)],
+                         "the last few changes only")
+        self.assertTrue(slots.carrying(hero))
+        slots.read(hero, self.read("item_boots") | wards(0, 625))
+        self.assertFalse(slots.carrying(hero), "the newest read had none")
+
+    def test_reads_are_timed_within_their_second(self):
+        feed = object.__new__(hero_scan.GsiFeed)
+        feed.ticks = collections.deque([(100.0, 599), (100.93, 600), (101.95, 601)])
+        self.assertEqual(feed.game_time(101.5), 600.57, "the arrival of second 600 starts it")
+        self.assertEqual(feed.game_time(102.0), 601.05)
+        self.assertEqual(feed.game_time(103.4), 601.99, "never past the next second (paused, or a packet late)")
+        self.assertIsNone(feed.game_time(99.0), "before the first packet")
+
+    def test_carriers_are_due_for_items_sooner(self):
+        import threading
+        from types import SimpleNamespace
+        scanner = object.__new__(hero_scan.Scanner)
+        heroes = {"npc_dota_hero_lion": 2, "npc_dota_hero_pudge": 3, "npc_dota_hero_axe": 3}
+        scanner.feed = SimpleNamespace(lock=threading.Lock(), mode="team-view", own_team=2, visible={"npc_dota_hero_pudge", "npc_dota_hero_axe"},
+                                       teams=heroes, match_id="9001")
+        scanner.lock, scanner.match_id, scanner.items_queued = threading.Lock(), "9001", {}
+        scanner.tried = {p: 100.0 for p in (7, 8, 9)}  # unknown players tried just now: not due again yet
+        scanner.player_hero = {0: "npc_dota_hero_lion", 5: "npc_dota_hero_pudge", 6: "npc_dota_hero_axe"}
+        scanner.args = SimpleNamespace(allies=False, item_visits=1, items_every=3.0, ward_items_every=0.4)
+        scanner.item_slots = hero_scan.ItemSlots(self.MANIFEST)
+        scanner.item_slots.read("npc_dota_hero_pudge", self.read("item_boots") | {"wards": {"observer": 1, "sentry": 0, "unknown": 0}, "time": 99.0})
+        scanner.heroes = {"npc_dota_hero_pudge": {"items": {"at": 99.5}}, "npc_dota_hero_axe": {"items": {"at": 98.0}}}
+        self.assertEqual(scanner.plan(100.0), [(5, True), (6, False)], "Pudge carries a ward: due 0.4 s after his last item read")
+        self.assertEqual(scanner.plan(101.5), [(5, False), (6, True)], "when both are due the longer-waiting one goes first")
 
     def test_live_file_lists_enemies_in_player_order_with_their_icons(self):
         import json
@@ -234,7 +270,7 @@ class Items(unittest.TestCase):
                 "npc_dota_hero_pudge": {"icon": "heroes/pudge.png"}, "npc_dota_hero_juggernaut": {"icon": "heroes/jugg.png"}}})
             scanner.lock, scanner.exported, scanner.run_id = threading.Lock(), set(), "ab12"
             scanner.item_slots = hero_scan.ItemSlots(self.MANIFEST)
-            scanner.item_slots.read("npc_dota_hero_pudge", self.read("item_boots") | {"wards": {"observer": 1, "sentry": 0, "unknown": 0}, "clock": 590})
+            scanner.item_slots.read("npc_dota_hero_pudge", self.read("item_boots") | {"wards": {"observer": 1, "sentry": 0, "unknown": 0}, "time": 590.4})
             scanner.item_slots.read("npc_dota_hero_juggernaut", self.read("?"))
             hero = lambda team, status: {"team": team, "status": status, "items": None, "seen": None}
             snap = {"mode": "team-view", "matchId": "9001", "ownTeam": 2, "clock": 600, "selecting": True,
@@ -247,7 +283,7 @@ class Items(unittest.TestCase):
             self.assertEqual(live["version"], 2)
             self.assertEqual(live["enemies"], [
                 {"hero": "npc_dota_hero_pudge", "level": 11, "age": 4.5, "items": ["item_boots", None, None, None, None, None],
-                 "neutral": None, "wards": [{"clock": 590, "observer": 1, "sentry": 0, "unknown": 0}]},
+                 "neutral": None, "wards": [{"first": 590.4, "clock": 590.4, "observer": 1, "sentry": 0, "unknown": 0}]},
                 {"hero": "npc_dota_hero_juggernaut", "level": None, "age": None, "items": None, "neutral": None}],
                 "allies left out; matched players first; a never-read enemy has nulls")
             icons = sorted(p.name for p in (root / "live" / "icons").iterdir())

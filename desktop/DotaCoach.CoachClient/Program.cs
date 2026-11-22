@@ -528,8 +528,8 @@ internal sealed class CoachWindow : Window
     }
     /// <summary>
     /// Subtitle for a ward guess, e.g. "莱恩 少了1个假眼 · 可能在敌方上路一塔大野（小地图已标）". Out of sight for long, the
-    /// marks are mostly wrong (in replays the likeliest was within 600 units for 71 % of guesses when the hero stayed in sight,
-    /// 27 % after 15–60 s unseen): then only that it warded, and no marks (WardTracker.Marks).
+    /// marks are mostly wrong (in replays the likeliest was within 600 units for 96 % of guesses when the hero stayed in sight,
+    /// 33 % after 15–60 s unseen): then only that it warded, and no marks (WardTracker.Marks).
     /// </summary>
     private string WardText(WardGuess g) =>
         $"{heroNames[g.Hero]} 少了{g.Count}个{g.Kind switch { "observer" => "假眼", "sentry" => "真眼", _ => "守卫" }}" +

@@ -107,6 +107,34 @@ internal static class WardTests
               double.Hypot(edge.Candidates[0].X - spot.X, edge.Candidates[0].Y - spot.Y) < 700,
             "a window opening out of sight counts as unseen; the walk from the last sighting still finds the spot on the way");
 
+        // Scanners since 2026-11-22: one entry per change of the counts, timed within the second. In sight all along,
+        // the mark goes a cast range ahead of where Lion walked at the time.
+        var exact = new WardTracker(map, spots);
+        for (double c = 600; c <= 606; c += 0.2) { tick = (long)(c * 1000); exact.Sight(Snap(Math.Floor(c), units: (Lion, 3, -3000 + 300 * (c - 600), 1000))); }
+        static WardReading E(double first, double latest, int observer) => new(latest, observer, 0, 0, first);
+        check(exact.Readings("9000000001", 2, Reads(E(600.4, 601.2, 2))).Count == 0 &&
+              exact.Readings("9000000001", 2, Reads(E(600.4, 602.6, 2))).Count == 0,
+            "the same counts read again (the entry's latest read moves on) add nothing");
+        var anchored = exact.Readings("9000000001", 2, Reads(E(600.4, 602.6, 2), E(603.0, 603.3, 1)));
+        check(anchored is [{ Kind: "observer", After: 602.6, Before: 603.0, Unseen: 0, Candidates: [{ Rough: false, Share: 0.9 } at, ..] }] &&
+              double.Hypot(at.X - (-3000 + 300 * 2.8 + 350), at.Y - 1000) < 60 && exact.Marks(610) is [{ Rank: 0 }, ..],
+            "a drop between the entry's latest read and the next one's first, in sight: the mark is ahead of Lion halfway through");
+        // Out of sight, a common spot the friend team's eyes covered all along is unlikely, and so is one behind the
+        // way the hero vanished.
+        WardSpot[] twins = [new(0, 2000, 50, [10, 20, 20]), new(0, -2000, 50, [10, 20, 20])];
+        var fog = new List<WardModel.Gap> { new((-1500, 0), (1500, 0), 100, 20, 20) };
+        List<(double, double, double)[]> NoEyes(double a, double b) => [];
+        var walk = new List<(double Clock, double X, double Y)> { (99, -1900, 0), (100, -1500, 0) };
+        double[] Model(WardModel.Scene scene) => WardModel.Likelihood(WardModel.Parts(twins, [], fog, scene), twins.Length);
+        double[] Likely((double X, double Y)[] eyes, List<(double, double, double)> track) =>
+            Model(new("observer", 1, 0.25, [.. track], [], [], (a, b) => [eyes.Select(e => (e.X, e.Y, 900.0)).ToArray()]));
+        var even = Model(new("observer", 1, 0.25, [.. walk], [], [], NoEyes));
+        var watched = Likely([(0, 2000)], [.. walk]);
+        check(Math.Abs(even[0] - even[1]) < 1e-9 && watched[1] > 0.6 && Math.Abs(watched.Sum() - 1) < 1e-9,
+            "two spots alike: the one the friend team watched through the gap falls behind");
+        var turning = Model(new("observer", 1, 0.25, [(99, -1900, -400), (100, -1500, 0)], [], [], NoEyes));
+        check(turning[0] > 0.55, "the spot the hero was heading for as it vanished comes first");
+
         // The friend team sees the enemy ward: the player sees it too, the guess is done. A new match starts afresh.
         var seen = new WardTracker(map, spots);
         Walk(seen, 600, 604, spot.X + 900, spot.Y, spot.X + 450, spot.Y); Fog(seen, 604.5, 608); Walk(seen, 608.5, 610, spot.X - 450, spot.Y, spot.X - 700, spot.Y);
@@ -178,11 +206,15 @@ internal static class WardTests
                 matchId = "9000000001", ownTeam = 2, clock = 900, selecting = true, enemies = new[] {
                     Row(Lion, new[] { new { clock = 601, observer = 2, sentry = 1, unknown = 0 }, new { clock = 609, observer = 1, sentry = 1, unknown = 0 } }),
                     Row("npc_dota_hero_pudge", new[] { new { clock = 601, observer = -1, sentry = 0, unknown = 0 } }),
-                    Row("npc_dota_hero_razor", null) } }));
+                    Row("npc_dota_hero_razor", null),
+                    Row("npc_dota_hero_lina", new[] { new { first = 600.25, clock = 604.5, observer = 1, sentry = 0, unknown = 0 } }),
+                    Row("npc_dota_hero_zuus", new[] { new { first = 605.5, clock = 604.5, observer = 1, sentry = 0, unknown = 0 } }) } }));
             var (status, board, reads) = ScanFeed.Poll(file, "9000000001", unix);
-            check(status.Running && board?.Heroes.Length == 3 && reads.Count == 1 &&
-                  reads[Lion] is [{ Clock: 601, Observer: 2, Sentry: 1, Unknown: 0 }, { Clock: 609, Observer: 1, Total: 2 }],
-                "ward reads are taken per enemy from the live file; a negative count drops that enemy's list only");
+            check(status.Running && board?.Heroes.Length == 5 && reads.Count == 2 &&
+                  reads[Lion] is [{ Clock: 601, Observer: 2, Sentry: 1, Unknown: 0, First: null }, { Clock: 609, Observer: 1, Total: 2 }] &&
+                  reads["npc_dota_hero_lina"] is [{ First: 600.25, Clock: 604.5 }],
+                "ward reads are taken per enemy from the live file, with the first read of each since 2026-11-22; a negative count " +
+                "or a first read after the latest drops that enemy's list only");
         }
         finally { Directory.Delete(dir, true); }
 

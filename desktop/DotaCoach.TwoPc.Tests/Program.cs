@@ -10,8 +10,8 @@ void Check(bool value, string name) { if (!value) throw new Exception(name); pas
 if (args.Contains("--video-codec")) { VideoTests.Codec(Check); return; }
 if (args is ["--creep-scan", .. var scanFiles]) { CreepHealthTests.Eval(scanFiles); return; }
 if (args is ["--ward-eval", .. var wardFiles]) { WardEval.Run(wardFiles); return; }
-if (args is ["--ward-session", .. var sessionArgs] && sessionArgs.Where(a => a != "--as-scanned").ToArray() is [var wardSession, var wardTruth]) {
-    WardSessionEval.Run(wardSession, wardTruth, sessionArgs.Contains("--as-scanned")); return;
+if (args is ["--ward-session", .. var sessionArgs] && sessionArgs.Where(a => a is not ("--as-scanned" or "--whole-seconds")).ToArray() is [var wardSession, var wardTruth]) {
+    WardSessionEval.Run(wardSession, wardTruth, sessionArgs.Contains("--as-scanned"), sessionArgs.Contains("--whole-seconds")); return;
 }
 if (args is ["--creep-bars", var barsOut, var barsSeconds, var barsGsi]) { CreepHealthTests.RecordBars(barsOut, double.Parse(barsSeconds), barsGsi); return; }
 if (args is ["--overlay-test", var overlayDir]) { CreepHealthTests.OverlayTest(overlayDir); return; }

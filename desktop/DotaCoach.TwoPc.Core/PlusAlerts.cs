@@ -136,10 +136,13 @@ public static class ScanFeed
             if (!row.TryGetProperty("wards", out var reads) || reads.ValueKind != JsonValueKind.Array || reads.GetArrayLength() > 8) continue;
             static int Count(JsonElement r, string key) => r.TryGetProperty(key, out var v) && v.TryGetInt32(out int n) && n is >= 0 and <= 30
                 ? n : throw new FormatException();
+            // Since 2026-11-22 an entry per change of the counts: its first and latest read ("first" ≤ "clock").
+            static double? First(JsonElement r, double clock) => !r.TryGetProperty("first", out var f) ? null
+                : f.GetDouble() is var v && Wire.Finite(v, -300, clock) ? v : throw new FormatException();
             try {
                 result[row.GetProperty("hero").GetString()!] = reads.EnumerateArray().Select(r =>
                     r.GetProperty("clock").GetDouble() is var c && Wire.Finite(c, -300, 43_200)
-                        ? new WardReading(c, Count(r, "observer"), Count(r, "sentry"), Count(r, "unknown")) : throw new FormatException()).ToArray();
+                        ? new WardReading(c, Count(r, "observer"), Count(r, "sentry"), Count(r, "unknown"), First(r, c)) : throw new FormatException()).ToArray();
             } catch (Exception e) when (e is FormatException or InvalidOperationException or KeyNotFoundException) { }
         }
         return result;
