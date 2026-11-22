@@ -19,11 +19,13 @@ internal static class Program
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)) {
             MessageBox.Show("双机游戏端首版需要 Windows 11 x64。"); return;
         }
+        // --creep-hp-log <file>: start the creep HP display at once and append its per-second rates (on-site measurement).
+        if (args is ["--creep-hp-log", var log]) { new Application().Run(new GameWindowUi(null) { CreepHpLog = log }); return; }
         new Application().Run(new GameWindowUi(E2ERun.Load(args)));
     }
 }
 
-internal sealed class GameWindowUi : Window
+internal sealed partial class GameWindowUi : Window
 {
     private readonly PasswordBox pairing = new() { Padding = new Thickness(8), Margin = new Thickness(0, 0, 0, 8), FontSize = 14 };
     private readonly Button connect;
@@ -49,6 +51,7 @@ internal sealed class GameWindowUi : Window
     private readonly Canvas marks = new() { IsHitTestVisible = false };
     private readonly Grid preview = new() { Background = Brushes.Black, MinHeight = 240 };
     private readonly AdviceOverlay overlay;
+    private readonly OverlayPanel? overlayPanel;
     private readonly DebugPanel debug;
     private readonly DispatcherTimer reminderTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private CancellationTokenSource? active;
@@ -57,6 +60,7 @@ internal sealed class GameWindowUi : Window
     private bool closed, closing, busy;
     private long localSequence;
     private Reminder? shown;
+    private GameLink? shownMinuteLink;
     private long reminderDeadline;
     private readonly E2ERun? e2e;
     private string? lastReceivedId;
@@ -69,16 +73,26 @@ internal sealed class GameWindowUi : Window
     private readonly Button practiceButton;
     private LastHitPractice? practice;
     private bool practiceBusy, practiceOwnsGsi;
+    private readonly TextBlock creepHpStatus = Ui.Text("默认关闭。开启后由游戏机本地识别小兵血条、用显卡在 Dota 上画出血量数字；画面不编码、不上传、不经过教练机。", 12);
+    private readonly Button creepHpButton;
+    private IAsyncDisposable? creepHp;
+    private bool creepHpBusy;
+    private volatile bool gsiOnlyConnection;
+    public string? CreepHpLog { get; init; }
 
     public GameWindowUi() : this(null) { }
     public GameWindowUi(E2ERun? run) : this(run, null) { }
     public GameWindowUi(E2ERun? run, string? debugRoot) : this(run, debugRoot, null) { }
-    public GameWindowUi(E2ERun? run, string? debugRoot, string? videoSettingsFile)
+    public GameWindowUi(E2ERun? run, string? debugRoot, string? videoSettingsFile) : this(run, debugRoot, videoSettingsFile, null) { }
+    public GameWindowUi(E2ERun? run, string? debugRoot, string? videoSettingsFile, string? overlaySettingsFile)
     {
         e2e = run; debug = new DebugPanel("game", debugRoot); overlay = new AdviceOverlay(run, () => debug.Recorder);
+        overlay.MinuteRouteValid = MinuteRouteValid;
+        // E2E evidence keeps the default subtitle style, whatever this machine's player chose.
+        if (e2e == null) overlayPanel = new OverlayPanel(overlaySettingsFile ?? GameOverlaySettings.DefaultPath, overlay);
         videoSettingsPath = videoSettingsFile ?? GameVideoSettings.DefaultPath;
         videoSettings = GameVideoSettings.Load(videoSettingsPath);
-        Title = "Dota Coach · 游戏端 v0.4.2";
+        Title = "Dota Coach · 游戏端 v0.6.1";
         Width = Math.Min(1120, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(900, SystemParameters.WorkArea.Height - 40);
         MinWidth = 760; MinHeight = 600; WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -111,19 +125,31 @@ internal sealed class GameWindowUi : Window
             panel.Children.Add(Ui.Section("塔还没开火？按当前血量试算", BuildPracticePreview()));
             bottom.Children.Add(Ui.Section("本机练习：正补、反补、塔下垫刀", panel));
         }
+        creepHpButton = Ui.Button("显示小兵血量", async (_, _) => await ToggleCreepHp());
+        if (e2e == null) {
+            var panel = new StackPanel();
+            panel.Children.Add(Ui.Text("默认血条、无边框或窗口模式。Dota 画面只在本机显卡上识别，不传给教练端；显卡有空闲时每帧刷新，显卡被游戏占满时限 60 帧以免拖慢游戏；切出 Dota 时隐藏。", 12));
+            panel.Children.Add(creepHpButton); panel.Children.Add(creepHpStatus);
+            bottom.Children.Add(Ui.Section("小兵血量：本机实时显示", panel));
+            Loaded += async (_, _) => { if (CreepHpLog != null) await ToggleCreepHp(); };
+        }
+        if (overlayPanel != null) bottom.Children.Add(Ui.Section("游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", overlayPanel));
         bottom.Children.Add(Ui.Section("设置：画面来源、视频、Dota 目录", BuildSettings()));
         bottom.Children.Add(Ui.Section("Debug", debug.View));
         Grid.SetRow(bottom, 2); root.Children.Add(bottom); Content = root;
         preview.SizeChanged += (_, _) => DrawMark();
         reminderTimer.Tick += (_, _) => {
             if (e2e != null && !closing && File.Exists(System.IO.Path.Combine(e2e.Directory, "stop-requested"))) { Close(); return; }
-            if (shown != null && Environment.TickCount64 >= reminderDeadline) ClearReminder();
+            if (shown != null && (Environment.TickCount64 >= reminderDeadline ||
+                shown.Kind == MinuteFarmContext.Kind && !MinuteRouteValid(shown))) ClearReminder();
             try {
-                var own = gsi?.Latest();
-                debug.Recorder?.State(new(status.Text, transportConnected, false, false, false, 0, 0, 0,
-                    lastCaptureAt is long at ? Environment.TickCount64 - at : null, own?.Player, GsiAgeMs: own?.AgeMs));
+                if (debug.Recorder is { } recorder) {
+                    var own = GameGsiSample.Read(gsi, participantOnly: gsiOnlyConnection);
+                    recorder.State(new(status.Text, transportConnected, false, false, false, 0, 0, 0,
+                        lastCaptureAt is long at ? Environment.TickCount64 - at : null, own.Player, GsiAgeMs: own.AgeMs));
+                }
             } catch { /* Debug must not affect the UI timer. */ }
-            if (gsi?.LastDiagnostics is { OwnStateAccepted: true } d) {
+            if (!gsiOnlyConnection && gsi?.LastDiagnostics is { OwnStateAccepted: true } d) {
                 string text = d.MinimapUnits > 0 ? $"小地图：{d.MinimapUnits} 个单位，其中敌方英雄 {d.EnemyHeroes} 个（只在本机统计）"
                     : "小地图：对局中没有收到";
                 if (text != minimapText) { minimapText = text; ShowGsi(); }
@@ -144,8 +170,10 @@ internal sealed class GameWindowUi : Window
             e.Cancel = true;
             if (closing) return;
             closing = true;
-            while (practiceBusy) await Task.Delay(25);
+            overlayPanel?.Flush();
+            while (practiceBusy || creepHpBusy) await Task.Delay(25);
             await StopPractice();
+            await StopCreepCapture();
             await Stop();
             if (gsi != null) { await gsi.DisposeAsync(); gsi = null; }
             closed = true; reminderTimer.Stop(); overlay.Close();
@@ -182,7 +210,7 @@ internal sealed class GameWindowUi : Window
             if (practice != null) { await StopPractice(); return; }
             if (gsi != null && !persistentGsi) { await gsi.DisposeAsync(); gsi = null; }
             if (gsi == null) {
-                gsi = await GsiReceiver.Start(resumeToken: GsiSetup.Token(GsiState));
+                gsi = await GsiReceiver.Start(resumeToken: GsiSetup.Token(GsiState), dotaInstall: dotaInstall.Text.Trim());
                 practiceOwnsGsi = true;
             }
             bool changed = GsiSetup.Install(dotaInstall.Text.Trim(), gsi.Config, GsiState).Changed;
@@ -206,6 +234,64 @@ internal sealed class GameWindowUi : Window
         practiceOwnsGsi = false; practiceDistance.IsEnabled = true; practiceButton.Content = "开始本机练习";
         practiceStatus.Text = "已停止本机练习。";
     }
+    private async Task ToggleCreepHp()
+    {
+        if (closing || creepHpBusy || gsiOnlyConnection || busy && source.SelectedIndex == 2) return;
+        creepHpBusy = true;
+        creepHpButton.IsEnabled = false;
+        try {
+            if (creepHp != null) {
+                await StopCreepCapture();
+                creepHpButton.Content = "显示小兵血量"; creepHpStatus.Text = "已关闭。";
+                return;
+            }
+            // Unit kinds come from the player's own GSI minimap: keep a receiver for the rest of this session.
+            string gsiNote = "";
+            if (gsi == null) {
+                try {
+                    gsi = await GsiReceiver.Start(resumeToken: GsiSetup.Token(GsiState), dotaInstall: dotaInstall.Text.Trim());
+                    persistentGsi = true;
+                } catch { gsiNote = "自身GSI启动失败（3219端口被占用？），只能显示百分比。"; }
+            }
+            if (gsi != null) {
+                try {
+                    if (GsiSetup.Install(dotaInstall.Text.Trim(), gsi.Config, GsiState).Changed)
+                        gsiNote = "已写入自身GSI：带 -gamestateintegration 完全重启 Dota 一次后，才能区分近战/远程/攻城兵。";
+                } catch { gsiNote = "自动写入GSI配置失败（检查“设置”里的 Dota 目录），只能显示百分比。"; }
+            }
+            if (closing || gsiOnlyConnection) return;
+            string? log = CreepHpLog;
+            CreepHpDisplay? started = null;
+            started = new CreepHpDisplay(s => {
+                if (log != null) try { File.AppendAllText(log, System.Text.Json.JsonSerializer.Serialize(new { at = DateTimeOffset.Now, s.Status,
+                    fps = Math.Round(s.Fps, 1), scanMs = Math.Round(s.ScanMs, 2), s.Bars, s.Known, s.GpuLoad, s.Limited }) + "\n"); } catch { }
+                Dispatcher.BeginInvoke(() => {
+                    if (creepHp != started) return;
+                    string rate = s.Fps > 0 ? $"\n{s.Fps:F0} 帧/秒{(s.Limited ? $"（显卡繁忙，限 {GpuPacing.LimitedFps} 以免拖慢游戏）" : "")} · 识别 {s.ScanMs:F1} ms · " +
+                        $"{s.Bars} 根血条，{s.Known} 根已认出兵种" : "";
+                    creepHpStatus.Text = s.Status + rate + (gsiNote.Length > 0 ? "\n" + gsiNote : "");
+                });
+            }, () => gsi?.LatestMinimap(), excludeFromCapture: log == null);
+            creepHp = started;
+            creepHpButton.Content = "关闭小兵血量";
+        } finally { creepHpBusy = false; creepHpButton.IsEnabled = !closing && !gsiOnlyConnection; }
+    }
+    private async Task StopCreepCapture()
+    {
+        var previous = creepHp; creepHp = null;
+        if (previous != null) await previous.DisposeAsync();
+    }
+    private async Task EnterMinutePrivacy()
+    {
+        // Local creep recognition is also a window capture, even though those pixels never leave the PC.
+        // Close the start race and wait for disposal BEFORE starting the metadata-only session.
+        gsiOnlyConnection = true; creepHpButton.IsEnabled = false;
+        minimapText = ""; ShowGsi(); overlay.Enemies(null);
+        while (creepHpBusy) await Task.Delay(20);
+        await StopCreepCapture();
+        creepHpButton.Content = "显示小兵血量";
+        creepHpStatus.Text = "仅本人 GSI 连接：已关闭本机屏幕识别，断开后才能重新开启。";
+    }
     private async Task Start()
     {
         if (busy || active != null || closing || practice != null || practiceBusy) return;
@@ -215,18 +301,23 @@ internal sealed class GameWindowUi : Window
         {
             var pair = Pairing.Decode(pairing.Password.Trim());
             bool diagnostic = source.SelectedIndex == 1;
-            var chosen = ReadVideoSettings();
-            if (!diagnostic && e2e == null && MessageBox.Show(this,
+            bool gsiOnly = source.SelectedIndex == 2 && e2e == null;
+            var chosen = gsiOnly ? videoSettings : ReadVideoSettings();
+            if (gsiOnly && MessageBox.Show(this,
+                "把自己的对局状态和游戏窗口尺寸传到配对的教练端？\n\n此模式不采集、编码或传送游戏画面。游戏端可独立显示教练端为本局授权的上次可见装备和眼位。开启分钟路线可能调用已配置的云模型并计费。不会控制英雄。",
+                "确认仅传本人 GSI", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+            if (!gsiOnly && !diagnostic && e2e == null && MessageBox.Show(this,
                 "开始传送 Dota 2 游戏画面并启用自动教练？\n\n画面含主视图、小地图、HUD，也可能含游戏内聊天。\n" +
                 (chosen.Capture == "window"
                     ? "窗口采集：切到其他窗口时仍持续传送 Dota 窗口自身的画面；其他应用的内容不会被采集。\n"
                     : "前台模式：只在 Dota 位于前台时采集屏幕区域，可能含系统通知。\n") +
                 "教练端默认将真实画面＋自身GSI发送到指定云模型，会计费。\n不会传音频或控制英雄；可随时停止。",
                 "确认游戏画面传输", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
-            try { chosen.Save(videoSettingsPath); } catch { /* Settings still apply to this run. */ }
+            try { if (!gsiOnly) chosen.Save(videoSettingsPath); } catch { /* Settings still apply to this run. */ }
             videoSettings = chosen;
             starting = new CancellationTokenSource(); active = starting;
             SetIdle(false);
+            if (gsiOnly) { await EnterMinutePrivacy(); starting.Token.ThrowIfCancellationRequested(); }
             if (!diagnostic && e2e == null && gsi != null && !persistentGsi) {
                 await gsi.DisposeAsync(); gsi = null;
             }
@@ -234,9 +325,10 @@ internal sealed class GameWindowUi : Window
             {
                 try {
                     string? identity = e2e?.ResumeGsiToken() ?? (diagnostic ? null : GsiSetup.Token(GsiState));
-                    gsi = await GsiReceiver.Start(cancellation: starting.Token, resumeToken: identity);
-                    gsi.Diagnostics = d => debug.Recorder?.Gsi(d);
-                    gsi.Snapshot = s => debug.Recorder?.PlayerMinimap(s);
+                    gsi = await GsiReceiver.Start(cancellation: starting.Token, resumeToken: identity,
+                        dotaInstall: !diagnostic && e2e == null ? dotaInstall.Text.Trim() : null);
+                    gsi.Diagnostics = d => { if (!gsiOnlyConnection) debug.Recorder?.Gsi(d); };
+                    gsi.Snapshot = s => { if (!gsiOnlyConnection) debug.Recorder?.PlayerMinimap(s); };
                     persistentGsi = !diagnostic && e2e == null;
                     ShowGsi("自身GSI：本机端口 3219 已启动");
                 }
@@ -245,6 +337,7 @@ internal sealed class GameWindowUi : Window
             }
             if (e2e == null && !diagnostic && gsi != null) {
                 try {
+                    gsi.UseDotaInstall(dotaInstall.Text.Trim());
                     bool changed = GsiSetup.Install(dotaInstall.Text.Trim(), gsi.Config, GsiState).Changed;
                     gsiText = changed ? "自身GSI配置已写入/更新：请完全退出并重启 Dota 一次。" : "自身GSI配置已就绪，等待对局数据";
                 } catch { gsiText = "自动写入GSI配置失败（目录/权限，或同名文件被改过；不会覆盖），请检查“设置”里的 Dota 目录。"; }
@@ -257,7 +350,7 @@ internal sealed class GameWindowUi : Window
             }
             starting.Token.ThrowIfCancellationRequested();
             var cancellation = starting.Token;
-            running = Run(pair, diagnostic, chosen, cancellation);
+            running = gsiOnly ? RunMinuteState(pair, cancellation) : Run(pair, diagnostic, chosen, cancellation);
             _ = FinishRun(running);
         }
         catch (OperationCanceledException) { status.Text = "启动已取消 · 不采集画面"; }
@@ -280,7 +373,8 @@ internal sealed class GameWindowUi : Window
     private StackPanel BuildSettings()
     {
         var panel = new StackPanel();
-        source.Items.Add("Dota 2 游戏画面"); source.Items.Add("诊断画面（不采集桌面，测试连接用）"); source.SelectedIndex = 0;
+        source.Items.Add("Dota 2 游戏画面"); source.Items.Add("诊断画面（不采集桌面，测试连接用）");
+        source.Items.Add("仅本人 GSI（可接收装备、眼位和分钟路线；不采集画面）"); source.SelectedIndex = 0;
         panel.Children.Add(Ui.Label("画面来源")); panel.Children.Add(source);
         panel.Children.Add(BuildVideoSettings());
         if (e2e == null) {
@@ -322,6 +416,9 @@ internal sealed class GameWindowUi : Window
     /// <summary>Settings are locked while a session runs; the single connect button flips to disconnect.</summary>
     private void SetIdle(bool idle)
     {
+        overlay.SetBoardSession(!idle);
+        if (idle && gsiOnlyConnection) { gsiOnlyConnection = false; creepHpStatus.Text = "已关闭。"; }
+        creepHpButton.IsEnabled = !closing && !creepHpBusy && !gsiOnlyConnection;
         foreach (var control in new Control[] { source, pairing, fpsChoice, resolutionChoice, encoderChoice, captureChoice, bitrateChoice })
             control.IsEnabled = idle;
         connect.Content = idle ? "连接" : "断开";
@@ -378,17 +475,21 @@ internal sealed class GameWindowUi : Window
                 int fps = GameVideoSettings.EffectiveFps(size.Width, size.Height, settings.Fps);
                 int bitrate = settings.Bitrate(size.Width, size.Height, fps);
                 await link.Connect(cancellation);
+                if (!diagnostic) link.BindPostgame(gsi, "dota2", () => Interlocked.Increment(ref localSequence));
                 await link.OpenVideo(cancellation);
                 var lease = await link.GetVideoTicket(cancellation);
                 transportConnected = true;
                 var stream = new VideoSender(lease, fps);
                 using var streamStop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+                using var captureStop = CancellationTokenSource.CreateLinkedTokenSource(streamStop.Token);
+                var endTask = diagnostic ? Task.CompletedTask : link.DeliverPostgames(streamStop.Token);
                 Func<IVideoSource> open = diagnostic ? () => new DiagnosticVideoSource() :
                     windowMode ? () => OpenWindowSource(surface!, size, fps, n => captureNote = n) :
                     () => new ForegroundVideoSource(surface!, size.Width, size.Height);
                 var captureTask = stream.StartCapture(open, diagnostic,
-                    () => Interlocked.Increment(ref localSequence), () => gsi?.Latest() ?? (null, null), streamStop.Token);
+                    () => Interlocked.Increment(ref localSequence), () => GameGsiSample.ReadForUpload(gsi, participantOnly: false), captureStop.Token);
                 var sendTask = Task.Run(() => stream.SendLoop(link, gpuEncoder, bitrate, streamStop.Token));
+                var boardTask = diagnostic ? Task.CompletedTask : PollBoards(link, Viewport, streamStop.Token);
                 long renewAt = Environment.TickCount64 + 750, previewAt = 0, rateAt = Environment.TickCount64, rateSent = 0, rateBytes = 0;
                 double actualFps = 0, actualMbps = 0;
                 bool background = false;
@@ -438,13 +539,16 @@ internal sealed class GameWindowUi : Window
                                 previewAt = Environment.TickCount64 + 250;
                             }
                         }
-                        ApplyReminder(await link.Poll(cancellation), diagnostic);
+                        ApplyReminder(await link.Poll(cancellation), diagnostic, link);
                         await Task.Delay(100, cancellation);
                     }
                 } finally {
+                    captureStop.Cancel(); // No new capture during the metadata-only viewport-loss grace.
+                    if (!diagnostic) await link.DrainVideoPostgame(cancellation);
                     streamStop.Cancel(); link.AbortVideo();
-                    try { await Task.WhenAll(captureTask, sendTask); } catch when (streamStop.IsCancellationRequested) { }
-                    ClearReminder(); image.Source = null; transportConnected = false; lastCaptureAt = null;
+                    ClearReminder(); transportConnected = false;
+                    try { await Task.WhenAll(captureTask, sendTask, boardTask, endTask); } catch when (streamStop.IsCancellationRequested) { }
+                    overlay.Enemies(null); image.Source = null; lastCaptureAt = null;
                     using var timeout = new CancellationTokenSource(1500);
                     try { await link.End(timeout.Token); } catch { }
                     if (stream.HardwareFailed) gpuEncoder = false; // Later sessions use the CPU limits, not a retry loop.
@@ -460,15 +564,57 @@ internal sealed class GameWindowUi : Window
             try { await link.End(timeout.Token); } catch { }
         }
     }
-    private void ApplyReminder(Reminder? reminder, bool diagnostic)
+    /// <summary>Neither a slow board response nor a batch of missing icons may stall GSI/terminal uploads,
+    /// video leases or the route poll. No diagnostic mode and no local spectator input.</summary>
+    private async Task PollBoards(GameLink link, Func<(int Width, int Height)> viewport, CancellationToken cancel)
     {
-        if (reminder == null) { ClearReminder(); return; }
+        EnemyBoard? Current(EnemyBoard receipt, int w, int h) =>
+            cancel.IsCancellationRequested || !transportConnected ? null : link.DisplayEnemies(receipt, gsi?.LatestMatch(), w, h);
+        overlay.BoardForDisplay = Current;
+        try {
+            while (!cancel.IsCancellationRequested) {
+                try {
+                    var size = viewport();
+                    var board = size.Width > 0 && (overlay.Settings.ShowEnemies || overlay.Settings.ShowWards) &&
+                        BoardDelivery.Live(gsi?.LatestMatch()) ? await link.Enemies(cancel) : null;
+                    size = viewport(); // Poll may have crossed a resize, pause, end, withdrawal or new session.
+                    if (board != null && Current(board, size.Width, size.Height) == null) board = null;
+                    overlay.Enemies(board);
+                    if (board != null && overlay.Settings.ShowEnemies) {
+                        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+                        budget.CancelAfter(500);
+                        try {
+                            foreach (string key in overlay.Icons.Missing(board, Environment.TickCount64).Take(8)) {
+                                if (!overlay.Settings.ShowEnemies || Current(board, size.Width, size.Height) == null) break;
+                                overlay.Icons.Add(key, await link.Icon(key, budget.Token), Environment.TickCount64);
+                            }
+                        } catch (OperationCanceledException) when (!cancel.IsCancellationRequested) { /* Retry icons on a later poll. */ }
+                    }
+                } catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or OperationCanceledException or System.IO.IOException or InvalidOperationException) {
+                    overlay.Enemies(null); // The optional channel fails closed; don't interrupt the main transport.
+                }
+                await Task.Delay(750, cancel);
+            }
+        } catch (OperationCanceledException) when (cancel.IsCancellationRequested) { }
+        finally { overlay.BoardForDisplay = null; overlay.Enemies(null); }
+    }
+    private bool MinuteRouteValid(Reminder r)
+    {
+        if (!transportConnected || active?.IsCancellationRequested != false || shownMinuteLink == null) return false;
+        var own = gsi?.Latest() ?? (null, null);
+        return shownMinuteLink.CanRenderMinuteRoute(r, own.Player, own.AgeMs);
+    }
+    private void ApplyReminder(Reminder? reminder, bool diagnostic, GameLink? link = null)
+    {
+        shownMinuteLink = reminder?.Kind == MinuteFarmContext.Kind && !diagnostic ? link : null;
+        if (reminder == null || reminder.Kind == MinuteFarmContext.Kind && !MinuteRouteValid(reminder)) { ClearReminder(); return; }
         long deadline = Environment.TickCount64 + reminder.RemainingMs;
         reminderDeadline = shown?.Id == reminder.Id ? Math.Min(reminderDeadline, deadline) : deadline;
         shown = reminder;
         caption.Text = !reminder.ShowSubtitle ? "地图路线提示（字幕已关闭）" :
             AdviceOverlay.Label(reminder) + "： " + reminder.Message +
-            (reminder.NextSteps is { Length: > 0 } steps ? "\n下一步：" + string.Join(" → ", steps) : "");
+            (reminder.NextSteps is { Length: > 0 } steps ? "\n下一步：" + string.Join(" → ", steps) : "") +
+            (overlay.Settings.Shows(reminder.Kind) ? "" : "\n（按本机“游戏内字幕”设置，这类字幕不在游戏里显示）");
         if (lastReceivedId != reminder.Id) {
             debug.Recorder?.Reminder("reminder-received", reminder); lastReceivedId = reminder.Id;
         }
@@ -504,9 +650,9 @@ internal sealed class GameWindowUi : Window
                     var capture = await Task.Run(() => diagnostic ? Capture.Diagnostic(seq) :
                         Capture.Game(surface!, e2e?.CaptureOverlayEvidence == true), cancellation);
                     if (capture == null) { ClearReminder(); await link.End(cancellation); transportConnected = false; lastCaptureAt = null; await Task.Delay(500, cancellation); continue; }
-                    var own = diagnostic ? (Player: (OwnState?)null, AgeMs: (int?)null) : gsi?.Latest() ?? (null, null);
+                    var own = diagnostic ? default : GameGsiSample.Read(gsi, participantOnly: false);
                     var meta = new FrameMeta(link.SessionId!, ticket.Id, seq, diagnostic ? "diagnostic" : "dota2",
-                        capture.Width, capture.Height, own.Player, own.AgeMs);
+                        capture.Width, capture.Height, own.Player, own.AgeMs, own.Phase);
                     lastFrame = meta;
                     lastCaptureAt = started;
                     debug.Recorder?.Frame("frame-captured", meta, capture.Jpeg, Environment.TickCount64 - started);
@@ -571,6 +717,7 @@ internal sealed class GameWindowUi : Window
     private void DrawMark()
     {
         marks.Children.Clear();
+        if (shown is { Kind: MinuteFarmContext.Kind } minute && !MinuteRouteValid(minute)) { ClearReminder(); return; }
         if (shown?.Marker is not { } point || image.Source == null) return;
         var rect = Ui.ImageRect(preview.ActualWidth, preview.ActualHeight, shown.SourceWidth, shown.SourceHeight);
         foreach (var p in shown.Route ?? [point]) {
@@ -582,12 +729,12 @@ internal sealed class GameWindowUi : Window
     private void ClearReminder()
     {
         if (shown != null) debug.Recorder?.Reminder("reminder-cleared", shown);
-        shown = null; overlay.Clear(); marks.Children.Clear();
+        shown = null; shownMinuteLink = null; overlay.Clear(); marks.Children.Clear();
         caption.Text = "无有效提醒（断线、过期或阵亡时自动清除）";
     }
     private async Task Stop()
     {
-        active?.Cancel(); ClearReminder();
+        active?.Cancel(); overlay.Enemies(null); ClearReminder();
         while (busy) await Task.Delay(25);
         var task = running; if (task != null) try { await task; } catch { }
         status.Text = "已停止 · 不再采集或传输画面";

@@ -220,7 +220,7 @@ const SEARCH_INDEX: SearchableEntity[] = (() => {
       asciiRegexes: ascii,
     });
 
-    // 2. Hero Abilities (all 734)
+    // 2. Hero Abilities (all 736)
     for (const ab of h.abilities) {
       const abCjk = new Set<string>();
       const abAscii: RegExp[] = [];
@@ -308,7 +308,7 @@ const SEARCH_INDEX: SearchableEntity[] = (() => {
 })();
 
 /**
- * Sub-millisecond scanner over all 127 heroes, 734 abilities, 402 items, and 43 tactical groups.
+ * Sub-millisecond scanner over all 127 heroes, 736 abilities, 419 items, and 43 tactical groups.
  * Returns concise high-precision glossary hints matched specifically to `text`.
  */
 export function matchDota2Terms(text: string, maxMatches = 18): string[] {
@@ -357,7 +357,7 @@ const CRITICAL_DISAMBIGUATION_BLOCK = [
 
 // Precompute static compact Tier-1 reference once at startup (~3.8k tokens):
 // Covers all 43 tactical groups, all 127 heroes + nicknames, all ~100 slang/core items, and all ~75 iconic abilities,
-// while Tier-2 `matchDota2Terms()` dynamically injects any of the 734 abilities & 402 items per utterance!
+// while Tier-2 `matchDota2Terms()` dynamically injects any of the 736 abilities & 419 items per utterance!
 const COMPACT_FULL_DOMAIN_REFERENCE: string = (() => {
   const tacticalLines = DOTA2_DICTIONARY.tacticalTerms.map(
     (t) => `- ${t.en} <=> ${t.zh}${t.zhAliases.length ? ` (${t.zhAliases.slice(0, 3).join('/')})` : ''}`,

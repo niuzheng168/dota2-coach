@@ -1,7 +1,7 @@
 # DOTA2 中英双语全量术语词典（英雄 · 全技能 · 全装备 · 战术黑话）
 
 > 数据源：Valve 官方实时双语数据库（`dota2.com/datafeed` `english` + `schinese`）+ 中美高分局语音常用黑话与简称。
-> 统计：**127** 位英雄 · **734** 个英雄技能（含先天技能）· **326** 件商店/消耗/特殊物品 · **76** 件中立道具与附魔 · **43** 组高频对线/视野/团战术语。
+> 统计：**127** 位英雄 · **736** 个英雄技能（含先天技能）· **344** 件商店/消耗/特殊物品 · **75** 件中立道具与附魔 · **43** 组高频对线/视野/团战术语。
 
 ## 0. 极易翻错的跨语种外号消歧表（Critical Disambiguation Rules）
 
@@ -202,7 +202,7 @@
 
 ---
 
-## 3. 商店装备、消耗品与中立道具中英对照（All 402 Items）
+## 3. 商店装备、消耗品与中立道具中英对照（All 419 Items）
 
 ### 3.1 商店装备、合成件与掉落物（Shop & Roshan Items）
 
@@ -234,6 +234,7 @@
 | **Battle Fury** | BF, Fury | **狂战斧** | 狂战 / 狂战斧 |
 | **Beloved Memory** | - | **挚爱回忆** | - |
 | **Belt of Strength** | - | **力量腰带** | - |
+| **Berserker's Hood** | - | **Berserker's Hood** | - |
 | **Black Grimoire (Warlock)** | - | **黑暗魔典（术士）** | - |
 | **Black King Bar** | BKB | **黑皇杖** | BKB / 黑皇 |
 | **Blade Mail** | BM | **刃甲** | 刃甲 |
@@ -244,6 +245,7 @@
 | **Blitz Knuckles** | - | **闪电指套** | - |
 | **Block of Cheese** | - | **奶酪块** | - |
 | **Blood Grenade** | Grenade | **血腥榴弹** | 血腥榴弹 / 榴弹 |
+| **Bloodslinger** | - | **Bloodslinger** | - |
 | **Bloodstone** | Bloodstone | **血精石** | 血精 / 血精石 |
 | **Bloodthorn** | - | **血棘** | 血棘 / 大紫怨 |
 | **Book of Shadows** | - | **暗影邪典** | - |
@@ -259,14 +261,16 @@
 | **Buckler** | - | **玄冥盾牌** | - |
 | **Bullwhip** | - | **凌厉长鞭** | - |
 | **Butterfly** | Butter | **蝴蝶** | 蝴蝶 |
-| **Ceremonial Robe** | - | **祭礼长袍** | - |
+| **Caduceus** | - | **双蛇杖** | 大灵匣 |
 | **Chainmail** | - | **锁子甲** | - |
 | **Chasm Stone** | - | **裂隙之石** | - |
 | **Cheese** | - | **奶酪** | 奶酪 |
 | **Circlet** | - | **圆环** | - |
 | **Clarity** | - | **净化药水** | 小蓝 / 净化 |
+| **Claszian Timepiece** | - | **Claszian Timepiece** | - |
 | **Claymore** | - | **大剑** | - |
 | **Cloak** | - | **抗魔斗篷** | - |
+| **Cloak of Flames** | - | **火焰斗篷** | - |
 | **Clumsy Net** | - | **笨拙渔网** | - |
 | **Consecrated Wraps** | - | **圣化护服** | - |
 | **Cornucopia** | - | **丰饶之环** | - |
@@ -276,6 +280,7 @@
 | **Crown** | - | **王冠** | - |
 | **Crystalys** | Crystalys | **水晶剑** | 小暴击 / 水晶剑 |
 | **Daedalus** | Daedalus, Crit | **代达罗斯之殇** | 大炮 |
+| **Dagger of Ristul** | - | **瑞斯图尔尖匕** | - |
 | **Dagon** | Dagon 1 | **达贡之神力** | 一级红杖 / 红杖 |
 | **Demon Edge** | - | **恶魔刀锋** | - |
 | **Desolator** | Deso | **黯灭** | 黯灭 / 暗灭 |
@@ -288,6 +293,7 @@
 | **Dragon Lance** | - | **魔龙枪** | - |
 | **Dragon Scale** | - | **炎龙之鳞** | - |
 | **Drum of Endurance** | Drums | **韧鼓** | 战鼓 |
+| **Duelist Gloves** | - | **决斗家手套** | - |
 | **Dust of Appearance** | Dust | **显影之尘** | 粉 / 显影之尘 |
 | **Eaglesong** | - | **鹰歌弓** | - |
 | **Echo Sabre** | Echo | **回音战刃** | 连击刀 |
@@ -298,6 +304,7 @@
 | **Enchanted Quiver** | - | **魔力箭袋** | - |
 | **Energy Booster** | - | **能量之球** | - |
 | **Essence Distiller** | - | **精之灵器** | - |
+| **Essence Ring** | - | **精华指环** | - |
 | **Eternal Shroud** | Shroud | **永世法衣** | 永世法衣 / 法衣 |
 | **Ethereal Blade** | E-Blade, Eblade | **虚灵之刃** | 虚灵刀 |
 | **Eul's Scepter of Divinity** | Euls, Eul's | **Eul的神圣法杖** | 吹风 / 小吹风 |
@@ -309,7 +316,7 @@
 | **Faerie Fire** | - | **仙灵之火** | 仙灵火 |
 | **Fairy's Trinket** | - | **仙灵饰品** | - |
 | **Falcon Blade** | - | **猎鹰战刃** | 猎鹰战刃 / 猎鹰刀 |
-| **Flicker** | - | **闪灵** | - |
+| **Flayer's Bota** | - | **剥皮血囊** | - |
 | **Fluffy Hat** | - | **毛毛帽** | - |
 | **Flying Courier** | - | **飞行信使** | - |
 | **Force Boots** | - | **原力鞋** | - |
@@ -320,7 +327,7 @@
 | **Gauntlets of Strength** | - | **力量手套** | - |
 | **Gem of True Sight** | Gem | **真视宝石** | 宝石 / 真视宝石 |
 | **Ghost Scepter** | Ghost | **幽魂权杖** | 绿杖 |
-| **Giant's Ring** | - | **巨人之戒** | - |
+| **Giant's Maul** | - | **巨人之槌** | - |
 | **Gleipnir** | Gleipnir, Atos Upgrade | **缚灵索** | 缚灵索 / 电锤网 |
 | **Glimmer Cape** | Glimmer | **微光披风** | 微光 |
 | **Gloves of Haste** | - | **加速手套** | - |
@@ -328,6 +335,7 @@
 | **Great Healing Lotus** | - | **大疗伤莲花** | - |
 | **Greater Faerie Fire** | - | **高级仙灵之火** | - |
 | **Greater Healing Lotus** | - | **巨大疗伤莲花** | - |
+| **Greater Horn of Battle** | - | **Greater Horn of Battle** | - |
 | **Gris-Gris** | - | **驱邪护符** | - |
 | **Grove Bow** | - | **林野长弓** | - |
 | **Guardian Greaves** | Greaves, GG Boots | **卫士胫甲** | 大鞋 / 卫士胫甲 |
@@ -345,11 +353,11 @@
 | **Helm of the Undying** | - | **不朽尸王的头盔** | - |
 | **Holy Locket** | Locket | **圣洁吊坠** | 圣洁吊坠 / 奶棒 |
 | **Hood of Defiance** | - | **挑战头巾** | - |
+| **Horn of Battle** | - | **战斗号角** | - |
 | **Hurricane Pike** | Pike | **飓风长戟** | 大推推 / 飓风长戟 |
 | **Hydra's Breath** | - | **怪蛇之息** | - |
 | **Hyperstone** | - | **振奋宝石** | - |
 | **Illusionist's Cape** | - | **幻术师披风** | - |
-| **Imp Claw** | - | **魔童之爪** | - |
 | **Infused Raindrops** | Raindrops | **凝魂之露** | 魂泪 |
 | **Iron Branch** | Branch, GG Branch | **铁树枝干** | 树枝 |
 | **Iron Talon** | - | **寒铁钢爪** | - |
@@ -377,10 +385,10 @@
 | **Mantle of Intelligence** | - | **智力斗篷** | - |
 | **Martyr's Plate** | - | **烈士鳞甲** | - |
 | **Mask of Madness** | MoM | **疯狂面具** | 疯脸 |
+| **Medallion of Courage** | - | **勇气勋章** | - |
 | **Mekansm** | Mek | **梅肯斯姆** | 梅肯 |
 | **Mercy & Grace** | - | **仁慈与恩泽** | - |
 | **Meteor Hammer** | Meteor Hammer, Meme Hammer | **陨星锤** | 陨星锤 |
-| **Mind Breaker** | - | **智灭** | - |
 | **Mirror Shield** | - | **神镜盾** | - |
 | **Mithril Hammer** | - | **秘银锤** | - |
 | **Mjollnir** | - | **雷神之锤** | 大电锤 |
@@ -392,11 +400,13 @@
 | **Nemesis Curse** | - | **天诛之咒** | - |
 | **Nether Shawl** | - | **幽冥披巾** | - |
 | **Ninja Gear** | - | **忍者用具** | - |
+| **Nothl Sigil** | - | **Nothl Sigil** | - |
 | **Null Talisman** | Null | **空灵挂件** | 挂件 / 空灵挂件 |
 | **Nullifier** | - | **否决坠饰** | 否决 |
 | **Oblivion Staff** | - | **空明杖** | - |
 | **Observer and Sentry Wards** | - | **侦察·岗哨守卫** | - |
 | **Observer Ward** | Obs, Observer | **侦察守卫** | 假眼 |
+| **Occult Bracelet** | - | **玄奥手镯** | - |
 | **Ocean Heart** | - | **海洋之心** | - |
 | **Octarine Core** | Octarine | **玲珑心** | 玲珑心 |
 | **Ogre Axe** | - | **食人魔之斧** | - |
@@ -425,6 +435,7 @@
 | **Pocket Roshan** | - | **袖珍肉山** | - |
 | **Pocket Tower** | - | **袖珍高塔** | - |
 | **Point Booster** | - | **精气之球** | - |
+| **Poor Man's Shield** | - | **穷鬼盾** | - |
 | **Power Treads** | Treads, PT | **动力鞋** | 假腿 |
 | **Prince's Knife** | - | **亲王短刀** | - |
 | **Pupil's Gift** | - | **学徒之礼** | - |
@@ -438,7 +449,6 @@
 | **Refresher Orb** | Refresher | **刷新球** | 刷新球 / 刷新 |
 | **Refresher Shard** | - | **刷新球碎片** | 刷新碎片 / 刷新球碎片 |
 | **Repair Kit** | - | **维修器具** | - |
-| **Revenant's Brooch** | Brooch | **英灵胸针** | 亡魂胸针 / 胸针 |
 | **Ring of Aquila** | - | **天鹰之戒** | - |
 | **Ring of Basilius** | - | **王者之戒** | - |
 | **Ring of Health** | - | **治疗指环** | - |
@@ -446,6 +456,7 @@
 | **Ring of Regen** | - | **回复戒指** | - |
 | **Ring of Tarrasque** | - | **恐鳌之戒** | - |
 | **Ripper's Lash** | - | **撕裂之鞭** | - |
+| **Ristul's Devotion** | - | **Ristul's Devotion** | - |
 | **River Vial: Blood** | - | **河水药瓶：血红** | - |
 | **River Vial: Chrome** | - | **河水药瓶：液铬** | - |
 | **River Vial: Dry** | - | **河水药瓶：干涸** | - |
@@ -457,14 +468,15 @@
 | **Rod of Atos** | Atos | **阿托斯之棍** | 阿托斯 / 根须 |
 | **Roshan's Banner** | - | **肉山的战旗** | - |
 | **Royal Jelly** | - | **蜂王浆** | - |
+| **Sabatons of Mordiggian** | - | **莫尔迪基安的护足** | 大相位 / 大臂章 |
 | **Sacred Relic** | - | **圣者遗物** | - |
-| **Safety Bubble** | - | **安全泡泡** | - |
 | **Sage's Mask** | - | **贤者面罩** | - |
 | **Sange** | - | **散华** | 散华 |
 | **Sange and Yasha** | SnY, S&Y | **散夜对剑** | 双刀 / 散夜对剑 |
 | **Satanic** | - | **撒旦之邪力** | 撒旦 |
 | **Scrying Shovel** | - | **占卜之铲** | - |
 | **Scythe of Vyse** | Hex, Sheep, Vyse | **邪恶镰刀** | 羊刀 |
+| **Searing Signet** | - | **炽热纹章** | - |
 | **Seer Stone** | - | **先哲之石** | - |
 | **Sentry Ward** | Sentry, Sentries | **岗哨守卫** | 真眼 |
 | **Shadow Amulet** | - | **暗影护符** | - |
@@ -474,6 +486,7 @@
 | **Silver Edge** | Silver Edge, SE | **白银之锋** | 大隐刀 |
 | **Sister's Shroud** | - | **魅影之衣** | - |
 | **Skull Basher** | Basher | **碎颅锤** | 晕锤 / 小晕锤 |
+| **Skypiercer** | - | **Skypiercer** | - |
 | **Slippers of Agility** | - | **敏捷便鞋** | - |
 | **Smoke of Deceit** | Smoke | **诡计之雾** | 雾 / 诡计之雾 |
 | **Solar Crest** | Solar, Crest | **炎阳纹章** | 大勋章 / 炎阳 |
@@ -482,10 +495,14 @@
 | **Spark of Courage** | - | **勇气之光** | - |
 | **Specialist's Array** | - | **行家阵列** | - |
 | **Spell Prism** | - | **法术棱镜** | - |
+| **Spider Legs** | - | **网虫腿** | - |
 | **Spirit Vessel** | Vessel | **魂之灵瓮** | 大骨灰 |
 | **Splintmail** | - | **片甲** | - |
 | **Staff of Wizardry** | - | **魔力法杖** | - |
+| **Starforge** | - | **Starforge** | 大陨星锤 |
+| **Stone of Recall** | - | **Stone of Recall** | - |
 | **Stout Shield** | - | **圆盾** | - |
+| **Stygian Desolator** | - | **寂灭** | - |
 | **Swift Blink** | Agi Blink | **迅疾闪光** | 敏捷跳刀 |
 | **Talisman of Evasion** | - | **闪避护符** | - |
 | **Tango** | - | **树之祭祀** | 吃树 |
@@ -511,6 +528,7 @@
 | **Trident** | - | **三元重戟** | - |
 | **Trusty Shovel** | - | **可靠铁铲** | - |
 | **Ultimate Orb** | - | **极限法球** | - |
+| **Unrelenting Eye** | - | **不屈之眼** | - |
 | **Unwavering Condition** | - | **坚毅之件** | - |
 | **Urn of Shadows** | Urn | **影之灵龛** | 小骨灰 / 骨灰盒 |
 | **Vambrace** | - | **臂甲** | - |
@@ -568,57 +586,56 @@
 | 附魔 (Enchantment) | **Wise** | **睿智** |
 | Tier 1 | **Ash Legion Shield** | **余烬军团战盾** |
 | Tier 1 | **Chipped Vest** | **碎裂背心** |
-| Tier 1 | **Dagger of Ristul** | **瑞斯图尔尖匕** |
 | Tier 1 | **Dormant Curio** | **休眠珍品** |
-| Tier 1 | **Duelist Gloves** | **决斗家手套** |
 | Tier 1 | **Forager's Kit** | **采菌套具** |
 | Tier 1 | **Kobold Cup** | **狗头人酒杯** |
-| Tier 1 | **Occult Bracelet** | **玄奥手镯** |
 | Tier 1 | **Pollywog Charm** | **蝌蚪护符** |
 | Tier 1 | **Possessed Mask** | **附魂面具** |
+| Tier 1 | **Red Ledger** | **悬红** |
+| Tier 1 | **Seeds of Serenity** | **宁静种籽** |
 | Tier 1 | **Stonefeather Satchel** | **石羽小包** |
+| Tier 1 | **Tumbler's Toy** | **杂技玩具** |
 | Tier 1 | **Weighted Dice** | **加重骰子** |
+| Tier 2 | **Brick** | **板砖** |
 | Tier 2 | **Crippling Crossbow** | **致残之弩** |
 | Tier 2 | **Defiant Shell** | **不羁甲壳** |
-| Tier 2 | **Essence Ring** | **精华指环** |
+| Tier 2 | **Gunpowder Gauntlet** | **火药手套** |
+| Tier 2 | **Imp Claw** | **魔童之爪** |
+| Tier 2 | **Jidi Pollen Bag** | **基迪花粉袋** |
 | Tier 2 | **Mana Draught** | **魔力药水** |
-| Tier 2 | **Medallion of Courage** | **勇气勋章** |
-| Tier 2 | **Poor Man's Shield** | **穷鬼盾** |
-| Tier 2 | **Searing Signet** | **炽热纹章** |
-| Tier 2 | **Seeds of Serenity** | **宁静种籽** |
-| Tier 2 | **Tumbler's Toy** | **杂技玩具** |
-| Tier 3 | **Cloak of Flames** | **火焰斗篷** |
-| Tier 3 | **Gunpowder Gauntlet** | **火药手套** |
-| Tier 3 | **Jidi Pollen Bag** | **基迪花粉袋** |
-| Tier 3 | **Partisan's Brand** | **天游烙印** |
-| Tier 3 | **Psychic Headband** | **通灵头带** |
+| Tier 2 | **Metamorphic Mandible** | **变态上颚** |
+| Tier 2 | **Partisan's Brand** | **天游烙印** |
+| Tier 2 | **Psychic Headband** | **通灵头带** |
+| Tier 2 | **Safety Bubble** | **安全泡泡** |
+| Tier 2 | **Spellslinger** | **咏咒之坠** |
+| Tier 3 | **Balmhook** | **Balmhook** |
+| Tier 3 | **Ceremonial Robe** | **祭礼长袍** |
+| Tier 3 | **Dandelion Amulet** | **蒲公英护符** |
+| Tier 3 | **Enchanter's Bauble** | **附魔师之椟** |
+| Tier 3 | **Harmonizer** | **协和** |
+| Tier 3 | **Idol of Scree'auk** | **丝奎奥克神像** |
+| Tier 3 | **Prophet's Pendulum** | **先知灵摆** |
+| Tier 3 | **Rattlecage** | **回响之笼** |
+| Tier 3 | **Revenant's Brooch** | **英灵胸针** |
 | Tier 3 | **Serrated Shiv** | **锯齿短刀** |
-| Tier 3 | **Spellslinger** | **咏咒之坠** |
 | Tier 3 | **Stormcrafter** | **风暴宝器** |
-| Tier 3 | **Unrelenting Eye** | **不屈之眼** |
+| Tier 3 | **Vile Phial** | **Vile Phial** |
+| Tier 4 | **Book of the Dead** | **冥灵书** |
 | Tier 4 | **Conjurer's Catalyst** | **咒术师触媒** |
-| Tier 4 | **Dandelion Amulet** | **蒲公英护符** |
-| Tier 4 | **Enchanter's Bauble** | **附魔师之椟** |
-| Tier 4 | **Flayer's Bota** | **剥皮血囊** |
-| Tier 4 | **Giant's Maul** | **巨人之槌** |
-| Tier 4 | **Idol of Scree'auk** | **丝奎奥克神像** |
-| Tier 4 | **Metamorphic Mandible** | **变态上颚** |
-| Tier 4 | **Prophet's Pendulum** | **先知灵摆** |
-| Tier 4 | **Rattlecage** | **回响之笼** |
-| Tier 5 | **Book of the Dead** | **冥灵书** |
-| Tier 5 | **Dezun Bloodrite** | **德尊血式** |
-| Tier 5 | **Divine Regalia** | **天赐华冠** |
-| Tier 5 | **Fallen Sky** | **天崩** |
-| Tier 5 | **Harmonizer** | **协和** |
-| Tier 5 | **Minotaur Horn** | **恶牛角** |
-| Tier 5 | **Riftshadow Prism** | **影墟棱晶** |
-| Tier 5 | **Spider Legs** | **网虫腿** |
-| Tier 5 | **Stygian Desolator** | **寂灭** |
-| Tier 5 | **Witchbane** | **行巫之祸** |
+| Tier 4 | **Dezun Bloodrite** | **德尊血式** |
+| Tier 4 | **Divine Regalia** | **天赐华冠** |
+| Tier 4 | **Fallen Sky** | **天崩** |
+| Tier 4 | **Flicker** | **闪灵** |
+| Tier 4 | **Giant's Ring** | **巨人之戒** |
+| Tier 4 | **Helm of the Hivemind** | **虫巢思维头盔** |
+| Tier 4 | **Mind Breaker** | **智灭** |
+| Tier 4 | **Minotaur Horn** | **恶牛角** |
+| Tier 4 | **Riftshadow Prism** | **影墟棱晶** |
+| Tier 4 | **Witchbane** | **行巫之祸** |
 
 ---
 
-## 4. 全部 127 位英雄全技能中英对照（All 734 Hero Abilities）
+## 4. 全部 127 位英雄全技能中英对照（All 736 Hero Abilities）
 
 ### Abaddon (Aba/LoA) ⇔ 亚巴顿（亚巴顿/LOA）
 - **Mist Coil** ⇔ **迷雾缠绕**
@@ -682,7 +699,7 @@
 - **Summon Razorback** ⇔ **召唤刀背兽**
 - **Summon Raptors** ⇔ **召唤猛禽**
 - **Inner Beast** ⇔ **野性之心** — *先天/Innate*
-- **Drums of Slom** ⇔ **斯洛姆战鼓**
+- **Summon Ancient Thunderhide** ⇔ **召唤远古雷肤兽**
 - **Primal Roar** ⇔ **原始咆哮**
 
 ### Bloodseeker (BS/Blood) ⇔ 血魔（血魔/BS）
@@ -735,8 +752,9 @@
 - **Chaos Bolt** ⇔ **混乱之箭**
 - **Reality Rift** ⇔ **实相裂隙**
 - **Chaos Strike** ⇔ **混沌一击**
-- **Fundamental Forging** ⇔ **基本法则锻造** — *先天/Innate*
+- **Ahead, Armageddon** ⇔ **天劫前进** — *先天/Innate*
 - **Phantasm** ⇔ **混沌之军**
+- **Heel, Armageddon** ⇔ **Heel, Armageddon** — *先天/Innate*
 
 ### Chen ⇔ 陈（陈）
 - **Penitence** ⇔ **赎罪**
@@ -798,6 +816,7 @@
 - **Poison Touch** ⇔ **剧毒之触**
 - **Shallow Grave** ⇔ **薄葬** — *EN: Grave · 俗称: 薄葬*
 - **Shadow Wave** ⇔ **暗影波**
+- **Through the Realm** ⇔ **穿越绝境**
 - **Weave** ⇔ **编织** — *先天/Innate*
 - **Nothl Projection** ⇔ **虚无投影**
 
@@ -962,7 +981,6 @@
 - **Blade Fury** ⇔ **剑刃风暴** — *EN: Spin · 俗称: 剑刃风暴/转*
 - **Healing Ward** ⇔ **治疗守卫**
 - **Blade Dance** ⇔ **剑舞**
-- **Swiftslash** ⇔ **迅风斩**
 - **Bladeform** ⇔ **剑心犹在** — *先天/Innate*
 - **Omnislash** ⇔ **无敌斩** — *EN: Omnislash · 俗称: 无敌斩*
 
@@ -1068,7 +1086,7 @@
 - **Howl** ⇔ **嗥叫**
 - **Feral Impulse** ⇔ **野性驱使**
 - **Wolf Bite** ⇔ **饿狼撕咬**
-- **Apex Predator** ⇔ **顶级掠食者** — *先天/Innate*
+- **Pack Hunter** ⇔ **Pack Hunter** — *先天/Innate*
 - **Shapeshift** ⇔ **变身**
 
 ### Magnus (Mag/RP) ⇔ 马格纳斯（猛犸）
@@ -1106,10 +1124,9 @@
 - **Poof** ⇔ **忽悠**
 - **Ransack** ⇔ **洗劫**
 - **Dig** ⇔ **掘地**
-- **MegaMeepo** ⇔ **超大米波**
-- **Divided We Stand** ⇔ **分则能成**
 - **Geomancy** ⇔ **地卜术** — *先天/Innate*
-- **MegaMeepo Fling** ⇔ **超大米波摔扔**
+- **Divided We Stand** ⇔ **分则能成**
+- **Fling** ⇔ **摔扔**
 
 ### Mirana (PotM) ⇔ 米拉娜（白虎/POM）
 - **Starstorm** ⇔ **群星风暴**
@@ -1152,7 +1169,7 @@
 ### Nature's Prophet (NP/Furion/Prophet) ⇔ 自然先知（先知/NP）
 - **Sprout** ⇔ **发芽**
 - **Teleportation** ⇔ **传送** — *俗称: 传送/先知飞*
-- **Nature's Call** ⇔ **自然的呼唤**
+- **Nature's Call** ⇔ **自然感召**
 - **Curse of the Oldgrowth** ⇔ **青森诅咒**
 - **Spirit of the Forest** ⇔ **丛林之魂** — *先天/Innate*
 - **Wrath of Nature** ⇔ **自然之怒**
@@ -1177,7 +1194,7 @@
 - **Mind Flare** ⇔ **神智爆裂**
 - **Spiked Carapace** ⇔ **尖刺外壳**
 - **Burrow** ⇔ **钻地**
-- **Mana Burn** ⇔ **法力燃烧** — *先天/Innate*
+- **Scarab Metabolism** ⇔ **圣甲虫代谢** — *先天/Innate*
 - **Vendetta** ⇔ **复仇**
 
 ### Ogre Magi (Ogre) ⇔ 食人魔魔法师（蓝胖）
@@ -1313,7 +1330,7 @@
 ### Sand King (SK) ⇔ 沙王（沙王/SK）
 - **Burrowstrike** ⇔ **掘地穿刺**
 - **Sand Storm** ⇔ **沙尘暴**
-- **Stinger** ⇔ **尾刺**
+- **Stinger** ⇔ **尾螫**
 - **Caustic Finale** ⇔ **腐尸毒** — *先天/Innate*
 - **Epicenter** ⇔ **地震**
 
@@ -1509,6 +1526,7 @@
 - **Decay** ⇔ **腐朽**
 - **Soul Rip** ⇔ **噬魂**
 - **Tombstone** ⇔ **墓碑** — *EN: Tomb/Tombstone · 俗称: 墓碑*
+- **Zombie Bite** ⇔ **僵尸撕咬**
 - **Ceaseless Dirge** ⇔ **挽歌犹唱** — *先天/Innate*
 - **Flesh Golem** ⇔ **血肉傀儡**
 
@@ -1566,6 +1584,7 @@
 - **The Swarm** ⇔ **虫群**
 - **Shukuchi** ⇔ **缩地**
 - **Geminate Attack** ⇔ **连击**
+- **Time Lapse (Ally)** ⇔ **时光倒流（友军）**
 - **Time Lapse** ⇔ **时光倒流**
 - **Threads of Fate** ⇔ **命运之线** — *先天/Innate*
 

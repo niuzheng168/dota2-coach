@@ -1,0 +1,1531 @@
+{
+  "patch": "7.42",
+  "patchEvidence": {
+    "valvePage": "https://www.dota2.com/patches/7.42",
+    "capturedNotesSha256": "5996779d30fe1a6c8178543de327831bb9d8be7c1a9ff65500682b6d853209a8",
+    "from": 1794988800
+  },
+  "rosterWindow": "Natural spawner batches at minute waves 1..20 inclusive; not clear counts or odds.",
+  "goldBasis": "Entity m_iGoldBountyMin/Max; every 30s at :05/:35, all live naturally spawned neutrals on team 4, all sixteen full DEMs. No stack split or payment implied.",
+  "samples": [
+    {
+      "matchId": 9096797937,
+      "build": 6983,
+      "demSha256": "2246941330cd7e95bc2284c1f582bbcdec39dfb887cfecf213def83ade9c0ba7",
+      "spawnBatches": 132
+    },
+    {
+      "matchId": 9096845332,
+      "build": 6983,
+      "demSha256": "7a3cd5202984d0e82038d865598b01a8c124fbac7499bbc7eeb081b033a14e6e",
+      "spawnBatches": 148
+    },
+    {
+      "matchId": 9097037811,
+      "build": 6983,
+      "demSha256": "92bdac754eaf2f7641605518c11318175263a3da7dfaa75675de14c3a98a104c",
+      "spawnBatches": 182
+    },
+    {
+      "matchId": 9097330939,
+      "build": 6985,
+      "demSha256": "1a78b37bcc86a8c34e1b473c51b6cac4054a74db273db114c7d11e7a05b27444",
+      "spawnBatches": 158
+    },
+    {
+      "matchId": 9097535245,
+      "build": 6986,
+      "demSha256": "c038e46d9c5845acfd27d46f6b6e18c970ab3c3ecbe185f66bfc99d008ab643f",
+      "spawnBatches": 134
+    },
+    {
+      "matchId": 9097559249,
+      "build": 6986,
+      "demSha256": "6479cc80ddb51da5c4e7f8a98bf024509cd883cd2e83f2c083b23bb9629770eb",
+      "spawnBatches": 140
+    },
+    {
+      "matchId": 9097587313,
+      "build": 6986,
+      "demSha256": "6db74582e7687fbd1da3e720785559bbcba25b05b49e804c49bd83d1f58b9645",
+      "spawnBatches": 180
+    },
+    {
+      "matchId": 9097801447,
+      "build": 6986,
+      "demSha256": "4c2c951f32f495b3c9c2b075a38a3530cc6b1ad2f53b3efcf5cf2d58cc71b51e",
+      "spawnBatches": 151
+    },
+    {
+      "matchId": 9098255705,
+      "build": 6986,
+      "demSha256": "e3691b9a919dc75cc13b8b5e1426c942744090febee7db887c22f08f6fe463f9",
+      "spawnBatches": 162
+    },
+    {
+      "matchId": 9098360852,
+      "build": 6986,
+      "demSha256": "68aa8c557a5a45b7e5cca9f4449f5a1a9ca229d48fa9417d986aae2499db2434",
+      "spawnBatches": 178
+    },
+    {
+      "matchId": 9098402606,
+      "build": 6986,
+      "demSha256": "3636481d3091e2ab19f5d1f7c1a0d9c8e0a02727efb24894694fe0f616bbd597",
+      "spawnBatches": 141
+    },
+    {
+      "matchId": 9098472218,
+      "build": 6986,
+      "demSha256": "aed3c0ab9407d2760977c11c0b02638da80fb75f61ab43d5ad0ce573cd348cc2",
+      "spawnBatches": 154
+    },
+    {
+      "matchId": 9098789898,
+      "build": 6988,
+      "demSha256": "79ea11c8bb38165ad29dafc7b4ffe060c9ea1a057f30f1e74bf2fc0e038b8d40",
+      "spawnBatches": 122
+    },
+    {
+      "matchId": 9099209663,
+      "build": 6989,
+      "demSha256": "c7da18d32a4346c8c8d50101623f20e4c542b43397f6b33fb2b66104ae9538b6",
+      "spawnBatches": 149
+    },
+    {
+      "matchId": 9099283649,
+      "build": 6989,
+      "demSha256": "17c8b1bc11e5d8b09b4ecfb0d3909623bb69f1ded3e4773a314b7a07c09788c3",
+      "spawnBatches": 162
+    },
+    {
+      "matchId": 9100049738,
+      "build": 6989,
+      "demSha256": "ab169c50752d5e8902d2a3b3c042d9a6b5596ca3decc3d5a00b68c4aae684660",
+      "spawnBatches": 153
+    }
+  ],
+  "batches": 2446,
+  "compositions": [
+    {
+      "units": [
+        "alpha_wolf",
+        "giant_wolf",
+        "giant_wolf"
+      ],
+      "observations": 152,
+      "matchCount": 16,
+      "spawnerTypes": [
+        1
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_20",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 9372624,
+        "ids": [
+          "1026:703",
+          "927:348",
+          "1025:633"
+        ]
+      }
+    },
+    {
+      "units": [
+        "ancient_frog_mage",
+        "grown_frog",
+        "grown_frog"
+      ],
+      "observations": 15,
+      "matchCount": 12,
+      "spawnerTypes": [
+        2
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_6",
+        "tick": 42658,
+        "seconds": 1200.033,
+        "spawnerHandle": 11092815,
+        "ids": [
+          "2639:109",
+          "2776:902",
+          "3144:122"
+        ]
+      }
+    },
+    {
+      "units": [
+        "black_dragon",
+        "black_drake",
+        "black_drake"
+      ],
+      "observations": 38,
+      "matchCount": 14,
+      "spawnerTypes": [
+        3
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_8",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 1524582,
+        "ids": [
+          "1640:634",
+          "1634:171",
+          "1637:93"
+        ]
+      }
+    },
+    {
+      "units": [
+        "centaur_khan",
+        "centaur_outrunner",
+        "centaur_outrunner"
+      ],
+      "observations": 117,
+      "matchCount": 16,
+      "spawnerTypes": [
+        2
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_5",
+        "tick": 26458,
+        "seconds": 660.033,
+        "spawnerHandle": 8700769,
+        "ids": [
+          "2677:760",
+          "2674:695",
+          "2680:166"
+        ]
+      }
+    },
+    {
+      "units": [
+        "dark_troll",
+        "dark_troll",
+        "dark_troll_warlord"
+      ],
+      "observations": 111,
+      "matchCount": 16,
+      "spawnerTypes": [
+        2
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_7",
+        "tick": 33658,
+        "seconds": 900.033,
+        "spawnerHandle": 10994526,
+        "ids": [
+          "1856:108",
+          "1860:281",
+          "680:1"
+        ]
+      }
+    },
+    {
+      "units": [
+        "eimermole",
+        "eimermole_foreman"
+      ],
+      "observations": 96,
+      "matchCount": 16,
+      "spawnerTypes": [
+        2
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_13",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 16286590,
+        "ids": [
+          "1558:166",
+          "1555:895"
+        ]
+      }
+    },
+    {
+      "units": [
+        "enraged_wildkin",
+        "wildkin",
+        "wildkin"
+      ],
+      "observations": 102,
+      "matchCount": 16,
+      "spawnerTypes": [
+        2
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_2",
+        "tick": 22858,
+        "seconds": 540.033,
+        "spawnerHandle": 9913184,
+        "ids": [
+          "1567:876",
+          "1561:856",
+          "1564:915"
+        ]
+      }
+    },
+    {
+      "units": [
+        "fel_beast",
+        "fel_beast",
+        "ghost"
+      ],
+      "observations": 96,
+      "matchCount": 16,
+      "spawnerTypes": [
+        0
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_2",
+        "tick": 13858,
+        "seconds": 240.033,
+        "spawnerHandle": 6964174,
+        "ids": [
+          "783:162",
+          "822:465",
+          "911:824"
+        ]
+      }
+    },
+    {
+      "units": [
+        "forest_troll_berserker",
+        "forest_troll_berserker",
+        "forest_troll_high_priest"
+      ],
+      "observations": 68,
+      "matchCount": 16,
+      "spawnerTypes": [
+        0
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_1",
+        "tick": 15658,
+        "seconds": 300.033,
+        "spawnerHandle": 15025099,
+        "ids": [
+          "1596:762",
+          "1520:594",
+          "1887:727"
+        ]
+      }
+    },
+    {
+      "units": [
+        "forest_troll_berserker",
+        "forest_troll_berserker",
+        "kobold_taskmaster"
+      ],
+      "observations": 66,
+      "matchCount": 16,
+      "spawnerTypes": [
+        0
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_16",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 8668093,
+        "ids": [
+          "921:998",
+          "924:969",
+          "1303:568"
+        ]
+      }
+    },
+    {
+      "units": [
+        "froglet_mage",
+        "tadpole",
+        "tadpole"
+      ],
+      "observations": 24,
+      "matchCount": 14,
+      "spawnerTypes": [
+        0
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_14",
+        "tick": 19258,
+        "seconds": 420.033,
+        "spawnerHandle": 13452171,
+        "ids": [
+          "2338:767",
+          "2376:27",
+          "2467:585"
+        ]
+      }
+    },
+    {
+      "units": [
+        "froglet",
+        "froglet_mage",
+        "tadpole"
+      ],
+      "observations": 15,
+      "matchCount": 10,
+      "spawnerTypes": [
+        0
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_11",
+        "tick": 31858,
+        "seconds": 840.033,
+        "spawnerHandle": 6013827,
+        "ids": [
+          "2388:482",
+          "2844:1001",
+          "2137:505"
+        ]
+      }
+    },
+    {
+      "units": [
+        "froglet",
+        "froglet",
+        "froglet_mage"
+      ],
+      "observations": 112,
+      "matchCount": 16,
+      "spawnerTypes": [
+        1
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_4",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 16221027,
+        "ids": [
+          "665:26",
+          "257:542",
+          "1301:286"
+        ]
+      }
+    },
+    {
+      "units": [
+        "froglet",
+        "froglet",
+        "grown_frog_mage"
+      ],
+      "observations": 46,
+      "matchCount": 16,
+      "spawnerTypes": [
+        1
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_14",
+        "tick": 24658,
+        "seconds": 600.033,
+        "spawnerHandle": 869235,
+        "ids": [
+          "2618:337",
+          "2622:1",
+          "2614:361"
+        ]
+      }
+    },
+    {
+      "units": [
+        "froglet",
+        "grown_frog",
+        "grown_frog_mage"
+      ],
+      "observations": 30,
+      "matchCount": 13,
+      "spawnerTypes": [
+        1
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_14",
+        "tick": 28258,
+        "seconds": 720.033,
+        "spawnerHandle": 869235,
+        "ids": [
+          "2552:276",
+          "1601:703",
+          "2786:265"
+        ]
+      }
+    },
+    {
+      "units": [
+        "frostbitten_golem",
+        "frostbitten_golem",
+        "ice_shaman"
+      ],
+      "observations": 41,
+      "matchCount": 15,
+      "spawnerTypes": [
+        3
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_8",
+        "tick": 24658,
+        "seconds": 600.033,
+        "spawnerHandle": 1524582,
+        "ids": [
+          "2009:731",
+          "2012:858",
+          "2015:750"
+        ]
+      }
+    },
+    {
+      "units": [
+        "gnoll_assassin",
+        "gnoll_assassin",
+        "gnoll_assassin"
+      ],
+      "observations": 12,
+      "matchCount": 8,
+      "spawnerTypes": [
+        0
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_13",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 16253820,
+        "ids": [
+          "1722:878",
+          "1726:803",
+          "1730:182"
+        ]
+      }
+    },
+    {
+      "units": [
+        "granite_golem",
+        "rock_golem",
+        "rock_golem"
+      ],
+      "observations": 35,
+      "matchCount": 13,
+      "spawnerTypes": [
+        3
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_8",
+        "tick": 28258,
+        "seconds": 720.033,
+        "spawnerHandle": 1524582,
+        "ids": [
+          "1611:6",
+          "2763:841",
+          "2766:254"
+        ]
+      }
+    },
+    {
+      "units": [
+        "grown_frog",
+        "grown_frog",
+        "grown_frog_mage"
+      ],
+      "observations": 109,
+      "matchCount": 16,
+      "spawnerTypes": [
+        2
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_14",
+        "tick": 33658,
+        "seconds": 900.033,
+        "spawnerHandle": 869235,
+        "ids": [
+          "2227:259",
+          "2552:277",
+          "782:537"
+        ]
+      }
+    },
+    {
+      "units": [
+        "harpy_scout",
+        "harpy_scout",
+        "harpy_storm"
+      ],
+      "observations": 93,
+      "matchCount": 16,
+      "spawnerTypes": [
+        0
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_2",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 6964174,
+        "ids": [
+          "1586:187",
+          "1590:885",
+          "1594:737"
+        ]
+      }
+    },
+    {
+      "units": [
+        "kobold",
+        "kobold",
+        "kobold_taskmaster",
+        "kobold_tunneler"
+      ],
+      "observations": 72,
+      "matchCount": 16,
+      "spawnerTypes": [
+        0
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_1",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 15025099,
+        "ids": [
+          "801:31",
+          "1537:141",
+          "1543:761",
+          "1540:959"
+        ]
+      }
+    },
+    {
+      "units": [
+        "mud_golem",
+        "mud_golem"
+      ],
+      "observations": 125,
+      "matchCount": 16,
+      "spawnerTypes": [
+        1
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_9",
+        "tick": 24658,
+        "seconds": 600.033,
+        "spawnerHandle": 10339156,
+        "ids": [
+          "1884:931",
+          "913:637"
+        ]
+      }
+    },
+    {
+      "units": [
+        "odobenus_footman",
+        "odobenus_footman",
+        "odobenus_frostmage"
+      ],
+      "observations": 129,
+      "matchCount": 16,
+      "spawnerTypes": [
+        1
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_12",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 4162497,
+        "ids": [
+          "1546:907",
+          "1549:326",
+          "1552:622"
+        ]
+      }
+    },
+    {
+      "units": [
+        "ogre_magi",
+        "ogre_mauler",
+        "ogre_mauler"
+      ],
+      "observations": 150,
+      "matchCount": 16,
+      "spawnerTypes": [
+        1
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_12",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 4785091,
+        "ids": [
+          "1315:584",
+          "1311:63",
+          "1313:197"
+        ]
+      }
+    },
+    {
+      "units": [
+        "ogre_seal",
+        "ogre_seal_pup",
+        "ogre_seal_pup"
+      ],
+      "observations": 45,
+      "matchCount": 15,
+      "spawnerTypes": [
+        3
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_8",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 2736996,
+        "ids": [
+          "664:432",
+          "1308:680",
+          "1310:190"
+        ]
+      }
+    },
+    {
+      "units": [
+        "polar_furbolg_champion",
+        "polar_furbolg_ursa_warrior"
+      ],
+      "observations": 107,
+      "matchCount": 16,
+      "spawnerTypes": [
+        2
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_7",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 10994526,
+        "ids": [
+          "1658:958",
+          "1662:1002"
+        ]
+      }
+    },
+    {
+      "units": [
+        "prowler_acolyte",
+        "prowler_acolyte",
+        "prowler_shaman"
+      ],
+      "observations": 35,
+      "matchCount": 16,
+      "spawnerTypes": [
+        3
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_8",
+        "tick": 42658,
+        "seconds": 1200.033,
+        "spawnerHandle": 1524582,
+        "ids": [
+          "3195:373",
+          "3198:109",
+          "3200:216"
+        ]
+      }
+    },
+    {
+      "units": [
+        "radigull",
+        "radigull"
+      ],
+      "observations": 130,
+      "matchCount": 16,
+      "spawnerTypes": [
+        1
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_15",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 8946573,
+        "ids": [
+          "914:425",
+          "1305:1009"
+        ]
+      }
+    },
+    {
+      "units": [
+        "satyr_hellcaller",
+        "satyr_soulstealer",
+        "satyr_soulstealer"
+      ],
+      "observations": 106,
+      "matchCount": 16,
+      "spawnerTypes": [
+        2
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_5",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 14582651,
+        "ids": [
+          "1711:974",
+          "1696:836",
+          "1707:832"
+        ]
+      }
+    },
+    {
+      "units": [
+        "satyr_soulstealer",
+        "satyr_soulstealer",
+        "satyr_trickster",
+        "satyr_trickster"
+      ],
+      "observations": 130,
+      "matchCount": 16,
+      "spawnerTypes": [
+        1
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "evil_9",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 10339156,
+        "ids": [
+          "1692:219",
+          "1715:982",
+          "1631:695",
+          "1645:727"
+        ]
+      }
+    },
+    {
+      "units": [
+        "tadpole",
+        "tadpole",
+        "tadpole"
+      ],
+      "observations": 39,
+      "matchCount": 16,
+      "spawnerTypes": [
+        0
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "camp": "good_14",
+        "tick": 8458,
+        "seconds": 60.033,
+        "spawnerHandle": 13452171,
+        "ids": [
+          "1479:940",
+          "208:51",
+          "701:503"
+        ]
+      }
+    }
+  ],
+  "bountyTiers": [
+    {
+      "tier": 0,
+      "offset": [
+        0,
+        0
+      ],
+      "censusRows": 16003,
+      "distinctEntities": 1791,
+      "firstCensusClock": 64.1,
+      "lastCensusClock": 425.033,
+      "checkedNames": [
+        "alpha_wolf",
+        "black_dragon",
+        "black_drake",
+        "centaur_khan",
+        "centaur_outrunner",
+        "dark_troll",
+        "dark_troll_warlord",
+        "eimermole",
+        "eimermole_foreman",
+        "enraged_wildkin",
+        "fel_beast",
+        "forest_troll_berserker",
+        "forest_troll_high_priest",
+        "froglet",
+        "froglet_mage",
+        "frostbitten_golem",
+        "ghost",
+        "giant_wolf",
+        "gnoll_assassin",
+        "granite_golem",
+        "grown_frog_mage",
+        "harpy_scout",
+        "harpy_storm",
+        "ice_shaman",
+        "kobold",
+        "kobold_taskmaster",
+        "kobold_tunneler",
+        "mud_golem",
+        "odobenus_footman",
+        "odobenus_frostmage",
+        "ogre_magi",
+        "ogre_mauler",
+        "ogre_seal",
+        "ogre_seal_pup",
+        "polar_furbolg_champion",
+        "polar_furbolg_ursa_warrior",
+        "prowler_acolyte",
+        "prowler_shaman",
+        "radigull",
+        "rock_golem",
+        "satyr_hellcaller",
+        "satyr_soulstealer",
+        "satyr_trickster",
+        "tadpole",
+        "wildkin"
+      ],
+      "checkedBuilds": [
+        6983,
+        6985,
+        6986,
+        6988,
+        6989
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "id": "208:51",
+        "name": "npc_dota_neutral_tadpole",
+        "tick": 8604,
+        "seconds": 64.9,
+        "hp": 400,
+        "rolled": [
+          17,
+          19
+        ]
+      }
+    },
+    {
+      "tier": 1,
+      "offset": [
+        0,
+        1
+      ],
+      "censusRows": 18344,
+      "distinctEntities": 3646,
+      "firstCensusClock": 454.1,
+      "lastCensusClock": 875.033,
+      "checkedNames": [
+        "alpha_wolf",
+        "black_dragon",
+        "black_drake",
+        "centaur_khan",
+        "centaur_outrunner",
+        "dark_troll",
+        "dark_troll_warlord",
+        "eimermole",
+        "eimermole_foreman",
+        "enraged_wildkin",
+        "fel_beast",
+        "forest_troll_berserker",
+        "forest_troll_high_priest",
+        "froglet",
+        "froglet_mage",
+        "frostbitten_golem",
+        "ghost",
+        "giant_wolf",
+        "gnoll_assassin",
+        "granite_golem",
+        "grown_frog",
+        "grown_frog_mage",
+        "harpy_scout",
+        "harpy_storm",
+        "ice_shaman",
+        "kobold",
+        "kobold_taskmaster",
+        "kobold_tunneler",
+        "mud_golem",
+        "odobenus_footman",
+        "odobenus_frostmage",
+        "ogre_magi",
+        "ogre_mauler",
+        "ogre_seal",
+        "ogre_seal_pup",
+        "polar_furbolg_champion",
+        "polar_furbolg_ursa_warrior",
+        "prowler_acolyte",
+        "prowler_shaman",
+        "radigull",
+        "rock_golem",
+        "satyr_hellcaller",
+        "satyr_soulstealer",
+        "satyr_trickster",
+        "tadpole",
+        "wildkin"
+      ],
+      "checkedBuilds": [
+        6983,
+        6985,
+        6986,
+        6988,
+        6989
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "id": "257:542",
+        "name": "npc_dota_neutral_froglet",
+        "tick": 20304,
+        "seconds": 454.9,
+        "hp": 730,
+        "rolled": [
+          25,
+          30
+        ]
+      }
+    },
+    {
+      "tier": 2,
+      "offset": [
+        1,
+        1
+      ],
+      "censusRows": 17160,
+      "distinctEntities": 4491,
+      "firstCensusClock": 904.1,
+      "lastCensusClock": 1325.033,
+      "checkedNames": [
+        "alpha_wolf",
+        "ancient_frog_mage",
+        "black_dragon",
+        "black_drake",
+        "centaur_khan",
+        "centaur_outrunner",
+        "dark_troll",
+        "dark_troll_warlord",
+        "eimermole",
+        "eimermole_foreman",
+        "enraged_wildkin",
+        "fel_beast",
+        "forest_troll_berserker",
+        "forest_troll_high_priest",
+        "froglet",
+        "froglet_mage",
+        "frostbitten_golem",
+        "ghost",
+        "giant_wolf",
+        "gnoll_assassin",
+        "granite_golem",
+        "grown_frog",
+        "grown_frog_mage",
+        "harpy_scout",
+        "harpy_storm",
+        "ice_shaman",
+        "kobold",
+        "kobold_taskmaster",
+        "kobold_tunneler",
+        "mud_golem",
+        "odobenus_footman",
+        "odobenus_frostmage",
+        "ogre_magi",
+        "ogre_mauler",
+        "ogre_seal",
+        "ogre_seal_pup",
+        "polar_furbolg_champion",
+        "polar_furbolg_ursa_warrior",
+        "prowler_acolyte",
+        "prowler_shaman",
+        "radigull",
+        "rock_golem",
+        "satyr_hellcaller",
+        "satyr_soulstealer",
+        "satyr_trickster",
+        "tadpole",
+        "wildkin"
+      ],
+      "checkedBuilds": [
+        6983,
+        6985,
+        6986,
+        6988,
+        6989
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "id": "210:943",
+        "name": "npc_dota_neutral_kobold_taskmaster",
+        "tick": 33804,
+        "seconds": 904.9,
+        "hp": 460,
+        "rolled": [
+          20,
+          22
+        ]
+      }
+    },
+    {
+      "tier": 3,
+      "offset": [
+        1,
+        2
+      ],
+      "censusRows": 14579,
+      "distinctEntities": 3584,
+      "firstCensusClock": 1354.1,
+      "lastCensusClock": 1775.033,
+      "checkedNames": [
+        "alpha_wolf",
+        "ancient_frog",
+        "ancient_frog_mage",
+        "black_dragon",
+        "black_drake",
+        "centaur_khan",
+        "centaur_outrunner",
+        "dark_troll",
+        "dark_troll_warlord",
+        "eimermole",
+        "eimermole_foreman",
+        "enraged_wildkin",
+        "fel_beast",
+        "forest_troll_berserker",
+        "forest_troll_high_priest",
+        "froglet",
+        "froglet_mage",
+        "frostbitten_golem",
+        "ghost",
+        "giant_wolf",
+        "gnoll_assassin",
+        "granite_golem",
+        "grown_frog",
+        "grown_frog_mage",
+        "harpy_scout",
+        "harpy_storm",
+        "ice_shaman",
+        "kobold",
+        "kobold_taskmaster",
+        "kobold_tunneler",
+        "mud_golem",
+        "odobenus_footman",
+        "odobenus_frostmage",
+        "ogre_magi",
+        "ogre_mauler",
+        "ogre_seal",
+        "ogre_seal_pup",
+        "polar_furbolg_champion",
+        "polar_furbolg_ursa_warrior",
+        "prowler_acolyte",
+        "prowler_shaman",
+        "radigull",
+        "rock_golem",
+        "satyr_hellcaller",
+        "satyr_soulstealer",
+        "satyr_trickster",
+        "tadpole",
+        "wildkin"
+      ],
+      "checkedBuilds": [
+        6983,
+        6985,
+        6986,
+        6988,
+        6989
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "id": "257:542",
+        "name": "npc_dota_neutral_froglet",
+        "tick": 47304,
+        "seconds": 1354.9,
+        "hp": 790,
+        "rolled": [
+          26,
+          31
+        ]
+      }
+    },
+    {
+      "tier": 4,
+      "offset": [
+        2,
+        2
+      ],
+      "censusRows": 8184,
+      "distinctEntities": 1700,
+      "firstCensusClock": 1804.1,
+      "lastCensusClock": 2225.033,
+      "checkedNames": [
+        "alpha_wolf",
+        "ancient_frog",
+        "ancient_frog_mage",
+        "black_dragon",
+        "black_drake",
+        "centaur_khan",
+        "centaur_outrunner",
+        "dark_troll",
+        "dark_troll_warlord",
+        "eimermole",
+        "eimermole_foreman",
+        "enraged_wildkin",
+        "fel_beast",
+        "forest_troll_berserker",
+        "forest_troll_high_priest",
+        "froglet",
+        "froglet_mage",
+        "frostbitten_golem",
+        "ghost",
+        "giant_wolf",
+        "gnoll_assassin",
+        "granite_golem",
+        "grown_frog",
+        "grown_frog_mage",
+        "harpy_scout",
+        "harpy_storm",
+        "ice_shaman",
+        "kobold",
+        "kobold_taskmaster",
+        "kobold_tunneler",
+        "mud_golem",
+        "odobenus_footman",
+        "odobenus_frostmage",
+        "ogre_magi",
+        "ogre_mauler",
+        "ogre_seal",
+        "ogre_seal_pup",
+        "polar_furbolg_champion",
+        "polar_furbolg_ursa_warrior",
+        "prowler_acolyte",
+        "prowler_shaman",
+        "radigull",
+        "rock_golem",
+        "satyr_hellcaller",
+        "satyr_soulstealer",
+        "satyr_trickster",
+        "tadpole",
+        "wildkin"
+      ],
+      "checkedBuilds": [
+        6983,
+        6985,
+        6986,
+        6989
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "id": "681:863",
+        "name": "npc_dota_neutral_grown_frog",
+        "tick": 60804,
+        "seconds": 1804.9,
+        "hp": 1020,
+        "rolled": [
+          39,
+          43
+        ]
+      }
+    },
+    {
+      "tier": 5,
+      "offset": [
+        2,
+        3
+      ],
+      "censusRows": 3287,
+      "distinctEntities": 539,
+      "firstCensusClock": 2254.1,
+      "lastCensusClock": 2674.9,
+      "checkedNames": [
+        "alpha_wolf",
+        "ancient_frog",
+        "ancient_frog_mage",
+        "black_dragon",
+        "black_drake",
+        "centaur_khan",
+        "centaur_outrunner",
+        "dark_troll",
+        "dark_troll_warlord",
+        "eimermole",
+        "eimermole_foreman",
+        "enraged_wildkin",
+        "fel_beast",
+        "forest_troll_berserker",
+        "forest_troll_high_priest",
+        "froglet",
+        "froglet_mage",
+        "frostbitten_golem",
+        "ghost",
+        "giant_wolf",
+        "gnoll_assassin",
+        "granite_golem",
+        "grown_frog",
+        "grown_frog_mage",
+        "harpy_scout",
+        "harpy_storm",
+        "ice_shaman",
+        "kobold",
+        "kobold_taskmaster",
+        "kobold_tunneler",
+        "mud_golem",
+        "odobenus_footman",
+        "odobenus_frostmage",
+        "ogre_magi",
+        "ogre_mauler",
+        "ogre_seal",
+        "ogre_seal_pup",
+        "polar_furbolg_champion",
+        "polar_furbolg_ursa_warrior",
+        "prowler_acolyte",
+        "prowler_shaman",
+        "radigull",
+        "rock_golem",
+        "satyr_hellcaller",
+        "satyr_soulstealer",
+        "satyr_trickster",
+        "tadpole",
+        "wildkin"
+      ],
+      "checkedBuilds": [
+        6983,
+        6985,
+        6986
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "id": "277:299",
+        "name": "npc_dota_neutral_ogre_magi",
+        "tick": 74304,
+        "seconds": 2254.9,
+        "hp": 750,
+        "rolled": [
+          30,
+          35
+        ]
+      }
+    },
+    {
+      "tier": 6,
+      "offset": [
+        3,
+        3
+      ],
+      "censusRows": 1517,
+      "distinctEntities": 374,
+      "firstCensusClock": 2704.1,
+      "lastCensusClock": 3124.2,
+      "checkedNames": [
+        "alpha_wolf",
+        "ancient_frog",
+        "ancient_frog_mage",
+        "black_dragon",
+        "black_drake",
+        "centaur_khan",
+        "centaur_outrunner",
+        "dark_troll",
+        "dark_troll_warlord",
+        "eimermole",
+        "eimermole_foreman",
+        "enraged_wildkin",
+        "fel_beast",
+        "forest_troll_berserker",
+        "forest_troll_high_priest",
+        "froglet",
+        "froglet_mage",
+        "frostbitten_golem",
+        "ghost",
+        "giant_wolf",
+        "gnoll_assassin",
+        "granite_golem",
+        "grown_frog",
+        "grown_frog_mage",
+        "harpy_scout",
+        "harpy_storm",
+        "ice_shaman",
+        "kobold",
+        "kobold_taskmaster",
+        "kobold_tunneler",
+        "mud_golem",
+        "odobenus_footman",
+        "odobenus_frostmage",
+        "ogre_magi",
+        "ogre_mauler",
+        "ogre_seal",
+        "ogre_seal_pup",
+        "polar_furbolg_champion",
+        "polar_furbolg_ursa_warrior",
+        "prowler_acolyte",
+        "prowler_shaman",
+        "radigull",
+        "rock_golem",
+        "satyr_hellcaller",
+        "satyr_soulstealer",
+        "satyr_trickster",
+        "wildkin"
+      ],
+      "checkedBuilds": [
+        6983,
+        6985,
+        6986
+      ],
+      "witness": {
+        "matchId": 9096797937,
+        "id": "259:82",
+        "name": "npc_dota_neutral_giant_wolf",
+        "tick": 89802,
+        "seconds": 2704.9,
+        "hp": 680,
+        "rolled": [
+          21,
+          25
+        ]
+      }
+    },
+    {
+      "tier": 7,
+      "offset": [
+        3,
+        4
+      ],
+      "censusRows": 1071,
+      "distinctEntities": 158,
+      "firstCensusClock": 3154.2,
+      "lastCensusClock": 3574.2,
+      "checkedNames": [
+        "alpha_wolf",
+        "ancient_frog",
+        "ancient_frog_mage",
+        "centaur_khan",
+        "centaur_outrunner",
+        "dark_troll",
+        "dark_troll_warlord",
+        "eimermole",
+        "eimermole_foreman",
+        "enraged_wildkin",
+        "fel_beast",
+        "forest_troll_berserker",
+        "froglet",
+        "froglet_mage",
+        "frostbitten_golem",
+        "ghost",
+        "giant_wolf",
+        "granite_golem",
+        "grown_frog",
+        "grown_frog_mage",
+        "harpy_scout",
+        "harpy_storm",
+        "ice_shaman",
+        "kobold",
+        "kobold_taskmaster",
+        "kobold_tunneler",
+        "mud_golem",
+        "odobenus_footman",
+        "odobenus_frostmage",
+        "ogre_magi",
+        "ogre_mauler",
+        "polar_furbolg_champion",
+        "polar_furbolg_ursa_warrior",
+        "prowler_acolyte",
+        "prowler_shaman",
+        "radigull",
+        "rock_golem",
+        "satyr_hellcaller",
+        "satyr_soulstealer",
+        "satyr_trickster",
+        "wildkin"
+      ],
+      "checkedBuilds": [
+        6985
+      ],
+      "witness": {
+        "matchId": 9097330939,
+        "id": "260:498",
+        "name": "npc_dota_neutral_froglet_mage",
+        "tick": 101734,
+        "seconds": 3154.2,
+        "hp": 910,
+        "rolled": [
+          28,
+          33
+        ]
+      }
+    },
+    {
+      "tier": 8,
+      "offset": [
+        4,
+        4
+      ],
+      "censusRows": 80,
+      "distinctEntities": 80,
+      "firstCensusClock": 3604.2,
+      "lastCensusClock": 3604.2,
+      "checkedNames": [
+        "alpha_wolf",
+        "ancient_frog",
+        "ancient_frog_mage",
+        "centaur_khan",
+        "centaur_outrunner",
+        "eimermole",
+        "eimermole_foreman",
+        "enraged_wildkin",
+        "forest_troll_berserker",
+        "froglet",
+        "froglet_mage",
+        "giant_wolf",
+        "gnoll_assassin",
+        "granite_golem",
+        "grown_frog",
+        "grown_frog_mage",
+        "harpy_scout",
+        "harpy_storm",
+        "kobold",
+        "kobold_taskmaster",
+        "kobold_tunneler",
+        "mud_golem",
+        "odobenus_footman",
+        "odobenus_frostmage",
+        "ogre_magi",
+        "ogre_mauler",
+        "prowler_acolyte",
+        "prowler_shaman",
+        "radigull",
+        "rock_golem",
+        "satyr_hellcaller",
+        "satyr_soulstealer",
+        "wildkin"
+      ],
+      "checkedBuilds": [
+        6985
+      ],
+      "witness": {
+        "matchId": 9097330939,
+        "id": "262:1000",
+        "name": "npc_dota_neutral_froglet",
+        "tick": 115234,
+        "seconds": 3604.2,
+        "hp": 940,
+        "rolled": [
+          29,
+          33
+        ]
+      }
+    }
+  ]
+}

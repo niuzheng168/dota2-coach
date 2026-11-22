@@ -1,6 +1,5 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace DotaCoach.TwoPc;
 
@@ -13,14 +12,16 @@ public sealed record ModelAdvice(string Hero, string Team, string Scene, string[
     string MarkerBasis, string[]? Route = null, ScreenMark[]? RouteMarks = null);
 public sealed record ModelResult(ModelAdvice Advice, string ResponseId, string Model,
     int InputTokens, int OutputTokens, long ElapsedMs);
-public sealed class ModelProviderException(int statusCode) : InvalidOperationException($"Foundry HTTP {statusCode}; no rule fallback")
+public sealed class ModelProviderException(int statusCode, bool codey = false) : InvalidOperationException(
+    $"{(codey ? "Codey / GitHub Copilot" : "Foundry")} HTTP {statusCode}; no rule fallback")
 {
     public int StatusCode { get; } = statusCode;
 }
 
 /// <summary>Experimental local-bot vision + short-horizon reasoning. No fixed farming policy.</summary>
-public sealed class CloudCoach : IDisposable
+public sealed partial class CloudCoach : IDisposable
 {
+    private const string JpegDataPrefix = "data:image/jpeg;base64,";
     private readonly HttpClient http;
     private readonly Uri endpoint;
     private readonly string model, lessons;
@@ -30,31 +31,7 @@ public sealed class CloudCoach : IDisposable
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(15);
     public CloudCoach(string envFile, string model, string lessons, HttpMessageHandler? handler = null,
         CalibratedMap? map = null, bool localBotOnly = true, MinimapLayout? layout = null, TimeSpan? timeout = null)
-    {
-        var env = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string line in File.ReadLines(envFile))
-        {
-            var m = Regex.Match(line, @"^\s*([A-Z_0-9]+)\s*=\s*(.*?)\s*$");
-            if (m.Success) env[m.Groups[1].Value] = m.Groups[2].Value.Trim('"', '\'');
-        }
-        if (!env.TryGetValue("AOAI_ENDPOINT", out var url) || !env.TryGetValue("FOUNDRY_KEY", out var key) ||
-            string.IsNullOrWhiteSpace(key) || !Uri.TryCreate(url, UriKind.Absolute, out var host) ||
-            host.Scheme != "https" || host.UserInfo != "" || host.Query != "" || host.Fragment != "" ||
-            !(host.Host.EndsWith(".openai.azure.com", StringComparison.OrdinalIgnoreCase) ||
-              host.Host.EndsWith(".services.ai.azure.com", StringComparison.OrdinalIgnoreCase)) ||
-            !Regex.IsMatch(model, @"^[A-Za-z0-9_.-]{1,100}$"))
-            throw new ArgumentException("Invalid dedicated Foundry configuration; no request sent");
-        endpoint = new Uri(host.GetLeftPart(UriPartial.Authority) + "/openai/v1/responses");
-        this.model = model; this.lessons = lessons.Length <= 12000 ? lessons : throw new ArgumentException("Lessons too large");
-        this.map = map;
-        this.localBotOnly = localBotOnly; this.layout = layout;
-        var limit = timeout ?? DefaultTimeout;
-        if (limit < TimeSpan.FromSeconds(5) || limit > TimeSpan.FromSeconds(20)) throw new ArgumentException("Model timeout must be 5–20 s");
-        http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false }) {
-            Timeout = limit,
-        };
-        http.DefaultRequestHeaders.Add("api-key", key);
-    }
+        : this(Foundry(envFile, model), lessons, handler, map, localBotOnly, layout, timeout) { }
     public static bool Eligible(FrameView frame, bool localBotOnly = true) => frame.Meta.Source == "dota2" &&
         frame.Meta.Player is { Alive: true } p && (!localBotOnly || p.MatchId == "0") &&
         frame.Meta.GsiAgeMs is >= 0 and <= 3000;
@@ -138,27 +115,22 @@ public sealed class CloudCoach : IDisposable
                     scope = localBotOnly ? "local-bot-experimental-next-step-not-verified-optimal-route" :
                         "player-visible-live-next-step-not-verified-optimal-route",
                 }, Wire.Json) },
-                new { type = "input_image", image_url = "data:image/jpeg;base64," + Convert.ToBase64String(frame.Jpeg), detail = "high" },
+                new { type = "input_image", image_url = JpegDataPrefix + Convert.ToBase64String(frame.Jpeg), detail = "high" },
             } } },
             text = new { format = new { type = "json_schema", name = "visible_farming_advice", strict = true,
                 schema = new { type = "object", additionalProperties = false, properties, required = properties.Keys.ToArray() } } },
         };
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        deadline.CancelAfter(http.Timeout);
+        var token = deadline.Token;
+        await CheckTarget(frame.Jpeg.Length, token);
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = JsonContent.Create(body) };
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation);
-        if (!response.IsSuccessStatusCode) throw new ModelProviderException((int)response.StatusCode);
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellation);
-        using var bytes = new MemoryStream(); var buffer = new byte[8192]; int n;
-        while ((n = await stream.ReadAsync(buffer, cancellation)) > 0) {
-            if (bytes.Length + n > 262144) throw new InvalidOperationException("Model response too large");
-            bytes.Write(buffer, 0, n);
-        }
-        using var doc = JsonDocument.Parse(bytes.ToArray());
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+        CheckStatus(response.StatusCode);
+        using var doc = JsonDocument.Parse(await ResponseBytes(response, 262144, token), CopilotGateway.StrictJson);
         var root = doc.RootElement;
-        if (root.GetProperty("status").GetString() != "completed") throw new InvalidOperationException("Model response incomplete");
-        string text = string.Concat(root.GetProperty("output").EnumerateArray()
-            .Where(x => x.GetProperty("type").GetString() == "message")
-            .SelectMany(x => x.GetProperty("content").EnumerateArray())
-            .Where(x => x.GetProperty("type").GetString() == "output_text").Select(x => x.GetProperty("text").GetString()));
+        CheckReturnedModel(root);
+        string text = CompletedText(root, 65536, allowTextParts: true);
         var advice = JsonSerializer.Deserialize<ModelAdvice>(text, Wire.Json) ?? throw new InvalidOperationException("Missing advice");
         advice = advice with { RouteMarks = null };
         if (map != null) {
@@ -169,6 +141,7 @@ public sealed class CloudCoach : IDisposable
             advice = advice with { Route = ids, Marker = marks.FirstOrDefault(), RouteMarks = marks.Length == 0 ? null : marks };
         }
         Validate(advice, frame, localBotOnly, layout);
+        token.ThrowIfCancellationRequested();
         var usage = root.GetProperty("usage");
         return new(advice, root.GetProperty("id").GetString()!, model,
             usage.GetProperty("input_tokens").GetInt32(), usage.GetProperty("output_tokens").GetInt32(),

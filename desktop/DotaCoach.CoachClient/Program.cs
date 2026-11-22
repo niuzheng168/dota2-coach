@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,11 +25,15 @@ internal static class Program
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)) {
             MessageBox.Show("双机教练端首版需要 Windows 11 x64。"); return;
         }
-        new Application().Run(new CoachWindow(E2ERun.Load(args)));
+        try { new Application().Run(new CoachWindow(E2ERun.Load(args))); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) {
+            MessageBox.Show("无法打开本机对局档案。请关闭同一账户下已运行的教练端，检查档案目录的权限和磁盘空间后重试。\n" +
+                MatchArchive.DefaultRoot, "Dota Coach");
+        }
     }
 }
 
-internal sealed class CoachWindow : Window
+internal sealed partial class CoachWindow : Window
 {
     private readonly ComboBox address = new() { FontSize = 14, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 8) };
     private readonly TextBox port = Ui.Input("38471");
@@ -52,6 +58,8 @@ internal sealed class CoachWindow : Window
     private long nextDecision;
     private readonly string settingsPath;
     private LiveCoachSettings preferences;
+    private readonly MatchArchive? matchArchive;
+    private readonly LiveMatchState matchState;
     private readonly CheckBox automatic = new() { Content = "自动教练", Foreground = Brushes.White };
     private readonly CheckBox subtitles = new() { Content = "游戏字幕", Foreground = Brushes.White };
     private readonly CheckBox mapMarkers = new() { Content = "小地图路线", Foreground = Brushes.White };
@@ -79,7 +87,8 @@ internal sealed class CoachWindow : Window
     private CancellationTokenSource? decisionStop;
     private long modelGeneration, inputTokens, outputTokens;
     private readonly DebugPanel debug;
-    // Dota Plus live spectating on THIS machine: observed and measured only, never fed to the model.
+    // Dota Plus on THIS machine: raw packets never go to the model; matched team observations
+    // enter MatchState, which shares the bounded minute projection only with separate consent.
     // Instance field so isolated UI tests never touch the real %LOCALAPPDATA% state.
     private string spectatorState = GsiSetup.StateDirectoryFor("Coach");
     private readonly TextBox spectatorInstall = Ui.Input(GsiSetup.FindInstall(GsiSetup.StateDirectoryFor("Coach")));
@@ -91,18 +100,53 @@ internal sealed class CoachWindow : Window
     private bool spectatorStarting;
     private string? delaySession;
     private long delaySequence, nextSpectatorText;
+    // Plus spectating on the game machine: a panel of enemy levels and items (hero_scan.py on this machine) and
+    // subtitles when enemies leave the friend team's vision (this machine's own Plus GSI). Team-view data only.
+    private readonly CheckBox enemyPanel = new() { Content = "对手等级和装备（游戏左侧面板）", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
+    private readonly CheckBox enemyVision = new() { Content = "对手离开视野", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
+    private readonly TextBlock alertStatus = Ui.Text("对手提醒：等待 Plus 队伍视角", 12, Brushes.LightGray);
+    private readonly VisionLossTracker visionLoss = new();
+    private readonly AlertComposer alerts = new();
+    private HeroNames heroNames = new();
+    private string scanFile = ScanFeed.DefaultPath; // instance field so UI tests never read the real scanner output
+    private ScanStatus scanStatus = new(false, "视觉扫描未运行");
+    private volatile bool panelOn, visionAlertsOn; // also read on the spectator receiver's threads
+    private long nextScanPoll;
+    private string lastAlert = "", panelText = "";
 
     // Tests instantiate inert windows explicitly; the application entry point uses automaticStartup=true.
     public CoachWindow() : this(null, false) { }
     public CoachWindow(E2ERun? run, bool automaticStartup = true, string? preferencesFile = null)
         : this(run, automaticStartup, preferencesFile, null) { }
     public CoachWindow(E2ERun? run, bool automaticStartup, string? preferencesFile, string? debugRoot)
+        : this(run, automaticStartup, preferencesFile, debugRoot, null) { }
+    public CoachWindow(E2ERun? run, bool automaticStartup, string? preferencesFile, string? debugRoot,
+        Func<HttpMessageHandler>? modelHandlerFactory)
     {
+        this.modelHandlerFactory = modelHandlerFactory;
         e2e = run; debug = new DebugPanel("coach", debugRoot);
         settingsPath = preferencesFile ?? LiveCoachSettings.DefaultPath;
+        string historyRoot = run != null ? System.IO.Path.Combine(run.Directory, "match-history") :
+            preferencesFile != null ? System.IO.Path.Combine(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(preferencesFile))!, "match-history") :
+            MatchArchive.DefaultRoot;
+        try { matchArchive = new(historyRoot); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException) {
+            // No second writer and no silent temporary replacement. Pairing/filtered game HUD can still
+            // operate; the operator gets a persistent banner, and real paid features fail closed.
+            matchArchive = null;
+        }
+        matchState = new(matchArchive);
+        if (matchState.StorageWarning is { } initialWarning) detail.Text = initialWarning;
         try { preferences = LiveCoachSettings.Load(settingsPath); }
-        catch { preferences = new(); notice.Text = "已保存的设置无效，请检查并重新应用；没有读取或输出密钥内容。"; }
-        Title = "Dota Coach · 教练端 v0.4.2";
+        catch {
+            // An invalid Codey or unknown profile is not consent to read Foundry credentials.
+            // Incidental preference saves cannot overwrite the rejected file until an explicit provider is committed.
+            preferences = new() { AutomaticAdvice = false, ModelProvider = "" }; modelEditsPending = true;
+            notice.Text = "已保存的设置无效；自动教练已暂停。请重新选择模型服务、保存设置后再开启。";
+        }
+        try { heroNames = new HeroNames(System.IO.Path.Combine(AppContext.BaseDirectory, "data", "dota2-dictionary.json")); }
+        catch { /* Alerts fall back to internal hero names. */ }
+        Title = "Dota Coach · 教练端 v0.6.1";
         Width = Math.Min(1320, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(940, SystemParameters.WorkArea.Height - 40);
         MinWidth = 1000; MinHeight = 640; WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -113,7 +157,7 @@ internal sealed class CoachWindow : Window
         root.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
         var left = new StackPanel();
         left.Children.Add(Ui.Text("教练端", 26, Ui.Accent));
-        left.Children.Add(Ui.Text("接收游戏机的画面和自身GSI，调用模型，把提醒发回游戏机。", 12, Brushes.LightGray));
+        left.Children.Add(Ui.Text("自动记录本人 GSI 和已接入的队伍视野；可只下发装备、眼位或分钟路线，赛后按时间复盘。", 12, Brushes.LightGray));
         var ips = NetworkInterface.GetAllNetworkInterfaces().Where(n => n.OperationalStatus == OperationalStatus.Up)
             .SelectMany(n => n.GetIPProperties().UnicastAddresses).Select(a => a.Address)
             .Where(a => Wire.IsLan(a) && !IPAddress.IsLoopback(a)).Select(a => a.ToString()).Distinct().Order().ToList();
@@ -147,7 +191,13 @@ internal sealed class CoachWindow : Window
             left.Children.Add(Ui.Section("模型设置", modelSettings));
             var calibration = new StackPanel(); BuildCalibration(calibration);
             left.Children.Add(Ui.Section("小地图校准", calibration));
-            left.Children.Add(Ui.Section("Plus 实时观战（实验，只记录）", BuildSpectatorPanel()));
+            left.Children.Add(Ui.Section("Plus 实时观战（实验）", BuildSpectatorPanel()));
+            left.Children.Add(Ui.Section("对局档案与复盘", BuildMatchReview()));
+            var share = new CheckBox { Content = "允许分钟模型读取本队当时已知的装备、视野和推测眼位",
+                IsChecked = preferences.ModelTeamKnowledge, Foreground = Brushes.White };
+            share.Checked += (_, _) => SaveMatchSharing(true); share.Unchecked += (_, _) => SaveMatchSharing(false);
+            modelSettings.Children.Add(share);
+            modelSettings.Children.Add(Ui.Text("仅勾选后，这些信息会随本人状态发给所选模型服务。全图录像永远不进实战模型。", 12, Brushes.LightGray));
         }
         var diagnostics = new StackPanel();
         diagnostics.Children.Add(debug.View);
@@ -198,6 +248,12 @@ internal sealed class CoachWindow : Window
             await Stop();
             if (spectator != null) { await spectator.DisposeAsync(); spectator = null; }
             cloud?.Dispose();
+            await StopMatchReviewAsync();
+            try { matchArchive?.Dispose(); }
+            catch (IOException error) {
+                debug.Recorder?.Error("match-archive-close", error);
+                MessageBox.Show(this, "本机对局档案未能完整写入，请检查剩余磁盘空间；不要把缺失区段当作没有事件。", "时间线写入失败");
+            }
             await debug.DisposeAsync();
             _ = Dispatcher.BeginInvoke(new Action(Close));
         };
@@ -217,6 +273,7 @@ internal sealed class CoachWindow : Window
             host = await CoachHost.Start(bind, number, starting.Token);
             host.Mailbox.DebugSink = () => debug.Recorder;
             host.Mailbox.VideoJpegEncoder = Ui.ExtractJpeg;
+            host.Mailbox.Icons = key => ScanFeed.Icon(scanFile, key);
             port.IsEnabled = false; address.IsEnabled = false;
             if (e2e == null) {
                 preferences = preferences with { BindAddress = bind.ToString() };
@@ -234,6 +291,7 @@ internal sealed class CoachWindow : Window
     private async Task Stop()
     {
         CancelDecision();
+        matchState.Disconnect();
         starting?.Cancel();
         while (busy) await Task.Delay(25);
         var current = host; host = null;
@@ -249,13 +307,28 @@ internal sealed class CoachWindow : Window
     }
     private StackPanel BuildSpectatorPanel()
     {
+        visionLoss.Map = wardTracker.Map;
         var panel = new StackPanel();
-        panel.Children.Add(Ui.Text("本机 Dota 用账号 B（有 Dota Plus，与游戏账号互为好友）对游戏账号“实时观战”时，这里显示收到的小地图并测量比游戏机慢多少。只显示和记录，不进自动教练。", 12, Brushes.LightGray));
+        panel.Children.Add(Ui.Text("本机 Dota 用账号 B 对好友“实时观战”。只记录与游戏机同局同阵营的队伍视角；以下开关只控制游戏端显示，不控制记录或模型授权。", 12, Brushes.LightGray));
         panel.Children.Add(Ui.Label("本机 Dota 安装目录")); panel.Children.Add(spectatorInstall);
         var buttons = new WrapPanel();
         buttons.Children.Add(Ui.Button("一键配置观战 GSI", async (_, _) => await StartSpectator()));
         buttons.Children.Add(Ui.Button("复制启动参数", (_, _) => spectatorSetup.Text = Ui.CopyLaunchOptions(SteamLaunch.Inspect())));
         panel.Children.Add(buttons); panel.Children.Add(spectatorSetup); panel.Children.Add(spectatorLive);
+        panel.Children.Add(Ui.Label("推送到游戏机（只用队伍视角看得到的信息）"));
+        enemyPanel.IsChecked = panelOn = preferences.EnemyPanel;
+        enemyVision.IsChecked = visionAlertsOn = preferences.EnemyVisionAlerts;
+        enemyWards.IsChecked = preferences.EnemyWards;
+        var toggles = new WrapPanel();
+        foreach (var toggle in new[] { enemyPanel, enemyVision, enemyWards }) {
+            toggles.Children.Add(toggle);
+            toggle.Checked += (_, _) => SaveAlertToggles(); toggle.Unchecked += (_, _) => SaveAlertToggles();
+        }
+        panel.Children.Add(toggles); panel.Children.Add(alertStatus);
+        panel.Children.Add(Ui.Text("对手面板一直显示在游戏画面左侧：敌方英雄最近一次被看到时的等级和装备，旧了会标出几秒前；" +
+            "需要本机视觉扫描。守卫数减少只表示可能插眼，也可能是转交、丢弃或卖掉；位置不明时不标点。" +
+            "离开视野只用观战 GSI，不能区分阵亡和进迷雾。", 12, Brushes.LightGray));
+        AddScanLauncher(panel);
         return panel;
     }
     private async Task StartSpectator()
@@ -266,7 +339,7 @@ internal sealed class CoachWindow : Window
             if (spectator == null) {
                 var receiver = await SpectatorReceiver.Start(spectatorPort, GsiSetup.Token(spectatorState), stop.Token);
                 // Called on server threads; both sinks are thread-safe.
-                receiver.Received = s => { plusDelay.Spectator(s); debug.Recorder?.Spectator(s); };
+                receiver.Received = s => { plusDelay.Spectator(s); debug.Recorder?.Spectator(s); OnSpectator(s); };
                 spectator = receiver;
             }
             bool changed = GsiSetup.Install(spectatorInstall.Text.Trim(), spectator.Config, spectatorState, GsiSetup.SpectatorConfigName).Changed;
@@ -310,6 +383,46 @@ internal sealed class CoachWindow : Window
             : $"\n延迟：{delay.Note}" + (delay.ClockGapSeconds is double gap ? $"（两边游戏时间相差 {gap:F0}s）" : ""));
         spectatorLive.Text = text.ToString();
     }
+    /// <summary>Spectator receiver threads: enemies leaving the friend team's vision become pending alerts.</summary>
+    private void OnSpectator(SpectatorSnapshot s)
+    {
+        ObserveTeamSight(s); // queued once; UpdateMatchIntel processes sight before deriving vision loss
+    }
+    private void SaveAlertToggles()
+    {
+        panelOn = enemyPanel.IsChecked == true; visionAlertsOn = enemyVision.IsChecked == true;
+        alerts.Clear(); // don't deliver an already queued, now disabled class of subtitle
+        preferences = preferences with { EnemyPanel = panelOn, EnemyVisionAlerts = visionAlertsOn, EnemyWards = enemyWards.IsChecked == true };
+        try { preferences.Save(settingsPath); }
+        catch { notice.Text = "设置无法保存，当前开关仅本次有效。"; }
+    }
+    /// <summary>Legacy video-only subtitles. The unified MatchState projection is the sole board publisher.</summary>
+    private void UpdateAlerts()
+    {
+        long now = Environment.TickCount64;
+        var frame = host?.Mailbox.Latest();
+        var own = TeamViewEvidence.Participant(frame, now);
+        lock (sightGate) {
+            if (own == null || own.MatchId != matchState.ActiveMatch || !LegacySubtitles(frame) ||
+                sightScope?.Session != frame?.Meta.SessionId || processedGeneration != sightGeneration ||
+                !TeamViewEvidence.Matches(own, latestSight, now)) { alerts.Clear(); return; }
+        }
+        if (host == null || frame == null) { alerts.Clear(); return; }
+        try {
+            if (host.Mailbox.Poll(frame.Meta.SessionId)?.Kind == MinuteFarmContext.Kind) { alerts.Clear(); return; }
+            if (alerts.Next(now, preferences.SubtitleSeconds * 1000) is { } text) {
+                host.Mailbox.SetReminder(frame.Meta.SessionId, frame.Meta.Sequence, "local-vision-observation", text, null,
+                    displayMs: preferences.SubtitleSeconds * 1000);
+                if (host.Mailbox.Poll(frame.Meta.SessionId) is { } sent) debug.Recorder?.Reminder("reminder-published", sent);
+                lastAlert = "已推送：" + text;
+            }
+            ShowTeamStatus(true, panelOn && host.Mailbox.Enemies(frame.Meta.SessionId) is { Heroes.Length: > 0 } sentBoard
+                ? $" · 已推送 {sentBoard.Heroes.Length} 名敌方英雄" : "");
+        } catch (Exception e) when (e is InvalidOperationException or ArgumentException) {
+            // Session revoked between Latest and Poll/Enemies, or origin no longer deliverable.
+            alerts.Clear(); lastAlert = "未推送（连接、参赛者或画面已变化）";
+        }
+    }
     private void Refresh()
     {
         if (e2e != null && !closing && File.Exists(System.IO.Path.Combine(e2e.Directory, "stop-requested"))) { Close(); return; }
@@ -322,30 +435,55 @@ internal sealed class CoachWindow : Window
                 modelConfigured, deciding, modelCalls, inputTokens, outputTokens, current?.FrameAgeMs, current?.Player,
                 frame == null ? null : preferences.EffectiveLayout(frame), GsiAgeMs: frame?.Meta.GsiAgeMs,
                 RequestLimit: e2e?.MaxModelCalls ?? preferences.RequestLimit, IntervalSeconds: preferences.IntervalSeconds,
-                Model: e2e?.Model ?? preferences.Model, SubtitlesEnabled: preferences.Subtitles, MapMarkersEnabled: preferences.MinimapMarkers));
+                Model: e2e?.Model ?? preferences.EffectiveModel, SubtitlesEnabled: preferences.Subtitles, MapMarkersEnabled: preferences.MinimapMarkers));
             }
         } catch { /* Debug must not affect live refresh. */ }
-        UpdateSpectator();
+        bool minuteMode = e2e == null && preferences.MinuteFarm742;
+        var pairedFrame = host?.Mailbox.Latest();
+        if (e2e == null) {
+            if (host?.Mailbox.TakePostgame() is { } terminal)
+                matchState.ObserveFrame(terminal);
+            matchState.ObserveFrame(pairedFrame);
+            UpdateSpectator(); UpdateMatchIntel(pairedFrame);
+            matchState.ExpireTeamSources();
+            if (host != null && pairedFrame?.Meta.Source != "diagnostic") {
+                MinimapLayout? layout = pairedFrame != null &&
+                    (BoardDelivery.InstalledBuild(pairedFrame.Meta) == MinuteFarmContext.SupportedBuild || MinuteFarmArmedFor(pairedFrame))
+                    ? preferences.LayoutFor(pairedFrame) : null;
+                host.Mailbox.SetEnemies(matchState.ForGame(pairedFrame, preferences.EnemyPanel, preferences.EnemyWards, layout));
+            }
+            if (minuteMode || pairedFrame?.Meta.Source == "dota2-gsi") alerts.Clear(); // No legacy subtitle can replace the route.
+            else UpdateAlerts();
+        }
         if (host == null) return;
         var snapshot = host.Mailbox.Snapshot();
         if (e2e != null && File.Exists(System.IO.Path.Combine(e2e.Directory, "enable-model")) &&
             cloud != null && !deciding && modelCalls < e2e.MaxModelCalls &&
             Environment.TickCount64 >= nextDecision && host.Mailbox.Latest() is { } candidate && CloudCoach.Eligible(candidate))
             _ = Decide(candidate, host);
+        else if (minuteMode)
+            RefreshMinuteFarm(host, pairedFrame);
         else if (e2e == null && preferences.AutomaticAdvice && (preferences.Subtitles || preferences.MinimapMarkers) &&
-            modelConfigured && cloud != null && !deciding && modelCalls < preferences.RequestLimit &&
-            Environment.TickCount64 >= nextDecision && host.Mailbox.Latest() is { } live &&
+            modelConfigured && catalogStop == null && cloud != null && !deciding && modelCalls < preferences.RequestLimit &&
+            Environment.TickCount64 >= nextDecision && pairedFrame is { } live && matchState.ForVision(live) is { } visionInput &&
             CloudCoach.Eligible(live, localBotOnly: false))
-            _ = Decide(live, host);
-        if (e2e == null && modelConfigured && !deciding)
-            autoStatus.Text = !preferences.AutomaticAdvice ? "已暂停自动教练；旧结果不再回传。" :
-                modelCalls >= preferences.RequestLimit ? $"本次请求上限已到：{modelCalls}/{preferences.RequestLimit}，已停止付费调用。" :
+            _ = Decide(live with { Meta = live.Meta with { Player = visionInput.Own } }, host, visionInput);
+        if (e2e == null && !minuteMode && modelConfigured && !deciding && catalogStop == null)
+            autoStatus.Text = ActiveModelLabel + " · " + (snapshot.Source == "dota2-gsi" ? "游戏端只传本人 GSI；请启用 7.42 分钟路线。没有画面，不会调用视觉模型。" :
+                !preferences.AutomaticAdvice ? "已暂停自动教练；旧结果不再回传。" :
+                modelCalls >= preferences.RequestLimit ? $"本次请求上限已到：{modelCalls}/{preferences.RequestLimit}，已停止模型调用。" :
                 $"自动教练已开启 · {modelCalls}/{preferences.RequestLimit}次 · 已记录tokens {inputTokens}+{outputTokens}\n" +
-                (snapshot.Player == null ? "等待新鲜自身GSI（不是旁观者全图）。" : "只使用玩家可见画面；过期/失败不回退规则。");
+                (snapshot.Player == null ? "等待新鲜自身GSI（不是旁观者全图）。" : "只使用玩家可见画面；过期/失败不回退规则。"));
         status.Text = snapshot.Connected ? "正在接收 · 加密配对连接" : snapshot.Status;
         detail.Text = $"累计 {snapshot.Frames} 帧 / {snapshot.Bytes / 1048576.0:F1} MiB · 最新画面 {snapshot.FrameAgeMs?.ToString() ?? "—"} ms 前\n" +
             (snapshot.Player is { } p ? $"自身GSI：{(p.Team == "radiant" ? "天辉" : "夜魇")} · {p.Hero} · 游戏 {p.Clock:F0}s · 血 {p.Health:F0} · 蓝 {p.Mana:F0}"
                 : "自身GSI：未知或已过期");
+        if (matchState.StorageWarning is { } warning) {
+            detail.Text += "\n" + warning; autoStatus.Text = "仅实时显示：档案不可用，自动决策已暂停。";
+            // Withdraw only paid suggestions. Live equipment/ward projections remain independently deliverable.
+            if (e2e == null && deciding && decisionStop?.IsCancellationRequested == false) CancelDecision();
+            if (e2e == null) host.Mailbox.ClearModelReminder();
+        }
         if (!snapshot.Connected)
         {
             ClearView(); CancelDecision();
@@ -358,7 +496,9 @@ internal sealed class CoachWindow : Window
             previous.Meta.Player?.Hero != snapshot.Player?.Hero || previous.Meta.Player?.Team != snapshot.Player?.Team ||
             previous.Meta.Player is { } oldPlayer && snapshot.Player is { } newPlayer && newPlayer.Clock < oldPlayer.Clock))
             ClearView();
-        if (displayed is { } shown)
+        if (displayed is { Meta.Source: "dota2-gsi" } metadata)
+            previewTitle.Text = $"仅本人 GSI · {metadata.Meta.SourceWidth}×{metadata.Meta.SourceHeight} · 没有采集游戏画面";
+        else if (displayed is { } shown)
             previewTitle.Text = $"{(shown.Meta.Source == "diagnostic" ? "诊断画面 · 不是游戏" : "DOTA 2")} · " +
                 (shown.Video is { } v ? $"H.264 {v.Width}×{v.Height} · 预览 {previewFps:F0}fps" : "旧版JPEG") + $" / #{shown.Meta.Sequence}";
     }
@@ -371,6 +511,13 @@ internal sealed class CoachWindow : Window
         if (host is not { } owner || closing || previewBusy) return;
         var latest = owner.Mailbox.Latest();
         if (latest == null || displayed?.Meta.SessionId == latest.Meta.SessionId && displayed?.Meta.Sequence == latest.Meta.Sequence) return;
+        if (latest.Meta.Source == "dota2-gsi") {
+            bool changed = displayed?.Meta.Source != latest.Meta.Source || displayed.Meta.SessionId != latest.Meta.SessionId ||
+                displayed.Meta.SourceWidth != latest.Meta.SourceWidth || displayed.Meta.SourceHeight != latest.Meta.SourceHeight;
+            image.Source = null; displayed = latest;
+            if (changed) DrawCalibration();
+            return;
+        }
         long generation = viewGeneration;
         if (latest.Video is not { } video) {
             try { ShowPreview(latest, Ui.FrameImage(latest)); } catch { notice.Text = "图像解码失败；该帧未显示。"; }
@@ -401,7 +548,7 @@ internal sealed class CoachWindow : Window
             previewShown = 0; previewRateAt = Environment.TickCount64;
         }
     }
-    private async Task Decide(FrameView frame, CoachHost target)
+    private async Task Decide(FrameView frame, CoachHost target, MatchFarmSlice? capturedState = null)
     {
         deciding = true; modelCalls++;
         nextDecision = Environment.TickCount64 + (e2e == null ? preferences.IntervalSeconds * 1000 : 20000);
@@ -412,23 +559,30 @@ internal sealed class CoachWindow : Window
         if (e2e != null)
             File.WriteAllBytes(System.IO.Path.Combine(e2e.Directory, $"model-frame-{frame.Meta.SessionId}-{frame.Meta.Sequence}.jpg"), frame.Jpeg);
         e2e?.Trace("coach", "model-start", new { frame.Meta.SessionId, frame = frame.Meta.Sequence, player = frame.Meta.Player, attempt = modelCalls });
-        autoStatus.Text = visionText.Text = $"模型推理中 #{modelCalls} · 来源帧 {frame.Meta.Sequence}";
+        autoStatus.Text = visionText.Text = $"{(e2e?.Model ?? ActiveModelLabel)} 推理中 #{modelCalls} · 来源帧 {frame.Meta.Sequence}";
+        bool inModelRequest = false;
         try {
             if (e2e == null) {
                 var layout = preferences.MinimapMarkers ? preferences.EffectiveLayout(frame) : null;
                 if (activeLayout != layout) {
-                    cloud?.Dispose(); activeLayout = layout;
-                    cloud = CreateLiveModel(layout);
+                    modelConfigured = false; cloud?.Dispose(); cloud = null; activeLayout = null;
+                    cloud = CreateLiveModel(layout); activeLayout = layout; modelConfigured = true;
                 }
             }
-            debug.Recorder?.ModelStarted(frame, e2e?.Model ?? preferences.Model, activeLayout, modelCalls);
+            debug.Recorder?.ModelStarted(frame, e2e?.Model ?? preferences.EffectiveModel, activeLayout, modelCalls);
+            if (capturedState != null) {
+                matchState.NoteDecision(capturedState, "image-requested");
+                if (!matchState.CanAudit) throw new InvalidOperationException("Match archive unavailable");
+            }
+            inModelRequest = true;
             var result = await cloud!.Decide(frame, deadline.Token);
+            inModelRequest = false;
             inputTokens += result.InputTokens; outputTokens += result.OutputTokens;
             debug.Recorder?.ModelFinished(frame, result);
             e2e?.Trace("coach", "model-result", new { frame.Meta.SessionId, frame = frame.Meta.Sequence, result });
             // Never stamp an old model result with the latest frame; mailbox checks the original capture.
             if (host != target || stop.IsCancellationRequested || deadline.IsCancellationRequested ||
-                generation != modelGeneration || e2e == null && !preferences.AutomaticAdvice)
+                generation != modelGeneration || e2e == null && (!preferences.AutomaticAdvice || !matchState.CanAudit))
                 throw new InvalidOperationException("Context ended");
             var advice = result.Advice;
             var steps = advice.NextSteps.Where(s => !string.IsNullOrWhiteSpace(s)).Take(Wire.MaxRouteSteps)
@@ -440,22 +594,24 @@ internal sealed class CoachWindow : Window
                 e2e == null ? preferences.SubtitleSeconds * 1000 : Wire.DefaultReminderMs,
                 advice.RouteMarks, steps.Length == 0 ? null : steps);
             var sent = target.Mailbox.Poll(frame.Meta.SessionId);
+            if (capturedState != null) matchState.NoteDecision(capturedState, "image-published",
+                chosen: advice.Route == null ? null : string.Join(" → ", advice.Route));
             if (sent != null) debug.Recorder?.Reminder("reminder-published", sent);
             e2e?.Trace("coach", "model-published", new { frame = frame.Meta.Sequence, reminder = sent });
-            visionText.Text = $"最近模型结果（游戏提醒到期撤回，非最优保证）：{advice.Message}\n" +
+            visionText.Text = $"{e2e?.Model ?? ActiveModelLabel} · 最近结果（游戏提醒到期撤回，非最优保证）：{advice.Message}\n" +
                 $"路线：{(advice.Route is { Length: > 0 } ids ? string.Join(" → ", ids.Select(LandmarkName)) : "无（未给地标或小地图未知）")}\n" +
                 $"后续意图：{string.Join(" → ", advice.NextSteps)}\n取消条件：{advice.CancelIf}\n" +
                 $"{result.ElapsedMs}ms · tokens {result.InputTokens}+{result.OutputTokens}";
         }
         catch (Exception error) {
+            if (capturedState != null) matchState.NoteDecision(capturedState, "image-failed");
             debug.Recorder?.Error("model-request-or-publication", error, frame.Meta,
                 stop.IsCancellationRequested ? "shutdown" : generation != modelGeneration ? "context-cancelled" :
                 error is OperationCanceledException ? "timeout" : error is ModelProviderException ? "upstream-status" : "rejected-or-network");
             // No provider body or request/credential in diagnostics.
             e2e?.Trace("coach", "model-rejected", new { frame = frame.Meta.Sequence, type = error.GetType().Name,
-                reason = error is OperationCanceledException ? "timeout/cancelled" :
-                    error is InvalidOperationException or ArgumentException ? error.Message : "request failed" });
-            visionText.Text = "模型失败/过期，未回传；没有规则回退。";
+                httpStatus = (error as ModelProviderException)?.StatusCode });
+            if (generation == modelGeneration && host == target && !closing) ReportModelFailure(error, vision: true, inModelRequest);
         }
         finally { if (decisionStop == deadline) decisionStop = null; deciding = false; }
     }
@@ -469,20 +625,13 @@ internal sealed class CoachWindow : Window
         foreach (var toggle in new[] { automatic, subtitles, mapMarkers, autoMinimap }) {
             toggle.Checked += (_, _) => SaveFeatureToggles(); toggle.Unchecked += (_, _) => SaveFeatureToggles();
         }
-        switches.Children.Add(toggles); switches.Children.Add(autoStatus);
-        switches.Children.Add(Ui.Text("开启后把画面和自身GSI发到云端模型并计费；只提醒，不控制英雄。", 12, Brushes.LightGray));
+        switches.Children.Add(toggles); BuildMinuteSetup(switches); switches.Children.Add(autoStatus);
+        switches.Children.Add(Ui.Text("推理可能计费或消耗配额。普通模式发送画面和自身 GSI；分钟模式默认只发本人数据和模拟候选，另行授权才加入队伍资料。不控制英雄。", 12, Brushes.LightGray));
 
-        foundryFile.Text = preferences.FoundryEnvFile; reasoningModel.Text = preferences.Model;
         interval.Text = preferences.IntervalSeconds.ToString(); requestLimit.Text = preferences.RequestLimit.ToString();
         subtitleSeconds.Text = preferences.SubtitleSeconds.ToString(); modelTimeout.Text = preferences.ModelTimeoutSeconds.ToString();
-        var browse = Ui.Button("选择…", (_, _) => {
-            var dialog = new Microsoft.Win32.OpenFileDialog { Filter = "配置文件|*.env|所有文件|*.*" };
-            if (dialog.ShowDialog(this) == true) { foundryFile.Text = dialog.FileName; ConfigureModel(save: true); }
-        });
-        browse.Margin = new Thickness(0, 0, 0, 8);
-        settings.Children.Add(Ui.Label("Foundry 配置文件（密钥只在教练机读取）")); settings.Children.Add(Ui.Row(foundryFile, browse));
-        settings.Children.Add(Ui.Label("部署名")); settings.Children.Add(reasoningModel);
-        settings.Children.Add(Ui.Label("调用间隔（秒） / 每次启动的请求上限（失败也计数）")); settings.Children.Add(Ui.Columns(interval, requestLimit));
+        BuildProviderControls(settings);
+        settings.Children.Add(Ui.Label("普通模式间隔（秒） / 本次启动请求上限（两种模式共用，失败也计数）")); settings.Children.Add(Ui.Columns(interval, requestLimit));
         settings.Children.Add(Ui.Label("字幕显示（秒，1–15） / 模型超时（秒，8–20）")); settings.Children.Add(Ui.Columns(subtitleSeconds, modelTimeout));
         settings.Children.Add(Ui.Button("保存模型设置", (_, _) => ConfigureModel(save: true)));
     }
@@ -501,20 +650,27 @@ internal sealed class CoachWindow : Window
     {
         modelGeneration++; decisionStop?.Cancel();
     }
+    private void SaveMatchSharing(bool enabled)
+    {
+        CancelDecision(); host?.Mailbox.ClearModelReminder();
+        preferences = preferences with { ModelTeamKnowledge = enabled };
+        try { preferences.Save(settingsPath); } catch { notice.Text = "本次授权已变更，但未能保存到本机。"; }
+    }
     private void SaveFeatureToggles()
     {
         CancelDecision(); host?.Mailbox.ClearReminder();
+        bool minuteChanged = preferences.MinuteFarm742 != (minuteFarm742.IsChecked == true);
         preferences = preferences with { AutomaticAdvice = automatic.IsChecked == true,
             Subtitles = subtitles.IsChecked == true, MinimapMarkers = mapMarkers.IsChecked == true,
-            AutoMinimap = autoMinimap.IsChecked == true };
+            AutoMinimap = autoMinimap.IsChecked == true, MinuteFarm742 = minuteFarm742.IsChecked == true };
         try { preferences.Save(settingsPath); }
         catch { notice.Text = "设置无法保存，当前开关仅本次有效。"; }
+        UpdateMinuteSetup();
+        if (minuteChanged) { visionText.Text = ""; ConfigureModel(save: false); }
         if (!preferences.AutomaticAdvice) autoStatus.Text = "已暂停自动教练；旧结果不再回传。";
+        else if (!modelConfigured) autoStatus.Text = modelSetupHint;
         DrawCalibration();
     }
-    private CloudCoach CreateLiveModel(MinimapLayout? layout) => new(preferences.FoundryEnvFile,
-        preferences.Model, liveLessons, map: liveMap, localBotOnly: false, layout: layout,
-        timeout: TimeSpan.FromSeconds(preferences.ModelTimeoutSeconds));
     private string LandmarkName(string id)
     {
         // Camps carry Chinese labels; towers are unit names such as npc_dota_goodguys_tower2_bot.
@@ -525,35 +681,11 @@ internal sealed class CoachWindow : Window
                 "一二三四"[tower.Groups[2].Value[0] - '1'] + "塔";
         return liveMap?.Landmarks.FirstOrDefault(l => l.Id == id)?.Label ?? id;
     }
-    private void ConfigureModel(bool save)
-    {
-        CancelDecision(); host?.Mailbox.ClearReminder(); modelConfigured = false;
-        cloud?.Dispose(); cloud = null; activeLayout = null;
-        try {
-            if (!int.TryParse(interval.Text, out int seconds) || !int.TryParse(requestLimit.Text, out int limit) ||
-                !int.TryParse(subtitleSeconds.Text, out int display) || !int.TryParse(modelTimeout.Text, out int timeoutSeconds))
-                throw new ArgumentException("请输入整数调用间隔、请求上限、字幕秒数和模型超时。");
-            var candidate = preferences with { FoundryEnvFile = foundryFile.Text.Trim(), Model = reasoningModel.Text.Trim(),
-                IntervalSeconds = seconds, RequestLimit = limit, SubtitleSeconds = display, ModelTimeoutSeconds = timeoutSeconds,
-                BindAddress = (string)address.SelectedItem };
-            candidate.Validate(); // Invalid input never replaces the working settings.
-            preferences = candidate;
-            if (save) preferences.Save(settingsPath);
-            string data = System.IO.Path.Combine(AppContext.BaseDirectory, "data");
-            liveMap = new CalibratedMap(System.IO.Path.Combine(data, "dota2-map-reference.json"));
-            liveLessons = File.ReadAllText(System.IO.Path.Combine(data, "luna-live-lessons.json"));
-            cloud = CreateLiveModel(null); modelConfigured = true;
-            autoStatus.Text = "模型配置就绪；收到新鲜自身GSI＋真实游戏画面后自动推理。";
-        } catch (Exception error) {
-            debug.Recorder?.Error("model-configuration", error);
-            autoStatus.Text = error is ArgumentException && error.Message.Any(c => c > 127) ? error.Message + " 未发出请求。" :
-                "自动教练已选择，但模型未就绪：请选择有效Foundry文件，检查部署名和包内data文件。未发出请求。";
-        }
-    }
     private FrameView CalibrationFrame()
     {
         var frame = host?.Mailbox.Latest();
-        if (frame == null || frame.Meta.Source != "dota2") throw new InvalidOperationException("请保持游戏在前台，先接收真实画面。");
+        if (frame == null || frame.Meta.Source is not ("dota2" or "dota2-gsi"))
+            throw new InvalidOperationException("请先连接游戏窗口，接收本人 GSI 或 Dota 画面。");
         return frame;
     }
     private MinimapLayout InputCalibration(FrameView frame)
@@ -591,11 +723,12 @@ internal sealed class CoachWindow : Window
     private void DrawCalibration()
     {
         calibrationMarks.Children.Clear();
-        if (displayed is not { Meta.Source: "dota2" } f) return;
+        if (displayed is not { Meta.Source: "dota2" or "dota2-gsi" } f) return;
         bool draft = draftLayout?.IsValidFor(f.Meta.SourceWidth, f.Meta.SourceHeight) == true;
         var confirmed = preferences.LayoutFor(f);
         var layout = draft ? draftLayout : preferences.EffectiveLayout(f);
-        mapStatus.Text = $"游戏画面 {f.Meta.SourceWidth}×{f.Meta.SourceHeight}：" +
+        mapStatus.Text = (f.Meta.Source == "dota2-gsi" ? "仅 GSI，无底图；请对照游戏实际 HUD。 " : "") +
+            $"游戏窗口 {f.Meta.SourceWidth}×{f.Meta.SourceHeight}：" +
             (draft ? "蓝框是预览，点“确认校准”保存。" : confirmed != null ? "已保存此分辨率的校准。" :
              layout != null ? "使用自动默认框（虚线）。没对准小地图时请校准。" :
              "未校准且未启用默认框：只发字幕，不画路线。");

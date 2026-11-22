@@ -7,7 +7,8 @@ public sealed record MinimapUnit(string Name, int Team, double X, double Y, doub
 /// <summary>
 /// One GSI packet from this coach machine's own Dota while it spectates. Mode "team-view" is Dota Plus
 /// live spectating (friend team's vision, player-mode layout); "full-spectator" is delayed spectating
-/// with teamN/playerN groups. Observations only: not admitted to the automatic coach.
+/// with teamN/playerN groups. Only a matched team-view projection may enter the live archive;
+/// the raw snapshot and full-spectator feeds are never model inputs.
 /// </summary>
 public sealed record SpectatorSnapshot(long ReceivedAt, string Mode, double? Clock, string? GameState, bool Paused,
     string? MatchId, int? OwnTeam, int GroupedPlayers, MinimapUnit[] Minimap, string[] BuildingTeams, string[] EventTypes)
@@ -32,24 +33,34 @@ public static class SpectatorGsi
     {
         if (section is not { } s) return 0;
         int n = 0;
-        foreach (var team in s.EnumerateObject().Where(p => Regex.IsMatch(p.Name, @"^team\d$") && p.Value.ValueKind == JsonValueKind.Object))
-            n += team.Value.EnumerateObject().Count(p => Regex.IsMatch(p.Name, @"^player\d{1,2}$"));
+        foreach (var team in s.EnumerateObject()) {
+            if (Regex.IsMatch(team.Name, @"^team\d+$"))
+                n += Math.Max(1, team.Value.ValueKind == JsonValueKind.Object ?
+                    team.Value.EnumerateObject().Count(p => Regex.IsMatch(p.Name, @"^player\d+$")) : 0);
+            else if (Regex.IsMatch(team.Name, @"^player\d+$") || team.Name == "allplayers") n++;
+        }
         return n;
     }
     public static SpectatorSnapshot Parse(JsonElement root, long receivedAt)
     {
         var map = Obj(root, "map"); var player = Obj(root, "player"); var hero = Obj(root, "hero");
-        int grouped = Math.Max(Grouped(player), Math.Max(Grouped(hero), Grouped(Obj(root, "items"))));
+        int grouped = Math.Max(Math.Max(Grouped(player), Grouped(hero)), Math.Max(Grouped(Obj(root, "items")), Grouped(Obj(root, "abilities"))));
+        if (root.TryGetProperty("allplayers", out _)) grouped = Math.Max(1, grouped);
         string? teamName = player is { } p ? Text(p, "team_name") : null;
-        bool playing = teamName is "radiant" or "dire" && hero is { } h && Text(h, "name") is { Length: > 0 };
-        string mode = map == null ? "menu" : grouped > 0 ? "full-spectator" : playing ? "player" : "team-view";
+        bool playing = teamName is "radiant" or "dire";
+        string mode = map == null ? "menu" : grouped > 0 ? "full-spectator" : playing ? "player" :
+            teamName == "spectator" ? "team-view" : "unknown";
         var units = new List<MinimapUnit>();
         if (Obj(root, "minimap") is { } minimap) {
+            int entries = 0;
             foreach (var entry in minimap.EnumerateObject()) {
-                if (units.Count >= MaxUnits) throw new ArgumentException("Too many minimap units");
+                if (++entries > MaxUnits) throw new ArgumentException("Too many minimap units");
                 var e = entry.Value;
                 if (e.ValueKind != JsonValueKind.Object || Number(e, "xpos", 20000) is not double x ||
-                    Number(e, "ypos", 20000) is not double y || Number(e, "team", 16) is not double team) continue;
+                    Number(e, "ypos", 20000) is not double y || Number(e, "team", 16) is not double team || team != Math.Truncate(team)) continue;
+                // A unit coming into sight sits at 0,0 (mid lane) for a packet or two before its position arrives: heroes,
+                // creeps and wards in the 2026-11-17 and 11-21 Plus games. Such a hero put a ward guess in mid lane.
+                if (x == 0 && y == 0) continue;
                 string name = Text(e, "unitname") is { } n && Name.IsMatch(n) ? n : "?";
                 string? image = Text(e, "image") is { } i && Icon.IsMatch(i) ? i : null;
                 units.Add(new(name, (int)team, x, y, Number(e, "yaw", 720), Number(e, "visionrange", 10000), image));
@@ -57,16 +68,15 @@ public static class SpectatorGsi
         }
         string[] buildings = Obj(root, "buildings") is { } b ? b.EnumerateObject().Select(t => t.Name)
             .Where(t => t is "radiant" or "dire").ToArray() : [];
-        int? ownTeam = playing ? (teamName == "radiant" ? 2 : 3) :
-            units.FirstOrDefault(u => u.Image == "minimap_herocircle_self")?.Team is int self and (2 or 3) ? self :
-            buildings.Length == 1 ? (buildings[0] == "radiant" ? 2 : 3) : null;
+        var sides = units.Where(u => u.Image == "minimap_herocircle_self" && u.Name.StartsWith("npc_dota_hero_") && u.Team is 2 or 3)
+            .Select(u => u.Team).Concat(buildings.Select(t => t == "radiant" ? 2 : 3)).Distinct().ToArray();
+        int? ownTeam = playing ? (teamName == "radiant" ? 2 : 3) : sides is [var side] ? side : null;
         string[] events = root.TryGetProperty("events", out var list) && list.ValueKind == JsonValueKind.Array
             ? list.EnumerateArray().Take(200).Where(e => e.ValueKind == JsonValueKind.Object)
                 .Select(e => Text(e, "event_type") is { } t && Name.IsMatch(t) ? t : "?").Distinct().ToArray() : [];
-        string? match = map is { } m && m.TryGetProperty("matchid", out var id) && id.ToString() is { Length: > 0 and <= 24 } s &&
-            s.All(char.IsAsciiDigit) && s != "0" ? s : null;
+        string? match = map is { } m && m.TryGetProperty("matchid", out var id) && TeamViewEvidence.RealMatch(id.ToString()) ? id.ToString() : null;
         return new(receivedAt, mode, map is { } mc ? Number(mc, "clock_time", 43200) : null,
-            map is { } ms ? Text(ms, "game_state") : null, map is { } mp && mp.TryGetProperty("paused", out var paused) && paused.ValueKind == JsonValueKind.True,
+            map is { } ms ? Text(ms, "game_state") : null, map is { } mp && mp.TryGetProperty("paused", out var paused) && paused.ValueKind != JsonValueKind.False,
             match, ownTeam, grouped, units.ToArray(), buildings, events);
     }
 }
@@ -76,7 +86,7 @@ public sealed record DelayStats(int Samples, double? MedianMs, double? P10Ms, do
 /// <summary>
 /// How far the coach's Plus view lags the game machine. Both sides are stamped with this coach
 /// machine's monotonic clock, so no wall-clock sync is needed. The game side is estimated as
-/// frame arrival minus GSI age, so the result reads low by the video pipeline latency (~0.1–0.2 s).
+/// frame (or status) arrival minus GSI age, so the result reads low by the transfer latency (video ~0.1–0.2 s).
 /// </summary>
 public sealed class PlusDelayTracker
 {

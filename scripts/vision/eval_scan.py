@@ -44,6 +44,7 @@ def main():
                                      else "wrong"] += 1
         items = dict(row.get("items") or {})  # only visits that waited for the item fade
         alt = items.pop("alt", {})
+        items.pop("wards", None)  # ward counts: the recorded GSI item names carry no charges to check them against
         for slot, got in items.items():
             want = truth["items"].get(slot) or "empty"
             if want.startswith("item_recipe_"):

@@ -75,6 +75,24 @@ HERO_SCORE = 0.5  # best-two-slot mean a hero needs to be named
 # Juggernaut and Pudge): median interquartile range 6-17 there, at least 29.5 in every dataset frame.
 BLANK_SPREAD = 20
 HERO_MARGIN = 0.08  # over the next hero
+# Stack counts are drawn bottom right in one font: white in the main slots, grey in the backpack. A ward dispenser draws
+# the ward in front (its count bottom right) over the other kind (its count smaller and grey, bottom left). Templates
+# come from GSI-labelled frames (`digits`); a digit is searched for by where its bottom-right corner may sit around the
+# slot centre: ((x from, to), (y from, to)).
+COUNT_SEARCH = {"main": ((22, 29), (15, 20)), "backpack": ((18, 26), (7, 12))}
+BEHIND_SEARCH = {"main": ((-26, -18), (15, 20)), "backpack": ((-27, -16), (5, 13))}  # backpack: 3 labelled samples only
+BEHIND_SCALE = 0.85
+DIGIT_PATCH = (14, 11)  # rows, columns: the glyph and its outline, anchored bottom right
+DIGIT_SCORE, DIGIT_MARGIN = 0.7, 0.05
+# Items whose stack counts the digit templates are learnt from (bottles and dispensers draw theirs differently).
+COUNTED = {"item_ward_observer", "item_ward_sentry", "item_tango", "item_clarity", "item_flask", "item_smoke_of_deceit", "item_dust",
+           "item_enchanted_mango", "item_famango", "item_great_famango", "item_blood_grenade", "item_magic_stick", "item_magic_wand",
+           "item_infused_raindrop", "item_urn_of_shadows", "item_spirit_vessel"}
+WARD_ITEMS = ("item_ward_observer", "item_ward_sentry", "item_ward_dispenser")
+# The front ward's colour, measured over the icon's upper right ((x from, to), (y from, to)) around the slot centre:
+# observers are yellow, sentries blue. Backpack icons and items on cooldown are grey: their kind stays unknown.
+WARD_TINT = ((2, 26), (-18, 6))
+DIGITS_FILE = "hud-digits-1080.npz"
 
 
 def text_reader(cuda: bool):
@@ -322,6 +340,59 @@ class HeroNames:
         return self.npc[max(inside, key=len)] if inside else None
 
 
+class Digits:
+    """Stack-count digits by masked correlation with templates: each template keeps the pixels that look the same in
+    every sample (the glyph and its dark outline), so the item art behind does not count."""
+
+    def __init__(self, templates: dict[str, tuple[np.ndarray, np.ndarray]]):
+        self.templates = templates
+        rows, cols = round(DIGIT_PATCH[0] * BEHIND_SCALE), round(DIGIT_PATCH[1] * BEHIND_SCALE)
+        self.small = {d: (cv2.resize(t, (cols, rows), interpolation=cv2.INTER_AREA),
+                          (cv2.resize(m, (cols, rows), interpolation=cv2.INTER_AREA) > 0.5).astype(np.float32))
+                      for d, (t, m) in templates.items()}
+
+    @classmethod
+    def load(cls, path: Path) -> "Digits | None":
+        if not path.exists():
+            return None
+        data = np.load(path)
+        return cls({d: (data[f"t{d}"], data[f"m{d}"]) for d in "0123456789" if f"t{d}" in data})
+
+    @staticmethod
+    def score(patch: np.ndarray, template: np.ndarray, mask: np.ndarray) -> float:
+        w = mask.sum()
+        a = (patch - (patch * mask).sum() / w) * mask
+        b = (template - (template * mask).sum() / w) * mask
+        return float((a * b).sum() / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-6))
+
+    def best(self, value: np.ndarray, cx: int, cy: int, search, small=False) -> tuple[float, str, float]:
+        """(score, digit, margin over the best other digit) for a glyph whose bottom-right corner is in `search`."""
+        (x0, x1), (y0, y1) = search
+        scores = {}
+        for d, (t, m) in (self.small if small else self.templates).items():
+            rows, cols = t.shape
+            for yb in range(cy + y0, cy + y1):
+                for xr in range(cx + x0, cx + x1):
+                    patch = value[yb - rows + 1:yb + 1, xr - cols + 1:xr + 1]
+                    if patch.shape == t.shape:
+                        scores[d] = max(scores.get(d, -1.0), self.score(patch, t, m))
+        if not scores:
+            return -1.0, "", 0.0
+        ranked = sorted(scores.items(), key=lambda kv: -kv[1])
+        return ranked[0][1], ranked[0][0], ranked[0][1] - (ranked[1][1] if len(ranked) > 1 else -1.0)
+
+    def read(self, value: np.ndarray, cx: int, cy: int, search, small=False) -> int | None:
+        """A one-digit count, or None when unsure. A second digit left of it (10 or more) also gives None."""
+        score, digit, margin = self.best(value, cx, cy, search, small)
+        if score < DIGIT_SCORE or margin < DIGIT_MARGIN:
+            return None
+        cols = DIGIT_PATCH[1] - 3  # a glyph is at most 8 wide; a tens digit sits that far further left
+        (x0, x1), ys = search
+        if not small and self.best(value, cx, cy, ((x0 - cols - 2, x1 - cols + 1), ys))[0] >= DIGIT_SCORE + 0.1:
+            return None
+        return int(digit)
+
+
 class HudRecognizer:
     def __init__(self, assets: Path, calibration: Path, device: str | None = None):
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
@@ -338,6 +409,8 @@ class HudRecognizer:
         self.abilities = AbilityReferences(assets, self.manifest, self.device)
         self.names = HeroNames(self.manifest)
         self.text_reader = text_reader(self.device.type == "cuda")
+        # Written by `digits` next to the HUD calibration; without it ward counts are not read.
+        self.digits = Digits.load(calibration.with_name(DIGITS_FILE))
 
     def ocr(self, crops: list[np.ndarray]) -> list[tuple[str, float]]:
         prepared = [cv2.copyMakeBorder(cv2.resize(c, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC),
@@ -390,6 +463,7 @@ class HudRecognizer:
                            "score": round(score, 3), **({"sameIcon": group[1:6]} if len(group) > 1 and name != "item_recipe" else {}),
                            **({"best": name} if score < MIN_SCORE else {})}
         items = {slot: items[slot] for slot in SLOTS} if full else None
+        wards = self.wards(frame, items, dr, dy) if full else None
         hero = self.abilities.identify(gray, dl, heroes)
         bars = self.bars(frame, dl, dr)
         # A dead hero's HUD covers the attributes with the buyback panel.
@@ -417,8 +491,55 @@ class HudRecognizer:
             **values,
             "fill": {k: round(fill, 4) for k, (_, _, fill) in bars.items()},
             "items": items,
+            "wards": wards,
             "ocr": {k: [t, round(s, 3)] for k, (t, s) in text.items()},
         }
+
+    def wards(self, frame: np.ndarray, items: dict, dr: int, dy: int) -> dict | None:
+        """Wards in the main slots and backpack: {"observer", "sentry", "unknown"} counts, unknown for grey icons
+        (backpack, cooldown) whose kind the colour cannot tell. Each ward slot also gets "count" (and for a dispenser
+        "front" and "behind"). None when a ward slot's count cannot be read, or without digit templates: such a read
+        says nothing about how many wards the hero has."""
+        if self.digits is None:
+            return None
+        out = {"observer": 0, "sentry": 0, "unknown": 0}
+        for slot, item in items.items():
+            if not item or item["name"] not in WARD_ITEMS or not slot.startswith("slot"):
+                continue
+            cx, cy = SLOTS[slot][0] + dr, SLOTS[slot][1] + dy
+            # Brightness around the slot; the search positions below are relative to its centre at (40, 32).
+            value = cv2.cvtColor(frame[cy - 32:cy + 24, cx - 40:cx + 34], cv2.COLOR_BGR2HSV)[..., 2].astype(np.float32)
+            back = kind(slot) == "backpack"
+            count = self.digits.read(value, 40, 32, COUNT_SEARCH["backpack" if back else "main"])
+            front = None if back else self.ward_tint(frame, cx, cy)
+            item["count"] = count
+            if count is None:
+                return None
+            if item["name"] != "item_ward_dispenser":
+                # A grey icon's match cannot be trusted with the kind: a sentry on cooldown matched the observer.
+                out[front or "unknown"] += count
+                continue
+            behind = self.digits.read(value, 40, 32, BEHIND_SEARCH["backpack" if back else "main"], small=True)
+            item["front"], item["behind"] = front, behind
+            if behind is None:
+                return None
+            if front is None:
+                out["unknown"] += count + behind
+            else:
+                out[front] += count
+                out["sentry" if front == "observer" else "observer"] += behind
+        return out
+
+    @staticmethod
+    def ward_tint(frame: np.ndarray, cx: int, cy: int) -> str | None:
+        """"observer" (yellow) or "sentry" (blue) for the front ward of a main slot; None when grey."""
+        (x0, x1), (y0, y1) = WARD_TINT
+        hsv = cv2.cvtColor(frame[cy + y0:cy + y1, cx + x0:cx + x1], cv2.COLOR_BGR2HSV).reshape(-1, 3)
+        vivid = hsv[hsv[:, 1] > 80, 0]
+        if len(vivid) < 100:
+            return None
+        yellow, blue = float(((vivid >= 12) & (vivid <= 40)).mean()), float(((vivid >= 80) & (vivid <= 110)).mean())
+        return "observer" if yellow > 0.4 and yellow > blue else "sentry" if blue > 0.4 else None
 
     @staticmethod
     def attribute_spans(frame: np.ndarray, dl: int) -> dict[str, tuple[int, int]] | None:
@@ -581,6 +702,54 @@ def calibrate(datasets: list[Path], reference: Path, out: Path, replays: set[str
           "empty references:", {k: len(v) for k, v in empties.items()})
 
 
+def count_glyph(value: np.ndarray, saturation: np.ndarray, cx: int, cy: int) -> tuple[int, int] | None:
+    """The pixel diagonally past the bottom-right corner of the one white digit in a main slot's count corner (the
+    corner a template patch is anchored at: it keeps a row and column of outline), or None (none, two, or unclear)."""
+    x0, y0 = cx + 4, cy + 3
+    mask = ((value[y0:cy + 24, x0:cx + 32] >= 160) & (saturation[y0:cy + 24, x0:cx + 32] <= 90)).astype(np.uint8)
+    n, _, stats, _ = cv2.connectedComponentsWithStats(mask, 8)
+    glyphs = [s for s in stats[1:] if 8 <= s[3] <= 13 and abs(y0 + s[1] + s[3] - (cy + 17)) <= 1]
+    if len(glyphs) != 1:
+        return None
+    x, y, w, h, _ = glyphs[0]
+    return x0 + x + w, y0 + y + h
+
+
+def calibrate_digits(hud: "HudRecognizer", datasets: list[Path], out: Path, replays: set[str] | None = None):
+    """Stack-count digit templates from GSI-labelled frames: one-digit counts in the main slots of items that draw them
+    there. Pixels that vary between samples (the art behind the glyph) are masked out."""
+    rows_, cols_ = DIGIT_PATCH
+    patches: dict[str, list[np.ndarray]] = {}
+    for d in datasets:
+        for row in map(json.loads, open(d / "captures.jsonl", encoding="utf-8")):
+            if replays is not None and row["replay"] not in replays:
+                continue
+            frame, x = normalize(cv2.imread(str(d / row["image"])))
+            a = hud.anchors(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), x)
+            if a["leftScore"] < 0.5 or a["rightRms"] > 12:
+                continue
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            value, saturation = hsv[..., 2].astype(np.float32), hsv[..., 1]
+            items = row["gsi"]["items"][row["selected"]["team"]][f"player{row['selected']['playerId']}"]
+            for i in range(6):
+                item = items.get(f"slot{i}") or {}
+                charges = item.get("charges")
+                if item.get("name") not in COUNTED or not isinstance(charges, int) or not 1 <= charges <= 9:
+                    continue
+                cx, cy = SLOTS[f"slot{i}"][0] + a["right"], SLOTS[f"slot{i}"][1] + a["rightY"]
+                if (corner := count_glyph(value, saturation, cx, cy)) is not None:
+                    xr, yb = corner
+                    patches.setdefault(str(charges), []).append(value[yb - rows_ + 1:yb + 1, xr - cols_ + 1:xr + 1])
+    if set(patches) != set("123456789") or any(len(v) < 3 for v in patches.values()):
+        raise SystemExit(f"Too few labelled digits: { {k: len(v) for k, v in sorted(patches.items())} }")
+    arrays = {}
+    for digit, samples in patches.items():
+        stack = np.stack(samples)
+        arrays[f"t{digit}"], arrays[f"m{digit}"] = stack.mean(0), (stack.std(0) < 45).astype(np.float32)
+    np.savez_compressed(out, **arrays)
+    print("digit templates:", {k: len(v) for k, v in sorted(patches.items())}, "->", out)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="command", required=True)
@@ -589,6 +758,11 @@ def main():
     c.add_argument("--reference", type=Path, required=True, help="a 4-ability hero frame")
     c.add_argument("--out", type=Path, default=Path(".tmp/vision-assets/hud-1080.npz"))
     c.add_argument("--replays", nargs="*", help="only frames from these replay files (keeps others for evaluation)")
+    g = sub.add_parser("digits", help="stack-count digit templates (ward counts) from GSI-labelled frames")
+    g.add_argument("datasets", nargs="+", type=Path)
+    g.add_argument("--assets", type=Path, default=Path(".tmp/vision-assets"))
+    g.add_argument("--calibration", type=Path, default=Path(".tmp/vision-assets/hud-1080.npz"))
+    g.add_argument("--replays", nargs="*", help="only frames from these replay files (keeps others for evaluation)")
     r = sub.add_parser("read")
     r.add_argument("images", nargs="+", type=Path)
     r.add_argument("--assets", type=Path, default=Path(".tmp/vision-assets"))
@@ -598,6 +772,9 @@ def main():
         calibrate(args.datasets, args.reference, args.out, set(args.replays) if args.replays else None)
         return
     hud = HudRecognizer(args.assets, args.calibration)
+    if args.command == "digits":
+        calibrate_digits(hud, args.datasets, args.calibration.with_name(DIGITS_FILE), set(args.replays) if args.replays else None)
+        return
     sys.stdout.reconfigure(encoding="utf-8")
     for path in args.images:
         print(json.dumps({"image": path.name, **hud.read(cv2.imread(str(path)))}, ensure_ascii=False))

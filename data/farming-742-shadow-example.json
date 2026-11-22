@@ -1,0 +1,16 @@
+{
+  "_note": "Fictional manual observations to exercise the visibility gate; NOT player-POV annotation from a replay. Local demonstration only.",
+  "informationScope": "player-visible",
+  "patch": "7.42",
+  "matchId": "manual-example",
+  "matchStartUnix": 1795305600,
+  "contextId": "demo",
+  "timeSec": 675,
+  "hero": "luna",
+  "team": "radiant",
+  "self": { "observedAtSec": 675, "alive": true, "canAct": true, "position": { "x": 5050, "y": -5400 } },
+  "visibleTargets": [
+    { "targetId": "good_1", "matchId": "manual-example", "seenAtSec": 675, "source": "manual-confirmed", "state": "present", "area": "own" },
+    { "targetId": "good_2", "matchId": "manual-example", "seenAtSec": 675, "source": "manual-confirmed", "state": "empty", "area": "own" }
+  ]
+}

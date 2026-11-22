@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -6,18 +7,29 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using DotaCoach.Desktop;
 
 namespace DotaCoach.TwoPc;
 
-internal sealed class AdviceOverlay : Window
+internal sealed partial class AdviceOverlay : Window
 {
     private readonly Canvas canvas = new() { IsHitTestVisible = false };
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private Reminder? reminder;
-    private long until, lastFrame;
+    private long until, lastFrame, previewUntil;
+    private EnemyBoard? enemies;
+    private bool boardSession;
+    // Only a reminder needs the full game area. The small equipment/ward HWNDs have independent lifetimes.
+    private string? drawn;
+    /// <summary>The player's local subtitle and enemy panel style; applied from the next redraw on.</summary>
+    public GameOverlaySettings Settings { get; set; } = new();
+    /// <summary>Game-side GSI/session guard, rechecked even when the visual is cached. No guard, no live minute route.</summary>
+    public Func<Reminder, bool>? MinuteRouteValid { get; set; }
+    internal Func<EnemyBoard, int, int, EnemyBoard?>? BoardForDisplay { get; set; }
+    public IconCache Icons { get; } = new(System.IO.Path.Combine(AppContext.BaseDirectory, "icons"));
     private IntPtr handle;
     private readonly E2ERun? e2e;
     private bool localBot;
@@ -33,15 +45,10 @@ internal sealed class AdviceOverlay : Window
         Focusable = false; IsHitTestVisible = false; Content = canvas;
         SourceInitialized += (_, _) => {
             handle = new WindowInteropHelper(this).Handle;
-            SetWindowLongPtr(handle, -20, new IntPtr(GetWindowLongPtr(handle, -20).ToInt64() | 0x20 | 0x80 | 0x08000000 | 0x80000));
-            SetWindowDisplayAffinity(handle, e2e?.CaptureOverlayEvidence == true && localBot ? 0u : 0x11u);
-            HwndSource.FromHwnd(handle)?.AddHook((IntPtr h, int m, IntPtr w, IntPtr l, ref bool handled) => {
-                if (m is 0x21 or 0x84) { handled = true; return new IntPtr(m == 0x21 ? 3 : -1); }
-                return IntPtr.Zero;
-            });
+            Passive(handle, e2e?.CaptureOverlayEvidence == true && localBot ? 0u : 0x11u);
         };
         timer.Tick += (_, _) => Draw(); timer.Start();
-        Closed += (_, _) => timer.Stop();
+        Closed += (_, _) => { timer.Stop(); equipmentWindow?.Close(); wardWindow?.Close(); };
     }
     public void FrameArrived(bool isLocalBot = false)
     {
@@ -57,28 +64,66 @@ internal sealed class AdviceOverlay : Window
         until = reminder?.Id == value.Id ? Math.Min(until, deadline) : deadline;
         reminder = value; Draw();
     }
+    /// <summary>The coach's enemy panel, renewed about once a second; null hides it.</summary>
+    public void Enemies(EnemyBoard? board)
+    {
+        enemies = board;
+        if (board == null) HideBoards();
+    }
+    internal void SetBoardSession(bool active)
+    {
+        boardSession = active; previewUntil = 0; Enemies(null);
+    }
+    /// <summary>Shows a sample subtitle and enemy panel over Dota for a while (live ones still win), to tune the style.</summary>
+    public void Preview(int ms)
+    {
+        previewUntil = Environment.TickCount64 + ms; Draw();
+    }
+    /// <summary>Withdraws the reminder; the enemy panel stays. Called on every empty poll, so a no-op when there is none.</summary>
     public void Clear()
+    {
+        if (reminder == null && renderedId == null) return;
+        DropReminder(); Draw();
+    }
+    private void DropReminder()
     {
         if (renderedId != null) e2e?.Trace("game", "overlay-cleared", new { id = renderedId });
         if (debugReceipt != null) debug?.Invoke()?.Overlay("overlay-cleared", debugReceipt);
-        debugReceipt = null;
-        renderedId = null; reminder = null; canvas.Children.Clear(); Hide();
+        debugReceipt = null; renderedId = null; reminder = null;
+    }
+    private void Blank()
+    {
+        if (drawn != null) { drawn = null; canvas.Children.Clear(); }
+        if (IsVisible) Hide();
     }
     /// <summary>Caption heading: what produced the text and how old the picture behind it is.</summary>
     public static string Label(Reminder r) =>
         r.Kind == "manual-link-test" ? "链路测试 · 非AI" :
+        r.Kind == MinuteFarmContext.Kind ? (r.FarmMinute is int m ? $"{m}:00" : "本分钟") + " · 打钱候选点" :
         r.Kind is "experimental-bot-advice" or "visible-farming-advice"
             ? "AI打钱路线" + (r.SourceAgeMs is int age && age >= 1500 ? $" · 依据约{Math.Round(age / 1000.0)}秒前画面" : "") + " · 非最优保证"
             : "视觉观察 · 未经核验";
     private void Draw()
     {
         var game = GameWindow.Find(out _);
-        if (reminder is not { } r || Environment.TickCount64 >= until ||
-            Environment.TickCount64 - lastFrame > Wire.PresenceLifetimeMs ||
-            game == null || game.Width != r.SourceWidth || game.Height != r.SourceHeight)
-        { Clear(); return; }
-        // Never float over other applications: hide while Dota is behind them, keep the reminder until it expires.
-        if (!GameWindow.IsForeground(game)) { if (IsVisible) Hide(); return; }
+        long now = Environment.TickCount64;
+        if (reminder is { } live && (now >= until || now - lastFrame > Wire.PresenceLifetimeMs ||
+            game == null || game.Width != live.SourceWidth || game.Height != live.SourceHeight ||
+            !AuthorizedForDraw(live, MinuteRouteValid))) DropReminder();
+        bool previewing = now < previewUntil, sample = reminder == null;
+        var r = reminder ?? (previewing && game != null ? new Reminder("caption-preview", "", 0, "local-vision-observation",
+            "预览：剃刀 离开视野 · 最后在中路", null, game.Width, game.Height, 0) : null);
+        var liveBoard = enemies == null ? null : BoardForDisplay?.Invoke(enemies, game?.Width ?? 0, game?.Height ?? 0);
+        if (liveBoard == null) enemies = null;
+        bool foreground = game != null && GameWindow.IsForeground(game);
+        if (game == null || !foreground && !(previewing && OwnWindowInFront())) { HideBoards(); Blank(); return; }
+        // The manual, offline STYLE preview never supplies a ward. No synthetic rows during a real session;
+        // no live board or route over a different foreground app, even while the settings preview is open.
+        var board = foreground ? liveBoard : null;
+        if (!boardSession && previewing && board == null) board = SampleBoard;
+        DrawBoards(game, board);
+        if (!foreground && r?.Kind == MinuteFarmContext.Kind) r = null;
+        if (r == null) { Blank(); return; }
         if (!IsVisible) Show();
         double scale = Math.Max(96, GetDpiForWindow(handle)) / 96.0;
         double unit = DisplayGeometry.OverlayUnit(game.Height, scale);
@@ -87,21 +132,72 @@ internal sealed class AdviceOverlay : Window
             int error = Marshal.GetLastWin32Error();
             e2e?.Trace("game", "overlay-position-failed", new { error });
             debug?.Invoke()?.Error("overlay-position", new System.ComponentModel.Win32Exception(error));
-            Clear(); return;
+            DropReminder(); Blank(); return;
         }
-        canvas.Width = game.Width / scale; canvas.Height = game.Height / scale; canvas.Children.Clear();
-        var caption = new TextBlock {
-            Foreground = Brushes.Gold, Background = new SolidColorBrush(Color.FromArgb(210, 8, 16, 24)),
-            FontSize = 28 * unit, Padding = new Thickness(12 * unit), TextWrapping = TextWrapping.Wrap,
-            TextAlignment = TextAlignment.Center, Width = Math.Min(900 * unit, canvas.Width * .75),
-        };
-        caption.Inlines.Add(new Run(Label(r) + "\n") { FontSize = 20 * unit, Foreground = Brushes.Khaki });
-        caption.Inlines.Add(new Run(r.Message));
-        if (r.NextSteps is { Length: > 0 } steps)
-            caption.Inlines.Add(new Run("\n下一步：" + string.Join(" → ", steps.Select((s, i) => $"{"①②③"[i]}{s}"))) {
-                FontSize = 22 * unit, Foreground = Brushes.White });
-        Canvas.SetLeft(caption, (canvas.Width - caption.Width) / 2); Canvas.SetTop(caption, canvas.Height * .1);
-        if (r.ShowSubtitle) canvas.Children.Add(caption);
+        canvas.Width = game.Width / scale; canvas.Height = game.Height / scale;
+        // The sample is shown whatever kinds are switched off: it previews the style, not a reminder.
+        var style = sample ? Settings with { ShowAlerts = true } : Settings;
+        string content = string.Join("|", r.Id, Label(r), style, canvas.Width, canvas.Height, unit);
+        if (content != drawn) { Compose(canvas, r, style, unit); drawn = content; }
+        if (sample) return; // A preview leaves no Debug or E2E receipt.
+        if (renderedId != r.Id)
+        {
+            renderedId = r.Id;
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => {
+                if (renderedId != r.Id || !IsVisible || reminder?.Id != r.Id) return;
+                GetWindowRect(handle, out var rect);
+                debugReceipt = new(r.Id, r.FrameSequence, rect.Right - rect.Left, rect.Bottom - rect.Top,
+                    scale, canvas.Children.Count, r.Marker?.X * game.Width, r.Marker?.Y * game.Height);
+                debug?.Invoke()?.Overlay("overlay-rendered", debugReceipt);
+                e2e?.Trace("game", "overlay-rendered", new { r.Id, r.FrameSequence, r.Kind, r.Message, r.Marker,
+                    actualBounds = new { rect.Left, rect.Top, rect.Right, rect.Bottom },
+                    canvasWidth = canvas.ActualWidth, canvasHeight = canvas.ActualHeight,
+                    dpiScale = scale, elements = canvas.Children.Count,
+                    markerPixelX = r.Marker?.X * game.Width, markerPixelY = r.Marker?.Y * game.Height,
+                    captureEvidence = e2e.CaptureOverlayEvidence && localBot });
+            }));
+        }
+    }
+    /// <summary>Compose the same layers off screen. Source sizes are physical client pixels, canvas sizes are DIPs.</summary>
+    internal static void Compose(Canvas canvas, Reminder? r, GameOverlaySettings style, double unit,
+        EnemyBoard? board = null, Func<string, ImageSource?>? icon = null, (int Width, int Height)? viewport = null)
+    {
+        canvas.Children.Clear();
+        if (board != null && Wire.ValidBoard(board)) {
+            if (style.ShowEnemies && board.Heroes.Length > 0) {
+                var panel = EnemyPanel(board, style, unit, icon ?? (_ => null));
+                Canvas.SetLeft(panel, 4 * unit); Canvas.SetTop(panel, style.EnemyTop(canvas.Height, panel.DesiredSize.Height));
+                canvas.Children.Add(panel);
+            }
+            var (w, h) = viewport ?? (r?.SourceWidth ?? 0, r?.SourceHeight ?? 0);
+            if (style.ShowWards && WardLayout(board, w, h) is { } layout) {
+                var layer = WardLayer(board, layout.Size * canvas.Width / w, layout.Size * canvas.Height / h, unit);
+                Canvas.SetLeft(layer, layout.Left * canvas.Width / w); Canvas.SetTop(layer, layout.Top * canvas.Height / h);
+                canvas.Children.Add(layer);
+            }
+        }
+        if (r == null) return;
+        if (r.ShowSubtitle && style.Shows(r.Kind))
+        {
+            double u = unit * style.Size / 100;
+            var text = new TextBlock {
+                Foreground = Brush(style.TextColor), FontSize = 28 * u, TextWrapping = TextWrapping.Wrap,
+                TextAlignment = TextAlignment.Center, Opacity = style.TextOpacity / 100.0,
+                // Keeps the text readable when the box is made see-through.
+                Effect = new DropShadowEffect { Color = Colors.Black, BlurRadius = 4 * u, ShadowDepth = 1.5 * u, Opacity = .9 },
+            };
+            if (style.ShowTitle) text.Inlines.Add(new Run(Label(r) + "\n") { FontSize = 20 * u, Foreground = Brush(style.TitleColor) });
+            text.Inlines.Add(new Run(r.Message));
+            if (r.NextSteps is { Length: > 0 } steps)
+                text.Inlines.Add(new Run("\n下一步：" + string.Join(" → ", steps.Select((s, i) => $"{"①②③"[i]}{s}"))) {
+                    FontSize = 22 * u, Foreground = Brushes.White });
+            var box = new Border { Child = text, Padding = new Thickness(12 * u), CornerRadius = new CornerRadius(6 * u),
+                Background = Brush(style.BackgroundColor, style.BackgroundOpacity), MaxWidth = canvas.Width * style.Width / 100 };
+            box.Measure(new Size(box.MaxWidth, double.PositiveInfinity));
+            var (left, top) = style.Place(canvas.Width, canvas.Height, box.DesiredSize.Width, box.DesiredSize.Height);
+            Canvas.SetLeft(box, left); Canvas.SetTop(box, top); canvas.Children.Add(box);
+        }
+        if (r.Kind == MinuteFarmContext.Kind) { DrawMinuteRoute(canvas, r, unit); return; }
         if (r.Marker is { } mark)
         {
             var points = (r.Route ?? [mark]).Select(p => new Point(p.X * canvas.Width, p.Y * canvas.Height)).ToArray();
@@ -125,25 +221,187 @@ internal sealed class AdviceOverlay : Window
                 new(first.X, first.Y - 15 * unit), new(first.X - 8 * unit, first.Y - 30 * unit), new(first.X + 8 * unit, first.Y - 30 * unit) } };
             canvas.Children.Add(arrow);
         }
-        if (renderedId != r.Id)
-        {
-            renderedId = r.Id;
-            _ = Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => {
-                if (renderedId != r.Id || !IsVisible || reminder?.Id != r.Id) return;
-                GetWindowRect(handle, out var rect);
-                debugReceipt = new(r.Id, r.FrameSequence, rect.Right - rect.Left, rect.Bottom - rect.Top,
-                    scale, canvas.Children.Count, r.Marker?.X * game.Width, r.Marker?.Y * game.Height);
-                debug?.Invoke()?.Overlay("overlay-rendered", debugReceipt);
-                e2e?.Trace("game", "overlay-rendered", new { r.Id, r.FrameSequence, r.Kind, r.Message, r.Marker,
-                    actualBounds = new { rect.Left, rect.Top, rect.Right, rect.Bottom },
-                    canvasWidth = canvas.ActualWidth, canvasHeight = canvas.ActualHeight,
-                    dpiScale = scale, elements = canvas.Children.Count,
-                    markerPixelX = r.Marker?.X * game.Width, markerPixelY = r.Marker?.Y * game.Height,
-                    captureEvidence = e2e.CaptureOverlayEvidence && localBot });
-            }));
+    }
+
+    internal static bool AuthorizedForDraw(Reminder r, Func<Reminder, bool>? minuteValid) =>
+        r.Kind != MinuteFarmContext.Kind || minuteValid?.Invoke(r) == true;
+    // These are the explicit condition suffixes in NextSteps, not observations of creeps. A missing or
+    // unfamiliar step gets a neutral pin; in particular the last stop isn't necessarily a lane return.
+    private const string Camp = "有野再打", Lane = "有线再收", UnknownStop = "待确认";
+    private static string Condition(string? step) => step?.EndsWith(Camp, StringComparison.Ordinal) == true ? Camp :
+        step?.EndsWith(Lane, StringComparison.Ordinal) == true ? Lane : UnknownStop;
+    private static Brush PinColor(string condition) => condition switch {
+        Camp => Brushes.Gold, Lane => Brushes.PaleTurquoise, _ => Brushes.Gainsboro };
+
+    private static void DrawMinuteRoute(Canvas canvas, Reminder r, double unit)
+    {
+        if (r.Minimap is not { } layout || !layout.IsValidFor(r.SourceWidth, r.SourceHeight) ||
+            r.Marker is not { } first || !Wire.ValidRoute(r.Route, first)) return;
+        var route = r.Route ?? [first];
+        if (!route.All(layout.Contains)) return; // Never guess a HUD corner or draw a partial, renumbered route.
+
+        double sx = canvas.Width / r.SourceWidth, sy = canvas.Height / r.SourceHeight;
+        double left = layout.Left * sx, top = layout.Top * sy;
+        var map = new Canvas { Width = layout.Size * sx, Height = layout.Size * sy, ClipToBounds = true, IsHitTestVisible = false };
+        Canvas.SetLeft(map, left); Canvas.SetTop(map, top); canvas.Children.Add(map);
+        var points = route.Select(p => new Point(p.X * canvas.Width - left, p.Y * canvas.Height - top)).ToArray();
+        var conditions = points.Select((_, i) => Condition(r.NextSteps is { } steps && steps.Length == points.Length ? steps[i] : null)).ToArray();
+        double u = Math.Min(unit, Math.Min(map.Width, map.Height) / 88);
+        var dark = Brush("#081018", 94);
+        double radius = 2.5 * u;
+        var anchors = points.Select(p => new Rect(p.X - radius, p.Y - radius, 2 * radius, 2 * radius)).ToArray();
+        var badges = new List<Rect>();
+        void Place(FrameworkElement element, Rect box) {
+            Canvas.SetLeft(element, box.X); Canvas.SetTop(element, box.Y); map.Children.Add(element);
+        }
+        static double Overlap(Rect a, Rect b) { var hit = Rect.Intersect(a, b); return hit.IsEmpty ? 0 : hit.Width * hit.Height; }
+
+        for (int i = 0; i < points.Length; i++) {
+            var accent = PinColor(conditions[i]);
+            var p = points[i];
+            // Only the number can move: its pip stays at the exact calibrated destination. Choose a
+            // neighbouring badge position away from the other numbers and pips, including at HUD edges.
+            double size = (i == 0 ? 17 : 15) * u;
+            var locations = from extra in new[] { 0d, size / 2, size } let offset = size / 2 + radius + extra
+                from dx in new[] { 0, 1, -1 } from dy in new[] { -1, 0, 1 } where dx != 0 || dy != 0
+                select new Rect(Math.Clamp(p.X + dx * offset - size / 2, 0, map.Width - size),
+                    Math.Clamp(p.Y + dy * offset - size / 2, 0, map.Height - size), size, size);
+            var at = locations.OrderBy(b => badges.Sum(other => Overlap(Rect.Inflate(other, u, u), b)))
+                .ThenBy(b => anchors.Sum(dot => Overlap(dot, b)))
+                .ThenBy(b => (new Point(b.X + size / 2, b.Y + size / 2) - p).LengthSquared).First();
+            badges.Add(at);
+            // In a crowd the badge may not touch its pip. Give just that badge a short tapered tip to its
+            // own coordinate. No geometry is ever constructed from one destination to the next.
+            var edge = new Point(Math.Clamp(p.X, at.Left, at.Right), Math.Clamp(p.Y, at.Top, at.Bottom));
+            if ((edge - p).Length > radius * 1.5) {
+                var center = new Point(at.X + size / 2, at.Y + size / 2);
+                var v = center - p; v.Normalize();
+                var normal = new Vector(-v.Y, v.X) * (size / 3);
+                var tip = new Polygon { Fill = accent, Points = new() { p, center + normal, center - normal } };
+                Panel.SetZIndex(tip, -1); map.Children.Add(tip);
+            }
+            Place(new Ellipse { Width = radius * 2, Height = radius * 2, Fill = accent, Stroke = dark, StrokeThickness = u }, anchors[i]);
+            Place(new Border {
+                Width = size, Height = size, CornerRadius = new(conditions[i] == Lane ? 2 * u : size / 2),
+                BorderBrush = accent, BorderThickness = new(1.3 * u), Background = i == 0 ? accent : dark,
+                Child = new TextBlock { Text = (i + 1).ToString(), FontSize = (i == 0 ? 12 : 11) * u, FontWeight = FontWeights.Bold,
+                    Foreground = i == 0 ? dark : accent, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            }, at);
+        }
+
+        // One key, not a caption (or three landmark names) across the playfield. Keep whole groups together
+        // on narrow custom maps. Match numbers as well as colours, so reading the key doesn't rely on colour.
+        var groups = new WrapPanel();
+        void Token(string text, Brush ink) => groups.Children.Add(new TextBlock { Text = text, Foreground = ink,
+            FontSize = 11 * u, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2 * u, 0, 2 * u, 0) });
+        if (r.FarmMinute is int minute) Token($"{minute}′", Brushes.White);
+        foreach (var group in Enumerable.Range(0, points.Length).GroupBy(i => conditions[i]))
+            Token(string.Join("·", group.Select(i => i + 1)) + " " + group.Key, PinColor(group.Key));
+        double pad = 2 * u;
+        var key = new Border { Child = groups, Background = dark, CornerRadius = new(3 * u), Padding = new Thickness(u),
+            MaxWidth = map.Width - 2 * pad };
+        var ink = badges.Concat(anchors).ToArray();
+        bool PlaceKey() {
+            key.Measure(new Size(key.MaxWidth, double.PositiveInfinity));
+            double farX = map.Width - key.DesiredSize.Width - pad, bottom = map.Height - key.DesiredSize.Height - pad;
+            var edges = layout.Left < r.SourceWidth / 2.0 ? new[] { pad, farX } : [farX, pad];
+            foreach (double y in new[] { pad, bottom }.Concat(ink.Select(b => b.Bottom + pad))) {
+                if (y < pad || y > bottom) continue;
+                foreach (double x in edges) {
+                    var box = new Rect(new Point(x, y), key.DesiredSize);
+                    if (ink.Any(b => Rect.Inflate(b, u, u).IntersectsWith(box))) continue;
+                    Place(key, box); return true;
+                }
+            }
+            return false;
+        }
+        if (!PlaceKey() && r.FarmMinute.HasValue) {
+            // On very small custom HUDs, give the condition words the space before sacrificing any destination.
+            groups.Children.RemoveAt(0);
+            key.InvalidateMeasure();
+            PlaceKey();
         }
     }
+
+    private static readonly EnemyBoard SampleBoard = new([
+        new("npc_dota_hero_razor", 12, ["item_power_treads", "item_black_king_bar", "item_blink", "item_magic_wand", null, null], null, 2),
+        new("npc_dota_hero_juggernaut", 14, ["item_phase_boots", "item_bfury", "item_manta", null, null, null], null, 35),
+        new("npc_dota_hero_lion", 9, ["item_tranquil_boots", "item_blink", "item_ward_observer", null, null, null], null, 95),
+        new("npc_dota_hero_pudge", null, null, null, null)]);
+    /// <summary>
+    /// The enemy panel at the game's left edge, one row per enemy: head icon, level, the six item slots and the
+    /// neutral item, and how long ago they were read (shown from 10 s; rows a minute old are dimmed).
+    /// </summary>
+    private static StackPanel EnemyPanel(EnemyBoard board, GameOverlaySettings style, double unit, Func<string, ImageSource?> icon)
+    {
+        double u = unit * style.EnemySize / 100, row = 14 * u, slot = row * 88 / 64;
+        var panel = new StackPanel { Opacity = style.EnemyOpacity / 100.0 };
+        RenderOptions.SetBitmapScalingMode(panel, BitmapScalingMode.HighQuality);
+        Border Slot(string? name, double width) => new() {
+            Width = width, Height = row, Margin = new Thickness(.5 * u, 0, .5 * u, 0),
+            Background = new SolidColorBrush(name == null ? Color.FromArgb(110, 20, 24, 28) : Color.FromArgb(200, 80, 80, 80)),
+            Child = name != null && icon(name) is { } image ? new Image { Source = image, Stretch = Stretch.UniformToFill } : null,
+        };
+        TextBlock Text(string text, double size, Brush color, bool bold = false) => new() {
+            Text = text, FontSize = size, Foreground = color, FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2 * u, 0, 2 * u, 0),
+        };
+        foreach (var hero in board.Heroes)
+        {
+            // A dark backing of its own: on the game machine (4K) bright HUD text under a lighter one made rows hard to read.
+            var line = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2 * u),
+                Background = new SolidColorBrush(Color.FromArgb(200, 0, 0, 0)) };
+            line.Children.Add(Slot(hero.Hero, row));
+            var level = Text(hero.Level?.ToString() ?? "?", 10 * u, Brushes.White, bold: true);
+            level.MinWidth = 11 * u; level.TextAlignment = TextAlignment.Center;
+            line.Children.Add(level);
+            if (hero.Items is { } items)
+                foreach (var name in items) line.Children.Add(Slot(name, slot));
+            if (hero.Items != null || hero.Neutral != null) {
+                var neutral = Slot(hero.Neutral, slot);
+                neutral.Margin = new Thickness(3 * u, 0, .5 * u, 0);
+                line.Children.Add(neutral);
+            }
+            string age = Age(hero.Age);
+            if (age.Length == 0 && board.MatchId != null) age = "刚读"; // A last read, never an assertion of current inventory.
+            if (age.Length > 0) line.Children.Add(Text(age, 9 * u, Brushes.LightGray));
+            if (hero.Age >= 60) line.Opacity = .7;
+            panel.Children.Add(line);
+            // A minimal installation may not have all the PNGs. Don't turn a known item or hero into a
+            // meaningless grey rectangle while waiting for art. Keep the source slot, never reorder equipment.
+            if (board.MatchId != null) {
+                var missing = new List<string>();
+                if (icon(hero.Hero) == null) missing.Add(hero.Hero["npc_dota_hero_".Length..].Replace('_', ' '));
+                void Missing(string slotName, string? name) {
+                    if (name != null && icon(name) == null) missing.Add($"{slotName} {name["item_".Length..].Replace('_', ' ')}");
+                }
+                if (hero.Items is { } slots) for (int i = 0; i < slots.Length; i++) Missing((i + 1).ToString(), slots[i]);
+                Missing("中立", hero.Neutral);
+                if (missing.Count > 0) {
+                    var fallback = Text(string.Join(" · ", missing), 10 * u, Brushes.White);
+                    fallback.MaxWidth = 195 * u; fallback.TextWrapping = TextWrapping.Wrap;
+                    fallback.Background = Brush("#081018", 90); panel.Children.Add(fallback);
+                }
+            }
+        }
+        panel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        return panel;
+    }
+    /// <summary>How old a row's reading is, in 5-second steps (so the panel repaints at most every few seconds).</summary>
+    private static string Age(double? seconds) => seconds switch {
+        null => "未见", < 10 => "", < 60 and var s => $"{(int)(s / 5) * 5}秒前", var s => $"{(int)(s / 60)}分前" };
+    private static string Describe(EnemyBoard? board) => board == null ? "" : string.Join(";", board.Heroes.Select(h =>
+        $"{h.Hero},{h.Level},{string.Join(",", h.Items ?? [])},{h.Neutral},{Age(h.Age)},{h.Age >= 60}"));
+    private static SolidColorBrush Brush(string hex, int opacity = 100)
+    {
+        var (red, green, blue) = GameOverlaySettings.Rgb(hex);
+        return new SolidColorBrush(Color.FromArgb((byte)Math.Round(opacity * 2.55), red, green, blue));
+    }
+    private static bool OwnWindowInFront() =>
+        GetWindowThreadProcessId(GetForegroundWindow(), out uint process) != 0 && process == (uint)Environment.ProcessId;
     [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr h, out uint process);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr h, out RECT rect);
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] private static extern IntPtr GetWindowLongPtr(IntPtr h, int i);
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] private static extern IntPtr SetWindowLongPtr(IntPtr h, int i, IntPtr v);

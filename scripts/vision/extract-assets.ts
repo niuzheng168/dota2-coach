@@ -25,11 +25,12 @@ if (!Number.isInteger(serverBuild)) throw new Error('Unreadable client build');
 const raw = path.join(out, 'raw'), decoded = path.join(out, 'decoded');
 const vpk = path.join(install, 'game/dota/pak01_dir.vpk');
 const run = (a: string[]) => execFileSync(cli, a, { encoding: 'utf8', windowsHide: true, timeout: 900_000, maxBuffer: 64 * 1024 * 1024 });
+const english = 'resource/localization/abilities_english.txt';
 const texts = ['scripts/npc/items.txt', 'scripts/npc/npc_heroes.txt', 'scripts/npc/heroes/',
-  'resource/localization/dota_schinese.txt', 'resource/localization/abilities_schinese.txt'];
+  'resource/localization/dota_schinese.txt', 'resource/localization/abilities_schinese.txt', english];
 if (!manifestOnly) {
   run(['-i', vpk, '-f', texts.join(','), '-o', raw, '-q']);
-  run(['-i', vpk, '-f', 'panorama/images/items/,panorama/images/spellicons/', '-e', 'vtex_c', '-o', raw, '-q']);
+  run(['-i', vpk, '-f', 'panorama/images/items/,panorama/images/spellicons/,panorama/images/heroes/icons/', '-e', 'vtex_c', '-o', raw, '-q']);
   run(['-i', raw, '--recursive', '-e', 'vtex_c', '-d', '-o', decoded, '-q', '--threads', '8']);
 }
 
@@ -39,6 +40,13 @@ const tokens = (file: string) => kvObject(kvObject(read(file).lang).Tokens);
 const zh = new Map(Object.entries({ ...tokens('resource/localization/dota_schinese.txt'),
   ...tokens('resource/localization/abilities_schinese.txt') }).map(([k, v]) => [k.toLowerCase(), v]));
 const text = (key: string) => { const v = zh.get(key.toLowerCase()); return typeof v === 'string' ? v : null; };
+// Items new in a patch can be untranslated for a while; the Chinese client then shows their English
+// name, and so does the manifest. Extractions made before this was added have no English file.
+const en = new Map(fs.existsSync(path.join(raw, english)) ? Object.entries(tokens(english)).map(([k, v]) => [k.toLowerCase(), v]) : []);
+const shown = (key: string) => {
+  for (const table of [zh, en]) for (const k of [key, `${key}:n`]) { const v = table.get(k.toLowerCase()); if (typeof v === 'string') return v; }
+  return null;
+};
 const icon = (folder: string, texture: string) => {
   const file = path.join(decoded, 'panorama/images', folder, `${texture}_png.png`);
   return fs.existsSync(file) ? path.relative(out, file).replaceAll('\\', '/') : null;
@@ -56,12 +64,14 @@ for (const [name, value] of Object.entries(kvObject(read('scripts/npc/items.txt'
   byTexture.set(texture, [...byTexture.get(texture) ?? [], name]);
   items[name] = {
     // Newer items (most neutral items) keep their display name under the ":n" key.
-    icon: file, altIcons: [], nameZh: text(`DOTA_Tooltip_ability_${name}`) ?? text(`DOTA_Tooltip_ability_${name}:n`), cost: Number(def.ItemCost) || 0,
+    icon: file, altIcons: [], nameZh: shown(`DOTA_Tooltip_ability_${name}`), cost: Number(def.ItemCost) || 0,
     recipe: def.ItemRecipe === '1', purchasable: def.ItemPurchasable !== '0',
     neutral: def.ItemIsNeutralActiveDrop === '1' || def.ItemIsNeutralPassiveDrop === '1',
     // Flag present but "0" (grisgris, eldwurms_edda): seen both in the neutral slot and the inventory.
     formerNeutral: (def.ItemIsNeutralActiveDrop ?? def.ItemIsNeutralPassiveDrop) === '0',
     enhancement: name.startsWith('item_enhancement_'),
+    // Used up or charged away (tango, wards, TP, mango): not worth announcing as a new item.
+    consumable: def.ItemQuality === 'consumable' || def.ItemPermanent === '0',
   };
 }
 // The HUD swaps some icons by state (power_treads_agi, bottle_empty, tranquil_boots_active,
@@ -84,7 +94,8 @@ for (const file of fs.readdirSync(heroDir).filter(f => /^npc_dota_hero_\w+\.txt$
     const abilities = Object.entries(def).filter(([k]) => /^Ability\d+$/.test(k)).map(([, v]) => String(v))
       .filter(a => a && !a.startsWith('special_bonus') && a !== 'generic_hidden')
       .map(a => ({ name: a, icon: icon('spellicons', a) })).filter(a => a.icon);
-    heroes[name] = { nameZh: text(`${name}:n`), abilities };
+    // The small head icon (32 px) the coach's enemy panel on the game machine shows.
+    heroes[name] = { nameZh: text(`${name}:n`), icon: icon('heroes/icons', name), abilities };
   }
 }
 

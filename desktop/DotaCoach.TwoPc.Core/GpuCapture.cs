@@ -33,6 +33,25 @@ public sealed unsafe class GpuDevice : IDisposable
             finally { Release(inspectable); }
         } catch { Dispose(); throw; }
     }
+    /// <summary>
+    /// Schedules this whole process's GPU work at the realtime class (granted without admin rights). Measured with
+    /// Dota uncapped on an RTX 3090 Ti: at the normal, high or thread-boosted classes a 0.1 ms scan still waited
+    /// ~35 ms behind the foreground game every time; at realtime it returns in ~1 ms.
+    /// </summary>
+    public bool RaiseGpuPriority() => D3DKMTSetProcessSchedulingPriorityClass(GetCurrentProcess(), 5 /* REALTIME */) >= 0;
+    /// <summary>The adapter's LUID as the "GPU Engine" performance counters name it (luid_0x00000000_0x0000D1A3).</summary>
+    public string AdapterLuid()
+    {
+        nint dxgi = Query(Device, new("54ec77fa-1377-44e6-8c32-88fd5f44c84c")), adapter = 0;
+        try {
+            Hr(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Slot(dxgi, 7))(dxgi, &adapter));
+            var desc = stackalloc byte[304]; // DXGI_ADAPTER_DESC; AdapterLuid (low, high) at 296
+            Hr(((delegate* unmanaged[Stdcall]<nint, byte*, int>)Slot(adapter, 8))(adapter, desc));
+            return $"luid_0x{*(uint*)(desc + 300):X8}_0x{*(uint*)(desc + 296):X8}";
+        } finally { Release(adapter); Release(dxgi); }
+    }
+    [DllImport("gdi32.dll")] private static extern int D3DKMTSetProcessSchedulingPriorityClass(nint process, int priority);
+    [DllImport("kernel32.dll")] private static extern nint GetCurrentProcess();
     internal nint Texture(int width, int height, int format, int usage, uint bind, uint cpu)
     {
         var desc = new TextureDesc { Width = (uint)width, Height = (uint)height, MipLevels = 1, ArraySize = 1,
@@ -136,13 +155,16 @@ public sealed unsafe class CaptureFrame : IDisposable
     internal nint Texture { get; private set; }
     public int ContentWidth { get; }
     public int ContentHeight { get; }
+    /// <summary>When the frame was composed, on the QueryPerformanceCounter clock in 100 ns units.</summary>
+    public long SystemRelativeTime { get; }
     internal CaptureFrame(nint frame)
     {
         this.frame = frame;
         try {
-            SizeInt32 content;
+            SizeInt32 content; long time;
             Hr(((delegate* unmanaged[Stdcall]<nint, SizeInt32*, int>)Slot(frame, 8))(frame, &content));
-            ContentWidth = content.Width; ContentHeight = content.Height;
+            Hr(((delegate* unmanaged[Stdcall]<nint, long*, int>)Slot(frame, 7))(frame, &time));
+            ContentWidth = content.Width; ContentHeight = content.Height; SystemRelativeTime = time;
             nint surface = 0, access = 0, texture = 0;
             Hr(((delegate* unmanaged[Stdcall]<nint, nint*, int>)Slot(frame, 6))(frame, &surface));
             try {

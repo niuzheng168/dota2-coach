@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>7.42 刷钱复盘 · 露娜与巨魔战将</title>
+  <link rel="stylesheet" href="/simulator.css"><link rel="stylesheet" href="/farming-replays.css"><link rel="stylesheet" href="/farming-742.css">
+</head>
+<body>
+  <header><div><span class="eyebrow">DOTA COACH / REPLAY STUDY</span><h1>7.42 刷钱复盘</h1></div><a href="/farming-replays">返回 7.41f 归档</a></header>
+  <nav class="set-nav" aria-label="7.42 复盘资料">
+    <a id="set-expanded" href="/farming-742">本轮复盘</a><a id="set-16" href="/farming-742?set=16">原 16 场归档</a>
+  </nav>
+  <div id="layer-picker" role="group" aria-label="选择证据来源" hidden>
+    <button id="pick-spatial" type="button" aria-controls="spatial-panel"><span>Valve 回放 · 营地与本体路线</span>
+      <strong id="spatial-count">正在读取坐标…</strong><small id="spatial-source">只计有实录本体坐标的对局。</small></button>
+    <button id="pick-tempo" type="button" aria-controls="tempo-panel"><span>D2PT 名册 · 扩大的一号位分钟样本</span>
+      <strong id="tempo-count">正在读取分钟样本…</strong><small>补刀记录不含坐标；两层场数不能相加。</small></button>
+  </div>
+  <section id="tempo-panel" aria-label="D2PT 分钟补刀" hidden>
+    <h2>一号位分钟补刀</h2><p id="tempo-status" role="status">正在读取 D2PT 分钟名册…</p>
+    <div id="tempo-view" hidden>
+      <label>名册对局 <select id="tempo-match"></select></label>
+      <p id="tempo-meta"></p>
+      <dl class="minute-lh" aria-label="各分钟累计补刀">
+        <div><dt>5 分钟</dt><dd id="lh-5"></dd></div><div><dt>10 分钟</dt><dd id="lh-10"></dd></div>
+        <div><dt>15 分钟</dt><dd id="lh-15"></dd></div><div><dt>20 分钟</dt><dd id="lh-20"></dd></div>
+      </dl>
+      <small>直接读取名册对应分钟的累计补刀。未到该分钟或缺值均为“未覆盖”，不用终局补刀补齐，也不据此推算金币、营地或路线。</small>
+      <p id="tempo-route-info"></p><button id="tempo-open-route" type="button" hidden>查看此局的实录路线 →</button>
+    </div>
+  </section>
+  <div id="spatial-panel">
+  <div class="notice"><span class="dot"></span><strong>只读录像，不生成路线</strong><span id="viewer-status" role="status">正在读取 7.42 回放…</span></div>
+  <div id="viewer" hidden>
+    <div class="controlbar">
+      <label>英雄 <select id="hero-filter"><option value="all">全部英雄</option><option value="luna">露娜</option><option value="troll_warlord">巨魔战将</option></select></label>
+      <label>阵营 <select id="team-filter"><option value="all">双方阵营</option><option value="radiant">天辉</option><option value="dire">夜魇</option></select></label>
+      <label class="match-control">对局 <select id="replay-match"></select></label>
+      <label>观察窗口 <select id="replay-window">
+        <option value="300,600">5–10 分钟</option><option value="600,900">10–15 分钟</option>
+        <option value="900,1200">15–20 分钟</option><option value="600,1200" selected>10–20 分钟</option>
+      </select></label>
+      <span id="match-count" class="pill"></span>
+    </div>
+    <p id="window-coverage" role="status"></p>
+    <main id="match-detail" class="replay-layout">
+      <section class="map-panel">
+        <div class="map-heading"><h2>本体轨迹</h2><output id="camp-info">悬停、点按或聚焦营地可查看编号和坐标</output></div>
+        <p id="trace-coverage"></p>
+        <svg id="route-map" role="group" aria-label="7.42 回放坐标图，北向上，无地形底图" aria-describedby="trace-coverage">
+          <g id="towers"></g><path id="body-trace"></path><g id="camps" aria-label="营地地标"></g><circle id="sample-marker" r="110"></circle>
+        </svg>
+        <div class="map-footer"><span>青线：本体轨迹 · 白点：所选采样</span><span>金点：营地（G 天辉 / E 夜魇）· 方块：塔址</span></div>
+        <small>只画这批 7.42 录像中的地标，不叠加旧地图。营地位置不代表到访或清空；死亡、采样缺口和传送等大位移处不连线。</small>
+      </section>
+      <aside>
+        <section><div class="section-title"><h2 id="replay-player"></h2><span id="replay-result" class="pill"></span></div><p id="replay-meta"></p></section>
+        <section><h2>窗口金币</h2><div class="route-metrics">
+          <div><span>小兵类金币</span><strong id="replay-lane-gold"></strong></div><div><span>野怪类金币</span><strong id="replay-neutral-gold"></strong></div>
+        </div><small id="counter-times"></small><small>只在窗口两端都有实录计数时作差，不以终局值补齐。小兵类可含敌方召唤物，野怪类可含野怪召唤物；两项都包含幻象等受控单位的收入，不是总 GPM。</small></section>
+        <section><h2><label for="replay-time">逐点查看本体</label></h2>
+          <input id="replay-time" type="range" min="0" step="1"><output id="sample-info" for="replay-time"></output>
+          <small>滑动或用方向键查看窗口内的实录采样，不在两点之间推算坐标。</small>
+        </section>
+      </aside>
+    </main>
+  </div>
+  </div>
+  <script type="module" src="/farming-742.js"></script>
+</body>
+</html>

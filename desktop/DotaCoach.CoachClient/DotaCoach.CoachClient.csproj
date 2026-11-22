@@ -6,17 +6,26 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>0.4.2</Version>
+    <Version>0.6.1</Version>
     <ApplicationManifest>../DotaCoach.Desktop/app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DotaCoach.TwoPc.Core/DotaCoach.TwoPc.Core.csproj" />
     <Compile Include="../TwoPc.SharedUi/Ui.cs" Link="Ui.cs" />
     <Compile Include="../TwoPc.SharedUi/DebugPanel.cs" Link="DebugPanel.cs" />
-    <Content Include="../../data/dota2-map-reference.json;../../data/luna-live-lessons.json">
+    <Content Include="../../data/dota2-map-reference.json;../../data/luna-live-lessons.json;../../data/dota2-dictionary.json">
       <Link>data/%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
+    <Content Include="../../data/dota2-coach-map.json;../../data/dota2-ward-spots-742.json" Link="data/%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- Coach only. No venv, locally extracted Valve art/calibration, recordings, GSI config or tokens. -->
+    <Content Include="../../scripts/vision/hero_scan.py;../../scripts/vision/hud_recognizer.py;../../scripts/vision/wgc.py;../../scripts/vision/capture_replay.py;../../scripts/vision/requirements.txt"
+             Link="scripts/vision/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../docs/twopc-enemy-wards.md" Link="ENEMY-WARDS.md"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../docs/hero-scan.md" Link="hero-scan.md"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

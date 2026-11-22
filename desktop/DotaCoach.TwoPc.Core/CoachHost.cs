@@ -57,7 +57,26 @@ public sealed class CoachHost : IAsyncDisposable
         app.MapPost("/v1/session", () => Results.Json(Mailbox.Begin(), Wire.Json));
         app.MapDelete("/v1/session", (HttpContext c) => { Mailbox.End(Session(c)); return Results.NoContent(); });
         app.MapGet("/v1/ticket", (HttpContext c) => Results.Json(Mailbox.Issue(Session(c)), Wire.Json));
+        app.MapGet("/v1/postgame-ticket", (HttpContext c) => Results.Json(Mailbox.IssuePostgameTicket(Session(c)), Wire.Json));
+        app.MapPost("/v1/postgame", async (HttpContext c) => {
+            if (!c.Request.HasJsonContentType()) return Results.StatusCode(415);
+            var receipt = JsonSerializer.Deserialize<PostgameReceipt>(await Bodies.Read(c.Request, 1536, c.RequestAborted), PostgameReceipt.Json);
+            if (receipt == null || receipt.SessionId != Session(c)) return Results.BadRequest();
+            Mailbox.AcceptPostgame(receipt);
+            return Results.NoContent();
+        });
+        app.MapPost("/v1/minute-state", async (HttpContext c) => {
+            if (!c.Request.HasJsonContentType()) return Results.StatusCode(415);
+            byte[] bytes = await Bodies.Read(c.Request, 24576, c.RequestAborted);
+            var meta = JsonSerializer.Deserialize<FrameMeta>(bytes, Wire.Json) ?? throw new ArgumentException();
+            if (meta.SessionId != Session(c)) return Results.BadRequest();
+            Mailbox.AcceptMinuteState(meta, bytes.Length);
+            return Results.NoContent();
+        });
         app.MapGet("/v1/reminder", (HttpContext c) => Results.Json(new { reminder = Mailbox.Poll(Session(c)) }, Wire.Json));
+        app.MapGet("/v1/enemies", (HttpContext c) => Results.Json(new { enemies = Mailbox.Enemies(Session(c)) }, Wire.Json));
+        app.MapGet("/v1/icon/{key}", (HttpContext c, string key) =>
+            Mailbox.Icon(Session(c), key) is { } png ? Results.Bytes(png, "image/png") : Results.NotFound());
         app.MapGet("/v2/video-ticket", (HttpContext c) => Results.Json(Mailbox.IssueVideoLease(Session(c)), Wire.Json));
         app.Map("/v2/video", async (HttpContext c) => {
             if (!c.WebSockets.IsWebSocketRequest || !c.WebSockets.WebSocketRequestedProtocols.Contains(VideoWire.Subprotocol) ||

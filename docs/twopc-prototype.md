@@ -101,7 +101,7 @@ dotnet run --project desktop/DotaCoach.CoachClient -c Release
 powershell -File desktop/build-twopc.ps1
 ```
 
-打包脚本生成两份独立、自带运行时、**未签名**的 ZIP 和 SHA-256 清单。拒绝覆盖已有输出；重打包请指定新的 `-OutputDirectory`。
+打包脚本生成两份独立、自带运行时、**未签名**的 ZIP 和 SHA-256 清单。拒绝覆盖已有输出；重打包请指定新的 `-OutputDirectory`。本机有 `.tmp/vision-assets`（`scripts/vision/extract-assets.ts` 从已安装的 Dota 提取）时，游戏端包里会带上对手面板用的英雄和物品图标（`icons\`，Valve 的美术，只供自用）；没有时给出警告，游戏端改为向教练端要图标。
 
 测试分层：
 

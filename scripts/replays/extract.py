@@ -23,6 +23,7 @@ NEUTRAL = "CDOTA_BaseNPC_Creep_Neutral"
 LANE = "CDOTA_BaseNPC_Creep_Lane"
 TOWER = "CDOTA_BaseNPC_Tower"
 SPAWNER = "CDOTA_NeutralSpawner"
+HERO_CLASSES = {"luna": "CDOTA_Unit_Hero_Luna", "troll_warlord": "CDOTA_Unit_Hero_TrollWarlord"}
 
 
 def position(entity):
@@ -33,13 +34,16 @@ def position(entity):
     return {"x": cx * 128 + x - OFFSET, "y": cy * 128 + y - OFFSET}
 
 
-def extract(dem: Path, output: Path, expected_id: int):
+def extract(dem: Path, output: Path, expected_id: int, hero_key: str = "luna", route_core: bool = False):
     if importlib.metadata.version("gem-dota") != "0.14.0":
         raise ValueError("Parser version must match the audited pin")
     if output.exists():
         raise FileExistsError("Existing extracted evidence will not be overwritten")
+    hero_class = HERO_CLASSES[hero_key]
+    hero_name = "npc_dota_hero_" + hero_key
     p = ReplayParser(str(dem))
     creatures, towers, spawners, camps, frames, hero_path, logs = {}, {}, {}, {}, [], [], []
+    farm_damage = []
     observed_classes = Counter()
     resource = None
     team_entities = {}
@@ -164,8 +168,15 @@ def extract(dem: Path, output: Path, expected_id: int):
             row["abilities"] = inventory(e, "m_vecAbilities", 32)
         return row
 
-    def capture_frame():
+    def capture_frame(terminal=False):
         selected = selected_heroes()
+        if route_core:
+            # Same economy/inventory counters, geometry, kill attribution and
+            # game-clock samples as full extraction. Don't materialize every
+            # unrelated unit every second; the postgame parity frame needs all 10.
+            return {"tick": p.tick, "roundedGameTime": p.game_time_s,
+                    "heroes": [hero(e, slot, e.get_class_name() == hero_class) for e, slot in selected
+                               if terminal or e.get_class_name() == hero_class]}
         units = [unit(e) for e in p.entity_manager.all_active() if e.get_class_name() in (NEUTRAL, LANE, TOWER)
                  and e.get("m_lifeState") == 0 and e.get("m_bIsWaitingToSpawn") is False]
         return {"tick": p.tick, "roundedGameTime": p.game_time_s, "units": units,
@@ -176,11 +187,18 @@ def extract(dem: Path, output: Path, expected_id: int):
         seconds = p.game_time_s
         if seconds is None or seconds < 0 or p.post_game_tick is not None:
             return
-        selected = selected_heroes()
+        if route_core and seconds > 1202:
+            # No spatial events or canonical economic boundaries after 20:00
+            # are published. Keep walking the replay and sampling loadouts for
+            # firstHeld, but not an unused 0.13s body history late in the match.
+            if seconds != last_second:
+                last_second = seconds
+                frames.append(capture_frame())
+            return
         if last_path_tick is None or p.tick - last_path_tick >= 3:
             last_path_tick = p.tick
-            for e, slot in selected:
-                if e.get_class_name() == "CDOTA_Unit_Hero_Luna":
+            for e, slot in selected_heroes():
+                if e.get_class_name() == hero_class:
                     hero_path.append({"tick": p.tick, **hero(e, slot, False)})
         if seconds == last_second:
             return
@@ -189,8 +207,12 @@ def extract(dem: Path, output: Path, expected_id: int):
         frames.append(capture_frame())
 
     def combat(log):
-        # Raw recorded Luna events. Do not infer camp/kill credit by nearest hero.
-        if any("luna" in str(getattr(log, k, "")) for k in ("attacker_name", "target_name", "inflictor_name")):
+        # Raw recorded hero events. Do not infer camp/kill credit by nearest hero.
+        if (route_core and log.log_type == "DAMAGE" and log.attacker_name == hero_name
+                and str(log.target_name).startswith("npc_dota_neutral_") and log.target_team == 4):
+            farm_damage.append([log.tick, log.target_name, log.value, log.attacker_team,
+                                log.attacker_is_illusion if log.attacker_is_illusion_present else None])
+        if any(hero_key in str(getattr(log, k, "")) for k in ("attacker_name", "target_name", "inflictor_name")):
             if str(log.log_type) in ("DEATH", "GOLD", "ABILITY", "ITEM", "PURCHASE"):
                 logs.append(asdict(log))
 
@@ -199,14 +221,14 @@ def extract(dem: Path, output: Path, expected_id: int):
     p.on_combat_log_entry(combat)
     # Flush after the terminal packet's entity deltas, not the preceding 1s
     # sample. Otherwise final last-hit totals can be low by one.
-    p.on_game_end(lambda _: frames.append(capture_frame()))
+    p.on_game_end(lambda _: frames.append(capture_frame(terminal=True)))
     started = time.monotonic()
     p.parse()
     if p.parse_error is not None or p.post_game_tick is None or p.match_id != expected_id:
         raise ValueError(f"Incomplete/mismatched replay: id={p.match_id}, postgame={p.post_game_tick}, error={p.parse_error}")
     frames = [f for f in frames if f["tick"] <= p.post_game_tick]
     hero_path = [h for h in hero_path if h["tick"] <= p.post_game_tick]
-    if not hero_path or any(h["name"] != "npc_dota_hero_luna" for h in hero_path):
+    if not hero_path or any(h["name"] != hero_name for h in hero_path):
         raise ValueError("Selected hero/name table mismatch")
     clock = p.game_clock
     for frame in frames:
@@ -231,17 +253,26 @@ def extract(dem: Path, output: Path, expected_id: int):
         "coordinateTransform": {"cellSize": 128, "offsetSubtract": OFFSET, "method": "cell*128+vec-16384; checked against named replay camp boxes and static towers"},
         "clock": asdict(clock), "classes": dict(observed_classes),
         "camps": list(camps.values()), "spawners": list(spawners.values()), "towers": list(towers.values()),
-        "creatures": list(creatures.values()), "heroPath": hero_path, "frames": frames, "lunaCombatLog": logs,
+        "creatures": list(creatures.values()), "heroPath": hero_path, "frames": frames,
+        # Keep historical Luna facts byte-compatible; never label Troll events as Luna's.
+        ("lunaCombatLog" if hero_key == "luna" else "trollCombatLog"): logs,
         "limitations": ["Replay all-map state is audit-only, not player-visible live context.",
                         "m_iMoveSpeed is a recorded base field, NOT necessarily effective speed with modifiers.",
                         "No heuristic camp-route classification, kill-credit proximity, or strategy selection.",
                         "Trees/river/collision and exact subpatch require separate evidence."],
     }
+    if route_core:
+        result["extractionScope"] = "route-core"
+        result["farmDamage"] = farm_damage
+        result["farmDamageFields"] = ["tick", "neutralName", "damage", "attackerTeam", "attackerIllusion"]
     output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("x", encoding="utf-8") as f:
+    target = output.with_suffix(output.suffix + ".partial") if route_core else output
+    with target.open("x", encoding="utf-8") as f:
         json.dump(result, f, separators=(",", ":"), ensure_ascii=False)
+    if route_core:
+        target.rename(output)
     print(json.dumps({"matchId": p.match_id, "build": p.game_build, "elapsedSeconds": round(time.monotonic()-started, 2),
-                      "frames": len(frames), "lunaSamples": len(hero_path), "camps": len(camps),
+                      "frames": len(frames), "hero": hero_key, "heroSamples": len(hero_path), "camps": len(camps),
                       "spawners": len(spawners), "towers": len(towers), "creatures": len(creatures)}, indent=2))
 
 
@@ -249,5 +280,9 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("match_id", type=int)
     ap.add_argument("--root", type=Path, default=Path(".tmp/replays"))
+    ap.add_argument("--hero", choices=HERO_CLASSES, default="luna")
+    ap.add_argument("--route-core", action="store_true",
+                    help="Focus per-second facts on the selected hero; retain terminal parity and spatial evidence.")
     args = ap.parse_args()
-    extract(args.root / f"{args.match_id}.dem", args.root / f"{args.match_id}.facts.json", args.match_id)
+    extract(args.root / f"{args.match_id}.dem", args.root / f"{args.match_id}.facts.json", args.match_id,
+            args.hero, args.route_core)

@@ -8,4 +8,8 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/minute-farm-742.json.gz" LogicalName="DotaCoach.MinuteFarm.Map742" />
+    <EmbeddedResource Include="../../data/farming-742-minute-priors.json" LogicalName="DotaCoach.MinuteFarm.Priors742" />
+  </ItemGroup>
 </Project>
