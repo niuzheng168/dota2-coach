@@ -25,6 +25,10 @@ internal static partial class Program
             Console.WriteLine("PASS fresh and v0.4.x profiles start in participant GSI mode with local HP off and no video or practice worker");
             return;
         }
+        // The released game client has no picture mode. These fixtures still drive the video, diagnostic and strict
+        // lanes, so they opt in to the developer selector; --game-controls above checks the production window.
+        Features.VideoUpload = true;
+        CheckDefaultProfiles(production: true);
         if (args is ["--offline-practice"]) { OfflinePractice(); return; }
         if (args is ["--lane-vision-e2e"]) { LaneVisionE2E.Run(); return; }
         if (args is ["--lane-window-e2e"]) { LaneWindowE2E.Run(); return; }
@@ -148,8 +152,10 @@ internal static partial class Program
         var source = Field<ComboBox>(game, "source");
         source.SelectedItem = source.Items.Cast<string>().Single(s => s.StartsWith(prefix, StringComparison.Ordinal));
     }
-    private static void CheckDefaultProfiles()
+    private static void CheckDefaultProfiles(bool production = true)
     {
+        bool developer = Features.VideoUpload;
+        Features.VideoUpload = !production && developer;
         var dir = Directory.CreateTempSubdirectory("game-controls-");
         try {
             var video = Path.Combine(dir.FullName, "game-video.json");
@@ -159,22 +165,25 @@ internal static partial class Program
                 var game = new GameWindowUi(null, dir.FullName, video, Path.Combine(dir.FullName, "overlay.json"));
                 try { CheckGameControls(game); } finally { game.Close(); }
             }
-        } finally { dir.Delete(true); }
+        } finally { dir.Delete(true); Features.VideoUpload = developer; }
     }
     private static void CheckGameControls(Window game)
     {
         var controls = Children(game).ToArray();
         var source = Field<ComboBox>(game, "source");
         if (!controls.OfType<Expander>().Select(e => e.Header as string).SequenceEqual([
-                "小兵血量：本机实时显示", "游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", "设置：画面来源、视频、Dota 目录", "Debug"]) ||
+                "小兵血量：本机实时显示", "游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度",
+                Features.VideoUpload ? "设置：画面来源、视频、Dota 目录" : "设置：Dota 目录", "Debug"]) ||
             !controls.OfType<Button>().Any(b => Equals(b.Content, "连接")) || !controls.OfType<Button>().Any(b => Equals(b.Content, "显示小兵血量")) ||
             controls.OfType<Button>().Any(b => b.Content is "试算" or "开始本机练习" or "停止显示血量") ||
             typeof(GameWindowUi).Assembly.GetType("DotaCoach.TwoPc.LastHitPractice") != null)
             throw new Exception("The normal client must retain local creep HP but must not ship the experimental practice UI or worker");
-        if (!controls.Contains(source) || source.SelectedItem is not string mode || !mode.StartsWith("仅本人 GSI", StringComparison.Ordinal) ||
+        // Production: no connection-mode selector at all, so no picture mode can be picked; UI tests opt in to it.
+        if (controls.Contains(source) != Features.VideoUpload || source.SelectedItem is not string mode ||
+            !mode.StartsWith("本人 GSI＋可选本机小兵血量", StringComparison.Ordinal) ||
             Field<Grid>(game, "preview").Visibility != Visibility.Collapsed || controls.Contains(Field<ComboBox>(game, "fpsChoice")) ||
             Field<CancellationTokenSource?>(game, "active") != null || Field<GsiReceiver?>(game, "gsi") != null || Field<IAsyncDisposable?>(game, "creepHp") != null)
-            throw new Exception("The initial selection must be the v0.6.1 photo-free participant route, not video, basic status or a local screen scan");
+            throw new Exception("The initial connection must be the photo-free own-GSI route with optional local HP, not video, basic status or a local screen scan");
     }
     private static CheckBox DebugSwitch(Window w) => Children(w).OfType<CheckBox>()
         .Single(c => Equals(c.Content, "开启 Debug 记录"));
@@ -427,12 +436,16 @@ internal static partial class Program
         plus.IsExpanded = true; Render(coach, Path.Combine(output, "coach-status-only.png")); plus.IsExpanded = false;
         Render(game, Path.Combine(output, "game-status-only.png"));
         var board = HudBoard(MinimapLayout.Suggest(1280, 720));
+        // The coach's tick republishes its own (here empty) last-known panel; hold the fixture panel instead.
+        var coachTimer = Field<System.Windows.Threading.DispatcherTimer>(coach, "timer");
+        coachTimer.Stop();
         host.Mailbox.SetEnemies(board);
         string session = host.Mailbox.Snapshot().SessionId!;
         var overlay = Field<AdviceOverlay>(game, "overlay");
-        await Wait(() => host.Mailbox.Enemies(session) == null && host.Mailbox.Icon(session, "item_blink") == null &&
-            Member<EnemyBoard?>(overlay, "enemies") == null && overlay.BoardForDisplay == null,
-            "ordinary status subtitles confer no right to an equipment/ward board or its icons");
+        await Task.Delay(1600);
+        await Wait(() => host.Mailbox.Enemies(session) != null && Member<EnemyBoard?>(overlay, "enemies") == null,
+            "the developer status lanes carry subtitles only: they never poll or draw the enemy panel");
+        coachTimer.Start();
         Click(game, "断开");
         await Wait(() => host.Mailbox.Snapshot().SessionId == null && Field<CancellationTokenSource?>(game, "active") == null &&
             Field<TextBlock>(game, "status").Text.Contains("已断开"), "disconnecting ends the status session");
@@ -472,7 +485,7 @@ internal static partial class Program
         host.Mailbox.SetEnemies(board);
         await Task.Delay(1000);
         await Wait(() => host.Mailbox.Enemies(latest.Meta.SessionId) == null && Member<EnemyBoard?>(overlay, "enemies") == null &&
-            overlay.BoardForDisplay == null && Volatile.Read(ref iconQueries) == 0,
+            Volatile.Read(ref iconQueries) == 0,
             "diagnostic video cannot deliver an unbound synthetic board or probe scanner icons");
         var styleIcons = new IconCache();
         foreach (var (key, png) in icons) styleIcons.Add(key, png, 0); // Offscreen fixture, never a live board.
@@ -499,9 +512,12 @@ internal static partial class Program
             return c;
         }
         var minimap = WardCanvas(wards).Children.OfType<Canvas>().Single();
+        var local = panel.Current.Minimap(1280, 720);
         await Wait(() => Canvas.GetLeft(minimap) == confirmed.Left && Canvas.GetTop(minimap) == confirmed.Top &&
-            minimap.Width == confirmed.Size && WardCanvas(wards with { Minimap = null }).Children.Count == 0,
-            "the local right/120% preview preference neither moves the confirmed left HUD nor substitutes for missing calibration");
+            minimap.Width == confirmed.Size && WardCanvas(wards with { Minimap = null }).Children.OfType<Canvas>().Single() is var fallback &&
+            local.Left > 640 && local.Size > 720 * 2 / 9d && Canvas.GetLeft(fallback) == local.Left && Canvas.GetTop(fallback) == local.Top &&
+            fallback.Width == local.Size && WardCanvas(wards with { MatchId = null, Team = null }).Children.Count == 0,
+            "a confirmed left HUD wins over the local right/120% minimap setting, which places marks only without a confirmed box");
         minimap.Measure(new Size(300, 300)); minimap.Arrange(new Rect(0, 0, 300, 300)); minimap.UpdateLayout();
         var wardBitmap = new RenderTargetBitmap(300, 300, 96, 96, PixelFormats.Pbgra32);
         wardBitmap.Render(minimap);

@@ -52,11 +52,10 @@ internal static partial class Program
                 var receipt = await link.Enemies(default) ?? throw new Exception("No authorized fixture board");
                 var keys = new IconCache().Missing(board, 0);
                 foreach (string key in keys) overlay.Icons.Add(key, await link.Icon(key, default), Environment.TickCount64);
-                await Wait(() => link.DisplayEnemies(receipt, phase, surface.Width, surface.Height) is { Heroes.Length: 5 } &&
-                    keys.All(key => overlay.Icons[key] != null), "all five fixture rows and their supplied PNGs crossed the pinned participant link");
+                await Wait(() => receipt is { Heroes.Length: 5 } && keys.All(key => overlay.Icons[key] != null),
+                    "all five fixture rows and their supplied PNGs crossed the pinned participant link");
                 Mark("fixture-icons", new { count = keys.Length });
                 await link.End(default);
-                await Wait(() => link.DisplayEnemies(receipt, phase, surface.Width, surface.Height) == null, "disconnect invalidates the fixture board");
             }
             // No application input or focus manipulation. The foreground requirement is part of the trial.
             game.ShowActivated = false; game.WindowState = WindowState.Minimized; game.Show();

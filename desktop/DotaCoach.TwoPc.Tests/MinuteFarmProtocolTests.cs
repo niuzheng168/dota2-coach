@@ -309,9 +309,12 @@ internal static class MinuteFarmProtocolTests
                 box.Poll(id) != null && await link.Poll(default) == null,
                 "local pause before next upload/poll permanently retires displayed origin: " + source);
         }
-        check(Reject(() => box.SetReminder(id, seq, "manual-link-test", "no legacy GSI-only", null)) &&
-            Reject(() => box.SetReminder(id, seq, "local-vision-observation", "no pixels", null)),
-            "GSI-only ingress cannot publish even a markerless legacy reminder");
+        check(Reject(() => box.SetReminder(id, seq, "manual-link-test", "no point without pixels", new(.1, .9))) &&
+            Reject(() => box.SetReminder(id, seq, "visible-farming-advice", "no image advice without pixels", null)),
+            "GSI-only ingress cannot publish a map point or image-model advice");
+        box.SetReminder(id, seq, "local-vision-observation", "剃刀 离开视野", null, displayMs: 3000);
+        check(await link.Poll(default) is { Kind: "local-vision-observation", Marker: null, Message: "剃刀 离开视野" },
+            "a markerless Plus alert crosses the GSI-only link like the v0.4.8 status link");
         long pending = await Send(own);
         try { await Send(null, rejectedTicket: true); throw new Exception("expected bad ticket"); } catch (HttpRequestException) { }
         await Send(own with { Clock = 601 });

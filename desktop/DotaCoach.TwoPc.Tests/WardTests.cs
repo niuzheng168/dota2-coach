@@ -205,21 +205,21 @@ internal static class WardTests
         Participant(1, 700);
         var unbound = new EnemyBoard([], [mark, mark with { Rank = 1, Left = 2 }]);
         mailbox.SetEnemies(unbound);
-        check(mailbox.Enemies(session) == null, "valid marks alone are not authorization for the current participant");
-        var scoped = unbound with { MatchId = actor.MatchId, Team = actor.Team, Minimap = hud,
-            SessionId = session, FrameSequence = 1, RemainingMs = 2800 };
+        check(mailbox.Enemies(session) == null, "marks without the player's match and team are never relayed");
+        var scoped = unbound with { MatchId = actor.MatchId, Team = actor.Team, Minimap = hud };
         mailbox.SetEnemies(scoped with { Minimap = null });
-        check(mailbox.Enemies(session) == null, "an identified participant without confirmed HUD geometry does not receive ward marks");
+        check(mailbox.Enemies(session) is { Wards.Length: 2, Minimap: null },
+            "without a confirmed box the marks still reach the game machine, which places them by its own HUD setting");
         mailbox.SetEnemies(scoped);
         now += 2500;
-        Participant(2, 702); // same actor and viewport; this fresh witness must not restart the publication lease
+        Participant(2, 702); // a fresh participant sample does not renew the panel: only the coach does
         check(mailbox.Enemies(session) is { Heroes: [], Wards: [{ Rank: 0, Age: 12.5, Left: 27.5 }],
-                FrameSequence: 1, HeldMs: 2500, RemainingMs: 300 } boardAt && boardAt.SessionId == session && boardAt.Minimap == hud,
+                FrameSequence: 1, HeldMs: 2500, RemainingMs: 2500 } boardAt && boardAt.SessionId == session && boardAt.Minimap == hud,
             "the game machine gets the marks aged by the time held, the expired one left out");
-        now += 299;
-        check(mailbox.Enemies(session)?.RemainingMs == 1, "re-polling the scoped board keeps the original TTL");
+        now += 2499;
+        check(mailbox.Enemies(session)?.RemainingMs == 1, "re-polling does not extend a panel the coach stopped renewing");
         now++;
-        check(mailbox.Enemies(session) == null, "the board expires at the exact source deadline, even with a fresh participant");
+        check(mailbox.Enemies(session) == null, "a panel the coach stopped renewing expires");
         string json = JsonSerializer.Serialize(new { enemies = new EnemyBoard([], [mark]) }, Wire.Json);
         check(json.Contains("\"wards\":[{\"hero\":\"npc_dota_hero_lion\"") &&
               JsonSerializer.Deserialize<EnemyHero[]>("[{\"hero\":\"npc_dota_hero_lion\",\"wards\":[{\"clock\":1}]}]", Wire.Json)![0].Hero == Lion,

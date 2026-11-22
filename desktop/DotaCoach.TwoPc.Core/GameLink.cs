@@ -14,9 +14,6 @@ public sealed partial class GameLink : IDisposable
     private readonly Dictionary<long, (long At, FrameMeta Meta)> captures = new();
     private readonly Queue<long> captureOrder = new();
     private readonly MinuteFarmWindow minuteWindow = new();
-    private readonly BoardWindow boardWindow = new();
-    private (EnemyBoard Receipt, EnemyBoard Value, long At, double AgeClock)? activeBoard;
-    private long boardPoll, lastBoardSequence;
     private (Reminder Plan, FrameMeta Origin, long At, long Until)? activeMinute;
     private long lastMinuteAccepted;
     private FrameMeta? currentCapture;
@@ -78,7 +75,7 @@ public sealed partial class GameLink : IDisposable
         SessionId = hello.SessionId; videoProtocol = hello.VideoProtocol; ClearCaptures();
     }
     private void ClearCaptures() { lock (gate) { captures.Clear(); captureOrder.Clear(); currentCapture = null;
-        minuteWindow.Clear(); activeMinute = null; lastMinuteAccepted = 0; boardWindow.Clear(); activeBoard = null; lastBoardSequence = 0; boardPoll++; } }
+        minuteWindow.Clear(); activeMinute = null; lastMinuteAccepted = 0; } }
     // Ticket round-trip precedes capture: both sides can bound frame age without synchronised wall clocks.
     public async Task<Ticket> GetTicket(CancellationToken cancellation)
     {
@@ -143,11 +140,11 @@ public sealed partial class GameLink : IDisposable
                 slots.Release();
             }
         } catch (Exception e) {
-            lock (gate) if (window == slots) { ackFailure = e; minuteWindow.Clear(); activeMinute = null; boardWindow.Withdraw(); activeBoard = null; }
+            lock (gate) if (window == slots) { ackFailure = e; minuteWindow.Clear(); activeMinute = null; }
             socket.Abort(); // Any pending send fails promptly instead of waiting for its timeout.
         }
     }
-    public void AbortVideo() { DropPostgame(); lock (gate) { minuteWindow.Clear(); activeMinute = null; boardWindow.Withdraw(); activeBoard = null; } video?.Abort(); }
+    public void AbortVideo() { DropPostgame(); lock (gate) { minuteWindow.Clear(); activeMinute = null; } video?.Abort(); }
     private void Remember(FrameMeta meta, long at)
     {
         lock (gate) {
@@ -157,8 +154,6 @@ public sealed partial class GameLink : IDisposable
                 captures.Clear(); captureOrder.Clear();
             }
             currentCapture = meta;
-            boardWindow.Observe(meta, at, now());
-            if (activeBoard is { } b && !boardWindow.Admits(b.Value, now())) activeBoard = null;
             minuteWindow.Observe(meta, at, now());
             PruneMinute(now());
             captures[meta.Sequence] = (at, meta); captureOrder.Enqueue(meta.Sequence);
@@ -220,7 +215,8 @@ public sealed partial class GameLink : IDisposable
                 instant - captured.At >= (minute ? CaptureRetentionMs : LegacyRetentionMs) || r.RemainingMs <= elapsed ||
                 r.RemainingMs > (minute ? MinuteFarmContext.MaxDisplayMs : Wire.MaxReminderMs) ||
                 string.IsNullOrWhiteSpace(r.Message) || r.Message.Length > 120 || minute != r.FarmMinute.HasValue ||
-                !minute && (captured.Meta.Source == "dota2-gsi" || currentCapture?.Source == "dota2-gsi") ||
+                !minute && (captured.Meta.Source == "dota2-gsi" || currentCapture?.Source == "dota2-gsi") &&
+                    !Wire.StatusSubtitle(r.Kind, r.Marker, r.Minimap, r.Route, r.NextSteps) ||
                 captured.Meta.IsLegacyStatus != (currentCapture?.IsLegacyStatus == true) ||
                 !Wire.ValidRoute(r.Route, r.Marker) || !Wire.ValidSteps(r.NextSteps) ||
                 (r.Route != null && !minute && r.Kind is not ("visible-farming-advice" or "experimental-bot-advice")) ||
@@ -285,82 +281,32 @@ public sealed partial class GameLink : IDisposable
             return true;
         }
     }
-    /// <summary>Only boards tied to our own fresh authenticated capture may be admitted. A v0.4.8 scanner DTO
-    /// remains readable, but an unbound reply (or a coach without this endpoint) cannot authorize a game overlay.</summary>
+    /// <summary>The coach's current enemy panel for this session, or null when it has none (or is a coach without one).
+    /// The coach keeps its last-known rows; this client shows each reply until the next one replaces it.</summary>
     public async Task<EnemyBoard?> Enemies(CancellationToken cancellation)
     {
-        long order, started = now();
-        lock (gate) order = ++boardPoll;
         using var request = Request(HttpMethod.Get, "/v1/enemies");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(http.Timeout);
-        EnemyBoard? board = null;
-        try {
-            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-            if (response.IsSuccessStatusCode)
-                board = BoardDelivery.Read(await Body(response, 65536, timeout.Token));
-            else if (response.StatusCode != System.Net.HttpStatusCode.NotFound) response.EnsureSuccessStatusCode();
-        } catch (Exception e) when (e is JsonException or InvalidOperationException) { /* Malformed/oversized: withdraw. */ }
-        catch {
-            // Lost pin/token, cancelled poll or transport failure: don't leave a previous receipt drawable.
-            lock (gate) if (order == boardPoll) activeBoard = null;
-            throw;
-        }
-        lock (gate) {
-            if (order != boardPoll) return null;
-            activeBoard = null;
-            long instant = now(), elapsed = instant - started;
-            if (board == null || board.SessionId != SessionId || ackFailure != null || elapsed < 0 ||
-                board.RemainingMs is < 1 or > Wire.BoardLifetimeMs || !boardWindow.Admits(board, instant) ||
-                board.FrameSequence < lastBoardSequence || !captures.TryGetValue(board.FrameSequence, out var origin) ||
-                origin.Meta.SessionId != SessionId || origin.Meta.MatchPhase == null) return null;
-            // Charge the full poll RTT, cap at our own original capture and never draw through a stalled poller.
-            double baseClock = origin.Meta.MatchPhase.Clock + board.HeldMs / 1000d;
-            long advance = BoardDelivery.ElapsedMs(elapsed, baseClock, boardWindow.Clock);
-            long remaining = Math.Min(Math.Min(board.RemainingMs, MatchWitness.MaxAgeMs) - advance, origin.At + Wire.BoardLifetimeMs - instant);
-            if (remaining <= 0) return null;
-            var value = BoardDelivery.Age(boardWindow.Calibrated(board), advance, (int)remaining);
-            if (BoardDelivery.Empty(value)) return null;
-            var receipt = BoardDelivery.Age(value, 0, value.RemainingMs);
-            activeBoard = (receipt, value, instant, baseClock + advance / 1000d); lastBoardSequence = board.FrameSequence;
-            return receipt;
-        }
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        EnemyBoard? board;
+        try { board = BoardDelivery.Read(await Body(response, 65536, timeout.Token)); }
+        catch (InvalidOperationException) { return null; } // Oversized: ignore this reply.
+        return board != null && board.SessionId == SessionId ? board : null;
     }
-    /// <summary>Revalidates on every render, including a cached drawing. Pass this machine's latest participant
-    /// witness and the actual viewport, never the coach's expectation or the minute-route verdict.</summary>
-    public EnemyBoard? DisplayEnemies(EnemyBoard receipt, MatchWitness? local, int width, int height)
-    {
-        lock (gate) {
-            if (activeBoard is not { } b || !ReferenceEquals(receipt, b.Receipt)) return null;
-            long instant = now();
-            if (!boardWindow.Local(local, width, height, instant)) { boardWindow.Withdraw(); activeBoard = null; return null; }
-            long advance = BoardDelivery.ElapsedMs(instant - b.At, b.AgeClock, local!.Clock);
-            if (ackFailure != null || !boardWindow.Admits(b.Value, instant) || instant < b.At || advance >= b.Value.RemainingMs) {
-                activeBoard = null; return null;
-            }
-            var result = BoardDelivery.Age(boardWindow.Calibrated(b.Value), advance, b.Value.RemainingMs - (int)advance);
-            return BoardDelivery.Empty(result) ? null : result;
-        }
-    }
-    private bool MayReadIcon(string key)
-    {
-        lock (gate) {
-            long instant = now();
-            return activeBoard is { } b && ackFailure == null && boardWindow.Admits(b.Value, instant) && instant >= b.At &&
-                BoardDelivery.ElapsedMs(instant - b.At, b.AgeClock, boardWindow.Clock) < b.Value.RemainingMs && BoardDelivery.HasIcon(b.Value, key);
-        }
-    }
-    /// <summary>Only icons on the currently admitted equipment panel, even when paired with an older coach.</summary>
+    /// <summary>One icon of the enemy panel as PNG bytes, or null when the coach has none (it serves only icons on its panel).</summary>
     public async Task<byte[]?> Icon(string key, CancellationToken cancellation)
     {
-        if (!Wire.ValidIconKey(key) || !MayReadIcon(key)) return null;
+        if (!Wire.ValidIconKey(key)) return null;
         using var request = Request(HttpMethod.Get, "/v1/icon/" + key);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(http.Timeout);
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         if (!response.IsSuccessStatusCode) return null;
         var data = await Body(response, Wire.MaxIconBytes, timeout.Token);
-        return Wire.IsIcon(data) && MayReadIcon(key) ? data : null;
+        return Wire.IsIcon(data) ? data : null;
     }
     public async Task End(CancellationToken cancellation)
     {
@@ -376,8 +322,7 @@ public sealed partial class GameLink : IDisposable
     private void CloseVideo()
     {
         DropPostgame();
-        lock (gate) { window = null; unacknowledged.Clear(); minuteWindow.Clear(); activeMinute = null; ackFailure = null;
-            boardWindow.Clear(); activeBoard = null; boardPoll++; }
+        lock (gate) { window = null; unacknowledged.Clear(); minuteWindow.Clear(); activeMinute = null; ackFailure = null; }
         video?.Abort(); video?.Dispose(); video = null;
     }
     public void Dispose() { CloseVideo(); http.Dispose(); ClearCaptures(); }

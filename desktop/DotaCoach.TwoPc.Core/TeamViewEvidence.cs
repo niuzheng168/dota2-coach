@@ -3,7 +3,7 @@ namespace DotaCoach.TwoPc;
 /// <summary>Admission for live Plus evidence, not for the delay meter or offline replay evaluations.</summary>
 public static class TeamViewEvidence
 {
-    public const int FreshMs = 3_000, MaxLagSeconds = 10;
+    public const int FreshMs = 3_000, MaxLagSeconds = 10, MaxLeadSeconds = 2;
     public static bool RealMatch(string? id) => MatchWitness.MatchIdOk(id);
     public static string? Side(int? n) => n switch { 2 => "radiant", 3 => "dire", _ => null };
     public static bool IsTeamView(SpectatorSnapshot? s) =>
@@ -23,8 +23,11 @@ public static class TeamViewEvidence
     public static bool Matches(MatchWitness? participant, SpectatorSnapshot? s, long now) =>
         participant != null && IsTeamView(s) && now - s!.ReceivedAt is >= 0 and < FreshMs &&
         participant.MatchId == s.MatchId && participant.Team == Side(s.OwnTeam) && Recent(s.Clock!.Value, participant.Clock);
+    // The player's GSI reaches the coach in whole seconds a few times a second over the LAN, so this machine's own
+    // Plus feed routinely shows the next second first. Treating that as another timeline reset the whole team view
+    // (ward tracker, leave-vision tracking) once per game second in v0.6.1; only a larger lead is suspicious.
     internal static bool Recent(double observed, double current) =>
-        Wire.Finite(current, -3600, 43_200) && Wire.Finite(observed, current - MaxLagSeconds, current);
+        Wire.Finite(current, -3600, 43_200) && Wire.Finite(observed, current - MaxLagSeconds, current + MaxLeadSeconds);
     private static bool Located(MinimapUnit u) => u.Team is 2 or 3 && (u.X != 0 || u.Y != 0) &&
         Wire.Finite(u.X, -12_000, 12_000) && Wire.Finite(u.Y, -12_000, 12_000);
     public static IEnumerable<MinimapUnit> VisibleHeroes(SpectatorSnapshot s) => !IsTeamView(s) ? [] : s.Heroes

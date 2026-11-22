@@ -3,6 +3,8 @@ using System.Text;
 using System.Text.Json;
 using DotaCoach.TwoPc;
 
+/// <summary>The game machine's enemy panel: the coach's last-known rows survive scanner and packet gaps, the mailbox
+/// relays them per session, and the game client shows each reply until the next one.</summary>
 internal static class AuthorizedBoardTests
 {
     private const string Match = "9034567891", Me = "npc_dota_hero_axe", Enemy = "npc_dota_hero_lion";
@@ -16,6 +18,7 @@ internal static class AuthorizedBoardTests
     public static async Task Run(Action<bool, string> check)
     {
         Shape(check);
+        KnownBoard(check);
         Mailbox(check);
         await RoundTrip(check);
         await PostgameDeliveryTests.Run(check);
@@ -45,75 +48,90 @@ internal static class AuthorizedBoardTests
             json.Replace("\"x\":0.3,", ""), json.Replace("\"y\":0.4", "\"y\":\"0.4\""),
             json.Replace("\"rank\":1", "\"rank\":0,\"rank\":1"), json.Replace("\"rough\":true", "\"rough\":true,\"track\":[]"),
             json.Replace("\"level\":11", "\"level\":11,\"wards\":[{}]"), json.Replace("\"team\":\"dire\"", "\"team\":null"),
-            json.Replace("\"remainingMs\":2100", "\"remainingMs\":0"), json.Replace("\"frameSequence\":5", "\"frameSequence\":0") })
+            json.Replace("\"sessionId\":\"", "\"sessionId\":\"x") })
             check(bad != json && Read(bad) == null, "incomplete/ambiguous/unfiltered board envelope rejected at decode");
         check(Read("""{"enemies":{"heroes":[]}}""") == null && Read(json.Replace(",\"rough\":true", ""))!.Wards![0].Rough == false,
             "unbound legacy board cannot authorize display; original optional Rough is still optional");
     }
 
+    private static void KnownBoard(Action<bool, string> check)
+    {
+        const string Sven = "npc_dota_hero_sven", Pudge = "npc_dota_hero_pudge";
+        string?[] blink = ["item_blink", null, null, null, null, null], bkb = ["item_blink", "item_black_king_bar", null, null, null, null];
+        long now = 1_000;
+        var board = new LastKnownBoard();
+        check(board.Board(now, true, true, null) == null, "nothing is published before the paired player names a match");
+        board.Participant(Match, "dire", 600, now);
+        board.Equipment(Match, 600.4, [new(Enemy, 11, blink, null, 2.4), new(Sven, null, null, null, null)]);
+        check(board.Board(now, true, true, null) is { MatchId: Match, Team: "dire",
+                Heroes: [{ Hero: Enemy, Level: 11, Age: > 2.39 and < 2.41 }, { Hero: Sven, Level: null, Age: null }] },
+            "rows keep the scanner's player order and age; a never-read enemy is listed without an age");
+        // A stale or missing scanner write is simply no update: the reading stays and ages on the player's clock.
+        board.Participant(Match, "dire", 640, now += 10_000);
+        check(board.Board(now, true, true, null) is { Heroes: [{ Level: 11, Items: ["item_blink", ..], Age: > 41.99 and < 42.01 }, _] },
+            "without new scans the last reading stays on the panel and its age grows");
+        // A restarted scanner lists the hero again before its next item visit: that never erases known items.
+        board.Equipment(Match, 640.2, [new(Enemy, 12, null, null, 0.2), new(Sven, null, null, null, null)]);
+        check(board.Board(now, true, true, null) is { Heroes: [{ Level: 11, Items: ["item_blink", ..], Age: >= 42 and < 42.5 }, { Age: null }] },
+            "a level-only read after a scanner restart doesn't replace a full reading");
+        board.Equipment(Match, 641, [new(Enemy, 12, bkb, null, 0.5), new(Sven, 9, blink, null, 1)]);
+        check(board.Board(now, true, true, null) is { Heroes: [{ Level: 12, Items: [_, "item_black_king_bar", ..] }, { Hero: Sven, Level: 9 }] },
+            "a newer full reading replaces the old one");
+        board.Equipment(Match, 641.5, [new(Enemy, 10, blink, null, 30)]);
+        check(board.Board(now, true, true, null) is { Heroes: [{ Level: 12, Items: [_, "item_black_king_bar", ..] }, { Hero: Sven, Level: 9 }] },
+            "an older reading cannot overwrite a newer one; a hero a write leaves out keeps its row");
+        board.Equipment("9034567892", 642, [new(Pudge, 5, blink, null, 0)]);
+        check(board.Board(now, true, true, null) is { Heroes: [{ Hero: Enemy }, { Hero: Sven }] }, "a scan of another match is ignored");
+        check(board.Board(now, false, false, null) == null && board.Board(now, true, false, null) is { Wards: null, SeenWards: null },
+            "the coach's toggles select equipment and wards independently");
+        board.Estimates(Match, [Estimate with { Left = 5 }, Estimate with { Rank = 2, Left = 60 }], 641);
+        board.Seen(Match, [new("observer", "radiant", 500, -900)], now);
+        board.Participant(Match, "dire", 650, now += 1_000);
+        check(board.Board(now, true, true, Map) is { Wards: [{ Rank: 2, Age: 29, Left: 51 }], SeenWards.Length: 1, Minimap: var m } && m == Map,
+            "ward guesses age and expire on their own lifetime; sightings and the confirmed box travel along");
+        check(board.Board(now + LastKnownBoard.SeenWardsMs, true, true, null) is { SeenWards: null },
+            "a sighting is only shown while Plus keeps reporting it");
+        check(board.Board(now + LastKnownBoard.ParticipantMs, true, true, null) == null,
+            "without the paired player naming the match (menu, abandoned game) nothing is published");
+        board.Participant(Match, "radiant", 651, now);
+        check(board.Read == 0 && board.Board(now, true, true, null) == null, "another team or match starts an empty panel");
+        board.Equipment(Match, 651, [new(Enemy, 11, blink, null, 1)]);
+        board.Clear();
+        check(board.Match == null && board.Board(now, true, true, null) == null, "the end of the match clears the panel");
+    }
+
     private static void Mailbox(Action<bool, string> check)
     {
         long now = 20_000, seq = 0;
-        var box = new CoachMailbox(() => now); string id = box.Begin().SessionId;
+        var box = new CoachMailbox(() => now);
+        var b = Board();
+        box.SetEnemies(b);
+        string id = box.Begin().SessionId;
+        check(box.Enemies(id) == null, "a panel set before the game machine connected is not handed to its session");
         void Send(MatchWitness? w, OwnState? player = null, int width = 1920, int height = 1080, int leaseMs = 0) {
             var t = box.Issue(id); now += leaseMs;
             box.AcceptMinuteState(new(id, t.Id, ++seq, "dota2-gsi", width, height, player, player == null ? null : 0, w), 300);
         }
-        var b = Board();
-        Send(null, Dead); box.SetEnemies(b);
-        check(box.Enemies(id) == null, "legacy own state without a fresh witness never authorizes a board");
-        Send(Playing, Dead);
-        long previousDead = seq; Send(Playing, Dead);
-        box.SetEnemies(b with { SessionId = id, FrameSequence = previousDead });
-        check(box.Enemies(id)?.FrameSequence == previousDead, "a valid participant projection can race another dead frame without depending on route history");
-        box.SetEnemies(b with { SessionId = id, FrameSequence = seq, Wards = null, SeenWards = null });
-        box.SetEnemies(b with { SessionId = id, FrameSequence = previousDead });
-        check(box.Enemies(id) is { Wards: null, SeenWards: null } newest && newest.FrameSequence == seq,
-            "an out-of-order projection cannot replace a newer equipment-only selection");
-        box.SetEnemies(b with { MatchId = null, Team = null }); check(box.Enemies(id) == null, "no synthetic binding to current GSI");
-        foreach (var wrong in new[] { b with { MatchId = "1234" }, b with { Team = "radiant" }, b with { Heroes = [b.Heroes[0] with { Hero = Me }] } }) {
-            box.SetEnemies(wrong); check(box.Enemies(id) == null, "wrong match/team or own hero is not an enemy board");
-        }
-        box.SetEnemies(b with { RemainingMs = 1900, Wards = [Estimate, Estimate with { Rank = 2, Left = .2 }] });
-        b.Heroes[0].Items![1] = "item_manta";
+        Send(null, Dead);
+        box.SetEnemies(b);
         now += 500;
         var delivered = box.Enemies(id)!;
-        check(delivered is { Heroes: [{ Age: 12.5, Items: [null, "item_blink", null, null, null, null] }],
-            Wards: [{ Age: 20.5, Left: 23.5, Rank: 1 }], SeenWards: [{ Team: "radiant" }], RemainingMs: 1400 } &&
-            delivered.SessionId == id && delivered.FrameSequence == seq && delivered.Minimap == Map,
-            "dead participant: frozen item slots, scoped source, original lease, last-read age and individual ward expiry");
-        delivered.Heroes[0].Items![1] = null;
-        check(box.Enemies(id)!.Heroes[0].Items![1] == "item_blink", "mutating a poll cannot mutate the publication");
-        now += 1400; check(box.Enemies(id) == null, "the exact shorter source lease expires even with fresh GSI");
-        foreach (var geometry in new MinimapLayout?[] { null, MinimapLayout.Suggest(1280, 720) }) {
-            box.SetEnemies(b with { Minimap = geometry });
-            check(box.Enemies(id) is { Heroes.Length: 1, Wards: null, SeenWards: null, Minimap: null },
-                "missing/mismatched calibration strips both ward subsets, not equipment");
-        }
-        Send(Playing, Dead with { Farm = new(true, true, false, InstalledBuild: 6990) });
-        Send(Playing, Dead); box.SetEnemies(b);
-        check(box.Enemies(id) is { Heroes.Length: 1, Wards: null, SeenWards: null }, "missing telemetry cannot turn an observed incompatible HUD build into a valid one");
-        Send(Playing, Dead with { Farm = new(true, true, false, InstalledBuild: 6989) });
-        Send(Playing with { InstalledBuild = 6990 }, Dead); box.SetEnemies(b);
-        check(box.Enemies(id) is { Heroes.Length: 1, Wards: null, SeenWards: null },
-            "independent install evidence fences an unsupported map even while farming telemetry is unavailable");
-        Send(Playing with { InstalledBuild = 6989 }, Dead); box.SetEnemies(b);
-        check(box.Enemies(id) is { Heroes.Length: 1, Wards.Length: 1, SeenWards.Length: 1 },
-            "verified standard install and HUD support the ward view without a farming-ready hero");
-        box.SetEnemies(b with { Heroes = [] });
-        check(box.Enemies(id) is { Heroes.Length: 0, Wards.Length: 1, SeenWards.Length: 1 }, "ward-only has no equipment rows");
-        box.SetEnemies(b with { Heroes = [], Wards = [], SeenWards = [] });
-        check(box.Enemies(id) == null, "an empty projection explicitly withdraws every subset");
-        box.SetEnemies(b);
-        Send(Playing with { Paused = true }, Dead); Send(Playing, Dead);
-        check(box.Enemies(id) == null, "pause/resume does not revive a prior publication");
-        box.SetEnemies(b with { SessionId = id, FrameSequence = delivered.FrameSequence });
-        check(box.Enemies(id) == null, "a projection computed before the scope fence cannot be rebound");
-        Send(Playing with { AgeMs = 2500 }, Dead, leaseMs: 501); box.SetEnemies(b);
-        check(box.Latest()?.Meta.MatchPhase == null && box.Enemies(id) == null, "GSI age includes LAN lease, not just time since arrival");
-        Send(Playing, Dead, 0, 0); box.SetEnemies(b);
-        check(box.Latest()?.Meta is { SourceWidth: 0, SourceHeight: 0, Player.Alive: false } && box.Enemies(id) == null,
-            "missing viewport is explicit, preserves real state and cannot authorize any overlay");
+        check(delivered is { Heroes: [{ Age: 12.5, Items: [null, "item_blink", null, null, null, null] }], Wards: [{ Age: 20.5, Left: 23.5 }],
+            SeenWards: [{ Team: "radiant" }], HeldMs: 500 } && delivered.SessionId == id && delivered.Minimap == Map,
+            "the coach's panel is relayed whatever the player's own GSI shows (dead, stale), aged while held");
+        delivered.Heroes[0].Items![1] = null; b.Heroes[0].Items![1] = "item_manta";
+        check(box.Enemies(id)!.Heroes[0].Items![1] == "item_blink", "neither the coach's nor a poll's arrays alias the publication");
+        box.SetEnemies(Board()); now += Wire.BoardLifetimeMs - 1;
+        check(box.Enemies(id) != null, "a panel the coach renews stays up");
+        now += 1;
+        check(box.Enemies(id) == null, "a panel the coach stops renewing (stalled or closed) disappears");
+        box.SetEnemies(Board());
+        box.SetEnemies(Board() with { Heroes = [], Wards = [], SeenWards = [] });
+        check(box.Enemies(id) == null, "an empty panel withdraws it");
+        box.SetEnemies(Board()); box.SetEnemies(null);
+        check(box.Enemies(id) == null, "null withdraws it");
+        box.SetEnemies(Board());
+        Send(Playing, Dead);
         Send(Playing with { Phase = "postgame", Clock = 605 }, width: 0, height: 0); Send(null);
         var end = box.TakePostgame(id);
         check(end?.Meta.MatchPhase is { Phase: "postgame", Clock: 605 } && end.Meta.Sequence == seq - 1 &&
@@ -152,47 +170,34 @@ internal static class AuthorizedBoardTests
         long now = 5_000_000, seq = 0;
         using var link = new GameLink(host.Pair(IPAddress.Loopback), () => now);
         await link.Connect(default);
-        async Task Send(MatchWitness w) {
+        async Task Send(MatchWitness? w, OwnState? own) {
             var t = await link.GetTicket(default);
-            await link.UploadMinuteState(new(t.SessionId, t.Id, ++seq, "dota2-gsi", 1920, 1080, Dead with { Clock = w.Clock }, 0, w), now, default);
+            await link.UploadMinuteState(new(t.SessionId, t.Id, ++seq, "dota2-gsi", 1920, 1080, own, own == null ? null : 0, w), now, default);
         }
-        await Send(Playing);
+        await Send(Playing, Dead);
         var b = Board() with { Wards = [Estimate with { Left = .4 }, Estimate with { Rank = 2 }] };
         host.Mailbox.SetEnemies(b);
-        var read = (await link.Enemies(default))!;
-        check(link.DisplayEnemies(read, Playing, 1920, 1080) is { Wards.Length: 2, SeenWards.Length: 1, Heroes.Length: 1 } &&
-            await link.Poll(default) == null, "real pinned-TLS GSI-only board without a minute route or a living hero");
+        check(await link.Enemies(default) is { Wards.Length: 2, SeenWards.Length: 1, Heroes.Length: 1 } read && read.SessionId == link.SessionId &&
+            await link.Poll(default) == null, "real pinned-TLS GSI-only link receives the panel without a minute route or a living hero");
         byte[] png = [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 32, 0, 0, 0, 32, .. new byte[12]];
         host.Mailbox.Icons = _ => png;
         check(await link.Icon("item_blink", default) != null && await link.Icon("item_manta", default) == null,
             "a paired client may fetch a published icon, not probe the scanner's other item files");
-        now += 600;
-        check(link.DisplayEnemies(read, Playing, 1920, 1080) is { Heroes: [{ Age: >= 12.6 }], Wards: [{ Rank: 2, Left: <= 23.4 }] },
-            "last-read age advances and a short candidate disappears locally between polls");
-        foreach (var wrong in new MatchWitness?[] { null, Playing with { MatchId = "332" }, Playing with { Team = "radiant" },
-            Playing with { Hero = Enemy }, Playing with { AgeMs = 3001 }, Playing with { Phase = "postgame" }, Playing with { Paused = true } }) {
-            check(link.DisplayEnemies(read, wrong, 1920, 1080) == null && link.DisplayEnemies(read, Playing, 1920, 1080) == null,
-                "a local withdrawal cannot be undone by a cached render");
-            await Send(Playing);
-            check(await link.Enemies(default) == null, "the old source cannot reappear after a local withdrawal and resume");
-            host.Mailbox.SetEnemies(b); read = (await link.Enemies(default))!;
-        }
-        check(link.DisplayEnemies(read, Playing, 1280, 720) == null, "viewport replacement withdraws the admitted board immediately");
-        await Send(Playing);
-        host.Mailbox.SetEnemies(b with { RemainingMs = 100 });
-        read = (await link.Enemies(default))!;
-        now += 101;
-        check(link.DisplayEnemies(read, Playing, 1920, 1080) == null, "even fresh local GSI cannot extend the original publication deadline");
-        host.Mailbox.SetEnemies(b);
-        var ahead = Playing with { Clock = Playing.Clock + 1 }; await Send(ahead); // No advance on the fixture's wall clock.
-        read = (await link.Enemies(default))!;
-        check(link.DisplayEnemies(read, ahead, 1920, 1080) is { Heroes: [{ Age: >= 13 and < 13.1 }], Wards: [{ Rank: 2, Left: <= 23 and > 22.9 }] } &&
-            link.DisplayEnemies(read, ahead with { Clock = ahead.Clock + 1 }, 1920, 1080) is { Heroes: [{ Age: >= 14 and < 14.1 }] },
-            "source game-clock age/expiry is charged once across both PCs, and local GSI can advance it before any poll");
+        await Send(null, null); await Send(Playing with { Paused = true }, Dead);
+        check(await link.Enemies(default) is { Heroes.Length: 1 }, "missing own GSI or a pause between polls doesn't blank the panel");
+        // Plus alerts are markerless text and reach the GSI-only link; anything with a map point needs a picture or a minute route.
+        await Send(Playing, Dead with { Alive = true, Health = 500 });
+        host.Mailbox.SetReminder(link.SessionId!, seq, "local-vision-observation", "剃刀 离开视野", null, displayMs: 3000);
+        check(await link.Poll(default) is { Kind: "local-vision-observation", Message: "剃刀 离开视野", Marker: null },
+            "a Plus alert subtitle reaches the GSI-only game client");
+        bool refused = false;
+        try { host.Mailbox.SetReminder(link.SessionId!, seq, "manual-link-test", "带点", new(.1, .9)); } catch (InvalidOperationException) { refused = true; }
+        check(refused, "a map point is not accepted without a picture behind it");
         host.Mailbox.SetEnemies(b with { Heroes = [], Wards = [] });
         check(await link.Enemies(default) is { Heroes: [], Wards: [], SeenWards.Length: 1 } && await link.Icon("item_blink", default) == null,
-            "a sightings-only poll never carries inventory, icons, or predictions");
-        await link.End(default);
-        check(link.DisplayEnemies(read, Playing, 1920, 1080) == null, "disconnect invalidates the board independently of its timer");
+            "a sightings-only panel never carries inventory or icons");
+        string first = link.SessionId!;
+        await link.End(default); await link.Connect(default);
+        check(link.SessionId != first && await link.Enemies(default) == null, "a new session starts without the previous session's panel");
     }
 }

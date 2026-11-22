@@ -123,8 +123,10 @@ foreach ($role in @("Game", "Coach")) {
 $manifest = [ordered]@{
     version = $version; builtAt = [DateTimeOffset]::UtcNow.ToString("o"); artifacts = $artifacts;
     protocol = "paired-wss-h264-v3"; automaticFarmingEnabled = $true
-    defaultConnectionMode = "participant-gsi"; videoUploadDefault = $false
-    connectionModes = @("participant-gsi", "participant-gsi-local-hp", "basic-status-local-hp", "diagnostic-status", "dota-video", "diagnostic-video")
+    # The game client has a single picture-free connection; the other lanes exist only for UI tests and the bot E2E.
+    defaultConnectionMode = "participant-gsi-local-hp"; videoUploadDefault = $false; gameVideoSelectable = $false
+    connectionModes = @("participant-gsi-local-hp")
+    developerConnectionModes = @("participant-gsi", "basic-status-local-hp", "diagnostic-status", "dota-video", "diagnostic-video")
     modelProviders = Get-PublicModelProviders
     minuteFarm = [ordered]@{ patch = "7.42"; map = "dota"; build = 6989; defaultOn = $false;
         requiresMatchConfirmation = $true; requiresConfirmedMinimap = $true; modelInput = "frozen-match-state-and-simulated-options";
@@ -143,7 +145,8 @@ $manifest = [ordered]@{
         extraTeamContextForModelDefault = $false; replayCanReachLive = $false }
     postgameReplay = [ordered]@{ package = "coach-only"; portableWorkerManifestSha256 = $pin; requiresVerifiedEnd = $true }
     playerMinimapDebugIntervalMs = 1000; playerMinimapObservationOnly = $true
-    enemyPanel = $true; bundledPanelIcons = $panelIcons; panelIconFallback = "coach"
+    enemyPanel = $true; enemyPanelHold = "last-known-until-match-end"; bundledPanelIcons = $panelIcons; panelIconFallback = "coach"
+    wardMarkLayout = "confirmed-box-or-game-hud-setting"; plusAlertsOverGsi = $true
     enemyWardGuesses = "coach-guess-game-minimap"; coachMapPatch = "7.42"
     creepHpDisplay = "game-local-gpu"; creepHpShown = "below-half"; creepHpLethal = "red-sure-kill-gsi-attack"
     towerPrepHits = "amber-count"; heroAttackDataBuild = 6989; gameStatusIntervalMs = 250

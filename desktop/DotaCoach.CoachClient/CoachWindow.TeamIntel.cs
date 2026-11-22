@@ -24,6 +24,19 @@ internal sealed partial class CoachWindow
     private readonly HashSet<string> seenAllies = new(StringComparer.Ordinal);
     private int? scannedHeroes;
     private int wardCount;
+    // What the game machine shows: last-known rows for the paired player's match, independent of the archive's
+    // strict per-sample timing, so a late scan write or a Plus packet gap never blanks the panel.
+    private readonly LastKnownBoard knownBoard = new();
+
+    /// <summary>The paired player's match, team, hero and clock in its latest frame (also while paused or dead).</summary>
+    private static (string Match, string Team, string Hero, double Clock, string Phase)? PanelScope(FrameView? frame)
+    {
+        if (frame?.Meta is not { Source: "dota2" or "dota2-gsi" } m) return null;
+        if (m.MatchPhase is { } w && TeamViewEvidence.RealMatch(w.MatchId) && w.Team is "radiant" or "dire")
+            return (w.MatchId, w.Team, w.Hero, w.Clock, w.Phase);
+        return m.Player is { } p && TeamViewEvidence.RealMatch(p.MatchId) && p.Team is "radiant" or "dire"
+            ? (p.MatchId, p.Team, p.Hero, p.Clock, "playing") : null;
+    }
 
     /// <summary>Receiver threads: queue each authenticated, matching team packet once. A switch to
     /// full spectator (even briefly in the same match) or loss of continuity fences pending data.
@@ -73,28 +86,48 @@ internal sealed partial class CoachWindow
             lastEstimateAt = double.NegativeInfinity; lastAlert = panelText = "";
             matchState.WithdrawTeam(); // also covers a brief full view between two UI ticks
         }
+        var scope = PanelScope(frame);
+        if (scope is { Phase: "postgame" }) knownBoard.Clear();
+        else if (scope is { } participant) knownBoard.Participant(participant.Match, participant.Team, participant.Clock, now);
         var own = TeamViewEvidence.Participant(frame, now);
         bool matched = own != null && own.MatchId == matchState.ActiveMatch && session == frame?.Meta.SessionId &&
             TeamViewEvidence.Matches(own, plus, now);
         bool poll = now >= nextScanPoll;
-        if (poll) { nextScanPoll = now + 250; UpdateScanButton(); }
+        long unix = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        (ScanStatus Status, EnemyBoard? Board, IReadOnlyDictionary<string, WardReading[]> Wards)? scan = null;
+        if (poll) {
+            nextScanPoll = now + 250; UpdateScanButton();
+            if (knownBoard.Match is { } panelMatch && scope is { } current) {
+                var read = ScanFeed.Poll(scanFile, panelMatch, unix);
+                scan = read; scanStatus = read.Status;
+                // Any fresh write of this match and side updates the panel; rows it hasn't read keep their last reading.
+                if (read.Board != null && read.Status.Sample is { } sample && TeamViewEvidence.Side(sample.OwnTeam) == knownBoard.Team)
+                    knownBoard.Equipment(panelMatch, sample.Clock,
+                        read.Board.Heroes.Where(h => h.Hero != current.Hero && !seenAllies.Contains(h.Hero)).ToArray());
+            }
+            panelText = (scan?.Status ?? scanStatus).Text + (knownBoard.Read > 0 ? $" · 游戏端面板 {knownBoard.Read} 名敌方英雄" : "");
+        }
         if (!matched || own == null) {
             matchState.WithdrawTeam();
             pendingScan = null;
-            alerts.Clear(); lastAlert = ""; panelText = "等待匹配的游戏机和新鲜 Plus 队伍视角";
+            alerts.Clear(); lastAlert = "";
+            if (knownBoard.Read == 0) panelText = "等待匹配的游戏机和新鲜 Plus 队伍视角";
             ShowTeamStatus(false);
             return;
         }
         foreach (var s in packets) {
             if (!TeamViewEvidence.Matches(own, s, now)) continue;
-            double at = s.Clock!.Value;
+            // A packet already in the player's next second is known by the player's current one: never a future fact.
+            double at = Math.Min(s.Clock!.Value, own.Clock);
             var heroes = TeamViewEvidence.VisibleHeroes(s)
                 .Select(u => new MatchSightHero(u.Name, TeamViewEvidence.Side(u.Team)!, u.X, u.Y)).ToArray();
             foreach (var h in heroes.Where(h => h.Team == own.Team)) if (seenAllies.Count < 5) seenAllies.Add(h.Hero);
             matchState.ObserveSight(own.MatchId, own.Team, at, heroes);
-            matchState.ObserveWards(own.MatchId, own.Team, at, TeamViewEvidence.VisibleWards(s)
+            var wards = TeamViewEvidence.VisibleWards(s)
                 .Select(u => new ObservedWard(u.Name == "npc_dota_observer_wards" ? "observer" : "sentry",
-                    TeamViewEvidence.Side(u.Team)!, u.X, u.Y)).ToArray());
+                    TeamViewEvidence.Side(u.Team)!, u.X, u.Y)).ToArray();
+            matchState.ObserveWards(own.MatchId, own.Team, at, wards);
+            knownBoard.Seen(own.MatchId, wards, now);
             // Empty observed lists say only "not visible in this packet", never placed/dewarded.
             if (wardTracker.Sight(s, own.Clock))
                 StoreEstimates(own, Math.Max(lastEstimateAt, wardTracker.Clock)); // never renew equipment from sight alone
@@ -104,15 +137,18 @@ internal sealed partial class CoachWindow
             }
         }
         if (poll) {
-            long unix = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var scan = ScanFeed.Poll(scanFile, own.MatchId, unix);
-            scanStatus = scan.Status;
-            if (scan.Board == null || scan.Status.Sample is not { } stamp ||
-                !TeamScanCursor.Fits(stamp, own, plus, now, unix, allowNextSecond: true) ||
-                scan.Board.Heroes.Any(h => h.Hero == own.Hero || seenAllies.Contains(h.Hero))) {
+            var scanned = knownBoard.Match == own.MatchId && scan is { } shared ? shared : ScanFeed.Poll(scanFile, own.MatchId, unix);
+            scanStatus = scanned.Status;
+            if (scanned.Board == null || scanned.Status.Sample is not { } stamp) {
+                // The scanner stopped, lost the team view or watches another game: its archived reads end here.
                 if (scannedHeroes.HasValue)
                     matchState.ObserveTeam(own.MatchId, own.Team, Math.Max(plus!.Clock!.Value, lastEstimateAt), null, authoritative: false);
                 scannedHeroes = null; pendingScan = null; wardCount = 0;
+            } else if (!TeamScanCursor.Fits(stamp, own, plus, now, unix, allowNextSecond: true) ||
+                scanned.Board.Heroes.Any(h => h.Hero == own.Hero || seenAllies.Contains(h.Hero))) {
+                // A write a second ahead of the player's GSI (or naming an ally) is skipped, not a withdrawal:
+                // the next write is a quarter second away, and the archive's own hold expires a stopped source.
+                pendingScan = null;
             } else {
                 // The scanner dates within a second; participant GSI has whole seconds. Hold at most
                 // ONE same-scope sample briefly for that clock edge. No reads/marks/notes until Fits strictly.
@@ -121,12 +157,13 @@ internal sealed partial class CoachWindow
                 if (pendingScan is { } ready && TeamScanCursor.Fits(ready.Stamp, own, plus, now, unix)) {
                     ConsumeScan(own, frame!, now, ready); pendingScan = null;
                 }
-                var input = new ScanInput(stamp, scan.Board, scan.Wards);
+                var input = new ScanInput(stamp, scanned.Board, scanned.Wards);
                 if (TeamScanCursor.Fits(stamp, own, plus, now, unix)) ConsumeScan(own, frame!, now, input);
                 else pendingScan ??= input;
             }
-            panelText = scan.Board == null ? scanStatus.Text : scannedHeroes == null ? "等待匹配的扫描时间和阵营" :
-                $"已记录 {scannedHeroes} 名敌方英雄 · 推测眼位 {wardCount} 处";
+            panelText = (scanned.Board == null ? scanStatus.Text : scannedHeroes == null ? "等待匹配的扫描时间和阵营" :
+                $"已记录 {scannedHeroes} 名敌方英雄 · 推测眼位 {wardCount} 处") +
+                (knownBoard.Read > 0 ? $" · 游戏端面板 {knownBoard.Read} 名" : "");
         }
         ShowTeamStatus(true);
     }
@@ -162,6 +199,7 @@ internal sealed partial class CoachWindow
     {
         var marks = wardTracker.Marks(knownAt);
         matchState.ObserveEstimates(own.MatchId, own.Team, knownAt, marks);
+        knownBoard.Estimates(own.MatchId, marks, knownAt);
         lastEstimateAt = knownAt;
         wardCount = marks.Count(m => m.Rank == 0);
     }
@@ -172,7 +210,8 @@ internal sealed partial class CoachWindow
             $" · 可能在{g.Candidates[0].Place}{(g.Candidates[0].Rough ? "一带" : "")}") +
         $"（读数 {g.After:0.##}–{g.Before:0.##} 秒）";
 
-    private bool LegacySubtitles(FrameView? frame) => e2e == null && !preferences.MinuteFarm742 && frame?.Meta.Source == "dota2";
+    // Plus alerts are markerless text: they reach the GSI-only game client too. A live minute route keeps its slot (UpdateAlerts).
+    private bool LegacySubtitles(FrameView? frame) => e2e == null && frame?.Meta.Source is "dota2" or "dota2-gsi";
 
     private void ShowTeamStatus(bool matched, string delivered = "")
     {

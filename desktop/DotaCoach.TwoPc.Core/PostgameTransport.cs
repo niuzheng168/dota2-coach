@@ -83,7 +83,7 @@ public sealed partial class CoachMailbox
             pendingPostgame = new(new(r.SessionId, "", r.Sequence, r.Source, 0, 0, null, null, end), [], t.At, instant);
             // Never call Store: no new current state, captured geometry, video, history sequence or frame count.
             if (frame != null) frame = WithdrawEndedState(frame);
-            reminder = null; minuteWindow.Clear(); board = null; boardWindow.Withdraw(); history.Clear(); historyOrder.Clear();
+            reminder = null; minuteWindow.Clear(); board = null; history.Clear(); historyOrder.Clear();
         }
     }
 }

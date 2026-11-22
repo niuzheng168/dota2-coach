@@ -61,12 +61,16 @@ internal static partial class Program
                 Draw(board with { Heroes = [], Wards = null }).Children.OfType<Canvas>().Single().Children.OfType<Polygon>().Count() == 1 &&
                 Draw(board with { Heroes = [], SeenWards = null }).Children.OfType<Canvas>().Single().Children.OfType<Ellipse>().Count() == 1,
                 "turning off route, equipment or wards does not suppress or synthesize another subset");
-            Check(Draw(board with { Minimap = null }, route).Children.OfType<Canvas>().Count() == 1 &&
+            var local = new GameOverlaySettings().Minimap(w, h);
+            var unconfirmed = Draw(board with { Minimap = null }, route).Children.OfType<Canvas>().Single(c => c.Children.OfType<Polygon>().Any());
+            var otherSize = Draw(board, physicalWidth: w + 1).Children.OfType<Canvas>().Single();
+            Check(Near(Canvas.GetLeft(unconfirmed) * dpi, local.Left) && Near(Canvas.GetTop(unconfirmed) * dpi, local.Top) &&
+                Near(unconfirmed.Width * dpi, local.Size) && Near(Canvas.GetTop(otherSize) * dpi, local.Top) &&
                 Draw(board with { MatchId = null, Team = null }, route).Children.OfType<Canvas>().Count() == 1 &&
-                !Draw(board, physicalWidth: w + 1).Children.OfType<Canvas>().Any() &&
                 Draw(board with { Heroes = [], Wards = [board.Wards![0] with { Left = 0 }],
                     SeenWards = [board.SeenWards![0] with { X = 15_000 }] }).Children.Count == 0,
-                "no borrowed route layout, unbound ward, stale resolution, expired estimate, or clamped off-map sighting");
+                "without a confirmed box for this size the marks use this machine's minimap setting (not the route's box); " +
+                "no unbound ward, expired estimate, or clamped off-map sighting");
             if (!right && dpi == 1) {
                 var neutralOnly = board with { Heroes = [board.Heroes[0] with { Items = null, Neutral = "item_pogo_stick" }] };
                 var panel = Draw(neutralOnly, wards: false).Children.OfType<StackPanel>().Single();
@@ -99,7 +103,7 @@ internal static partial class Program
         // An earlier independent HP opt-in is represented by a disposable stand-in, never a real WGC worker.
         var hp = new FakeLocalCapture(); hp.Stopped.SetResult();
         Set(setup, "creepHp", hp);
-        if (localHp) SelectSource(setup, "本人 GSI＋可选本机小兵血量");
+        SelectSource(setup, localHp ? "本人 GSI＋可选本机小兵血量" : "仅本人 GSI");
         SetGameIdle(setup, false);
         using var stop = new CancellationTokenSource();
         await PrepareSelectedMode(setup, stop.Token);
@@ -140,22 +144,23 @@ internal static partial class Program
             var map = new MinimapLayout(size.Width, size.Height, 1080, 530, 180);
             var blink = SolidPng(Colors.Blue, 88, 64);
             host.Mailbox.Icons = key => key == "item_blink" ? blink : null;
+            await Task.Delay(1100); await Post("GAME_IN_PROGRESS", 381); // A new provider second: the local witness stays fresh below.
             host.Mailbox.SetEnemies(HudBoard(map) with { MatchId = "9134567999" });
-            check(host.Mailbox.Enemies(received.SessionId) == null && host.Mailbox.Icon(received.SessionId, "item_blink") == null,
-                "enabling local HP never authorizes a board or icons from a different match");
+            await Task.Delay(1600); // Two board polls.
+            check(Member<EnemyBoard?>(overlay, "enemies") == null && overlay.Icons["item_blink"] == null,
+                "a panel naming another match than this machine's own GSI is neither drawn nor completed with icons");
             host.Mailbox.SetEnemies(HudBoard(map));
             await Wait(() => Member<EnemyBoard?>(overlay, "enemies") is { Wards.Length: 1, SeenWards.Length: 1, Heroes.Length: 1 } &&
                 overlay.Icons["item_blink"] is BitmapSource && host.Mailbox.Latest()?.Jpeg.Length == 0 &&
                 Field<Image>(setup, "image").Source == null && Field<Reminder?>(setup, "shown") == null,
                 "the real game-client board poll receives the authorized subsets and item icon with no picture or route");
-            var receipt = Member<EnemyBoard>(overlay, "enemies");
-            var authorized = overlay.BoardForDisplay?.Invoke(receipt, 1280, 720);
-            check(authorized?.Minimap == map, "production draw guard admits the paired projection");
+            var authorized = Member<EnemyBoard>(overlay, "enemies");
+            check(authorized.Minimap == map && authorized.MatchId == BoardMatch, "the drawn panel carries the coach's confirmed box and the player's match");
             if (localHp) {
                 // User can turn an opted-in HP display OFF via the actual game button while the scoped overlay stays paired.
                 hpButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 await Wait(() => hp.StopRequested && Field<IAsyncDisposable?>(setup, "creepHp") == null && hpButton.IsEnabled &&
-                    Field<bool>(setup, "transportConnected") && overlay.BoardForDisplay?.Invoke(receipt, 1280, 720)?.MatchId == BoardMatch &&
+                    Field<bool>(setup, "transportConnected") && Member<EnemyBoard?>(overlay, "enemies")?.MatchId == BoardMatch &&
                     host.Mailbox.Latest() is { HasImage: false, Video: null, Meta.Source: "dota2-gsi" },
                     "switching off only the local HP worker preserves the authenticated photo-free match overlay");
             }
@@ -176,9 +181,10 @@ internal static partial class Program
                     "actual passive native windows cover only the left panel and calibrated right HUD while the reminder HWND stays hidden");
             } finally { drawBoards.Invoke(overlay, [offscreen, null]); }
             await Post("GAME_IN_PROGRESS", 382, paused: true, dead: false);
-            check(overlay.BoardForDisplay?.Invoke(receipt, 1280, 720) == null, "local raw-GSI pause withdraws before the next LAN poll");
             await Wait(() => host.Mailbox.Latest()?.Meta is { Player: { Hero: BoardHero, Alive: true }, MatchPhase: { Paused: true } },
                 "pause is transmitted as evidence, not dropped or treated as an end");
+            host.Mailbox.SetEnemies(HudBoard(map)); await Task.Delay(1600);
+            check(Member<EnemyBoard?>(overlay, "enemies") is { Heroes.Length: 1 }, "a pause keeps the last-known enemy panel on screen");
             await Post("GAME_IN_PROGRESS", 383);
             await Wait(() => host.Mailbox.Latest()?.Meta.MatchPhase is { Paused: false, Clock: 383 }, "resumed participant reaches the original paired session");
             // Verify the VIDEO producer too, using one in-memory image, no codec, real process or display capture.
@@ -195,7 +201,7 @@ internal static partial class Program
             await Wait(() => host.Mailbox.Latest()?.Meta.MatchPhase?.Clock == 384, "fresh participant before the ward-only update");
             host.Mailbox.SetEnemies(HudBoard(map) with { Heroes = [] });
             await Wait(() => Member<EnemyBoard?>(overlay, "enemies") is { Heroes: [], Wards: [{ Kind: "observer", Rank: 0, Rough: true }],
-                SeenWards: [{ Kind: "sentry" }] } only && overlay.BoardForDisplay?.Invoke(only, 1280, 720)?.Minimap == map,
+                SeenWards: [{ Kind: "sentry" }] } only && only.Minimap == map,
                 "the game client admits ward guesses and sightings on the confirmed HUD without an equipment panel or a picture");
             size = default;
             await Post("POST_GAME", 385, sparse: true); // no hero stats for OwnState, no drawable window

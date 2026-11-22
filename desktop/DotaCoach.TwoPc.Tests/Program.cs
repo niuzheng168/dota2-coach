@@ -186,14 +186,16 @@ await using (var host = await CoachHost.Start(IPAddress.Loopback, 0))
     var participant = Own();
     var panel = new EnemyBoard([new("npc_dota_hero_razor", 12, ["item_blink", null, null, null, null, null], "item_pogo_stick", 3)],
         MatchId: participant.MatchId, Team: participant.Team);
-    host.Mailbox.SetEnemies(panel);
-    Check(await link.Enemies(default) == null, "diagnostic video cannot authorize even a match-labelled board");
+    Reject(() => host.Mailbox.SetEnemies(panel with { MatchId = "0" }), "a panel for a bot/unknown match is not publishable");
+    Reject(() => host.Mailbox.SetEnemies(panel with { Team = null }), "a panel without the player's team is not publishable");
+    host.Mailbox.SetEnemies(panel with { MatchId = null, Team = null });
+    Check(await link.Enemies(default) == null, "an unscoped (v0.4.8 scanner-shaped) panel never reaches the game overlay");
     t = await link.GetTicket(default);
     await link.Upload(Meta(link.SessionId!, t, 2, participant) with { MatchPhase = BoardWitness(participant) },
         jpeg, Environment.TickCount64, default);
     host.Mailbox.SetEnemies(panel);
     Check(await link.Enemies(default) is { Heroes: [{ Hero: "npc_dota_hero_razor", Level: 12, Items: ["item_blink", null, null, null, null, null],
-        Neutral: "item_pogo_stick" }] }, "the enemy panel reaches the game client over pinned TLS");
+        Neutral: "item_pogo_stick" }] } shown && shown.SessionId == link.SessionId, "the enemy panel reaches the game client over pinned TLS");
     byte[] Png(int width, int height) {
         var png = new byte[64];
         new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13 }.CopyTo(png, 0);
@@ -211,8 +213,10 @@ await using (var host = await CoachHost.Start(IPAddress.Loopback, 0))
     host.Mailbox.SetReminder(link.SessionId!, 3, "manual-link-test", "只传状态", null);
     Check(host.Mailbox.Latest() is { HasImage: false, Meta.Sequence: 3 } && (await link.Poll(default)) is { Message: "只传状态", FrameSequence: 3 },
         "video off: a status over pinned TLS carries a reminder back to the game client");
+    Check(await link.Enemies(default) is { Heroes.Length: 1 }, "a status between participant samples does not blank the coach's last-known panel");
+    host.Mailbox.SetEnemies(null);
     Check(await link.Enemies(default) == null && await link.Icon("item_blink", default) == null,
-        "a diagnostic status withdraws the previous participant board and its icon access");
+        "the coach withdrawing its panel also ends icon access");
     bool videoRefused = false;
     try { await link.OpenVideo(default); } catch (System.Net.WebSockets.WebSocketException) { videoRefused = true; }
     Check(videoRefused, "a coach without a video decoder (video off) refuses video streams");

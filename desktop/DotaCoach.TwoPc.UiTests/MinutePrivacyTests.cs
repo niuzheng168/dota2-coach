@@ -25,8 +25,9 @@ internal static partial class Program
         var captured = new FakeLocalCapture();
         Set(game, "creepHp", captured);
         Set(game, "creepHpBusy", true); // A scanner startup was already awaiting the receiver.
+        SelectSource(game, "仅本人 GSI");
         SetGameIdle(game, false);
-        Task privacy = PrepareSelectedMode(game); // The normal default must dispatch to the strict, no-local-capture gate.
+        Task privacy = PrepareSelectedMode(game); // The strict developer mode dispatches to the no-local-capture gate.
         var button = Field<Button>(game, "creepHpButton");
         await Wait(() => !privacy.IsCompleted && !button.IsEnabled && !captured.StopRequested && Field<bool>(game, "participantConnection"),
             "GSI-only mode locks out new screen scans before waiting for an in-progress local scanner setup");

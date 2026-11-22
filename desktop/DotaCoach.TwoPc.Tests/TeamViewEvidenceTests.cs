@@ -13,10 +13,11 @@ internal static class TeamViewEvidenceTests
         bool Accept(FrameView frame, SpectatorSnapshot source) =>
             TeamViewEvidence.Matches(TeamViewEvidence.Participant(frame, tick), source, tick);
         check(Accept(f, s), "a fresh phase witness identifies a participant even without alive combat telemetry");
+        check(Accept(f, s with { Clock = 602 }), "the local Plus feed may show the next seconds before the player's own GSI arrives");
         foreach (var bad in new[] { s with { Mode = "full-spectator" }, s with { GroupedPlayers = 1 }, s with { GameState = "menu" },
             s with { Paused = true }, s with { OwnTeam = 3 }, s with { OwnTeam = null }, s with { MatchId = null },
             s with { MatchId = "0" }, s with { MatchId = "000" }, s with { MatchId = "9000000002" },
-            s with { Clock = 601.01 }, s with { Clock = 580 }, s with { ReceivedAt = tick - 3000 }, s with { ReceivedAt = tick + 1 } })
+            s with { Clock = 603.01 }, s with { Clock = 580 }, s with { ReceivedAt = tick - 3000 }, s with { ReceivedAt = tick + 1 } })
             check(!Accept(f, bad), "not live evidence: " + (bad.Mode, bad.GroupedPlayers, bad.OwnTeam, bad.MatchId, bad.Clock, bad.ReceivedAt, bad.Paused, bad.GameState));
         var bare = new OwnState(match, w.Hero, w.Team, w.Clock, true, 100, 100, 1, 1, [], []);
         foreach (var bad in new[] { f with { Meta = f.Meta with { MatchPhase = null, Player = bare, GsiAgeMs = 1 } },

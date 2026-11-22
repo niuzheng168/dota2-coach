@@ -98,7 +98,7 @@ internal static partial class Program
 
                 BindFake();
                 await State(480); await MinuteTicks(timer);
-                Check(mode.IsChecked == false && Field<TextBlock>(w, "previewTitle").Text.Contains("仅本人 GSI") &&
+                Check(mode.IsChecked == false && Field<TextBlock>(w, "previewTitle").Text.StartsWith("本人 GSI · ") &&
                     Field<Image>(w, "image").Source == null && Quiet(0),
                     "ordinary configured coach receives metadata but never starts its legacy image model");
                 Mode(true);

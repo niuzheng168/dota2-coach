@@ -28,7 +28,6 @@ internal sealed partial class AdviceOverlay : Window
     public GameOverlaySettings Settings { get; set; } = new();
     /// <summary>Game-side GSI/session guard, rechecked even when the visual is cached. No guard, no live minute route.</summary>
     public Func<Reminder, bool>? MinuteRouteValid { get; set; }
-    internal Func<EnemyBoard, int, int, EnemyBoard?>? BoardForDisplay { get; set; }
     public IconCache Icons { get; } = new(System.IO.Path.Combine(AppContext.BaseDirectory, "icons"));
     private IntPtr handle;
     private readonly E2ERun? e2e;
@@ -64,7 +63,7 @@ internal sealed partial class AdviceOverlay : Window
         until = reminder?.Id == value.Id ? Math.Min(until, deadline) : deadline;
         reminder = value; Draw();
     }
-    /// <summary>The coach's enemy panel, renewed about once a second; null hides it.</summary>
+    /// <summary>The coach's last-known enemy panel, renewed every poll and shown until the next one; null hides it.</summary>
     public void Enemies(EnemyBoard? board)
     {
         enemies = board;
@@ -113,8 +112,7 @@ internal sealed partial class AdviceOverlay : Window
         bool previewing = now < previewUntil, sample = reminder == null;
         var r = reminder ?? (previewing && game != null ? new Reminder("caption-preview", "", 0, "local-vision-observation",
             "预览：剃刀 离开视野 · 最后在中路", null, game.Width, game.Height, 0) : null);
-        var liveBoard = enemies == null ? null : BoardForDisplay?.Invoke(enemies, game?.Width ?? 0, game?.Height ?? 0);
-        if (liveBoard == null) enemies = null;
+        var liveBoard = enemies;
         bool foreground = game != null && GameWindow.IsForeground(game);
         if (game == null || !foreground && !(previewing && OwnWindowInFront())) { HideBoards(); Blank(); return; }
         // The manual, offline STYLE preview never supplies a ward. No synthetic rows during a real session;
@@ -170,7 +168,7 @@ internal sealed partial class AdviceOverlay : Window
                 canvas.Children.Add(panel);
             }
             var (w, h) = viewport ?? (r?.SourceWidth ?? 0, r?.SourceHeight ?? 0);
-            if (style.ShowWards && WardLayout(board, w, h) is { } layout) {
+            if (style.ShowWards && WardLayout(board, w, h, style) is { } layout) {
                 var layer = WardLayer(board, layout.Size * canvas.Width / w, layout.Size * canvas.Height / h, unit);
                 Canvas.SetLeft(layer, layout.Left * canvas.Width / w); Canvas.SetTop(layer, layout.Top * canvas.Height / h);
                 canvas.Children.Add(layer);

@@ -75,7 +75,7 @@ internal sealed partial class AdviceOverlay
                 size.Width * scale, size.Height * scale);
         } else equipmentWindow?.Withdraw();
 
-        if (Settings.ShowWards && board != null && WardLayout(board, game.Width, game.Height) is { } map) {
+        if (Settings.ShowWards && board != null && WardLayout(board, game.Width, game.Height, Settings) is { } map) {
             var layer = wardWindow ??= new("双机教练 · 目击与推测眼位");
             double scale = layer.Scale, side = map.Size / scale, unit = DisplayGeometry.OverlayUnit(game.Height, scale);
             string key = string.Join("|", side, unit, board.Team,
@@ -84,7 +84,7 @@ internal sealed partial class AdviceOverlay
             layer.SetContent(key, () => WardLayer(board, side, side, unit));
             layer.Place(game, map.Left, map.Top, map.Size, map.Size);
         } else if (Settings.ShowWards && !boardSession && ReferenceEquals(board, SampleBoard)) {
-            // v0.4.8 HUD side/size is a useful offline ruler, never authority to place live marks.
+            // The style preview outlines where this machine's HUD setting puts the minimap.
             var outline = Settings.Minimap(game.Width, game.Height);
             var layer = wardWindow ??= new("双机教练 · 目击与推测眼位");
             double side = outline.Size / layer.Scale;
@@ -94,10 +94,12 @@ internal sealed partial class AdviceOverlay
         } else wardWindow?.Withdraw();
     }
 
-    private static MinimapLayout? WardLayout(EnemyBoard board, int width, int height) =>
-        board.MatchId != null && board.Team != null && board.Minimap?.IsValidFor(width, height) == true &&
-        (board.Wards?.Any(w => w.Left > 0) == true || board.SeenWards?.Any(w => BoardDelivery.OnOverview(w) != null) == true)
-            ? board.Minimap : null;
+    // A box the coach confirmed for this resolution wins; otherwise this machine's own HUD setting (minimap side and
+    // size under 游戏内显示) places the marks, as in v0.4.8. Marks are fractions of the minimap, not screen points.
+    private static MinimapLayout? WardLayout(EnemyBoard board, int width, int height, GameOverlaySettings style) =>
+        board.MatchId == null || board.Team == null || width <= 0 || height <= 0 ||
+        board.Wards?.Any(w => w.Left > 0) != true && board.SeenWards?.Any(w => BoardDelivery.OnOverview(w) != null) != true ? null :
+        board.Minimap?.IsValidFor(width, height) == true ? board.Minimap : style.Minimap(width, height);
 
     // Estimates are hollow dashed regions with '?', including rank 0. Seen wards are a solid diamond at the
     // actual observed world point. One category cannot turn into the other, even at an identical coordinate.

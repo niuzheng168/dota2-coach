@@ -32,7 +32,7 @@ public sealed record GameOverlaySettings
     /// <summary>Icon size, % of the default (14 px rows at 720p, scaled with the game height).</summary>
     public int EnemySize { get; init; } = 100;
     public int EnemyOpacity { get; init; } = 75;
-    /// <summary>Show authorized sightings and candidate wards on the coach-confirmed HUD.</summary>
+    /// <summary>Show sightings and candidate wards on the minimap (the coach-confirmed box, else this machine's setting below).</summary>
     public bool ShowWards { get; init; } = true;
     /// <summary>Dota's minimap is on the right (the HUD option to flip it).</summary>
     public bool MinimapRight { get; init; }
@@ -53,7 +53,8 @@ public sealed record GameOverlaySettings
             new[] { TextColor, TitleColor, BackgroundColor }.Any(c => c == null || !Hex.IsMatch(c)))
             throw new ArgumentException("字幕、对手面板或小地图的位置、大小、透明度或颜色无效。");
     }
-    /// <summary>The player's local preview outline only. Never substitutes for a confirmed live-board or route calibration.</summary>
+    /// <summary>The minimap as this player set it: the preview outline, and where ward marks go when the coach has no
+    /// confirmed box for this resolution. Never a minute-route calibration.</summary>
     public MinimapLayout Minimap(int width, int height)
     {
         var standard = MinimapLayout.Suggest(width, height, MinimapRight);

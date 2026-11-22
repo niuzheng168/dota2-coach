@@ -56,7 +56,7 @@ public sealed partial class CloudCoach
             { Timeout = limit };
         if (codey) {
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", provider.Key);
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("DotaCoach/0.6.1"); // Codey gives Codex/Claude clients a different catalog.
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("DotaCoach/0.6.2"); // Codey gives Codex/Claude clients a different catalog.
             http.DefaultRequestHeaders.Accept.Add(new("application/json"));
         } else http.DefaultRequestHeaders.Add("api-key", provider.Key);
     }

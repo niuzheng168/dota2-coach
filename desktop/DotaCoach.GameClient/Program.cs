@@ -35,8 +35,11 @@ internal sealed partial class GameWindowUi : Window
     private readonly Button connect;
     private enum LinkMode { Video, DiagnosticVideo, ParticipantGsi, Status, DiagnosticStatus, ParticipantWithLocalHp }
     private readonly ComboBox source = Ui.Choice();
-    // Never infer consent to pictures from a saved bitrate, capture preference or older release.
-    private LinkMode Mode => source.SelectedIndex is >= 0 and <= (int)LinkMode.ParticipantWithLocalHp ? (LinkMode)source.SelectedIndex : LinkMode.ParticipantGsi;
+    // No picture ever leaves this machine. Without the developer switch (UI tests) or the bot E2E harness there is
+    // one connection: own GSI out; subtitles, enemy panel, wards and minute routes in; local creep HP independent.
+    private readonly bool developerModes;
+    private LinkMode Mode => !developerModes ? LinkMode.ParticipantWithLocalHp :
+        source.SelectedIndex is >= 0 and <= (int)LinkMode.ParticipantWithLocalHp ? (LinkMode)source.SelectedIndex : LinkMode.ParticipantWithLocalHp;
     private static bool UsesParticipantLane(LinkMode mode) => mode is LinkMode.ParticipantGsi or LinkMode.ParticipantWithLocalHp;
     private static bool SendsVideo(LinkMode mode) => mode is LinkMode.Video or LinkMode.DiagnosticVideo;
     private readonly TextBlock modeNote = Ui.Text("", 12, Brushes.LightGray);
@@ -93,12 +96,13 @@ internal sealed partial class GameWindowUi : Window
     public GameWindowUi(E2ERun? run, string? debugRoot, string? videoSettingsFile, string? overlaySettingsFile)
     {
         e2e = run; debug = new DebugPanel("game", debugRoot); overlay = new AdviceOverlay(run, () => debug.Recorder);
+        developerModes = Features.VideoUpload || run != null;
         overlay.MinuteRouteValid = MinuteRouteValid;
         // E2E evidence keeps the default subtitle style, whatever this machine's player chose.
         if (e2e == null) overlayPanel = new OverlayPanel(overlaySettingsFile ?? GameOverlaySettings.DefaultPath, overlay);
         videoSettingsPath = videoSettingsFile ?? GameVideoSettings.DefaultPath;
         videoSettings = GameVideoSettings.Load(videoSettingsPath);
-        Title = "Dota Coach · 游戏端 v0.6.1";
+        Title = "Dota Coach · 游戏端 v0.6.2";
         Width = Math.Min(1120, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(900, SystemParameters.WorkArea.Height - 40);
         MinWidth = 760; MinHeight = 600; WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -131,7 +135,7 @@ internal sealed partial class GameWindowUi : Window
             Loaded += async (_, _) => { if (CreepHpLog != null) await ToggleCreepHp(); };
         }
         if (overlayPanel != null) bottom.Children.Add(Ui.Section("游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", overlayPanel));
-        bottom.Children.Add(Ui.Section("设置：画面来源、视频、Dota 目录", BuildSettings(root.RowDefinitions[1])));
+        bottom.Children.Add(Ui.Section(developerModes ? "设置：画面来源、视频、Dota 目录" : "设置：Dota 目录", BuildSettings(root.RowDefinitions[1])));
         bottom.Children.Add(Ui.Section("Debug", debug.View));
         Grid.SetRow(bottom, 2); root.Children.Add(bottom); Content = root;
         preview.SizeChanged += (_, _) => DrawMark();
@@ -271,9 +275,9 @@ internal sealed partial class GameWindowUi : Window
             if (participant && MessageBox.Show(this,
                 "把自己的对局状态和游戏窗口尺寸传到配对的教练端？\n\n" +
                 (strict ? "不采集、编码或传送游戏画面，已开启的小兵血量识别也会停止。" :
-                    "允许保留或手动开启本机小兵血量识别；识别只在本机显卡上运行，不编码或传送画面。") +
-                "游戏端可独立显示教练端为本局授权的上次可见装备和眼位。开启分钟路线可能调用已配置的云模型并计费。不会控制英雄。",
-                strict ? "确认仅传本人 GSI" : "确认传本人 GSI，并允许本机血量识别", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+                    "不传游戏画面。连接不会开关小兵血量：它只在本机显卡上识别，随时可在「小兵血量」里开关。") +
+                "游戏里显示教练端推送的字幕、对手装备面板和眼位。教练端开启分钟路线时可能调用已配置的云模型并计费。不会控制英雄。",
+                strict ? "确认仅传本人 GSI" : "确认连接教练端", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
             if (chosen != null && !diagnostic && e2e == null && MessageBox.Show(this,
                 "开始传送 Dota 2 游戏画面并启用自动教练？\n\n画面含主视图、小地图、HUD，也可能含游戏内聊天。\n" +
                 (chosen.Capture == "window"
@@ -341,11 +345,12 @@ internal sealed partial class GameWindowUi : Window
         var panel = new StackPanel();
         source.Items.Add("Dota 2 游戏视频（采集并传送画面）");
         source.Items.Add("诊断视频（合成画面，不采集桌面）");
-        source.Items.Add("仅本人 GSI（可接收装备、眼位和分钟路线；不采集画面）");
+        source.Items.Add("仅本人 GSI（严格不采集画面；连接时停用本机小兵血量）");
         source.Items.Add("基础状态（只传 GSI，允许手动开启本机小兵血量识别）");
         source.Items.Add("诊断状态（零画面，无需 Dota）");
         source.Items.Add("本人 GSI＋可选本机小兵血量（可接收装备、眼位和分钟路线；不上传画面）");
-        panel.Children.Add(Ui.Label("连接模式 / 画面来源")); panel.Children.Add(source);
+        // The selector, and with it every picture mode, exists only for UI tests and the bot E2E harness.
+        if (developerModes) { panel.Children.Add(Ui.Label("连接模式 / 画面来源（开发测试）")); panel.Children.Add(source); }
         var videoSlot = new ContentControl(); panel.Children.Add(videoSlot);
         void UpdateMode() {
             var mode = Mode;
@@ -354,7 +359,8 @@ internal sealed partial class GameWindowUi : Window
                 LinkMode.Video => "将 Dota 画面和自身 GSI 加密传给教练端；画面可能含游戏内聊天。连接前需确认。",
                 LinkMode.DiagnosticVideo => "仅向教练端发送合成诊断视频，不传 Dota 画面或真实 GSI。",
                 LinkMode.Status => "只传自身 GSI 与窗口尺寸，接收普通字幕，不传视频、不启用分钟模型。本机小兵血量可单独开启。",
-                LinkMode.ParticipantWithLocalHp => "只传本人 GSI 与窗口尺寸，可接收本局授权的装备、眼位和分钟路线。本机小兵血量可独立开关，不上传画面。",
+                LinkMode.ParticipantWithLocalHp => "把自身 GSI 和游戏窗口尺寸加密传给教练端，不传画面。游戏里显示教练端推送的字幕、对手装备面板、眼位和分钟路线；" +
+                    "小兵血量只在本机识别，随时可开关。不读内存、不控制英雄。",
                 LinkMode.DiagnosticStatus => "只发诊断心跳以测试连接；无需 Dota，不传视频或真实 GSI。",
                 _ => "仅本人 GSI：连接后不采集或传送画面，不启用本机血量识别。可接收本局授权的装备、眼位和分钟路线。",
             };
@@ -365,8 +371,9 @@ internal sealed partial class GameWindowUi : Window
             metrics.Visibility = video || UsesParticipantLane(mode) ? Visibility.Visible : Visibility.Collapsed;
         }
         source.SelectionChanged += (_, _) => UpdateMode();
-        source.SelectedIndex = (int)(e2e == null ? LinkMode.ParticipantGsi : LinkMode.Video);
-        source.IsEnabled = e2e == null;
+        source.SelectedIndex = (int)(e2e == null ? LinkMode.ParticipantWithLocalHp : LinkMode.Video);
+        source.IsEnabled = developerModes && e2e == null;
+        UpdateMode(); // Also when the selector is absent and SelectionChanged never fires.
         if (e2e == null) {
             panel.Children.Add(Ui.Label("Dota 安装目录（连接时自动写入自身GSI配置）"));
             panel.Children.Add(dotaInstall);
@@ -412,7 +419,7 @@ internal sealed partial class GameWindowUi : Window
         creepHpButton.IsEnabled = !closing && !creepHpBusy && !gsiOnlyConnection;
         foreach (var control in new Control[] { pairing, fpsChoice, resolutionChoice, encoderChoice, captureChoice, bitrateChoice })
             control.IsEnabled = idle;
-        source.IsEnabled = idle && e2e == null;
+        source.IsEnabled = idle && developerModes && e2e == null;
         connect.Content = idle ? "连接" : "断开";
     }
     private void ShowGsi(string? text = null)
@@ -480,7 +487,7 @@ internal sealed partial class GameWindowUi : Window
                 var captureTask = stream.StartCapture(open, diagnostic,
                     () => Interlocked.Increment(ref localSequence), () => GameGsiSample.ReadForUpload(gsi, participantOnly: false), captureStop.Token);
                 var sendTask = Task.Run(() => stream.SendLoop(link, gpuEncoder, bitrate, streamStop.Token));
-                var boardTask = diagnostic ? Task.CompletedTask : PollBoards(link, Viewport, streamStop.Token);
+                var boardTask = diagnostic ? Task.CompletedTask : PollBoards(link, streamStop.Token);
                 long renewAt = Environment.TickCount64 + 750, previewAt = 0, rateAt = Environment.TickCount64, rateSent = 0, rateBytes = 0;
                 double actualFps = 0, actualMbps = 0;
                 bool background = false;
@@ -555,39 +562,39 @@ internal sealed partial class GameWindowUi : Window
             try { await link.End(timeout.Token); } catch { }
         }
     }
-    /// <summary>Neither a slow board response nor a batch of missing icons may stall GSI/terminal uploads,
-    /// video leases or the route poll. No diagnostic mode and no local spectator input.</summary>
-    private async Task PollBoards(GameLink link, Func<(int Width, int Height)> viewport, CancellationToken cancel)
+    /// <summary>
+    /// The coach's enemy panel, polled beside the main transport: a slow reply or missing icons never stall GSI uploads,
+    /// video leases or the route poll. Each reply stays on screen until the next one replaces it; a failed poll keeps the
+    /// last panel (the main transport notices a lost coach and ends the session), only a long silence withdraws it.
+    /// </summary>
+    private async Task PollBoards(GameLink link, CancellationToken cancel)
     {
-        EnemyBoard? Current(EnemyBoard receipt, int w, int h) =>
-            cancel.IsCancellationRequested || !transportConnected ? null : link.DisplayEnemies(receipt, gsi?.LatestMatch(), w, h);
-        overlay.BoardForDisplay = Current;
+        const int KeepMs = 15_000;
+        long answeredAt = Environment.TickCount64;
         try {
             while (!cancel.IsCancellationRequested) {
                 try {
-                    var size = viewport();
-                    var board = size.Width > 0 && (overlay.Settings.ShowEnemies || overlay.Settings.ShowWards) &&
-                        BoardDelivery.Live(gsi?.LatestMatch()) ? await link.Enemies(cancel) : null;
-                    size = viewport(); // Poll may have crossed a resize, pause, end, withdrawal or new session.
-                    if (board != null && Current(board, size.Width, size.Height) == null) board = null;
+                    var board = overlay.Settings.ShowEnemies || overlay.Settings.ShowWards ? await link.Enemies(cancel) : null;
+                    answeredAt = Environment.TickCount64;
+                    // Only this machine's own GSI can veto a panel: one positively naming another match is never drawn.
+                    if (board != null && gsi?.LatestMatch() is { } local && local.MatchId != board.MatchId) board = null;
                     overlay.Enemies(board);
                     if (board != null && overlay.Settings.ShowEnemies) {
                         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancel);
                         budget.CancelAfter(500);
                         try {
-                            foreach (string key in overlay.Icons.Missing(board, Environment.TickCount64).Take(8)) {
-                                if (!overlay.Settings.ShowEnemies || Current(board, size.Width, size.Height) == null) break;
+                            foreach (string key in overlay.Icons.Missing(board, Environment.TickCount64).Take(8))
                                 overlay.Icons.Add(key, await link.Icon(key, budget.Token), Environment.TickCount64);
-                            }
                         } catch (OperationCanceledException) when (!cancel.IsCancellationRequested) { /* Retry icons on a later poll. */ }
                     }
-                } catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or OperationCanceledException or System.IO.IOException or InvalidOperationException) {
-                    overlay.Enemies(null); // The optional channel fails closed; don't interrupt the main transport.
+                } catch (Exception ex) when (!cancel.IsCancellationRequested && ex is System.Net.Http.HttpRequestException or
+                                               OperationCanceledException or System.IO.IOException or InvalidOperationException) {
+                    if (Environment.TickCount64 - answeredAt >= KeepMs) overlay.Enemies(null);
                 }
                 await Task.Delay(750, cancel);
             }
         } catch (OperationCanceledException) when (cancel.IsCancellationRequested) { }
-        finally { overlay.BoardForDisplay = null; overlay.Enemies(null); }
+        finally { overlay.Enemies(null); }
     }
     private bool MinuteRouteValid(Reminder r)
     {

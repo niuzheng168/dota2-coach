@@ -23,7 +23,7 @@ internal sealed partial class GameWindowUi
             link.BindPostgame(gsi, "dota2-gsi", () => Interlocked.Increment(ref localSequence));
             ends = link.DeliverPostgames(stop.Token);
             transportConnected = true;
-            boards = PollBoards(link, viewport, stop.Token);
+            boards = PollBoards(link, stop.Token);
             while (!cancel.IsCancellationRequested) {
                 var lease = await link.GetTicket(cancel);
                 long sampledAt = Environment.TickCount64;
@@ -39,19 +39,18 @@ internal sealed partial class GameWindowUi
                     "dota2-gsi", width, height, player, sample.AgeMs, sample.Phase);
                 await link.UploadMinuteState(meta, sampledAt, cancel);
                 lastCaptureAt = player == null ? null : sampledAt; // Fresh metadata, never a captured picture.
-                status.Text = Mode == LinkMode.ParticipantWithLocalHp ? "本人 GSI · 允许本机血量识别 · 不传送画面" :
+                status.Text = Mode == LinkMode.ParticipantWithLocalHp ? "已连接 · 只传本人 GSI，不传画面" :
                     "仅本人 GSI · 加密连接 · 不采集或传送画面";
                 metrics.Text = width == 0 ? "暂无游戏窗口 · 不显示叠加层" : $"游戏窗口 {width}×{height} · 无视频编码";
                 ShowGsi(current.Phase is { } w ? $"本人 GSI：{w.Hero} · {w.Team} · {w.Clock:F0}s" +
                     (w.Phase == "postgame" ? " · 已结束" : w.Paused ? " · 已暂停" : player?.Alive == false ? " · 阵亡" : "") :
                     "等待新鲜的本人对局 GSI；不使用观战数据。");
-                if (!MinuteFarmContext.Eligible(player)) {
-                    ClearReminder(); // Never clears the independent equipment/ward layers.
-                } else {
-                    overlay.FrameArrived();
-                    var reminder = await link.Poll(cancel);
-                    ApplyReminder(reminder?.Kind == MinuteFarmContext.Kind ? reminder : null, diagnostic: false, link: link);
-                }
+                // Plus alerts and the link test are markerless text; only a minute route needs an eligible hero.
+                // Clearing a reminder never touches the independent equipment/ward layers.
+                overlay.FrameArrived();
+                var reminder = await link.Poll(cancel);
+                if (reminder?.Kind == MinuteFarmContext.Kind && !MinuteFarmContext.Eligible(player)) reminder = null;
+                ApplyReminder(reminder, diagnostic: false, link: link);
                 await Task.Delay(250, cancel);
             }
         } catch (Exception e) when (e is not OutOfMemoryException) {

@@ -149,7 +149,7 @@ internal sealed partial class CoachWindow : Window
         }
         try { heroNames = new HeroNames(System.IO.Path.Combine(AppContext.BaseDirectory, "data", "dota2-dictionary.json")); }
         catch { /* Alerts fall back to internal hero names. */ }
-        Title = "Dota Coach · 教练端 v0.6.1";
+        Title = "Dota Coach · 教练端 v0.6.2";
         Width = Math.Min(1320, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(940, SystemParameters.WorkArea.Height - 40);
         MinWidth = 1000; MinHeight = 640; WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -160,7 +160,7 @@ internal sealed partial class CoachWindow : Window
         root.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
         var left = new StackPanel();
         left.Children.Add(Ui.Text("教练端", 26, Ui.Accent));
-        left.Children.Add(Ui.Text("游戏端可只传状态或本人 GSI，不传画面。装备、眼位、分钟路线按需显示；普通视觉模型只用游戏端选择上传的真实画面。", 12, Brushes.LightGray));
+        left.Children.Add(Ui.Text("游戏端只传本人 GSI，不传画面。对手装备、眼位、字幕和分钟路线推送到游戏里显示；赛后按时间复盘。", 12, Brushes.LightGray));
         var ips = NetworkInterface.GetAllNetworkInterfaces().Where(n => n.OperationalStatus == OperationalStatus.Up)
             .SelectMany(n => n.GetIPProperties().UnicastAddresses).Select(a => a.Address)
             .Where(a => Wire.IsLan(a) && !IPAddress.IsLoopback(a)).Select(a => a.ToString()).Distinct().Order().ToList();
@@ -341,9 +341,9 @@ internal sealed partial class CoachWindow : Window
             toggle.Checked += (_, _) => SaveAlertToggles(); toggle.Unchecked += (_, _) => SaveAlertToggles();
         }
         panel.Children.Add(toggles); panel.Children.Add(alertStatus);
-        panel.Children.Add(Ui.Text("面板显示敌方英雄上次可见时的等级、装备和读取年龄；需在本机前台观战并启动视觉扫描。" +
-            "守卫数量减少也可能是转交、丢弃或卖掉。7.42 常见眼位只给候选，不当作目击；显示眼位需相符版本和已确认的小地图框。" +
-            "离开视野不能区分阵亡和进迷雾；普通画面连接可收这类字幕。旧状态连接没有可信参赛凭据；严格仅本人 GSI 和分钟模式不以普通字幕覆盖路线。" +
+        panel.Children.Add(Ui.Text("面板一直显示敌方英雄上次读到的等级、装备和读取年龄，到本局结束；新的读数需在本机前台观战并启动视觉扫描。" +
+            "守卫数量减少也可能是转交、丢弃或卖掉。7.42 常见眼位只给候选，不当作目击；确认过小地图框时按框画，否则按游戏端自己的小地图设置。" +
+            "离开视野不能区分阵亡和进迷雾；这类字幕不会盖住正在显示的分钟路线。" +
             (wardTracker.Map == null ? " 缺少 7.42 地图，无法推测眼位位置。" : ""), 12, Brushes.LightGray));
         AddScanLauncher(panel);
         return panel;
@@ -459,20 +459,20 @@ internal sealed partial class CoachWindow : Window
         } catch { /* Debug must not affect live refresh. */ }
         bool minuteMode = e2e == null && preferences.MinuteFarm742;
         if (e2e == null) {
-            if (host?.Mailbox.TakePostgame() is { } terminal)
+            if (host?.Mailbox.TakePostgame() is { } terminal) {
                 matchState.ObserveFrame(terminal);
+                if (terminal.Meta.MatchPhase?.MatchId == knownBoard.Match) knownBoard.Clear();
+            }
             matchState.ObserveFrame(pairedFrame);
             if (visionInFlight is { } origin && decisionStop is { IsCancellationRequested: false } && !VisionContinues(origin, pairedFrame))
                 CancelDecision();
             UpdateSpectator(); UpdateMatchIntel(pairedFrame);
             matchState.ExpireTeamSources();
-            if (host != null) {
-                MinimapLayout? layout = pairedFrame != null &&
-                    (BoardDelivery.InstalledBuild(pairedFrame.Meta) == MinuteFarmContext.SupportedBuild || MinuteFarmArmedFor(pairedFrame))
-                    ? preferences.LayoutFor(pairedFrame) : null;
-                host.Mailbox.SetEnemies(matchState.ForGame(pairedFrame, preferences.EnemyPanel, preferences.EnemyWards, layout));
-            }
-            UpdateAlerts(pairedFrame); // LegacySubtitles excludes strict GSI / minute routes.
+            // The game machine always gets the last-known panel of its match: equipment rows age instead of
+            // disappearing. A confirmed minimap box places the wards; without one the game uses its own HUD setting.
+            host?.Mailbox.SetEnemies(knownBoard.Board(Environment.TickCount64, preferences.EnemyPanel, preferences.EnemyWards,
+                pairedFrame == null ? null : preferences.LayoutFor(pairedFrame)));
+            UpdateAlerts(pairedFrame); // Markerless Plus alerts reach the GSI-only game client; a live minute route keeps its slot.
         }
         if (host == null) return;
         var snapshot = host.Mailbox.Snapshot();
@@ -490,7 +490,7 @@ internal sealed partial class CoachWindow : Window
         bool metadataOnly = pairedFrame is { HasImage: false };
         if (e2e == null && !minuteMode && modelConfigured && !deciding && catalogStop == null)
             autoStatus.Text = ActiveModelLabel + " · " + (metadataOnly ?
-                (pairedFrame!.Meta.Source == "dota2-gsi" ? "仅本人 GSI；可选 7.42 分钟路线。" : "普通状态连接；需要分钟规划请改用「仅本人 GSI」。") + "没有画面，不调用视觉模型。" :
+                (pairedFrame!.Meta.Source == "dota2-gsi" ? "本人 GSI；可选 7.42 分钟路线。" : "普通状态连接；需要分钟规划请更新游戏端。") + "没有画面，不调用视觉模型。" :
                 !preferences.AutomaticAdvice ? "已暂停自动教练；旧结果不再回传。" :
                 modelCalls >= preferences.RequestLimit ? $"本次请求上限已到：{modelCalls}/{preferences.RequestLimit}，已停止模型调用。" :
                 $"自动教练已开启 · {modelCalls}/{preferences.RequestLimit}次 · 已记录tokens {inputTokens}+{outputTokens}\n" +
@@ -522,7 +522,7 @@ internal sealed partial class CoachWindow : Window
         if (metadataOnly) {
             ShowStatus(pairedFrame!);
             var meta = pairedFrame!.Meta;
-            string kind = meta.Source switch { "dota2-gsi" => "仅本人 GSI", "diagnostic" => "诊断状态", _ => "普通状态" };
+            string kind = meta.Source switch { "dota2-gsi" => "本人 GSI", "diagnostic" => "诊断状态", _ => "普通状态" };
             previewTitle.Text = $"{kind} · " + (meta.SourceWidth > 0 ? $"{meta.SourceWidth}×{meta.SourceHeight}" : "游戏窗口不可用") + " · 没有采集游戏画面";
         }
         else if (displayed is { } shown)
@@ -730,7 +730,7 @@ internal sealed partial class CoachWindow : Window
         var frame = host?.Mailbox.Latest();
         if (frame == null || frame.Meta.IsLegacyStatus || frame.Meta.Source is not ("dota2" or "dota2-gsi") ||
             frame.Meta.SourceWidth <= 0 || frame.Meta.SourceHeight <= 0)
-            throw new InvalidOperationException("请先用「仅本人 GSI」或游戏画面连接，接收真实的游戏窗口尺寸。");
+            throw new InvalidOperationException("请先连接游戏端，接收真实的游戏窗口尺寸。");
         return frame;
     }
     private MinimapLayout InputCalibration(FrameView frame)

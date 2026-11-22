@@ -80,8 +80,9 @@ public static class Wire
 }
 
 /// <summary>
-/// Video upload is opt-in. The legacy status link carries presence and text only. Ticketed participant GSI
-/// can authorize a scoped board and minute routes without uploading an image.
+/// The game client sends no pictures: it always connects with its own GSI, and receives subtitles, the enemy panel,
+/// ward marks and minute routes over that link. Only this developer switch (UI tests) brings back the video and
+/// diagnostic connection modes; the local bot E2E harness keeps its own picture evidence.
 /// </summary>
 public static class Features
 {
@@ -235,9 +236,7 @@ public sealed partial class CoachMailbox
     private (Reminder Value, long Until, FrameMeta Origin, long OriginAt)? reminder;
     private readonly MinuteFarmWindow minuteWindow = new();
     private long lastMinutePublished;
-    private readonly BoardWindow boardWindow = new(keepOrigins: true);
-    private (EnemyBoard Value, long At, double Clock)? board;
-    private long lastBoardFrame;
+    private (EnemyBoard Value, long At)? board;
     private FrameView? pendingPostgame;
     private readonly Dictionary<long, (FrameMeta Meta, long At)> history = new();
     private readonly Queue<long> historyOrder = new();
@@ -266,7 +265,7 @@ public sealed partial class CoachMailbox
     public void Clear() { lock (gate) ResetSession(keepTerminal: false); } // Explicit revocation/disposal erases even the local receipt.
     private void ResetSession(bool keepTerminal)
     {
-        session = null; frame = null; reminder = null; board = null; boardWindow.Clear(); lastBoardFrame = 0;
+        session = null; frame = null; reminder = null; board = null;
         if (!keepTerminal || pendingPostgame is { } end && !BoardDelivery.Fresh(end.Meta.MatchPhase, end.CapturedNoEarlierThan, now()))
             pendingPostgame = null;
         ticket = null; sequence = 0; history.Clear(); historyOrder.Clear(); videoLeases.Clear(); videoOwner = null;
@@ -370,8 +369,6 @@ public sealed partial class CoachMailbox
         if (previous != null && meta.BreaksReminderScope(previous)) { reminder = null; history.Clear(); historyOrder.Clear(); }
         frame = incoming;
         long instant = now();
-        boardWindow.Observe(meta, incoming.CapturedNoEarlierThan, instant);
-        if (board is { } b && !boardWindow.Admits(b.Value, instant)) board = null;
         if (meta.IsLegacyStatus) endOrigin = null; // No terminal may borrow a playing origin across this lane.
         else ObservePostgameOrigin(incoming, instant);
         minuteWindow.Observe(meta, incoming.CapturedNoEarlierThan, instant);
@@ -437,7 +434,8 @@ public sealed partial class CoachMailbox
             long instant = now();
             if (frame == null || !history.TryGetValue(basedOn, out var source) || instant - frame.ReceivedAt > Wire.PresenceLifetimeMs ||
                 instant - source.At is < 0 or >= Wire.FrameLifetimeMs || frame.Meta.Player?.Alive == false ||
-                !minute && (frame.Meta.Source == "dota2-gsi" || source.Meta.Source == "dota2-gsi") ||
+                // Without a picture only markerless text (Plus alerts, link test) or a minute route has a basis.
+                !minute && (frame.Meta.Source == "dota2-gsi" || source.Meta.Source == "dota2-gsi") && !Wire.StatusSubtitle(kind, mark, minimap, route, nextSteps) ||
                 (frame.Meta.IsLegacyStatus || source.Meta.IsLegacyStatus) && !Wire.StatusSubtitle(kind, mark, minimap, route, nextSteps))
                 throw new InvalidOperationException("Source frame expired; refresh the preview");
             ScreenMark[] points = route ?? (mark == null ? Array.Empty<ScreenMark>() : new[] { mark });
@@ -481,26 +479,14 @@ public sealed partial class CoachMailbox
             if (reminder is { } r && r.Value.Kind is MinuteFarmContext.Kind or "visible-farming-advice" or "experimental-bot-advice")
                 reminder = null;
     }
-    /// <summary>Replaces the enemy panel on the game machine; null hides it. Unless renewed it expires after <see cref="Wire.BoardLifetimeMs"/>.</summary>
+    /// <summary>Replaces the enemy panel on the game machine; null hides it. The coach renews its last-known panel on
+    /// every UI tick; one it stops renewing (coach stalled or closed) disappears after <see cref="Wire.BoardLifetimeMs"/>.</summary>
     public void SetEnemies(EnemyBoard? value)
     {
-        lock (gate) {
-            if (value is { FrameSequence: > 0 } stamped && stamped.SessionId == session && stamped.FrameSequence < lastBoardFrame) return;
-            board = null;
-            if (value == null) { lastBoardFrame = frame?.Meta.Sequence ?? 0; return; }
-            if (!Wire.ValidBoard(value)) throw new ArgumentException("Invalid enemy board");
-            long instant = now();
-            if (frame == null || !boardWindow.Matches(value, instant)) return;
-            var filtered = boardWindow.Calibrated(value);
-            if (BoardDelivery.Empty(filtered) || value.RemainingMs is < 0 or > Wire.BoardLifetimeMs) return;
-            // If the projection supplies its source (possibly computed just before a reconnect/withdrawal),
-            // verify it, never silently rebind it. Otherwise pin this synchronous publication to the current frame.
-            double sourceClock = boardWindow.Clock;
-            if ((value.SessionId != null || value.FrameSequence != 0) && !boardWindow.TryOrigin(value, instant, out sourceClock)) return;
-            lastBoardFrame = value.FrameSequence != 0 ? value.FrameSequence : frame.Meta.Sequence;
-            board = (BoardDelivery.Age(filtered, 0, value.RemainingMs > 0 ? value.RemainingMs : Wire.BoardLifetimeMs) with {
-                SessionId = session, FrameSequence = lastBoardFrame, HeldMs = 0 }, instant, sourceClock);
-        }
+        if (value != null && !Wire.ValidBoard(value)) throw new ArgumentException("Invalid enemy board");
+        lock (gate) // A panel names the player's match and team; an unscoped scanner-shaped one is never relayed.
+            board = value?.MatchId == null || session == null || BoardDelivery.Empty(value) ? null :
+                (BoardDelivery.Age(value, 0, Wire.BoardLifetimeMs) with { SessionId = session, FrameSequence = frame?.Meta.Sequence ?? 0, HeldMs = 0 }, now());
     }
     public EnemyBoard? Enemies(string id)
     {
@@ -508,12 +494,9 @@ public sealed partial class CoachMailbox
         {
             Check(id);
             long instant = now();
-            if (board is not { } b || instant < b.At || instant - b.At >= b.Value.RemainingMs ||
-                !boardWindow.Admits(b.Value, instant)) { board = null; return null; }
-            long held = BoardDelivery.ElapsedMs(instant - b.At, b.Clock, boardWindow.Clock);
-            if (held >= b.Value.RemainingMs) { board = null; return null; }
-            var result = BoardDelivery.Age(boardWindow.Calibrated(b.Value), held, b.Value.RemainingMs - (int)held) with { HeldMs = (int)held };
-            return BoardDelivery.Empty(result) ? null : result;
+            if (board is not { } b || instant < b.At || instant - b.At >= Wire.BoardLifetimeMs) return null;
+            long held = instant - b.At;
+            return BoardDelivery.Age(b.Value, held, (int)(Wire.BoardLifetimeMs - held)) with { HeldMs = (int)held };
         }
     }
     public byte[]? Icon(string id, string key)

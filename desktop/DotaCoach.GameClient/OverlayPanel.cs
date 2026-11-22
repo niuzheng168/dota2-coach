@@ -24,7 +24,7 @@ internal sealed class OverlayPanel : StackPanel
     private readonly string path;
     private readonly AdviceOverlay overlay;
     private readonly CheckBox advice = Check("AI 打钱建议"), alerts = Check("对手提醒（离开视野、插眼，Plus 观战）"), title = Check("标题行（来源与“未经核验”）"),
-        enemies = Check("显示对手面板"), wards = Check("显示已授权的目击与推测眼位"), minimapRight = Check("预览框在右侧");
+        enemies = Check("显示对手面板"), wards = Check("显示已授权的目击与推测眼位"), minimapRight = Check("小地图在右侧");
     private readonly Slider x = Range(0, 100), y = Range(0, 100),
         size = Range(GameOverlaySettings.MinSize, GameOverlaySettings.MaxSize), width = Range(GameOverlaySettings.MinWidth, GameOverlaySettings.MaxWidth),
         textOpacity = Range(GameOverlaySettings.MinTextOpacity, 100), backgroundOpacity = Range(0, 100),
@@ -62,7 +62,7 @@ internal sealed class OverlayPanel : StackPanel
         Children.Add(Ui.Label("眼位：◆ 表示队伍视角实际目击（绿边己方、红边敌方）；虚线圈和 ? 只表示推测区域。金色侦察、蓝色岗哨，和装备、分钟路线分别显示。"));
         var mapChecks = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         mapChecks.Children.Add(wards); mapChecks.Children.Add(minimapRight);
-        Children.Add(Ui.Columns(mapChecks, Cell("离线预览框大小", minimapSize, v => v == 100 ? "默认" : v + "%")));
+        Children.Add(Ui.Columns(mapChecks, Cell("小地图大小", minimapSize, v => v == 100 ? "默认" : v + "%")));
         Children.Add(Ui.Row(status,
             Ui.Button("预览 8 秒", (_, _) => { overlay.Preview(PreviewMs); status.Text = PreviewNote(); }),
             Ui.Button("恢复默认", (_, _) => { Fill(new()); Changed(); })));
