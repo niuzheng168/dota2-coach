@@ -2,7 +2,7 @@
 
 游戏机运行 `DotaCoach.GameClient`：在自己的 Dota 窗口看小兵血量、对手装备、眼位和路线。教练机运行 `DotaCoach.CoachClient`：接收本人 GSI，可接入 Dota Plus 队伍视角、调用模型，并在赛后复盘。两端通过配对的 TLS 连接通信，可在同一台 Windows 电脑上试用。
 
-**v0.6.3** 两端的主页只放状态和常用开关，其余在「设置」里分组；**v0.6.2** 保留 v0.4.8 的小兵补刀提示、7.42 地图和守卫推测。游戏端不传画面：实战只用游戏机的本人 GSI，以及同局同阵营当时可见的 Plus 信息。对手装备面板一直显示到本局结束，读不到时只把读取年龄往上加。不读内存、不注入游戏、不代操作；赛后回放全图不回填实战。
+**v0.6.4** 可以在游戏端小地图上看三路兵线和预计交汇点。请两端一起升级，在教练端「设置 → 小地图校准」确认 HUD 框。无 Plus 时显示理论兵波；有同局同阵营的队伍视野时，另标出实见小兵和进雾后的短时估计。游戏端仍不传画面，对手装备面板保留到局末。赛后录像和每日复盘不参与实时兵线估算。
 
 ## 我想做什么？
 
@@ -11,6 +11,7 @@
 | 只在游戏机看补刀提示 | [小兵血量与塔下垫刀](docs/game-creep-hp.md)：半血以下，友方绿字、敌方白字；按自身攻击力、兵的护甲和回血估算，一刀可收时变红。塔下黄字是建议先垫的刀数。本机显卡识别和绘制，不要求配对、Plus 或模型。 |
 | 配对、记档，同局看小兵血量和对手装备／眼位 | 游戏端只有一种连接：只传本人 GSI，不传画面，接收字幕、装备面板、眼位和分钟路线。小兵血量在本机识别，连接前后都可在「显示小兵血量」开关。见[不传画面的连接](docs/twopc-status-only.md)。 |
 | 看上次读到的对手装备、离开视野和守卫 | [Plus 实时观战与推送](docs/twopc-plus-alerts.md) · [视觉扫描](docs/hero-scan.md) · [眼位规则与实测](docs/twopc-enemy-wards.md)。装备标读取年龄；守卫目击与按携带量减少推测的 1–3 个候选点分开显示。地名见 [7.42 教练地图](docs/coach-map-742.md)。 |
+| 看兵线、迷雾估计和交汇倒计时 | [兵线小地图图例](docs/twopc-game-overlay.md#兵线小地图)。标准 7.42 / build 6989，按游戏秒更新，不需要模型。空心点是最近所见小兵的估计，不是确认它还活着。 |
 | 调游戏里的字幕、装备面板和小地图 | [游戏内显示](docs/twopc-game-overlay.md)：改位置、大小、颜色和透明度，用「预览 8 秒」看样式。分钟路线要在教练端确认与游戏 HUD 一致的小地图框；眼位没确认框时按这里的小地图位置和大小画。 |
 | 让模型按分钟选线或野 | [7.42 分钟打钱](docs/twopc-minute-farm-742.md)：露娜／巨魔，显式开启，核对标准地图、build 6989 和小地图框。每个游戏分钟最多尝试一次；可弃答，不续用上分钟的路线，不保证提高 GPM。无需 Plus 或传画面。 |
 | 选择模型 | [Foundry 或 Codey（GitHub Copilot）](docs/twopc-model-providers.md)：普通画面建议和分钟规划共用教练机选择的服务。Codey 的 Astra / Sol 先查本机目录，失败不自动换模型或服务；可能计费的推理与查目录是两回事。 |
@@ -55,7 +56,7 @@ dotnet run --project desktop/DotaCoach.TwoPc.UiTests -c Release -- .tmp/twopc-ui
 
 ```powershell
 .\desktop\build-twopc.ps1
-.\desktop\verify-match-release.ps1 -Directory .\dist\twopc\v0.6.1
+.\desktop\verify-match-release.ps1 -Directory .\dist\twopc\v0.6.4
 ```
 
 版本取两端项目一致的 `<Version>`；默认输出 `dist/twopc/v<版本>/`，已存在即拒绝覆盖，可另选 `-OutputDirectory`。包内 `README.md` 是对局档案手册，`MODEL-PROVIDERS.md` 和 `MINUTE-FARM.md` 分别讲模型和分钟路线。另附 `NO-VIDEO.md`、`CREEP-HP.md`、`PLUS-ALERTS.md`、`ENEMY-WARDS.md`、`GAME-OVERLAY.md`；`USAGE.md` 保留 v0.4.3 的历史说明。本机已提取图标时，游戏端包可带图标（仅供自用）；未附的图标向教练端请求。
@@ -72,6 +73,7 @@ dotnet run --project desktop/DotaCoach.TwoPc.UiTests -c Release -- .tmp/twopc-ui
 
 | 版本 | 内容 |
 |---|---|
+| [v0.6.4](docs/twopc-game-overlay.md#兵线小地图) | 游戏端兵线、进雾估计和交汇倒计时；另有[按补丁、英雄、分钟保存的离线录像复盘](docs/daily-replay-memory.md)。 |
 | [v0.6.1](docs/twopc-model-providers.md) | 教练端选择 Foundry 或 Codey / GitHub Copilot。 |
 | [v0.6.0](docs/twopc-match-information.md) | 对局档案、按授权显示装备与眼位、赛后回放对照。 |
 | [v0.5.0](docs/twopc-minute-farm-742.md) | 7.42 露娜／巨魔分钟规划，不依赖游戏机上传画面。 |
