@@ -165,8 +165,25 @@ internal static partial class Program
             await Task.Delay(1600); // Two board polls.
             check(Member<EnemyBoard?>(overlay, "enemies") == null && overlay.Icons["item_blink"] == null,
                 "a panel naming another match than this machine's own GSI is neither drawn nor completed with icons");
-            await Post("GAME_IN_PROGRESS", 381); // Fresh evidence after waiting through the wrong-match polls.
-            await Wait(() => host.Mailbox.Latest()?.Meta.MatchPhase is { Clock: 381, AgeMs: < 800 }, "fresh local clock for the two-second wave lease");
+            // GSI timestamps have whole-second precision. A single packet sent at ...:ss.900 is
+            // already 900 ms old, even on loopback. Feed normal heartbeats until a NEW upload meets
+            // the actual age bound, then stop the feed before testing the two-second map lease.
+            long beforeRefresh = host.Mailbox.Latest()!.Meta.Sequence;
+            using (var refresh = new CancellationTokenSource()) {
+                async Task Heartbeats() {
+                    try {
+                        while (!refresh.IsCancellationRequested) {
+                            await Post("GAME_IN_PROGRESS", 381);
+                            await Task.Delay(200, refresh.Token);
+                        }
+                    } catch (OperationCanceledException) when (refresh.IsCancellationRequested) { }
+                }
+                var feed = Heartbeats();
+                try {
+                    await Wait(() => host.Mailbox.Latest()?.Meta is { MatchPhase: { Clock: 381, AgeMs: < 800 } } m &&
+                        m.Sequence > beforeRefresh, "fresh local clock for the two-second wave lease");
+                } finally { refresh.Cancel(); await feed; }
+            }
             host.Mailbox.SetEnemies(HudBoard(map) with { LaneMap = new(381, [new("top",3,"fog",-6040,1800,455,378,-6150,2450)], 2000) });
             await Wait(() => Member<EnemyBoard?>(overlay, "enemies") is { Wards.Length: 1, SeenWards.Length: 1, Heroes.Length: 1, LaneMap: not null } &&
                 overlay.Icons["item_blink"] is BitmapSource && host.Mailbox.Latest()?.Jpeg.Length == 0 &&
