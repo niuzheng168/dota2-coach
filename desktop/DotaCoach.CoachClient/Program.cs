@@ -218,7 +218,7 @@ internal sealed partial class CoachWindow : Window
             left.Children.Add(Ui.Text("Plus 观战与对手信息", 17, Ui.Accent));
             var plusSettings = BuildSpectatorPanel(left);
             var modelSettings = new StackPanel(); BuildAutomaticControls(switches, modelSettings);
-            var share = new CheckBox { Content = "允许分钟模型读取本队当时已知的装备、视野和推测眼位",
+            var share = new CheckBox { Content = "允许分钟模型读取本队当时已知的装备、视野、推测眼位及兵线",
                 IsChecked = preferences.ModelTeamKnowledge, Foreground = Brushes.White };
             share.Checked += (_, _) => SaveMatchSharing(true); share.Unchecked += (_, _) => SaveMatchSharing(false);
             modelSettings.Children.Add(share);
@@ -226,7 +226,7 @@ internal sealed partial class CoachWindow : Window
             var calibration = new StackPanel(); BuildCalibration(calibration);
             pages.Add("Plus 观战与扫描", plusSettings, "本机 Dota 用另一个账号对好友实时观战；首次使用先在这里配置一次。");
             pages.Add("AI 模型", modelSettings, "模型服务、调用频率，以及 AI 结果推送到游戏的方式。");
-            pages.Add("小地图校准", calibration, "只有镜像 HUD 或放大过小地图才需要。");
+            pages.Add("小地图校准", calibration, "显示兵线推演或分钟路线前，先确认当前分辨率的小地图框。");
         }
         pages.Add("调试", debug.View, "排查问题时才打开；记录只存本机。");
         Content = new Border { Child = pages, Margin = new Thickness(24) };
@@ -332,6 +332,7 @@ internal sealed partial class CoachWindow : Window
         enemyPanel.IsChecked = panelOn = preferences.EnemyPanel;
         enemyVision.IsChecked = visionAlertsOn = preferences.EnemyVisionAlerts;
         enemyWards.IsChecked = preferences.EnemyWards;
+        laneOverlay.IsChecked = preferences.LaneWavesOnMap;
         var toggles = new WrapPanel();
         foreach (var toggle in new[] { enemyPanel, enemyVision, enemyWards }) {
             toggles.Children.Add(toggle);
@@ -346,6 +347,10 @@ internal sealed partial class CoachWindow : Window
         buttons.Children.Add(Ui.Button("一键配置观战 GSI", async (_, _) => await StartSpectator()));
         buttons.Children.Add(Ui.Button("复制启动参数", (_, _) => spectatorSetup.Text = Ui.CopyLaunchOptions(SteamLaunch.Inspect())));
         panel.Children.Add(buttons); panel.Children.Add(spectatorSetup);
+        panel.Children.Add(laneOverlay);
+        laneOverlay.Checked += (_, _) => SaveAlertToggles(); laneOverlay.Unchecked += (_, _) => SaveAlertToggles();
+        panel.Children.Add(Ui.Label("兵线交汇（按游戏秒推演，不发送队友 ping）")); panel.Children.Add(waveStatus);
+        panel.Children.Add(Ui.Text("空线基线假设同批小兵一路畅通；卡兵、拉兵、推线、塔火和上一波残兵都会改变实际交汇。", 12, Brushes.LightGray));
         panel.Children.Add(Ui.Text("面板一直显示敌方英雄上次读到的等级、装备和读取年龄，到本局结束；新的读数需在本机前台观战并启动视觉扫描。" +
             "守卫数量减少也可能是转交、丢弃或卖掉。7.42 常见眼位只给候选，不当作目击；确认过小地图框时按框画，否则按游戏端自己的小地图设置。" +
             "离开视野不能区分阵亡和进迷雾；这类字幕不会盖住正在显示的分钟路线。" +
@@ -417,7 +422,8 @@ internal sealed partial class CoachWindow : Window
     {
         panelOn = enemyPanel.IsChecked == true; visionAlertsOn = enemyVision.IsChecked == true;
         alerts.Clear(); // don't deliver an already queued, now disabled class of subtitle
-        preferences = preferences with { EnemyPanel = panelOn, EnemyVisionAlerts = visionAlertsOn, EnemyWards = enemyWards.IsChecked == true };
+        preferences = preferences with { EnemyPanel = panelOn, EnemyVisionAlerts = visionAlertsOn, EnemyWards = enemyWards.IsChecked == true,
+            LaneWavesOnMap = laneOverlay.IsChecked == true };
         try { preferences.Save(settingsPath); }
         catch { notice.Text = "设置无法保存，当前开关仅本次有效。"; }
     }
@@ -473,10 +479,16 @@ internal sealed partial class CoachWindow : Window
                 CancelDecision();
             UpdateSpectator(); UpdateMatchIntel(pairedFrame);
             matchState.ExpireTeamSources();
+            ShowLaneWaves(pairedFrame);
             // The game machine always gets the last-known panel of its match: equipment rows age instead of
             // disappearing. A confirmed minimap box places the wards; without one the game uses its own HUD setting.
-            host?.Mailbox.SetEnemies(knownBoard.Board(Environment.TickCount64, preferences.EnemyPanel, preferences.EnemyWards,
-                pairedFrame == null ? null : preferences.LayoutFor(pairedFrame)));
+            var layout = pairedFrame == null ? null : preferences.LayoutFor(pairedFrame);
+            var panel = knownBoard.Board(Environment.TickCount64, preferences.EnemyPanel, preferences.EnemyWards, layout);
+            if (preferences.LaneWavesOnMap && layout != null && pairedFrame != null &&
+                matchState.ForGame(pairedFrame, false, false, layout, laneWaves: true, confirmedWaveMap: MinuteFarmArmedFor(pairedFrame)) is { LaneMap: not null } waves &&
+                (panel == null || panel.MatchId == waves.MatchId && panel.Team == waves.Team))
+                panel = panel == null ? waves : waves with { Heroes = panel.Heroes, Wards = panel.Wards, SeenWards = panel.SeenWards };
+            host?.Mailbox.SetEnemies(panel);
             UpdateAlerts(pairedFrame); // Markerless Plus alerts reach the GSI-only game client; a live minute route keeps its slot.
         }
         if (host == null) return;

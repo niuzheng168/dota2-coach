@@ -33,9 +33,9 @@ internal static partial class Program
             var target = new ScreenMark((m.Left + m.Size * .7) / w, (m.Top + m.Size * .4) / h);
             var route = new Reminder("minute", "session", 4, MinuteFarmContext.Kind, "空点跳过", target,
                 w, h, 5000, m, false, [target], ["有野再打"], FarmMinute: 10);
-            Canvas Draw(EnemyBoard b, Reminder? r = null, bool equipment = true, bool wards = true, int? physicalWidth = null) {
+            Canvas Draw(EnemyBoard b, Reminder? r = null, bool equipment = true, bool wards = true, int? physicalWidth = null, bool waves = true) {
                 var c = new Canvas { Width = w / dpi, Height = h / dpi };
-                AdviceOverlay.Compose(c, r, new() { ShowEnemies = equipment, ShowWards = wards }, DisplayGeometry.OverlayUnit(h, dpi),
+                AdviceOverlay.Compose(c, r, new() { ShowEnemies = equipment, ShowWards = wards, ShowLaneWaves = waves }, DisplayGeometry.OverlayUnit(h, dpi),
                     b, viewport: (physicalWidth ?? w, h));
                 c.Measure(new Size(c.Width, c.Height)); c.Arrange(new Rect(0, 0, c.Width, c.Height)); c.UpdateLayout();
                 return c;
@@ -45,6 +45,22 @@ internal static partial class Program
             var map = mixed.Children.OfType<Canvas>().Single(c => c.Children.OfType<Polygon>().Any());
             var guess = map.Children.OfType<Ellipse>().Single(); var seen = map.Children.OfType<Polygon>().Single();
             bool Near(double a, double b) => Math.Abs(a - b) < .01;
+            var dots = new LaneMap742(1213, [new("top",3,"fog",-4736,-4736,455,1210,-4700,-3900),
+                new("mid",2,"seen",400,520,0,1213), new("bot",2,"march",6000,-5500,700,Spawn:1200),
+                new("mid",0,"forecast",450,460,420,1213,Meeting:1220)],1900);
+            var withWaves = board with { LaneMap=dots };
+            var wl = Draw(withWaves,equipment:false,wards:false).Children.OfType<Canvas>().Single();
+            var gap = wl.Children.OfType<Ellipse>().Single(e=>Equals(e.Tag,"wave-fog"));
+            Check(Near(Canvas.GetLeft(wl)*dpi,m.Left) && Near(Canvas.GetTop(wl)*dpi,m.Top) &&
+                Near((Canvas.GetLeft(gap)+gap.Width/2)*dpi,m.Size*.25) && Near((Canvas.GetTop(gap)+gap.Height/2)*dpi,m.Size*.75) &&
+                gap.Fill == Brushes.Transparent && wl.Children.OfType<Ellipse>().Single(e=>Equals(e.Tag,"wave-seen")).Fill != Brushes.Transparent &&
+                wl.Children.OfType<Ellipse>().Any(e=>Equals(e.Tag,"wave-uncertainty") && e.StrokeDashArray.Count>0) &&
+                wl.Children.OfType<Polygon>().Any(e=>Equals(e.Tag,"wave-march")) && wl.Children.OfType<TextBlock>().Any(e=>e.Text=="~7s"),
+                $"actual game compositor: separate observed/fog/march/ETA shapes at confirmed {(right?"right":"left")} {h}p/{dpi}x");
+            Check(Draw(withWaves,equipment:false,wards:false,waves:false).Children.Count==0 &&
+                Draw(withWaves,equipment:false,wards:false,physicalWidth:w+10).Children.Count==0 &&
+                Draw(withWaves,route,wards:false).Children.OfType<Canvas>().Count()==2,
+                "local switch, uncalibrated viewport and route/board separation also apply to wave-only maps");
             Check(Near(Canvas.GetLeft(gear), 4 * DisplayGeometry.OverlayUnit(h, dpi)) &&
                 mixed.Children.OfType<Canvas>().Count() == 2 && Near(Canvas.GetLeft(map) * dpi, m.Left) &&
                 Near(Canvas.GetTop(map) * dpi, m.Top) && Near(map.Width * dpi, m.Size) && map.ClipToBounds && !map.IsHitTestVisible,
@@ -149,13 +165,17 @@ internal static partial class Program
             await Task.Delay(1600); // Two board polls.
             check(Member<EnemyBoard?>(overlay, "enemies") == null && overlay.Icons["item_blink"] == null,
                 "a panel naming another match than this machine's own GSI is neither drawn nor completed with icons");
-            host.Mailbox.SetEnemies(HudBoard(map));
-            await Wait(() => Member<EnemyBoard?>(overlay, "enemies") is { Wards.Length: 1, SeenWards.Length: 1, Heroes.Length: 1 } &&
+            await Post("GAME_IN_PROGRESS", 381); // Fresh evidence after waiting through the wrong-match polls.
+            await Wait(() => host.Mailbox.Latest()?.Meta.MatchPhase is { Clock: 381, AgeMs: < 800 }, "fresh local clock for the two-second wave lease");
+            host.Mailbox.SetEnemies(HudBoard(map) with { LaneMap = new(381, [new("top",3,"fog",-6040,1800,455,378,-6150,2450)], 2000) });
+            await Wait(() => Member<EnemyBoard?>(overlay, "enemies") is { Wards.Length: 1, SeenWards.Length: 1, Heroes.Length: 1, LaneMap: not null } &&
                 overlay.Icons["item_blink"] is BitmapSource && host.Mailbox.Latest()?.Jpeg.Length == 0 &&
                 Field<Image>(setup, "image").Source == null && Field<Reminder?>(setup, "shown") == null,
                 "the real game-client board poll receives the authorized subsets and item icon with no picture or route");
             var authorized = Member<EnemyBoard>(overlay, "enemies");
             check(authorized.Minimap == map && authorized.MatchId == BoardMatch, "the drawn panel carries the coach's confirmed box and the player's match");
+            check(overlay.BoardForDisplay?.Invoke(authorized, size.Width, size.Height)?.LaneMap?.Marks[0].Kind == "fog",
+                "game-client poll and draw guard admit the same dated wave symbols in GSI-only mode");
             if (localHp) {
                 // User can turn an opted-in HP display OFF via the actual game button while the scoped overlay stays paired.
                 hpButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

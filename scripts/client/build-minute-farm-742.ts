@@ -220,7 +220,9 @@ function compile(source: ReturnType<typeof extract>) {
   const up = units.mechanics.neutral_upgrade;
   return { format: 1, build: 6989, overview: source.overview, width: w, height: h, x0, y0, cellSize: size,
     hull: POLICY742.halfHull, sides: sides.toString('base64'), edges: edges.toString('base64'), sites, groups,
-    heroes: source.heroes, upgrade: [Number(up.increase_time), Number(up.increase_health), Number(up.increase_armor)] };
+    heroes: source.heroes, upgrade: [Number(up.increase_time), Number(up.increase_health), Number(up.increase_armor)],
+    waveRoutes: source.lanes, laneTowers: routes.map.towers.filter((t: any) => /_tower[123]_(top|mid|bot)$/.test(t.id))
+      .map(({ id, x, y }: { id: string; x: number; y: number }) => ({ id, x, y })) };
 }
 
 const args = process.argv.slice(2), check = args.includes('--check'), other = args.filter(v => v !== '--check');

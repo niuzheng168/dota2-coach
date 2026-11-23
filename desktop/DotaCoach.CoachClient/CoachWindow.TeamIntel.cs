@@ -10,10 +10,15 @@ namespace DotaCoach.TwoPc;
 internal sealed partial class CoachWindow
 {
     private readonly CheckBox enemyWards = new() { Content = "可能的敌方眼位（推测）", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
+    private readonly TextBlock waveStatus = Ui.Text("", 13);
+    private readonly CheckBox laneOverlay = new() { Content = "兵线与迷雾推演（游戏端小地图）", Foreground = Brushes.White };
     private readonly WardTracker wardTracker = new(CoachMap.Bundled(), WardSpots.Bundled());
     private readonly TeamScanCursor scanCursor = new();
     private readonly object sightGate = new();
     private readonly Queue<SpectatorSnapshot> sightPackets = new();
+    // The local Plus feed can lead the paired player by up to two seconds. Keep only the first
+    // wave sample per early game second until the participant reaches it; never backdate a sighting.
+    private readonly List<SpectatorSnapshot> earlyWavePackets = [];
     private (string Session, string Match, string Team, string Hero)? sightScope;
     private long receivedSightAt = -1, sightGeneration, processedGeneration;
     private SpectatorSnapshot? latestSight;
@@ -80,6 +85,7 @@ internal sealed partial class CoachWindow
             packets = sightPackets.ToArray(); sightPackets.Clear();
         }
         if (processedGeneration != generation) {
+            earlyWavePackets.Clear();
             processedGeneration = generation;
             wardTracker.Clear(); visionLoss.Clear(); alerts.Clear();
             seenAllies.Clear(); scannedHeroes = null; pendingScan = null; scannerRun = null; wardCount = 0;
@@ -108,6 +114,7 @@ internal sealed partial class CoachWindow
             panelText = (scan?.Status ?? scanStatus).Text + (knownBoard.Read > 0 ? $" · 游戏端面板 {knownBoard.Read} 名敌方英雄" : "");
         }
         if (!matched || own == null) {
+            earlyWavePackets.Clear();
             matchState.WithdrawTeam();
             pendingScan = null;
             alerts.Clear(); lastAlert = "";
@@ -115,6 +122,17 @@ internal sealed partial class CoachWindow
             ShowTeamStatus(false);
             return;
         }
+        bool confirmed = MinuteFarmArmedFor(frame!);
+        if (own.Phase == "playing" && LiveMatchState.WaveBuild(frame!.Meta, confirmed)) {
+            var pending = earlyWavePackets.Concat(packets).ToArray();
+            earlyWavePackets.Clear();
+            foreach (var s in pending) {
+                if (!TeamViewEvidence.Matches(own, s, now)) continue;
+                if (s.Clock <= own.Clock) { matchState.ObserveLaneWaves(frame, s, confirmed); continue; }
+                if (!earlyWavePackets.Any(p => Math.Floor(p.Clock!.Value) == Math.Floor(s.Clock!.Value)))
+                    earlyWavePackets.Add(s);
+            }
+        } else earlyWavePackets.Clear();
         foreach (var s in packets) {
             if (!TeamViewEvidence.Matches(own, s, now)) continue;
             // A packet already in the player's next second is known by the player's current one: never a future fact.
@@ -212,6 +230,36 @@ internal sealed partial class CoachWindow
 
     // Plus alerts are markerless text: they reach the GSI-only game client too. A live minute route keeps its slot (UpdateAlerts).
     private bool LegacySubtitles(FrameView? frame) => e2e == null && frame?.Meta.Source is "dota2" or "dota2-gsi";
+
+    private void ShowLaneWaves(FrameView? frame)
+    {
+        var own = TeamViewEvidence.Participant(frame, Environment.TickCount64);
+        if (frame == null || own?.Phase != "playing" || own.MatchId != matchState.ActiveMatch ||
+            !LiveMatchState.WaveBuild(frame.Meta, MinuteFarmArmedFor(frame))) {
+            waveStatus.Text = "等待已配对、未暂停的标准 7.42 / build 6989 本人对局。"; return;
+        }
+        var sight = matchState.CurrentLaneWaves(frame);
+        static string Time(double s) => $"{(int)s / 60}:{(int)s % 60:00}";
+        var lines = LaneWave742.Baseline(own.Clock).Select(b => {
+            var r = sight?.Lanes.Single(w => w.Lane == b.Lane);
+            string road = b.Lane switch { "top" => "上路", "mid" => "中路", _ => "下路" };
+            string basis = r?.Basis switch {
+                "seen-close" => "实见双方兵已接近",
+                "two-visible-fronts" => "双方可见前排推演",
+                "recent-fog-fronts" => $"迷雾外推（依据 {Time(r.FogAnchorClock!.Value)} 最后所见{(r.AssumedSpawnClock is int sp ? $"，假设有 {Time(sp)} 波" : "")}）",
+                "reinforce-last-contact" => $"若 {Time(r.FogAnchorClock!.Value)} 最后交汇处仍有残兵，预计增援到达",
+                "one-visible-plus-assumed-spawn" => $"仅见{(r.RadiantSeen > 0 ? "天辉" : "夜魇")}兵；假设对面 {Time(r.AssumedSpawnClock!.Value)} 波未受阻",
+                "ambiguous" => "有多处交汇，不能唯一定位；空线基线",
+                "unresolved" => "无法配对当前前排；空线基线",
+                _ => "当前线未知；空线基线"
+            };
+            var point = r?.Meeting ?? b.Meeting;
+            string past = r?.Meeting != null && r.Basis != "seen-close" && point.Clock < own.Clock ? "（预计时刻已过，未确认）" : "";
+            return $"{road} · {basis} · {(r?.Basis == "seen-close" ? "" : "约 ")}{Time(point.Clock)}，{point.Landmark}{past}";
+        });
+        waveStatus.Text = (sight == null ? "仅按出兵时钟，无实时兵线观测" : $"队伍小地图采样 {Time(sight.ObservedClock)}") +
+            "\n" + string.Join("\n", lines);
+    }
 
     private void ShowTeamStatus(bool matched, string delivered = "")
     {

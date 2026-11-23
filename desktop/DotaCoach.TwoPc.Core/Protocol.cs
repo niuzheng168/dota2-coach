@@ -67,7 +67,8 @@ public static class Wire
             Finite(w.Left, 0, w.Kind == "observer" ? WardTracker.ObserverLifetime : WardTracker.SentryLifetime))) &&
         (board.SeenWards == null || board.SeenWards.Length <= MaxSeenWards && board.SeenWards.All(w =>
             w is { Kind: "observer" or "sentry", Team: "radiant" or "dire" } &&
-            Finite(w.X, -16_000, 16_000) && Finite(w.Y, -16_000, 16_000)));
+            Finite(w.X, -16_000, 16_000) && Finite(w.Y, -16_000, 16_000))) &&
+        (board.LaneMap == null || board.MatchId != null && board.Minimap != null && board.LaneMap.Valid());
     /// <summary>A small PNG, checked from its header before any image decoder sees network data.</summary>
     public static bool IsIcon(ReadOnlySpan<byte> data)
     {
@@ -154,10 +155,13 @@ public sealed record EnemyHero(string Hero, int? Level, string?[]? Items, string
 /// <summary>A candidate, never a sighting. X/Y are fractions across the minimap from its top left, not world coordinates.</summary>
 public sealed record WardMark(string Hero, string Kind, double X, double Y, int Rank, double Share, double Age, double Left, bool Rough = false);
 /// <summary>Only the selected subsets. Team is the paired participant's team, not the enemy team.
-/// Minimap is the confirmed original-client-pixel rectangle for this build. No tracks, snapshots or replays.</summary>
+/// Minimap is the confirmed original-client-pixel rectangle for this build. Optional dated lane symbols,
+/// never raw tracking history, a spectator snapshot or replay.</summary>
 public sealed record EnemyBoard(EnemyHero[] Heroes, WardMark[]? Wards = null, string? MatchId = null, string? Team = null,
     MinimapLayout? Minimap = null, ObservedWard[]? SeenWards = null)
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public LaneMap742? LaneMap { get; init; }
     // Filled by the mailbox, never inferred from a scanner. A poll cannot start a new publication lease.
     public string? SessionId { get; init; }
     public long FrameSequence { get; init; }
@@ -484,9 +488,15 @@ public sealed partial class CoachMailbox
     public void SetEnemies(EnemyBoard? value)
     {
         if (value != null && !Wire.ValidBoard(value)) throw new ArgumentException("Invalid enemy board");
-        lock (gate) // A panel names the player's match and team; an unscoped scanner-shaped one is never relayed.
+        lock (gate) { // Never rebind a wave to a different participant, calibration, game second, or session.
+            long instant = now();
+            if (value?.LaneMap != null && (frame == null || (value.SessionId != null && value.SessionId != session) ||
+                (value.FrameSequence != 0 && value.FrameSequence != frame.Meta.Sequence) ||
+                !BoardDelivery.WaveFrame(value, frame.Meta, origin: true) || !BoardDelivery.Fresh(frame.Meta.MatchPhase, frame.CapturedNoEarlierThan, instant)))
+                value = BoardDelivery.Legacy(value); // never take down a last-known equipment row with its lane marks
             board = value?.MatchId == null || session == null || BoardDelivery.Empty(value) ? null :
-                (BoardDelivery.Age(value, 0, Wire.BoardLifetimeMs) with { SessionId = session, FrameSequence = frame?.Meta.Sequence ?? 0, HeldMs = 0 }, now());
+                (BoardDelivery.Age(value, 0, Wire.BoardLifetimeMs) with { SessionId = session, FrameSequence = frame?.Meta.Sequence ?? 0, HeldMs = 0 }, instant);
+        }
     }
     public EnemyBoard? Enemies(string id)
     {
@@ -496,7 +506,10 @@ public sealed partial class CoachMailbox
             long instant = now();
             if (board is not { } b || instant < b.At || instant - b.At >= Wire.BoardLifetimeMs) return null;
             long held = instant - b.At;
-            return BoardDelivery.Age(b.Value, held, (int)(Wire.BoardLifetimeMs - held)) with { HeldMs = (int)held };
+            var result = BoardDelivery.Age(b.Value, held, (int)(Wire.BoardLifetimeMs - held)) with { HeldMs = (int)held };
+            if (result.LaneMap != null && (frame == null || !BoardDelivery.WaveFrame(result, frame.Meta) ||
+                !BoardDelivery.Fresh(frame.Meta.MatchPhase, frame.CapturedNoEarlierThan, instant))) return BoardDelivery.Legacy(result);
+            return BoardDelivery.Empty(result) ? null : result;
         }
     }
     public byte[]? Icon(string id, string key)

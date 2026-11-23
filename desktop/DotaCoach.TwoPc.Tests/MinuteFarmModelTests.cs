@@ -62,7 +62,8 @@ internal static class MinuteFarmModelTests
             var self = data.GetProperty("self");
             var options = data.GetProperty("options");
             var stops = options[1].GetProperty("stops");
-            check(Keys(data, "minute", "clock", "horizonSeconds", "mapBasis", "conditions", "self", "timing", "options", "historicalPrior") &&
+            check(Keys(data, "minute", "clock", "horizonSeconds", "mapBasis", "conditions", "self", "timing", "options", "historicalPrior", "emptyLaneMeetings") &&
+                data.GetProperty("emptyLaneMeetings").GetArrayLength() == 3 &&
                 Keys(self, "hero", "team", "alive", "health", "maxHealth", "mana", "maxMana", "lastHits", "silenced", "muted", "x", "y",
                     "level", "moveSpeed", "attackDamage", "attackSpeed", "items", "abilities") &&
                 self.GetProperty("health").GetInt32() == 881 && self.GetProperty("mana").GetInt32() == 203 &&

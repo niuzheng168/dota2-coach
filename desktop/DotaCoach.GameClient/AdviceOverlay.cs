@@ -21,6 +21,7 @@ internal sealed partial class AdviceOverlay : Window
     private Reminder? reminder;
     private long until, lastFrame, previewUntil;
     private EnemyBoard? enemies;
+    internal Func<EnemyBoard, int, int, EnemyBoard?>? BoardForDisplay { get; set; }
     private bool boardSession;
     // Only a reminder needs the full game area. The small equipment/ward HWNDs have independent lifetimes.
     private string? drawn;
@@ -118,6 +119,8 @@ internal sealed partial class AdviceOverlay : Window
         // The manual, offline STYLE preview never supplies a ward. No synthetic rows during a real session;
         // no live board or route over a different foreground app, even while the settings preview is open.
         var board = foreground ? liveBoard : null;
+        if (board?.LaneMap != null)
+            board = BoardForDisplay != null ? BoardForDisplay(board, game.Width, game.Height) : board with { LaneMap = null };
         if (!boardSession && previewing && board == null) board = SampleBoard;
         DrawBoards(game, board);
         if (!foreground && !sample) r = null; // Only the labelled style sample may appear with the settings window in front.
@@ -168,8 +171,8 @@ internal sealed partial class AdviceOverlay : Window
                 canvas.Children.Add(panel);
             }
             var (w, h) = viewport ?? (r?.SourceWidth ?? 0, r?.SourceHeight ?? 0);
-            if (style.ShowWards && WardLayout(board, w, h, style) is { } layout) {
-                var layer = WardLayer(board, layout.Size * canvas.Width / w, layout.Size * canvas.Height / h, unit);
+            if (MapParts(board, style, w, h) is { } selected && WardLayout(selected, w, h, style) is { } layout) {
+                var layer = WardLayer(selected, layout.Size * canvas.Width / w, layout.Size * canvas.Height / h, unit);
                 Canvas.SetLeft(layer, layout.Left * canvas.Width / w); Canvas.SetTop(layer, layout.Top * canvas.Height / h);
                 canvas.Children.Add(layer);
             }

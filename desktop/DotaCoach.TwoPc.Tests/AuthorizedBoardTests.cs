@@ -178,6 +178,30 @@ internal static class AuthorizedBoardTests
         }
         await Send(Playing, Dead);
         var b = Board() with { Wards = [Estimate with { Left = .4 }, Estimate with { Rank = 2 }] };
+        var dots = new LaneMap742(601,[new("top",3,"fog",-6230,4920,350,599,-6240,5550), new("mid",0,"baseline",-179,-102,900,Spawn:600,Meeting:619)],1600);
+        host.Mailbox.SetEnemies(b with { LaneMap = dots });
+        var waveRead = (await link.Enemies(default))!;
+        check(link.DisplayEnemies(waveRead,Playing,1920,1080)?.LaneMap?.Marks[0] is { Kind:"fog", SeenAt:599 } &&
+            BoardDelivery.Age(waveRead,1600,2000) is { LaneMap:null, Heroes.Length:1 } &&
+            link.DisplayEnemies(waveRead,Playing with { InstalledBuild=9999 },1920,1080) is { LaneMap:null, Heroes.Length:1, SeenWards.Length:1 },
+            "real TLS wave layer is independently leased; an incompatible build strips wave estimates, not equipment or existing ward marks");
+        var pairing = host.Pair(IPAddress.Loopback);
+        using (var old = new HttpClient(new HttpClientHandler { UseProxy=false, ServerCertificateCustomValidationCallback=(_,cert,_,_) =>
+            cert?.GetCertHashString(System.Security.Cryptography.HashAlgorithmName.SHA256).Equals(pairing.Fingerprint,StringComparison.OrdinalIgnoreCase)==true }) {
+            BaseAddress=new Uri(pairing.Address) }) {
+            old.DefaultRequestHeaders.Authorization=new("Bearer",pairing.Token); old.DefaultRequestHeaders.Add("X-Session",link.SessionId);
+            string legacy = await old.GetStringAsync("/v1/enemies");
+            check(!legacy.Contains("laneMap") && BoardDelivery.Read(Encoding.UTF8.GetBytes(legacy)) is { Heroes.Length:1 },
+                "the legacy endpoint omits even the optional key so old strict game clients still receive their board");
+            host.Mailbox.SetEnemies(b with { Heroes=[],Wards=null,SeenWards=null,LaneMap=dots });
+            var waveOnly = await link.Enemies(default);
+            check(waveOnly is { LaneMap:not null, Heroes.Length:0 } &&
+                JsonDocument.Parse(await old.GetStringAsync("/v1/enemies")).RootElement.GetProperty("enemies").ValueKind==JsonValueKind.Null,
+                "wave-only downlink with wards/panel off; no phantom legacy board");
+            now += 2000;
+            check(link.DisplayEnemies(waveOnly!, Playing, 1920, 1080) == null,
+                "a stalled game poll cannot keep drawing an expired wave receipt");
+        }
         host.Mailbox.SetEnemies(b);
         check(await link.Enemies(default) is { Wards.Length: 2, SeenWards.Length: 1, Heroes.Length: 1 } read && read.SessionId == link.SessionId &&
             await link.Poll(default) == null, "real pinned-TLS GSI-only link receives the panel without a minute route or a living hero");

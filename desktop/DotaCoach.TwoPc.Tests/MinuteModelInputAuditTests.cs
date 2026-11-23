@@ -62,6 +62,9 @@ internal static class MinuteModelInputAuditTests
                     [new(enemy, "observer", .3, .4, 0, .6, 4, 50)]));
                 state.ObserveWards(id, "radiant", 600.25, [new("sentry", "dire", 77, 80)]);
                 state.ObserveSight(id, "radiant", 600.25, [new(enemy, "dire", -501, 220)]);
+                state.ObserveLaneWaves(origin, new(t, "team-view", 600, "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS", false, id, 2, 0,
+                    [new("npc_dota_creep_goodguys_melee", 2, -363, -254, null, 750, null),
+                     new("npc_dota_creep_badguys_ranged", 3, -185, -109, null, 750, null)], [], []), confirmed: true);
                 var shared = state.ForFarm(origin, true)!; var ownOnly = state.ForFarm(origin, false)!;
                 state.ObserveFrame(Sample(601.25, 810, 4999));
                 state.ObserveEquipment(id, "radiant", 601.25, [new(enemy, 9, ["item_dagon", null, null, null, null, null], null, 0)]);
@@ -97,6 +100,9 @@ internal static class MinuteModelInputAuditTests
                     self.GetProperty("x").GetDouble() == 813.25 && sent[0].GetProperty("ownEconomy").GetProperty("gold").GetInt32() == 27 &&
                     sent[0].GetRawText().Contains("item_sheepstick") && !sent[0].GetRawText().Contains("item_dagon"),
                     "input uses the frozen subsecond self, original causal cursor and authorized team reads, never the later frame");
+                check(sent[0].GetProperty("teamKnowledge").GetProperty("laneWaves").GetProperty("lanes")[1].GetProperty("basis").GetString() == "seen-close" &&
+                    !sent[1].GetRawText().Contains("seen-close") && JsonElement.DeepEquals(sent[0].GetProperty("emptyLaneMeetings"), sent[1].GetProperty("emptyLaneMeetings")),
+                    "sharing off still gets identical clock-only baseline, no team sightings; opt-in sends and archives frozen wave evidence");
                 check(options.GetArrayLength() == 2 && options[0].GetProperty("stops")[0].GetProperty("costBasis").ValueKind == JsonValueKind.Null &&
                     options[1].GetProperty("stops")[0].GetProperty("packWindowSeconds").GetInt32() == 33 &&
                     sent[0].GetProperty("historicalPrior").ValueKind == JsonValueKind.Object && !sent[1].TryGetProperty("teamKnowledge", out _) &&
@@ -107,6 +113,8 @@ internal static class MinuteModelInputAuditTests
                     d => d["input"]!["timing"]!["auth"] = true, d => d["input"]!["historicalPrior"]!["matchId"] = id,
                     d => d["input"]!["options"]![1]!["stops"]![0]!["pixels"] = true,
                     d => d["input"]!["teamKnowledge"]!["lastReadEquipment"]![0]!["steamId"] = "private",
+                    d => d["input"]!["teamKnowledge"]!["laneWaves"]!["lanes"]![1]!["minimap"] = "raw",
+                    d => d["input"]!["emptyLaneMeetings"]![0]!["meeting"]!["steamId"] = "private",
                     d => d["input"]!["options"] = new JsonArray(new JsonNode?[33]), d => d["includesTeamKnowledge"] = false,
                     d => d["input"] = "arbitrary blob", d => d["inputSequence"] = long.MaxValue,
                     d => d["input"]!["providerId"] = "foundry", d => d["input"]!["modelId"] = deployment,

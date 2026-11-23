@@ -23,7 +23,7 @@ public sealed record FarmMinuteScenario(int Minute, int Clock, string Hero, stri
     public FarmTimingBasis? Timing { get; init; }
     public string MapBasis => "7.42/build 6989 initial-map own-interior ground graph; markers are destinations, not straight-line legs.";
     public string Conditions => "Clock offsets are planning/leave-by budgets, not live ETAs. Inspect first; skip empty, stacked, " +
-        "dangerous or costly camps. Roster, wave, safety and income are unknown. A lane stop is a static return point only.";
+        "dangerous or costly camps. A lane stop is a static return point, not a wave meeting. Actual availability, safety and income are unknown.";
 }
 
 public static class MinuteFarmSimulation
@@ -33,6 +33,7 @@ public static class MinuteFarmSimulation
     private const int CampVisitLimit = 25; // A decision deadline, NOT a truncated estimate of time to clear.
     private const double WalkSlack = 1.15; // Explicit policy margin on distance/speed, not a measured engine multiplier.
     private static readonly Lazy<FarmMap> Map = new(() => new FarmMap());
+    internal static (WaveRoute[] Routes, WaveTowerLandmark[] Towers) WaveGeometry => (Map.Value.Data.WaveRoutes, Map.Value.Data.LaneTowers);
 
     /// <summary>Up to six distinct, time-bounded choices of at most three stops. A pure jungle itinerary does
     /// not borrow time for, or require, a return to lane. A mixed itinerary pays for its actual return leg.</summary>
@@ -235,7 +236,7 @@ public static class MinuteFarmSimulation
     private sealed record PackGroup(int Catalog, double[][][] Packs);
     private sealed record MapData(int Format, int Build, double[] Overview, int Width, int Height, int X0, int Y0,
         int CellSize, int Hull, byte[] Sides, byte[] Edges, Site[] Sites, Dictionary<string, PackGroup> Groups,
-        Dictionary<string, double[]> Heroes, double[] Upgrade);
+        Dictionary<string, double[]> Heroes, double[] Upgrade, WaveRoute[] WaveRoutes, WaveTowerLandmark[] LaneTowers);
 
     private sealed class FarmMap
     {

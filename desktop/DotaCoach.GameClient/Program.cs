@@ -147,7 +147,7 @@ internal sealed partial class GameWindowUi : Window
         preview.Children.Add(image); preview.Children.Add(marks); Grid.SetRow(preview, 1); home.Children.Add(preview);
         var (developer, dota) = BuildSettings(home.RowDefinitions[1]);
         pages = new AppPages("游戏端", home);
-        if (overlayPanel != null) pages.Add("游戏内显示", overlayPanel, "字幕、对手面板和眼位的位置、大小、颜色和透明度。改动立即生效。");
+        if (overlayPanel != null) pages.Add("游戏内显示", overlayPanel, "字幕、对手面板、眼位和兵线小地图。改动立即生效。");
         if (e2e == null) {
             var hp = new StackPanel();
             hp.Children.Add(Ui.Text("只给半血以下的兵标血量；你现在出手、这一刀落地时必能打死（正补、反补）时数字变红。塔下的兵需要先垫刀时，" +
@@ -605,10 +605,11 @@ internal sealed partial class GameWindowUi : Window
     {
         const int KeepMs = 15_000;
         long answeredAt = Environment.TickCount64;
+        overlay.BoardForDisplay = (board, w, h) => link.DisplayEnemies(board, gsi?.LatestMatch(), w, h);
         try {
             while (!cancel.IsCancellationRequested) {
                 try {
-                    var board = overlay.Settings.ShowEnemies || overlay.Settings.ShowWards ? await link.Enemies(cancel) : null;
+                    var board = overlay.Settings.ShowEnemies || overlay.Settings.ShowWards || overlay.Settings.ShowLaneWaves ? await link.Enemies(cancel) : null;
                     answeredAt = Environment.TickCount64;
                     // Only this machine's own GSI can veto a panel: one positively naming another match is never drawn.
                     if (board != null && gsi?.LatestMatch() is { } local && local.MatchId != board.MatchId) board = null;
@@ -628,7 +629,7 @@ internal sealed partial class GameWindowUi : Window
                 await Task.Delay(750, cancel);
             }
         } catch (OperationCanceledException) when (cancel.IsCancellationRequested) { }
-        finally { overlay.Enemies(null); }
+        finally { overlay.BoardForDisplay = null; overlay.Enemies(null); }
     }
     private bool MinuteRouteValid(Reminder r)
     {

@@ -480,12 +480,20 @@ public sealed class MatchArchive : IDisposable
             ("neutral", Maybe(Token)), ("lastSeenClock", Maybe(Number)));
         var ward = Exact(("hero", Token), ("kind", OneOf("observer", "sentry", "ward")), ("rank", Int32), ("rough", Boolean),
             ("share worldX worldY estimatedClock expiresClock", Number));
+        var road = OneOf("top", "mid", "bot");
+        var contact = Exact(("clock worldX worldY", Int32), ("landmark", Text));
+        var baseline = Exact(("lane", road), ("spawnClock", Int32), ("meeting", contact));
+        var wave = Exact(("lane", road), ("radiantSeen direSeen", Count), ("assumedSpawnClock", Maybe(Int32)),
+            ("basis", OneOf("seen-close", "two-visible-fronts", "one-visible-plus-assumed-spawn", "recent-fog-fronts", "reinforce-last-contact", "unseen", "unresolved", "ambiguous")),
+            ("fogAnchorClock?", Int32),
+            ("meeting", Maybe(contact)));
         var team = Exact(("knowledgeClock", Number), ("equipmentObservedClock sightObservedClock wardSightObservedClock estimateObservedClock", Maybe(Number)),
             ("lastReadEquipment", ArrayOf(5, equipment)), ("visibleAtSightSample", ArrayOf(10, VisibleHero)),
-            ("visibleAtWardSample", ArrayOf(64, SeenWard)), ("possibleEnemyWards", ArrayOf(12, ward)));
+            ("visibleAtWardSample", ArrayOf(64, SeenWard)), ("possibleEnemyWards", ArrayOf(12, ward)),
+            ("laneWaves?", Exact(("observedClock", Number), ("lanes", ArrayOf(3, wave, min: 3)))));
         var model = Exact(("minute clock horizonSeconds", Int32), ("mapBasis conditions", Text), ("self", self),
             ("timing", Maybe(timing)), ("options", ArrayOf(32, option, min: 1)), ("historicalPrior", Maybe(prior)),
-            ("ownEconomy?", economy), ("teamKnowledge?", team));
+            ("ownEconomy?", economy), ("teamKnowledge?", team), ("emptyLaneMeetings?", ArrayOf(3, baseline, min: 3)));
         var fact = Exact(("inputSequence", Count), ("inputClock", Number), ("includesTeamKnowledge", Boolean),
             ("providerId? modelId?", e => e.ValueKind == JsonValueKind.String),
             ("input", e => JsonMarshal.GetRawUtf8Value(e).Length <= 48 * 1024 && model(e)));

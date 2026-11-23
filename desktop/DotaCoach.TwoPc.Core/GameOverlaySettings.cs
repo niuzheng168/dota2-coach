@@ -34,6 +34,8 @@ public sealed record GameOverlaySettings
     public int EnemyOpacity { get; init; } = 75;
     /// <summary>Show sightings and candidate wards on the minimap (the coach-confirmed box, else this machine's setting below).</summary>
     public bool ShowWards { get; init; } = true;
+    /// <summary>Short-lived lane estimates are only displayed on a coach-confirmed HUD.</summary>
+    public bool ShowLaneWaves { get; init; } = true;
     /// <summary>Dota's minimap is on the right (the HUD option to flip it).</summary>
     public bool MinimapRight { get; init; }
     /// <summary>Minimap size, % of the default HUD's (raise it for Dota's extra-large minimap).</summary>

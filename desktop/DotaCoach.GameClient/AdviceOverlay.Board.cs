@@ -75,13 +75,13 @@ internal sealed partial class AdviceOverlay
                 size.Width * scale, size.Height * scale);
         } else equipmentWindow?.Withdraw();
 
-        if (Settings.ShowWards && board != null && WardLayout(board, game.Width, game.Height, Settings) is { } map) {
-            var layer = wardWindow ??= new("双机教练 · 目击与推测眼位");
+        if (MapParts(board, Settings, game.Width, game.Height) is { } selected && WardLayout(selected, game.Width, game.Height, Settings) is { } map) {
+            var layer = wardWindow ??= new("双机教练 · 兵线与眼位");
             double scale = layer.Scale, side = map.Size / scale, unit = DisplayGeometry.OverlayUnit(game.Height, scale);
-            string key = string.Join("|", side, unit, board.Team,
-                string.Join(";", (board.Wards ?? []).Select(m => $"{m.Hero},{m.Kind},{m.X:R},{m.Y:R},{m.Rank},{m.Rough},{m.Left < 60}")),
-                string.Join(";", (board.SeenWards ?? []).Select(w => $"{w.Kind},{w.Team},{w.X:R},{w.Y:R}")));
-            layer.SetContent(key, () => WardLayer(board, side, side, unit));
+            string key = string.Join("|", side, unit, selected.MatchId, selected.Team, WaveKey(selected.LaneMap),
+                string.Join(";", (selected.Wards ?? []).Select(m => $"{m.Hero},{m.Kind},{m.X:R},{m.Y:R},{m.Rank},{m.Rough},{m.Left < 60}")),
+                string.Join(";", (selected.SeenWards ?? []).Select(w => $"{w.Kind},{w.Team},{w.X:R},{w.Y:R}")));
+            layer.SetContent(key, () => WardLayer(selected, side, side, unit));
             layer.Place(game, map.Left, map.Top, map.Size, map.Size);
         } else if (Settings.ShowWards && !boardSession && ReferenceEquals(board, SampleBoard)) {
             // The style preview outlines where this machine's HUD setting puts the minimap.
@@ -94,11 +94,20 @@ internal sealed partial class AdviceOverlay
         } else wardWindow?.Withdraw();
     }
 
+    private static EnemyBoard? MapParts(EnemyBoard? b, GameOverlaySettings style, int width, int height) => b == null ? null : b with {
+        Wards = style.ShowWards ? b.Wards : null, SeenWards = style.ShowWards ? b.SeenWards : null,
+        LaneMap = style.ShowLaneWaves && b.Minimap?.IsValidFor(width, height) == true ? b.LaneMap : null };
+    private static int WaveKey(LaneMap742? map) {
+        if (map == null) return 0;
+        var hash = new HashCode(); hash.Add(map.Clock);
+        foreach (var mark in map.Marks) hash.Add(mark);
+        return hash.ToHashCode(); // A lease countdown alone doesn't move any glyph.
+    }
     // A box the coach confirmed for this resolution wins; otherwise this machine's own HUD setting (minimap side and
     // size under 游戏内显示) places the marks, as in v0.4.8. Marks are fractions of the minimap, not screen points.
     private static MinimapLayout? WardLayout(EnemyBoard board, int width, int height, GameOverlaySettings style) =>
         board.MatchId == null || board.Team == null || width <= 0 || height <= 0 ||
-        board.Wards?.Any(w => w.Left > 0) != true && board.SeenWards?.Any(w => BoardDelivery.OnOverview(w) != null) != true ? null :
+        board.LaneMap == null && board.Wards?.Any(w => w.Left > 0) != true && board.SeenWards?.Any(w => BoardDelivery.OnOverview(w) != null) != true ? null :
         board.Minimap?.IsValidFor(width, height) == true ? board.Minimap : style.Minimap(width, height);
 
     // Estimates are hollow dashed regions with '?', including rank 0. Seen wards are a solid diamond at the
@@ -112,6 +121,7 @@ internal sealed partial class AdviceOverlay
         void Place(FrameworkElement element, double x, double y) {
             Canvas.SetLeft(element, x); Canvas.SetTop(element, y); map.Children.Add(element);
         }
+        if (board.LaneMap is { } waves) DrawWaves(map, waves, board.Team!, u, boxes);
         foreach (var m in (board.Wards ?? []).Where(w => w.Left > 0).OrderByDescending(w => w.Rank)) {
             double x = m.X * width, y = m.Y * height, size = (m.Rough ? 25 : m.Rank == 0 ? 18 : 14) * u;
             var color = ColorOf(m.Kind);
@@ -135,9 +145,11 @@ internal sealed partial class AdviceOverlay
                 Fill = ColorOf(w.Kind), Stroke = w.Team == board.Team ? Brushes.LimeGreen : Brushes.OrangeRed, StrokeThickness = 1.5 * u }, box.X, box.Y);
         }
         bool estimated = board.Wards?.Any(m => m.Left > 0) == true, seen = board.SeenWards?.Any(w => BoardDelivery.OnOverview(w) != null) == true;
-        string legend = string.Join("  ", new[] { seen ? "◆ 目击" : null, estimated ? "? 推测" : null }.Where(t => t != null));
+        string legend = string.Join("  ", new[] { seen ? "◆ 目击" : null, estimated ? "? 推测" : null,
+            board.LaneMap != null ? "兵 ●见 ○雾 △波 ×汇" : null }.Where(t => t != null));
         var key = new Border { Background = Brush("#081018", 90), CornerRadius = new(2 * u), Padding = new Thickness(2 * u, 0, 2 * u, 0),
-            Child = new TextBlock { Text = legend, Foreground = Brushes.White, FontSize = 10 * u, FontWeight = FontWeights.SemiBold } };
+            Child = new TextBlock { Text = legend, Foreground = Brushes.White, FontSize = 10 * u, FontWeight = FontWeights.SemiBold,
+                MaxWidth = Math.Max(1, width - 6*u), TextWrapping = TextWrapping.Wrap } };
         key.Measure(new Size(width, height));
         double pad = u, right = width - key.DesiredSize.Width - pad, bottom = height - key.DesiredSize.Height - pad;
         var corners = new[] { new Point(pad, bottom), new Point(right, bottom), new Point(pad, pad), new Point(right, pad) };

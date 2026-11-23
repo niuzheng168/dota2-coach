@@ -19,7 +19,7 @@ internal static partial class Program
         // Default loss timing was exercised above. Shorten the debounce here to exercise persistence rather than wait another 7s.
         Set(w, "visionLoss", new VisionLossTracker { MinVisibleMs = 0, GoneMs = 1 });
         object Unit(string n, int team, double x, double y, int vision) => new { unitname = n, team, xpos = x, ypos = y, visionrange = vision };
-        var crop = new FarmPlayerTelemetry(true, true, false, Epoch: Guid.NewGuid());
+        var crop = new FarmPlayerTelemetry(true, true, false, Epoch: Guid.NewGuid(), InstalledBuild: 6989);
         async Task Packet(int clock, object units, string side = "dire", bool full = false, int plusLead = 0)
         {
             var ticket = host.Mailbox.Issue(session);
@@ -36,11 +36,16 @@ internal static partial class Program
         object Row(string hero, int count) => new { hero, level = 9, age = 21.25, items = new string?[] { "item_blink", null, null, null, null, null },
             neutral = (string?)null, wards = new[] { new { first = 144.7, clock = 144.8, observer = count, sentry = 0, unknown = 1 - count },
                 new { first = 145.0, clock = 145.0, observer = 0, sentry = 0, unknown = 0 } } };
-        var seen = new { h = Unit(lion, 2, -2500, 1200, 1800), w = Unit("npc_dota_sentry_wards", 3, 2500, -1200, 0) };
+        var seen = new { h = Unit(lion, 2, -2500, 1200, 1800), w = Unit("npc_dota_sentry_wards", 3, 2500, -1200, 0),
+            r = Unit("npc_dota_creep_goodguys_melee", 2, -363, -254, 750), d = Unit("npc_dota_creep_badguys_ranged", 3, -185, -109, 750) };
         await Packet(145, seen);
         await Wait(() => Team()?.SightObservedClock == 145, "GSI-only mode observes team sight with delivery off");
-        await Packet(146, seen);
+        await Wait(() => Team()?.LaneWaves?.Lanes[1].Basis == "seen-close" && Field<TextBlock>(w, "waveStatus").Text.Contains("实见双方兵已接近"),
+            "the coach's local lane panel uses the paired team minimap without a model, scanner or game overlay");
+        await Packet(146, new { seen.h, seen.w, seen.r });
         await Wait(() => Team()?.SightObservedClock == 146, "source advances independently of scanner writes");
+        await Wait(() => Team()?.LaneWaves?.Lanes[1] is { DireSeen: 0, Basis: not "seen-close" } &&
+            !Field<TextBlock>(w, "waveStatus").Text.Contains("实见双方兵已接近"), "enemy disappears near an allied creep: no claim of a fresh sighting");
         File.WriteAllText(live, JsonSerializer.Serialize(new { version = 2, run = "off", stopped = false, mode = "team-view",
             matchId = match, ownTeam = 3, clock = 145, gsiAge = 0, written = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000d,
             enemies = new[] { Row(lion, 1), Row(other, 0) } }));
@@ -64,7 +69,8 @@ internal static partial class Program
             facts.Any(f => f.Source == "team-vision" && f.Kind == "vision-alert" && f.Data.GetProperty("hero").GetString() == lion) &&
             host.Mailbox.Poll(session) == null, "all delivery off: persist located and unknown inferences and point-free vision loss, without subtitles");
         await Packet(148, seen, full: true);
-        await Wait(() => Team() is { EquipmentObservedClock: null, SightObservedClock: null, EstimateObservedClock: null, WardSightObservedClock: null },
+        await Wait(() => Team() is { EquipmentObservedClock: null, SightObservedClock: null, EstimateObservedClock: null, WardSightObservedClock: null, LaneWaves: null } &&
+            Field<TextBlock>(w, "waveStatus").Text.Contains("仅按出兵时钟"),
             "switching to full spectator immediately withdraws all live sources");
         await Packet(149, seen, side: "radiant");
         await Task.Delay(350);
@@ -93,5 +99,22 @@ internal static partial class Program
             r.Message.Contains("离开视野") && host.Mailbox.Latest()?.Meta.Source == "dota2-gsi" && Field<long>(w, "sightGeneration") == generation,
             "an enemy leaving vision is pushed as a subtitle to the GSI-only game client");
         Field<CheckBox>(w, "enemyVision").IsChecked = false;
+        var hud = MinimapLayout.Suggest(3840, 2160, true);
+        Set(w, "preferences", Field<LiveCoachSettings>(w, "preferences") with { LaneWavesOnMap = true, Calibrations = [hud] });
+        var creep = new { enemy = Unit("npc_dota_creep_goodguys_ranged", 2, -6040, 380, 750) };
+        await Packet(157, creep, plusLead: 1);
+        await Wait(() => host.Mailbox.Enemies(session)?.LaneMap is { Clock: 157 } first && first.Marks.All(m => m.X != -6040 || m.Kind != "seen"),
+            "a leading Plus wave packet is not backdated into the participant's previous second");
+        await Packet(158, new { }, plusLead: 1);
+        await Wait(() => host.Mailbox.Enemies(session)?.LaneMap?.Marks.Any(m => m.Kind == "seen" && m.X == -6040 && m.SeenAt == 158) == true,
+            "the paired coach publishes the early sighting once the player reaches its game second, even with equipment/ward delivery off");
+        await Packet(159, new { }, plusLead: 1);
+        await Wait(() => host.Mailbox.Enemies(session)?.LaneMap?.Marks.Any(m => m.Kind == "fog" && m.SeenAt == 158) == true,
+            "the next game second projects the missing individual without new vision");
+        await Packet(160, seen, full: true);
+        await Wait(() => host.Mailbox.Enemies(session)?.LaneMap is { Clock: 160 } pure && pure.Marks.All(m => m.SeenAt == null),
+            "full spectator withdraws fog anchors; only the participant-clock baseline remains");
+        Set(w, "preferences", Field<LiveCoachSettings>(w, "preferences") with { LaneWavesOnMap = false });
+        await Wait(() => host.Mailbox.Enemies(session) == null, "the wave display switch is independent of model sharing");
     }
 }

@@ -17,6 +17,8 @@ public sealed partial class GameLink : IDisposable
     private (Reminder Plan, FrameMeta Origin, long At, long Until)? activeMinute;
     private long lastMinuteAccepted;
     private FrameMeta? currentCapture;
+    private EnemyBoard? waveReceipt;
+    private long waveUntil;
     private readonly object gate = new();
     private readonly Pairing pairing;
     private ClientWebSocket? video;
@@ -74,7 +76,7 @@ public sealed partial class GameLink : IDisposable
             throw new InvalidOperationException("Protocol version mismatch");
         SessionId = hello.SessionId; videoProtocol = hello.VideoProtocol; ClearCaptures();
     }
-    private void ClearCaptures() { lock (gate) { captures.Clear(); captureOrder.Clear(); currentCapture = null;
+    private void ClearCaptures() { lock (gate) { captures.Clear(); captureOrder.Clear(); currentCapture = null; waveReceipt = null;
         minuteWindow.Clear(); activeMinute = null; lastMinuteAccepted = 0; } }
     // Ticket round-trip precedes capture: both sides can bound frame age without synchronised wall clocks.
     public async Task<Ticket> GetTicket(CancellationToken cancellation)
@@ -153,6 +155,8 @@ public sealed partial class GameLink : IDisposable
             if (currentCapture != null && (currentCapture.IsLegacyStatus || meta.IsLegacyStatus) && meta.BreaksReminderScope(currentCapture)) {
                 captures.Clear(); captureOrder.Clear();
             }
+            if (waveReceipt != null && (!BoardDelivery.WaveFrame(waveReceipt, meta) || currentCapture?.MatchPhase?.Hero != meta.MatchPhase?.Hero ||
+                currentCapture?.MatchPhase?.Clock > meta.MatchPhase?.Clock)) waveReceipt = null;
             currentCapture = meta;
             minuteWindow.Observe(meta, at, now());
             PruneMinute(now());
@@ -285,7 +289,8 @@ public sealed partial class GameLink : IDisposable
     /// The coach keeps its last-known rows; this client shows each reply until the next one replaces it.</summary>
     public async Task<EnemyBoard?> Enemies(CancellationToken cancellation)
     {
-        using var request = Request(HttpMethod.Get, "/v1/enemies");
+        long started = now();
+        using var request = Request(HttpMethod.Get, "/v1/enemies?waves=1");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(http.Timeout);
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
@@ -294,7 +299,33 @@ public sealed partial class GameLink : IDisposable
         EnemyBoard? board;
         try { board = BoardDelivery.Read(await Body(response, 65536, timeout.Token)); }
         catch (InvalidOperationException) { return null; } // Oversized: ignore this reply.
-        return board != null && board.SessionId == SessionId ? board : null;
+        lock (gate) {
+            waveReceipt = null;
+            if (board == null || board.SessionId != SessionId) return null;
+            if (board.LaneMap is not { } map) return board;
+            long at = now();
+            if (at < started || ackFailure != null || !captures.TryGetValue(board.FrameSequence, out var origin) ||
+                origin.Meta.SessionId != SessionId || !BoardDelivery.WaveFrame(board, origin.Meta, origin: true) ||
+                currentCapture?.MatchPhase?.Hero != origin.Meta.MatchPhase!.Hero || !BoardDelivery.WaveFrame(board, currentCapture!) ||
+                (waveUntil = Math.Min(started + map.LeaseMs, origin.At + LaneMap742.Lease - origin.Meta.MatchPhase.AgeMs)) <= at)
+                return BoardDelivery.Legacy(board);
+            waveReceipt = board;
+            return board;
+        }
+    }
+    /// <summary>At draw time only the wave layer must still fit the live participant, build, time and HUD.
+    /// The last-known equipment and the independent ward layer keep the existing main-branch behavior.</summary>
+    public EnemyBoard? DisplayEnemies(EnemyBoard receipt, MatchWitness? local, int width, int height)
+    {
+        lock (gate) {
+            if (receipt.LaneMap == null) return receipt;
+            if (ReferenceEquals(waveReceipt, receipt)) {
+                if (now() < waveUntil && receipt.SessionId == SessionId && ackFailure == null && BoardDelivery.WaveWitness(receipt, local) &&
+                    local!.Hero == currentCapture?.MatchPhase?.Hero && receipt.Minimap?.IsValidFor(width, height) == true) return receipt;
+                waveReceipt = null;
+            }
+            return BoardDelivery.Legacy(receipt);
+        }
     }
     /// <summary>One icon of the enemy panel as PNG bytes, or null when the coach has none (it serves only icons on its panel).</summary>
     public async Task<byte[]?> Icon(string key, CancellationToken cancellation)

@@ -39,6 +39,7 @@ public sealed record LiveCoachSettings
     public bool EnemyVisionAlerts { get; init; } = true;
     /// <summary>Display inferred ward candidates. Does not enable/disable collection or authorize model input.</summary>
     public bool EnemyWards { get; init; } = false;
+    public bool LaneWavesOnMap { get; init; } = true;
     /// <summary>Local scanner workspace (.tmp/vision-assets) and vision Python. Never bundled or started automatically.</summary>
     public string ScanFolder { get; init; } = "";
     public string ScanPython { get; init; } = "";

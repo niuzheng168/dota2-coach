@@ -38,6 +38,7 @@ internal static partial class Program
                 if (trial) { await PanelTrial(args[1], args[2]); Console.WriteLine($"Enemy panel trial on the real Dota window: {passed} checks passed."); }
                 else if (args.FirstOrDefault() == "--match-full-journey") await MatchFullJourney.Run(args);
                 else if (args is ["--participant-board"]) { await ParticipantBoardChecks(); Console.WriteLine($"Participant board: {passed} checks passed."); }
+                else if (args is ["--wave-overlay", var input, var png]) WaveOverlayExample(input,png);
                 else if (args.FirstOrDefault() == "--minute-route") {
                     MinuteRouteChecks(args.ElementAtOrDefault(1) ?? ".tmp/minute-route-qa", args.ElementAtOrDefault(2));
                     Console.WriteLine($"Off-screen minute route: {passed} checks passed.");

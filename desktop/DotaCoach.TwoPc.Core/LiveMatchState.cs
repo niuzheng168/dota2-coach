@@ -11,7 +11,11 @@ public sealed record FarmWardEstimate(string Hero, string Kind, int Rank, double
     double EstimatedClock, double ExpiresClock, bool Rough);
 public sealed record FarmTeamKnowledge(double KnowledgeClock, double? EquipmentObservedClock, FarmEquipment[] LastReadEquipment,
     double? SightObservedClock, MatchSightHero[] VisibleAtSightSample, double? WardSightObservedClock,
-    ObservedWard[] VisibleAtWardSample, double? EstimateObservedClock, FarmWardEstimate[] PossibleEnemyWards);
+    ObservedWard[] VisibleAtWardSample, double? EstimateObservedClock, FarmWardEstimate[] PossibleEnemyWards)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public LaneWaveSample? LaneWaves { get; init; }
+}
 
 /// <summary>Frozen at the source frame, BEFORE local simulation or the paid call. No review/archive API,
 /// raw packet, account IDs, pairing secrets, image, or replay contents can be supplied in this projection.</summary>
@@ -44,6 +48,10 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
     private WardMark[]? estimates;
     private ObservedWard[]? observedWards;
     private MatchSightHero[]? sight;
+    private LaneWaveSample? waves;
+    private readonly LaneWave742.Tracker waveTracks = new();
+    private long wavesReceived;
+    private void ClearWaves() { if (waves != null) waveTracks.Clear(); waves = null; }
     private double scanClock, estimateClock, wardClock, sightClock, lastSightSample = double.NegativeInfinity;
     private long scanAt, estimateAt, wardsAt, sightAt;
     private string? eqSignature, estimateSignature, wardsSignature;
@@ -78,7 +86,7 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
     }
     private void DropTeam()
     {
-        equipmentRows = null; estimates = null; observedWards = null; sight = null;
+        equipmentRows = null; estimates = null; observedWards = null; sight = null; ClearWaves();
         eqSignature = estimateSignature = wardsSignature = null;
         scanClock = estimateClock = wardClock = sightClock = lastSightSample = double.NegativeInfinity;
         noted.Clear(); chargeHistory.Clear();
@@ -150,11 +158,13 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
             bool resuming = !connected;
             clock = highWater = w.Clock; connected = true; lastAt = frame.CapturedNoEarlierThan - w.AgeMs; frameSequence = meta.Sequence;
             if (phase != w.Phase || paused != w.Paused || resuming) {
+                ClearWaves();
                 farmScope = new();
                 if (resumedArchive) Write(clock, "coach", "gap", new { reason = "resumed-after-interruption" });
                 Write(clock, "own-gsi", "phase", new { phase = w.Phase, paused = w.Paused, team, hero, resumed = resuming && (!newMatch || resumedArchive) });
             }
             phase = w.Phase; paused = w.Paused;
+            if (BoardDelivery.InstalledBuild(meta) is int wb && wb != MinuteFarmContext.SupportedBuild) ClearWaves();
             if (phase == "postgame") {
                 if (CanAudit && archive != null) {
                     try { archive.Seal(match!, clock); }
@@ -246,6 +256,7 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
     }
     private void WithdrawSources(bool all)
     {
+        if (all || !FreshWaves()) ClearWaves();
         if (all || !Held(scanAt, scanClock)) ClearEquipment(clock);
         if (all || !Held(estimateAt, estimateClock)) ClearEstimates(clock);
         if (observedWards != null && (all || !Held(wardsAt, wardClock))) {
@@ -258,6 +269,37 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
     }
     public void WithdrawTeam() { lock (gate) WithdrawSources(true); }
     public void ExpireTeamSources() { lock (gate) WithdrawSources(false); }
+    private bool FreshWaves() => waves != null && Fresh() && !paused && now() - wavesReceived is >= 0 and < TeamViewEvidence.FreshMs &&
+        clock >= waves.ObservedClock && clock - waves.ObservedClock < LaneWave742.FreshSeconds;
+    internal static bool WaveBuild(FrameMeta m, bool confirmed) => BoardDelivery.InstalledBuild(m) is int build
+        ? build == MinuteFarmContext.SupportedBuild : confirmed;
+    internal void ObserveLaneWaves(FrameView frame, SpectatorSnapshot s, bool confirmed = false)
+    {
+        lock (gate) {
+            if (!Matches(frame) || !WaveBuild(frame.Meta, confirmed)) { ClearWaves(); return; }
+            var witness = TeamViewEvidence.Participant(frame, now());
+            if (witness?.Phase != "playing" || !TeamViewEvidence.Matches(witness, s, now())) { ClearWaves(); return; }
+            // Consume the first packet of each game second, not each 100-ms UI refresh. No renewal on duplicates.
+            if (waves != null && Math.Floor(s.Clock!.Value) <= Math.Floor(waves.ObservedClock)) return;
+            waves = LaneWave742.Observe(witness, s, now(), waveTracks);
+            if (waves == null) waveTracks.Clear();
+            wavesReceived = s.ReceivedAt;
+        }
+    }
+    internal LaneWaveSample? CurrentLaneWaves(FrameView frame)
+    {
+        lock (gate) return Matches(frame) && FreshWaves() ? waves! with { Lanes = [.. waves.Lanes] } : null;
+    }
+    private LaneMap742? GameWaves(FrameView frame, bool confirmed)
+    {
+        if (phase != "playing" || !WaveBuild(frame.Meta, confirmed) || frame.Meta.MatchPhase == null) return null;
+        bool teamView = FreshWaves();
+        long tick = now(), age = Math.Max(tick - lastAt, teamView ? tick - wavesReceived : 0);
+        int lease = (int)(LaneMap742.Lease - age);
+        if (lease <= 0) return null;
+        var map = waveTracks.Project((int)Math.Floor(clock), teamView);
+        return map with { Marks = [.. map.Marks], LeaseMs = lease };
+    }
     public void ObserveWards(string matchId, string team, double observedClock, ObservedWard[] wards)
     {
         lock (gate) {
@@ -318,7 +360,7 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
     private bool Matches(FrameView? frame) => frame != null && Fresh() && frame.Meta.SessionId == session &&
         frame.Meta.Sequence == frameSequence && (frame.Meta.Player?.MatchId ?? frame.Meta.MatchPhase?.MatchId) == match;
 
-    public EnemyBoard? ForGame(FrameView? frame, bool equipment, bool wards, MinimapLayout? calibrated)
+    public EnemyBoard? ForGame(FrameView? frame, bool equipment, bool wards, MinimapLayout? calibrated, bool laneWaves = false, bool confirmedWaveMap = false)
     {
         lock (gate) {
             if (!Matches(frame) || paused) return null;
@@ -326,11 +368,12 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
             double elapsed = clock - estimateClock;
             var eq = !equipment || !tracked ? [] : equipmentRows!.Select(h => Copy(h) with {
                 Age = h.Age is double a ? Math.Min(86400, a + clock - scanClock) : null }).ToArray();
-            var layout = wards && calibrated?.IsValidFor(frame!.Meta.SourceWidth, frame.Meta.SourceHeight) == true ? calibrated : null;
-            var marks = layout == null || estimates == null || !Held(estimateAt, estimateClock) ? [] : estimates.Where(w => w.Left > elapsed)
+            var layout = (wards || laneWaves) && calibrated?.IsValidFor(frame!.Meta.SourceWidth, frame.Meta.SourceHeight) == true ? calibrated : null;
+            var marks = !wards || layout == null || estimates == null || !Held(estimateAt, estimateClock) ? [] : estimates.Where(w => w.Left > elapsed)
                 .Select(w => w with { Age = w.Age + elapsed, Left = w.Left - elapsed }).ToArray();
-            var seen = layout != null && observedWards != null && Held(wardsAt, wardClock) ? observedWards.ToArray() : [];
-            if (eq.Length + marks.Length + seen.Length == 0) return null;
+            var seen = wards && layout != null && observedWards != null && Held(wardsAt, wardClock) ? observedWards.ToArray() : [];
+            var waveMap = laneWaves && layout != null ? GameWaves(frame!, confirmedWaveMap) : null;
+            if (eq.Length + marks.Length + seen.Length == 0 && waveMap == null) return null;
             // A UI refresh is not new evidence. Pin the original participant frame and the shortest
             // remaining source lease so a final poll (or a reconnect racing publication) cannot renew it.
             long t = now();
@@ -341,7 +384,7 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
             if (marks.Length > 0) left = Math.Min(left, Remaining(estimateAt, estimateClock));
             if (seen.Length > 0) left = Math.Min(left, Remaining(wardsAt, wardClock));
             return left <= 0 ? null : new EnemyBoard(eq, marks, match, team, layout, seen) {
-                SessionId = session, FrameSequence = frameSequence, RemainingMs = (int)left
+                SessionId = session, FrameSequence = frameSequence, RemainingMs = (int)left, LaneMap = waveMap
             };
         }
     }
@@ -356,7 +399,8 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
                 sh ? sightClock : null, sh ? sight!.ToArray() : [], ws ? wardClock : null, ws ? observedWards!.ToArray() : [],
                 est ? estimateClock : null, est ? estimates!.Where(w => w.Left > clock - estimateClock)
                     .OrderBy(w => w.Rank).ThenByDescending(w => w.Share).Take(12).Select(w => new FarmWardEstimate(w.Hero,
-                        w.Kind, w.Rank, w.Share, -9472 + 18944 * w.X, 9472 - 18944 * w.Y, estimateClock - w.Age, estimateClock + w.Left, w.Rough)).ToArray() : []);
+                    w.Kind, w.Rank, w.Share, -9472 + 18944 * w.X, 9472 - 18944 * w.Y, estimateClock - w.Age, estimateClock + w.Left, w.Rough)).ToArray() : [])
+                { LaneWaves = CurrentLaneWaves(frame) };
             return new(Copy(own), session!, frameSequence, sequence, intel) { FarmScope = farmScope };
         }
     }

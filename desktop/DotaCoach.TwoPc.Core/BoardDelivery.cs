@@ -26,9 +26,10 @@ public static class BoardDelivery
     }
     // Standard build 6989 overview: posX=-9472, posY=9472, span=18944. No side mirroring.
     private const int WorldEdge = 9472;
-    public static ScreenMark? OnOverview(ObservedWard w) =>
-        Wire.Finite(w.X, -WorldEdge, WorldEdge) && Wire.Finite(w.Y, -WorldEdge, WorldEdge) ?
-        new((w.X + WorldEdge) / (2 * WorldEdge), (WorldEdge - w.Y) / (2 * WorldEdge)) : null;
+    public static ScreenMark? OnOverview(ObservedWard w) => OnOverview(w.X, w.Y);
+    public static ScreenMark? OnOverview(double x, double y) =>
+        Wire.Finite(x, -WorldEdge, WorldEdge) && Wire.Finite(y, -WorldEdge, WorldEdge) ?
+        new((x + WorldEdge) / (2 * WorldEdge), (WorldEdge - y) / (2 * WorldEdge)) : null;
 
     public static bool SamePlayer(MatchWitness phase, OwnState own) =>
         phase.MatchId == own.MatchId && phase.Team == own.Team && phase.Hero == own.Hero && phase.Clock == own.Clock;
@@ -44,6 +45,15 @@ public static class BoardDelivery
     internal static bool Fresh(MatchWitness? witness, long bound, long instant) =>
         MatchWitness.Valid(witness, instant - bound) && instant - bound < MatchWitness.MaxAgeMs - witness!.AgeMs;
 
+    // Equipment is last-known until match end; a wave is a short-lived projection in one calibrated frame.
+    internal static bool WaveWitness(EnemyBoard b, MatchWitness? w) =>
+        b.LaneMap is { } map && w is { Phase: "playing" } && Live(w) && w.Team == b.Team && w.MatchId == b.MatchId &&
+        w.InstalledBuild is null or MinuteFarmContext.SupportedBuild && w.Clock >= map.Clock && w.Clock - map.Clock < LaneMap742.Lease / 1000d;
+    internal static bool WaveFrame(EnemyBoard b, FrameMeta m, bool origin = false) =>
+        m.Source is "dota2" or "dota2-gsi" && WaveWitness(b, m.MatchPhase) &&
+        InstalledBuild(m) is null or MinuteFarmContext.SupportedBuild && b.Minimap?.IsValidFor(m.SourceWidth, m.SourceHeight) == true &&
+        (!origin || b.LaneMap!.Clock == Math.Floor(m.MatchPhase!.Clock));
+
     // Age all last reads while the panel is held. Never invent an age for a never-read hero,
     // resuscitate an expired candidate, or substitute an estimate for a sighting. Cut mutable array aliases.
     internal static EnemyBoard Age(EnemyBoard board, long elapsedMs, int remainingMs)
@@ -53,11 +63,16 @@ public static class BoardDelivery
             Heroes = board.Heroes.Select(h => h with { Items = h.Items?.ToArray(), Age = h.Age is double a ? Math.Min(86_400, a + seconds) : null }).ToArray(),
             Wards = board.Wards?.Where(w => w.Left > seconds).Select(w => w with {
                 Age = Math.Min(86_400, w.Age + seconds), Left = w.Left - seconds }).ToArray(),
-            SeenWards = board.SeenWards?.ToArray(), RemainingMs = remainingMs,
+            SeenWards = board.SeenWards?.ToArray(), LaneMap = board.LaneMap?.Age(elapsedMs), RemainingMs = remainingMs,
         };
     }
     internal static bool HasIcon(EnemyBoard? board, string key) =>
         board?.Heroes.Any(h => h.Hero == key || h.Neutral == key || h.Items?.Contains(key) == true) == true;
     internal static bool Empty(EnemyBoard board) =>
-        board.Heroes.Length == 0 && board.Wards is not { Length: > 0 } && board.SeenWards is not { Length: > 0 };
+        board.Heroes.Length == 0 && board.Wards is not { Length: > 0 } && board.SeenWards is not { Length: > 0 } && board.LaneMap == null;
+    internal static EnemyBoard? Legacy(EnemyBoard? board) {
+        if (board?.LaneMap == null) return board;
+        var legacy = board with { LaneMap = null };
+        return Empty(legacy) ? null : legacy;
+    }
 }

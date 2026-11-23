@@ -141,7 +141,9 @@ $manifest = [ordered]@{
     debugRecordingOptIn = $true; debugMaximumBytes = 2L * 1024 * 1024 * 1024; debugMaximumMinutes = 120
     plusSpectatorObservationOnly = $true; plusSpectatorPort = 3220
     matchArchive = [ordered]@{ live = "participant-and-matched-team-vision"; clock = "event-and-first-known";
-        wardEvidence = @("seen", "inferred", "postgame-replay"); gameProjection = "selected-equipment-and-wards";
+        wardEvidence = @("seen", "inferred", "postgame-replay"); gameProjection = "selected-equipment-wards-and-calibrated-lane-symbols";
+        laneHud = @{ build = 6989; defaultAfterCalibration = $true; individualMemoryGameSeconds = 12;
+            lastContactMemoryGameSeconds = 30; rawSpectatorOrReplaySent = $false };
         extraTeamContextForModelDefault = $false; replayCanReachLive = $false }
     postgameReplay = [ordered]@{ package = "coach-only"; portableWorkerManifestSha256 = $pin; requiresVerifiedEnd = $true }
     playerMinimapDebugIntervalMs = 1000; playerMinimapObservationOnly = $true

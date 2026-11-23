@@ -20,6 +20,9 @@ if (args is ["--lane-role-audit",var samplesFile]) { LaneRoleTests.Audit(samples
 if (args.Contains("--last-hit-latency")) { LastHitLatencyReplay.Run(); return; }
 if (args.Contains("--last-hit-gpu-bench")) { LastHitGpuBenchmark.Run(); return; }
 if (args is ["--minute-farm"]) { await MinuteSuite(); return; }
+if (args is ["--lane-waves"]) { LaneWaveTests.Run(Check); Console.WriteLine($"Lane wave checks: {passed} passed."); return; }
+if (args is ["--lane-wave-eval", var openings]) { LaneWaveTests.Evaluate(openings); return; }
+if (args is ["--lane-wave-fog-eval", var waveData]) { LaneFogEval.Run(waveData); return; }
 if (args is ["--copilot"]) {
     await CopilotContractTests.Run(Check); Console.WriteLine($"Offline Copilot contract checks: {passed} passed."); return;
 }
@@ -44,6 +47,7 @@ async Task MatchSuite()
 }
 async Task MinuteSuite()
 {
+    LaneWaveTests.Run(Check);
     MinuteFarmSimulationTests.Run(Check);
     await MinuteFarmProtocolTests.Run(Check);
     await MinuteFarmModelTests.Run(Check);

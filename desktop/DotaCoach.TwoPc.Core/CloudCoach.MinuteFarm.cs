@@ -47,11 +47,20 @@ public sealed partial class CloudCoach
                 bonuses, assume a teleport, or shorten the supplied budgets. timing gives the simulator's effective
                 values and their bases, not necessarily observed hero stats. walkUnits is graph distance.
                 arrivalSeconds and finishSeconds are offsets AFTER clock, bounded by horizonSeconds, not live ETAs.
-                A lane stop is arrival at a static return point only: no wave was observed and no lane clear is timed.
+                A lane stop is arrival at a static return point only: do not move it to a predicted meeting or assume a clear.
+                emptyLaneMeetings is the next hypothetical approach of two isolated same-spawn waves on each lane,
+                based only on clock and map. Meeting clocks are absolute game seconds, not arrival offsets.
+                If teamKnowledge.laneWaves exists, seen-close means opposing creeps were near at observedClock, not fighting now.
+                two-visible-fronts projects two sampled groups; one-visible-plus-assumed-spawn assumes an unseen reinforcement.
+                recent-fog-fronts uses last-seen wave positions at fogAnchorClock; missing creeps may have died or been pulled.
+                reinforce-last-contact asks when reinforcements could arrive IF the last witnessed fight still holds at that location.
+                assumedSpawnClock, when present, is hypothetical. No fog forecast is a sighting or a creep count.
+                Prefer recent team observations over the empty-lane baseline. No prediction verifies hidden units, tower state,
+                intervening pulls, remaining gold, safety or what will still be there when the hero arrives.
                 At a camp finishSeconds is a LEAVE-BY deadline. A 25s visit budget is not a 25s clear. packWindowSeconds
                 is uncapped reference work for the modeled unstacked rosters under the stated assumptions, if known.
                 modeledRosters/catalogRosters describes coverage, not which pack spawned or a probability of clearing it.
-                Wave position, camp presence/stacks and path danger are unknown; own territory is not proof of safety.
+                Unobserved waves, camp presence/stacks and path danger remain unknown; own territory is not proof of safety.
                 If teamKnowledge is supplied it is a frozen team-view projection known at knowledgeClock. Its hero
                 positions and ward sightings refer ONLY to the stated past sample game clocks; last-read items can be stale.
                 possibleEnemyWards are inferred candidates, not sightings. Never treat several candidates as several wards.
@@ -146,7 +155,7 @@ public sealed partial class CloudCoach
                 items = own.Items.Where(Equipped).Select(Entry), abilities = own.Abilities.Select(Entry) },
             timing = timing == null ? null : new { timing.Level, timing.LevelBasis, timing.MoveSpeed, timing.MoveBasis,
                 timing.DamagePerHit, timing.DamageBasis, timing.AttackSpeed, timing.AttackSpeedBasis, timing.BaseAttackTime },
-            options, historicalPrior = MinuteFarmReplayPrior.For(own.Hero, scenario.Minute),
+            options, emptyLaneMeetings = LaneWave742.Baseline(own.Clock), historicalPrior = MinuteFarmReplayPrior.For(own.Hero, scenario.Minute),
         }, Wire.Json)!.AsObject();
         if (own.Stats is { } stats) payload["ownEconomy"] = JsonSerializer.SerializeToNode(new {
             stats.Gold, stats.NetWorth, stats.LastHits, stats.Denies, stats.Kills, stats.Deaths, stats.Assists, stats.Gpm, stats.Xpm
