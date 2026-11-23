@@ -41,12 +41,26 @@ public sealed record HeroLoadout(string Hero, int Level, bool Broken, int Attrib
 /// One plain attack of the own hero before armor: the least and most of the damage roll (the HUD shows their mean, split into
 /// white base and green bonus) and Quelling Blade's extra against creeps. A lower bound, see <see cref="HeroAttackTable"/>.
 /// <see cref="Interval"/> is the time between attacks and <see cref="Delay"/> from the order to the hit (attack point, plus
-/// the projectile's flight over the hero's full range); both at least as long as in the game.
+/// the projectile's flight over the hero's full range); both at least as long as in the game. <see cref="Swing"/> is the
+/// attack point alone, <see cref="Projectile"/> the projectile's speed (0 for melee heroes) and <see cref="Range"/> the base
+/// attack range, hull edge to hull edge.
 /// </summary>
-public readonly record struct HeroAttack(int Min, int Max, int Quell, double Interval, double Delay)
+public readonly record struct HeroAttack(int Min, int Max, int Quell, double Interval, double Delay, double Swing = 0, double Projectile = 0, double Range = 0)
 {
+    /// <summary>Hero and creep hull radii (24 + 16): attack range counts from hull edge to hull edge.</summary>
+    public const double Hulls = 40;
+
     /// <summary>Share of physical damage that gets through armor.</summary>
     public static double ArmorMultiplier(double armor) => 1 - .06 * armor / (1 + .06 * Math.Abs(armor));
+
+    /// <summary>
+    /// Seconds the server takes to start an ordered attack: in the last-hit lab (level-1 Luna, 58 orders) the hit landed this
+    /// much after <see cref="Swing"/> plus the flight on average (a tick when facing the creep, two when turning to it).
+    /// </summary>
+    public const double Order = .04;
+
+    /// <summary>Seconds from the order to the hit on a creep <paramref name="distance"/> away (centre to centre), the hero in range.</summary>
+    public double DelayAt(double distance) => Order + Swing + (Projectile > 0 ? distance / Projectile : 0);
 
     /// <summary>The least and most one attack takes off a lane creep, or null for other units.</summary>
     public (double Least, double Most)? Against(string unitName) =>
@@ -72,6 +86,8 @@ public sealed class HeroAttackTable
     private readonly double universal;
     private readonly double[] attributeBonus;
     public int Build { get; }
+    /// <summary>Server ticks per second.</summary>
+    public const double ServerTicks = 30;
 
     public HeroAttackTable(string path)
     {
@@ -102,8 +118,9 @@ public sealed class HeroAttackTable
         foreach (var t in root.GetProperty("towers").EnumerateObject()) {
             var v = t.Value;
             var damage = Numbers(v.GetProperty("damage"));
-            towers[int.Parse(t.Name)] = new(damage[0], damage[1], v.GetProperty("attackRate").GetDouble() * 100 / v.GetProperty("attackSpeed").GetDouble(),
-                v.GetProperty("range").GetDouble());
+            // The server attacks on its 30 Hz ticks: 0.9 / 1.1 = 0.818 s becomes 25 ticks, 0.833 s (measured in the last-hit lab).
+            double interval = Math.Ceiling(v.GetProperty("attackRate").GetDouble() * 100 / v.GetProperty("attackSpeed").GetDouble() * ServerTicks - 1e-6) / ServerTicks;
+            towers[int.Parse(t.Name)] = new(damage[0], damage[1], interval, v.GetProperty("range").GetDouble());
         }
         if (heroes.Count < 100 || attributeBonus.Length == 0 || universal is <= 0 or >= 1 || towers.Count != 4)
             throw new ArgumentException("Incomplete hero attack data");
@@ -161,12 +178,10 @@ public sealed class HeroAttackTable
         int least = (int)Math.Floor(hero.DamageMin + main + flat), most = (int)Math.Floor(hero.DamageMax + main + flat);
         // One attack speed per point of agility; buffs left out make the attack only slower than in the game.
         double rate = Math.Clamp(speed + whole[1], 20, 700) / 100;
-        double flight = hero.ProjectileSpeed > 0 ? (hero.Range + RangeHulls) / hero.ProjectileSpeed : 0;
-        return least < 1 ? null : new HeroAttack(least, Math.Max(least, most), quell, hero.AttackRate / rate, hero.AttackPoint / rate + flight);
+        double flight = hero.ProjectileSpeed > 0 ? (hero.Range + HeroAttack.Hulls) / hero.ProjectileSpeed : 0;
+        return least < 1 ? null : new HeroAttack(least, Math.Max(least, most), quell, hero.AttackRate / rate, hero.AttackPoint / rate + flight,
+            hero.AttackPoint / rate, hero.ProjectileSpeed, hero.Range);
     }
-
-    /// <summary>Hero and creep hull radii (24 + 16): attack range counts from hull edge to hull edge.</summary>
-    private const double RangeHulls = 40;
 }
 
 /// <summary>One tier of towers: damage roll, seconds between shots and attack range.</summary>

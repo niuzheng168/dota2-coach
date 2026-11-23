@@ -118,7 +118,7 @@ public sealed class CreepUnitMatcher
 
 /// <summary>
 /// Follows bars from frame to frame (same side, nearest within half a bar width) and keeps the unit name each
-/// track was matched to, so one stale or missing GSI match does not change the number shown.
+/// track was matched to, so one stale or missing GSI match does not change the number shown, and the bar's drops.
 /// </summary>
 public sealed class CreepTracks
 {
@@ -127,12 +127,15 @@ public sealed class CreepTracks
         public CreepHealthBar Bar = bar;
         public long Seen = seen;
         public readonly Dictionary<string, int> Votes = [];
+        public readonly CreepHitHistory Hits = new();
         public string? Name => Votes.Count == 0 ? null : Votes.MaxBy(v => v.Value).Key;
     }
     private List<Track> tracks = [];
 
+    /// <param name="at">This frame's capture time in seconds, for the drop histories.</param>
+    /// <param name="hits">Filled per bar with its track's drop history.</param>
     /// <returns>Per bar, the unit name its track was most often matched to (null if never matched).</returns>
-    public string?[] Update(IReadOnlyList<CreepHealthBar> bars, IReadOnlyList<MinimapUnit?> matches, long now)
+    public string?[] Update(IReadOnlyList<CreepHealthBar> bars, IReadOnlyList<MinimapUnit?> matches, long now, double at = 0, CreepHitHistory?[]? hits = null)
     {
         var next = new List<Track>(bars.Count);
         var names = new string?[bars.Count];
@@ -150,6 +153,7 @@ public sealed class CreepTracks
                     if (--track.Votes[other] <= 0) track.Votes.Remove(other);
             }
             names[i] = track.Name;
+            if (hits != null) { track.Hits.Add(at, bar.Fill); hits[i] = track.Hits; }
             next.Add(track);
         }
         // Tracks not seen this frame survive briefly (a bar hidden for a frame by another bar).

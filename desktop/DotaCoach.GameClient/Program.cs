@@ -17,14 +17,22 @@ internal static class Program
     [STAThread] public static void Main(string[] args)
     {
         // Unsupported switches (including the retired live practice UI) must never launch a window or a worker.
-        if (args.Length != 0 && args is not ["--local-bot-e2e", _] && args is not ["--creep-hp-log", _]) {
+        if (args.Length != 0 && args is not ["--local-bot-e2e", _] && args is not ["--creep-hp-log", _, ..]) {
             Console.Error.WriteLine("不支持此游戏端启动参数。"); Environment.ExitCode = 2; return;
         }
         if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)) {
             MessageBox.Show("双机游戏端首版需要 Windows 11 x64。"); return;
         }
         // --creep-hp-log <file>: start the creep HP display at once and append its per-second rates (on-site measurement).
-        if (args is ["--creep-hp-log", var log]) { new Application().Run(new GameWindowUi(null) { CreepHpLog = log }); return; }
+        // Lab only (scripts/lasthit/lab.ts --loop): [--lead S --latency S [--singles] [--patient]] looks ahead with that timing, [--cues PORT]
+        // sends every number turning red to that local UDP port.
+        if (args is ["--creep-hp-log", var log, .. var lab]) {
+            string? Option(string name) { int i = Array.IndexOf(lab, name); return i >= 0 && i + 1 < lab.Length ? lab[i + 1] : null; }
+            var timing = Option("--lead") is { } lead && Option("--latency") is { } latency
+                ? new LastHitTiming(double.Parse(lead, System.Globalization.CultureInfo.InvariantCulture), double.Parse(latency, System.Globalization.CultureInfo.InvariantCulture), lab.Contains("--singles"), Patient: lab.Contains("--patient")) : null;
+            new Application().Run(new GameWindowUi(null) { CreepHpLog = log, CreepTiming = timing, CreepCuePort = Option("--cues") is { } port ? int.Parse(port) : null });
+            return;
+        }
         new Application().Run(new GameWindowUi(E2ERun.Load(args)));
     }
 }
@@ -84,11 +92,14 @@ internal sealed partial class GameWindowUi : Window
     private long? lastCaptureAt;
     private readonly TextBlock creepHpStatus = Ui.Text("默认关闭。开启后由游戏机本地识别小兵血条、用显卡在 Dota 上画出血量数字；画面不编码、不上传、不经过教练机。", 12);
     private readonly Button creepHpButton;
+    private readonly CreepTimingPanel? creepTiming;
     private IAsyncDisposable? creepHp;
     private bool creepHpBusy;
     private volatile bool participantConnection; // Both ticketed modes use only participant data in the link and its debug view.
     private bool gsiOnlyConnection; // The stricter local no-capture promise; also blocks a programmatic HP toggle.
     public string? CreepHpLog { get; init; }
+    public LastHitTiming? CreepTiming { get; init; }
+    public int? CreepCuePort { get; init; }
 
     public GameWindowUi() : this(null) { }
     public GameWindowUi(E2ERun? run) : this(run, null) { }
@@ -139,9 +150,10 @@ internal sealed partial class GameWindowUi : Window
         if (overlayPanel != null) pages.Add("游戏内显示", overlayPanel, "字幕、对手面板和眼位的位置、大小、颜色和透明度。改动立即生效。");
         if (e2e == null) {
             var hp = new StackPanel();
-            hp.Children.Add(Ui.Text("只给半血以下的兵标血量；你的英雄一刀必能打死（正补、反补）时数字变红。塔下的兵需要先垫刀时，" +
+            hp.Children.Add(Ui.Text("只给半血以下的兵标血量；你现在出手、这一刀落地时必能打死（正补、反补）时数字变红。塔下的兵需要先垫刀时，" +
                 "血条右边的黄字是要垫几刀，垫完等塔打到变红再补。默认血条、无边框或窗口模式。Dota 画面只在本机显卡上识别，不传给教练端；显卡有空闲时每帧刷新，显卡被游戏占满时限 60 帧以免拖慢游戏；切出 Dota 时隐藏。", 12));
-            pages.Add("小兵血量", hp, "在主页开关；这里是说明。");
+            hp.Children.Add(creepTiming = new CreepTimingPanel(CreepHpSettings.DefaultPath));
+            pages.Add("小兵血量", hp, "在主页开关；这里调红字什么时候出现。");
             pages.Add("Dota 与 GSI", dota, "连接时自动写入本人 GSI 配置。");
         }
         if (developerModes) pages.Add("开发测试", developer, "只在 UI 测试和本地机器人局验收中出现；正式版没有画面模式。");
@@ -181,6 +193,7 @@ internal sealed partial class GameWindowUi : Window
             if (closing) return;
             closing = true;
             overlayPanel?.Flush();
+            creepTiming?.Flush();
             while (creepHpBusy) await Task.Delay(25);
             await StopCreepCapture();
             await Stop();
@@ -239,10 +252,20 @@ internal sealed partial class GameWindowUi : Window
                         $"{s.Bars} 根血条，{s.Known} 根已认出兵种，{s.Shown} 根半血以下标了数字" : "";
                     creepHpStatus.Text = s.Status + rate + (s.Kill.Length > 0 ? "\n" + s.Kill : "") + (gsiNote.Length > 0 ? "\n" + gsiNote : "");
                 });
-            }, () => gsi?.LatestMinimap(), () => gsi?.LatestLoadout(), excludeFromCapture: log == null);
+            }, () => gsi?.LatestMinimap(), () => gsi?.LatestLoadout(), excludeFromCapture: log == null,
+                // The lab's switches fix the timing; otherwise the panel's, read every frame.
+                CreepTiming != null || CreepCuePort != null ? () => CreepTiming : creepTiming == null ? null : () => creepTiming.Current.Timing, CueSender());
             creepHp = started;
             creepHpButton.Content = "关闭小兵血量";
         } finally { creepHpBusy = false; creepHpButton.IsEnabled = !closing && !gsiOnlyConnection; }
+    }
+    /// <summary>Lab only: each red number as a JSON datagram to <see cref="CreepCuePort"/> on this machine.</summary>
+    private Action<CreepHpDisplay.Cue>? CueSender()
+    {
+        if (CreepCuePort is not int port) return null;
+        var udp = new System.Net.Sockets.UdpClient();
+        udp.Connect(System.Net.IPAddress.Loopback, port);
+        return cue => { try { var data = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(cue); udp.Send(data, data.Length); } catch { } };
     }
     private async Task StopCreepCapture()
     {

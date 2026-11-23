@@ -13,6 +13,9 @@ if (args is ["--creep-bars", var barsOut, var barsSeconds, var barsGsi]) { Creep
 if (args is ["--overlay-test", var overlayDir]) { CreepHealthTests.OverlayTest(overlayDir); return; }
 if (args is ["--lethal-preview", var previewFrame, var previewGsi, var previewOut]) { HeroAttackTests.Preview(previewFrame, previewGsi, previewOut); return; }
 if (args.Contains("--last-hit")) { LastHitTests.Run(Check); return; }
+if (args is ["--last-hit-timing"]) { LastHitTimingTests.Run(Check); return; }
+if (args is ["--last-hit-eval", .. var evalArgs]) { LastHitEval.Run(evalArgs); return; }
+if (args is ["--last-hit-loop", var loopTrace]) { LastHitEval.Loop(loopTrace); return; }
 if (args is ["--lane-role-audit",var samplesFile]) { LaneRoleTests.Audit(samplesFile); return; }
 if (args.Contains("--last-hit-latency")) { LastHitLatencyReplay.Run(); return; }
 if (args.Contains("--last-hit-gpu-bench")) { LastHitGpuBenchmark.Run(); return; }
@@ -630,6 +633,7 @@ WardTests.Run(Check); TeamViewEvidenceTests.Run(Check); await HeroScanTests.Run(
 OverlaySettingsTests.Run(Check);
 CreepHealthTests.Run(Check);
 HeroAttackTests.Run(Check);
+LastHitTimingTests.Run(Check);
 await MinuteSuite();
 await MatchSuite();
 await CopilotContractTests.Run(Check);

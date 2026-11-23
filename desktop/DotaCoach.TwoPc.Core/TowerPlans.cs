@@ -4,10 +4,11 @@ namespace DotaCoach.TwoPc;
 public readonly record struct LaneTower(int Team, double X, double Y, double DamageMin, double DamageMax, double Interval, double Reach);
 
 /// <summary>
-/// The rest of one GSI packet that the creep labels use: game clock, the own hero's attack, the standing towers and the
-/// flagbearers (their aura makes nearby creeps regenerate faster).
+/// The rest of one GSI packet that the creep labels use: game clock, the own hero's attack and where it stands, the standing
+/// towers and the flagbearers (their aura makes nearby creeps regenerate faster).
 /// </summary>
-public sealed class LaneView(double? clock, HeroAttack? attack, IReadOnlyList<LaneTower> towers, IReadOnlyList<MinimapUnit> flagbearers)
+public sealed class LaneView(double? clock, HeroAttack? attack, IReadOnlyList<LaneTower> towers, IReadOnlyList<MinimapUnit> flagbearers,
+    (double X, double Y)? heroAt = null)
 {
     /// <summary>Tower and creep hull radii (144 + 16): a tower's range counts from hull edge to hull edge.</summary>
     public const double TowerHulls = 160;
@@ -15,16 +16,19 @@ public sealed class LaneView(double? clock, HeroAttack? attack, IReadOnlyList<La
     public double? Clock { get; } = clock;
     public HeroAttack? Attack { get; } = attack;
     public IReadOnlyList<LaneTower> Towers { get; } = towers;
+    public (double X, double Y)? HeroAt { get; } = heroAt;
 
-    public static LaneView From(SpectatorSnapshot? snapshot, HeroAttack? attack, HeroAttackTable? table)
+    /// <param name="hero">The own hero's unit name, to find it on the minimap.</param>
+    public static LaneView From(SpectatorSnapshot? snapshot, HeroAttack? attack, HeroAttackTable? table, string? hero = null)
     {
         if (snapshot == null) return new(null, attack, [], []);
         var towers = new List<LaneTower>();
         foreach (var u in snapshot.Minimap)
             if (u.Team is 2 or 3 && table?.Tower(u.Name) is { } t)
                 towers.Add(new(u.Team, u.X, u.Y, t.DamageMin, t.DamageMax, t.Interval, t.Range + TowerHulls));
+        var own = hero == null ? null : snapshot.Minimap.FirstOrDefault(u => u.Name == hero && u.Team == snapshot.OwnTeam);
         return new(snapshot.Clock, attack, towers,
-            snapshot.Minimap.Where(u => u.Name.Contains("_flagbearer", StringComparison.Ordinal)).ToArray());
+            snapshot.Minimap.Where(u => u.Name.Contains("_flagbearer", StringComparison.Ordinal)).ToArray(), own == null ? null : (own.X, own.Y));
     }
 
     /// <summary>The nearest tower of the other side that can shoot this creep, or null.</summary>

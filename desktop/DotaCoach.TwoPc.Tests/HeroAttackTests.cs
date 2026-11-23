@@ -87,12 +87,12 @@ internal static class HeroAttackTests
             "observer-shaped or implausible hero blocks give no loadout");
     }
 
-    /// <summary>Tower last-hit plans: tier-1 towers shoot 88-92 every 0.82 s; level-1 Luna hits 52-58 every 1.37 s, 0.69 s after the order.</summary>
+    /// <summary>Tower last-hit plans: tier-1 towers shoot 88-92 every 0.83 s; level-1 Luna hits 52-58 every 1.37 s, 0.69 s after the order.</summary>
     private static void TowerTests(Action<bool, string> check, HeroAttackTable table, HeroAttack luna, Func<int, CreepHealthBar> bar)
     {
         var t1 = table.Tower("npc_dota_goodguys_tower1_top")!.Value;
-        check(t1 is { DamageMin: 88, DamageMax: 92 } && Math.Abs(t1.Interval - .9 / 1.1) < 1e-9 && table.Tower("npc_dota_badguys_tower4") is { DamageMin: 170 } &&
-              table.Tower("npc_dota_goodguys_fort") == null, "tower stats by tier from the client");
+        check(t1 is { DamageMin: 88, DamageMax: 92 } && Math.Abs(t1.Interval - 25 / 30d) < 1e-9 && table.Tower("npc_dota_badguys_tower4") is { DamageMin: 170 } &&
+              table.Tower("npc_dota_goodguys_fort") == null, "tower stats by tier from the client; 0.9 / 1.1 s on the server's 30 Hz ticks is 25 ticks");
         TowerPlan? Plan(string creep, double hp, double regen, (double Least, double Most)? hero = null, double? interval = null, double? delay = null,
             bool preppable = true)
         {

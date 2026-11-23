@@ -23,6 +23,8 @@ public readonly record struct CreepHealthBar(int X, int Y, int Rows, int Fill, i
     public int Hp(int maximum) => Fill >= Inner ? maximum : Math.Clamp((int)Math.Round(Fraction * maximum), 1, maximum);
     /// <summary>The most health that still draws only <see cref="Fill"/> pixels.</summary>
     public double MostHp(int maximum) => Fill >= Inner ? maximum : Math.Min(maximum, Fill / Span * maximum);
+    /// <summary>The least health that still draws <see cref="Fill"/> pixels.</summary>
+    public double LeastHp(int maximum) => Fill >= Inner ? Math.Min(maximum, (Inner - 1) / Span * maximum) : Math.Max(0, (Fill - 1) / Span * maximum);
     public int CenterX => X + (Inner + 2) / 2;
 }
 
@@ -117,20 +119,54 @@ public static class CreepKinds
 /// <summary>
 /// What the creep HP display writes over one frame's bars. Only creeps below half health get a number (where last hits come,
 /// and allies can be denied): their health, or a percentage without a known unit. It is red when one attack of the own hero
-/// surely kills: the most health the bar's pixels allow, plus what the creep regenerates until the hit lands, against the
-/// weakest roll after the creep's armor. A creep a tower can shoot that needs prep hits before the tower brings it into
-/// last-hit range (<see cref="TowerPlans"/>) also gets their count, in amber right of its bar, whatever its health; then
-/// the tower's shots bring it down until the number turns red.
+/// ordered now surely kills (<see cref="Kills"/>).
+/// A creep a tower can shoot that needs prep hits before the tower brings it into last-hit range (<see cref="TowerPlans"/>)
+/// also gets their count, in amber right of its bar, whatever its health; then the tower's shots bring it down until the
+/// number turns red.
 /// </summary>
 public static class CreepLabels
 {
     public const uint Ally = 0xA8FF8C, Enemy = 0xFFFFFF, Lethal = 0xFF3B30, Prep = 0xFFC83C;
+    /// <summary>Beyond its range by more than this the hero walks first, and when its hit lands is not foreseen.</summary>
+    public const double OutOfReach = 100;
+
+    /// <summary>
+    /// Whether one attack of the own hero, ordered in reaction to this frame, surely kills: the most health the bar's pixels
+    /// allow, plus what the creep regenerates until the hit lands, less the hits its attackers' rhythm foretells before then
+    /// (<see cref="CreepHitHistory.Foretold"/>), against the weakest roll after armor. Without a timing, a history or with
+    /// the hero out of range nothing is foretold and the hit lands after the attack's full delay.
+    /// </summary>
+    /// <param name="distance">From the own hero to the creep, when both positions are known.</param>
+    /// <param name="towerInterval">Seconds between shots of a tower that can shoot the creep.</param>
+    public static bool Kills(CreepHealthBar bar, int max, double regen, HeroAttack attack, double least, CreepHitHistory? history, double now,
+        LastHitTiming? timing, double? distance, double? towerInterval)
+    {
+        double horizon = attack.Delay, foretold = 0;
+        if (timing != null && history != null && !(distance > attack.Range + HeroAttack.Hulls + OutOfReach)) {
+            horizon = timing.Horizon(attack, distance);
+            double perPixel = max / bar.Span;
+            foretold = history.Foretold(now, now + horizon - CreepHitHistory.Tolerance, perPixel, towerInterval, timing.Singles, timing.Beats);
+            if (timing.Alive && foretold > 0 && bar.LeastHp(max) - foretold <= 0) return false;
+            // Patient: when only foretold hits make it a kill, wait for the first of them to show if the creep would still be
+            // alive when an order given then lands, even after one more hit nobody foretold (a foretold hit that never comes would
+            // make the hit land too early).
+            if (timing.Patient && foretold > 0 && bar.MostHp(max) + regen * horizon > least &&
+                history.Next(now, now + horizon, perPixel, towerInterval, timing.Singles, timing.Beats) is double first &&
+                bar.LeastHp(max) - history.Foretold(now, first + horizon - CreepHitHistory.Tolerance, perPixel, towerInterval, timing.Singles, timing.Beats) >
+                    CreepHitHistory.MaxCreepHit)
+                return false;
+        }
+        return bar.MostHp(max) + regen * horizon - foretold <= least;
+    }
 
     /// <param name="names">Per bar, the unit it is tracked as (null when unknown).</param>
     /// <param name="units">Per bar, the GSI unit matched in this frame (its position), or null.</param>
+    /// <param name="hits">Per bar, its track's drops (<see cref="CreepTracks.Update"/>); with <paramref name="timing"/> the red
+    /// numbers look ahead at foretold hits. <paramref name="now"/> is this frame's time on the history's clock.</param>
+    /// <param name="red">Filled per bar with whether its number is red.</param>
     /// <returns>How many bars belong to a lane creep of known maximum health.</returns>
     public static int Build(IReadOnlyList<CreepHealthBar> bars, IReadOnlyList<string?> names, IReadOnlyList<MinimapUnit?> units, LaneView lane,
-        List<OverlayLabel> labels)
+        List<OverlayLabel> labels, IReadOnlyList<CreepHitHistory?>? hits = null, double now = 0, LastHitTiming? timing = null, bool[]? red = null)
     {
         labels.Clear();
         int known = 0;
@@ -146,7 +182,8 @@ public static class CreepLabels
             if (maximum is int max && lane.Attack is { } attack && attack.Against(name!) is { } hit) {
                 // Without a position the flagbearer may be near.
                 double regen = unit != null ? lane.Regen(unit) : CreepKinds.Regen(name!) + CreepKinds.FlagbearerRegen;
-                lethal = bar.MostHp(max) + regen * attack.Delay <= hit.Least;
+                double? distance = unit != null && lane.HeroAt is { } h ? double.Hypot(h.X - unit.X, h.Y - unit.Y) : null;
+                lethal = Kills(bar, max, regen, attack, LastHitTiming.Roll(hit, timing), hits?[i], now, timing, distance, unit != null ? lane.TowerOver(unit)?.Interval : null);
                 if (!lethal && unit != null && lane.TowerOver(unit) is { } tower && !CreepKinds.IsSiege(name!) &&
                     CreepKinds.Armor(name!) is double armor) {
                     double share = HeroAttack.ArmorMultiplier(armor);
@@ -154,7 +191,9 @@ public static class CreepLabels
                         (tower.DamageMin * share, tower.DamageMax * share), tower.Interval, preppable: !bar.Ally || half);
                 }
             }
-            if (half)
+            if (red != null) red[i] = lethal;
+            // Looking ahead, a creep just above half health can already be red.
+            if (half || lethal)
                 labels.Add(new(bar.CenterX, bar.Y - 1, maximum is int m ? bar.Hp(m).ToString() : $"{Math.Round(bar.Fraction * 100)}%",
                     lethal ? Lethal : bar.Ally ? Ally : Enemy));
             // Glyphs are about a sixth of the bar's span high: just right of the bar, centred on it.

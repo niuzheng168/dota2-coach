@@ -26,12 +26,20 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
     /// because of it; and the attack the red numbers are judged by, or why there are none.
     /// </summary>
     public sealed record Stats(string Status, double Fps, double ScanMs, int Bars, int Known, int Shown, double? GpuLoad, bool Limited, string Kill);
+    /// <summary>
+    /// A number turning red, for the last-hit lab's closed loop (scripts/lasthit/lab.ts --loop): by which rule ("ahead" with
+    /// the timing, "frame" without), the unit, where GSI has it and the health shown; <see cref="At"/> is the frame's capture time.
+    /// <see cref="Drops"/>: the track's drops the prediction saw, "seconds before:pixels".
+    /// </summary>
+    public readonly record struct Cue(double At, string Rule, string Unit, double X, double Y, int Hp, string Drops);
     private readonly CancellationTokenSource stop = new();
     private readonly Task worker;
     private readonly Action<Stats> report;
     private readonly Func<(SpectatorSnapshot Snapshot, int AgeMs)?> minimap;
     private readonly Func<HeroLoadout?> hero;
     private readonly bool excludeFromCapture;
+    private readonly Func<LastHitTiming?>? timing;
+    private readonly Action<Cue>? cues;
     private readonly GpuPacing pacing = new();
     private readonly HeroAttackTable? attacks = HeroAttackTable.Bundled();
     private HeroLoadout? attackFor;
@@ -44,9 +52,12 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
     /// <param name="minimap">The player's own GSI units; without it bars show a percentage.</param>
     /// <param name="hero">The player's own hero from GSI; without it no number turns red.</param>
     /// <param name="excludeFromCapture">Like the coach subtitles, keep the numbers out of recordings and screen captures.</param>
-    public CreepHpDisplay(Action<Stats> report, Func<(SpectatorSnapshot Snapshot, int AgeMs)?> minimap, Func<HeroLoadout?> hero, bool excludeFromCapture = true)
+    /// <param name="timing">Read every frame: red numbers look ahead at the hits other units are about to land (null: only this frame's health).</param>
+    /// <param name="cues">Lab only: told whenever a number turns red, by either rule.</param>
+    public CreepHpDisplay(Action<Stats> report, Func<(SpectatorSnapshot Snapshot, int AgeMs)?> minimap, Func<HeroLoadout?> hero, bool excludeFromCapture = true,
+        Func<LastHitTiming?>? timing = null, Action<Cue>? cues = null)
     {
-        this.report = report; this.minimap = minimap; this.hero = hero; this.excludeFromCapture = excludeFromCapture;
+        this.report = report; this.minimap = minimap; this.hero = hero; this.excludeFromCapture = excludeFromCapture; this.timing = timing; this.cues = cues;
         worker = Task.Factory.StartNew(Run, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
     }
 
@@ -63,7 +74,7 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
             else kill = Summary(a, attacks, snapshot?.Clock);
         }
         laneFor = snapshot;
-        return lane = LaneView.From(snapshot, attack, attacks);
+        return lane = LaneView.From(snapshot, attack, attacks, loadout?.Hero);
     }
 
     /// <summary>The red-number thresholds, and the tower plans for full-health creeps under a tier-1 tower (flagbearer near).</summary>
@@ -146,11 +157,12 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
                 double seconds = (now - rateAt) / 1000d;
                 string status = !capture.Unthrottled ? "正在显示；此 Windows 版本采集上限约 60 fps" :
                     minimap() == null ? "正在显示百分比：没有收到自身 GSI，无法区分近战/远程/攻城兵" : "正在显示（本机 GPU 识别与绘制，不传输画面）";
-                report(new(status, frames / seconds, frames > 0 ? scanTotal / frames : 0, bars, known, shown, gpuLoad, pacing.Limited, kill));
+                report(new(status, frames / seconds, frames > 0 ? scanTotal / frames : 0, bars, known, shown, gpuLoad, pacing.Limited, kill + Ahead()));
                 rateAt = now; frames = 0; scanTotal = 0;
             }
             using var frame = capture.Latest();
-            if (GetForegroundWindow() != game.Handle) {
+            bool front = GetForegroundWindow() == game.Handle;
+            if (!front && cues == null) {
                 // Alt+Tab: nothing over other applications; the capture keeps running so coming back is instant.
                 overlay.Hide(); labels.Clear(); Pause(20); continue;
             }
@@ -163,18 +175,51 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
             // One GPU submission per frame: this frame's scan goes out with the Present of the labels found in the
             // previous one, so numbers appear a frame later. Uncapped at 60 Hz a separate Present cost the game 5.5% fps, this 2.1%.
             scanner.Submit(frame, client);
-            overlay.Place(game.Left, game.Top, game.Width, game.Height);
-            overlay.Draw(labels);
+            // The lab reads a Dota window behind other windows too, but draws only over Dota.
+            if (front) { overlay.Place(game.Left, game.Top, game.Width, game.Height); overlay.Draw(labels); }
+            else overlay.Hide();
             var found = scanner.Collect();
             scanTotal += Stopwatch.GetElapsedTime(started).TotalMilliseconds;
             var units = minimap();
             var matches = units is { } u && u.Snapshot.OwnTeam is int team
                 ? matcher.Match(found, u.Snapshot.Minimap, team, game.Width, game.Height) : new MinimapUnit?[found.Count];
-            var names = tracks.Update(found, matches, now);
-            known = CreepLabels.Build(found, names, matches, Lane(units?.Snapshot), labels);
+            double at = frame.SystemRelativeTime / 1e7;
+            var hits = new CreepHitHistory?[found.Count];
+            var names = tracks.Update(found, matches, now, at, hits);
+            var view = Lane(units?.Snapshot);
+            var red = new bool[found.Count];
+            var ahead = timing?.Invoke();
+            known = CreepLabels.Build(found, names, matches, view, labels, hits, at, ahead, red);
+            if (cues != null) {
+                Onsets("ahead", red, redAhead);
+                var plain = new bool[found.Count];
+                CreepLabels.Build(found, names, matches, view, scratch, hits, at, null, plain);
+                Onsets("frame", plain, redFrame);
+            }
             frames++; bars = found.Count; shown = labels.Count;
+
+            // A track's number turning red, once the bar is matched to a GSI unit (the lab's harness needs its position).
+            void Onsets(string rule, bool[] flags, HashSet<CreepHitHistory> before)
+            {
+                var current = new HashSet<CreepHitHistory>();
+                for (int i = 0; i < found.Count; i++) {
+                    if (!flags[i] || hits[i] is not { } track) continue;
+                    if (before.Contains(track)) { current.Add(track); continue; }
+                    if (matches[i] is not { } unit || unit.Name != names[i] || CreepKinds.MaxHp(unit.Name, view.Clock) is not int max) continue;
+                    current.Add(track);
+                    cues?.Invoke(new(at, rule, unit.Name, unit.X, unit.Y, found[i].Hp(max),
+                        string.Join(" ", track.Drops.Select(d => $"{d.At - at:F3}:{d.Pixels}"))));
+                }
+                before.Clear(); before.UnionWith(current);
+            }
         }
     }
+    private readonly HashSet<CreepHitHistory> redAhead = [], redFrame = [];
+    private readonly List<OverlayLabel> scratch = [];
+
+    /// <summary>The look-ahead in the status, at the hero's full range.</summary>
+    private string Ahead() => timing?.Invoke() is { } t && attack is { } a && kill.Length > 0 && !kill.EndsWith("不标红", StringComparison.Ordinal)
+        ? $"\n红字提前看：反应 {t.Lead:F2} 秒＋延迟 {t.Latency:F2} 秒＋出手到命中约 {a.DelayAt(a.Range + HeroAttack.Hulls):F2} 秒，算上这段时间里别的兵和塔按节奏要打的几下" : "";
 
     private void Pause(int ms) => stop.Token.WaitHandle.WaitOne(ms);
 
