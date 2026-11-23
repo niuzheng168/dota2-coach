@@ -7,7 +7,8 @@ using DotaCoach.TwoPc;
 /// are, and per creep what a player reacting to its first red frame would get: the kill, a hit landing too early (the creep
 /// survives it), too late (someone else killed it first), or never a red number. The screen is simulated from the engine's
 /// health at a display rate and resolution: the bar's fill pixels, read without error. The lab hero's own hits are not the
-/// simulated player's: a creep's life is cut at the first of them.
+/// simulated player's: a creep's life is cut at the first of them. Last, the same creeps with better foresight than the bars
+/// give (every attack under way seen, the engine's future health), to tell what limits the red numbers.
 ///   --last-hit-eval [--synthetic N | TRACE.jsonl ...] [--hero NAME] [--level N] [--distance D] [--fps F] [--height H] [--extra S] [--latency S]
 /// </summary>
 internal static class LastHitEval
@@ -39,7 +40,7 @@ internal static class LastHitEval
         var towers = new List<Tower>();
         string? labHero = null;
         var orders = new List<Order>();
-        var hits = new List<(double T, int Attacker, int Victim)>();
+        var hits = new List<(double T, int Attacker, int Victim, double D)>();
         var kinds = new Dictionary<int, string>();
         if (Option("--synthetic", "") is { Length: > 0 } n) lives.AddRange(Synthetic(int.Parse(n), new Random(7)));
         foreach (var file in args.Where(a => a.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase)))
@@ -55,6 +56,7 @@ internal static class LastHitEval
         var lateness = Delays(orders, attack);
         double Extra(Random rng) => lateness.Count > 0 ? lateness[rng.Next(lateness.Count)] : extra;
         Rhythms(hits, kinds, lives);
+        Calibrate(lives, fps, geometry);
         // Last-hit chances: creeps the lab hero never hit that died after falling below half health in the trace.
         var chances = lives.Where(l => l.Frames.Count > 0 && l.End < double.PositiveInfinity && l.Cut == double.PositiveInfinity &&
             l.Frames.Min(f => f.Hp) * 2 < l.Frames.Max(f => f.Max)).ToList();
@@ -87,6 +89,166 @@ internal static class LastHitEval
                 Console.WriteLine($"{name,-22} {reaction,5:F2} {Total(),5} {Share(Outcome.Kill)} {Share(Outcome.Early)} {Share(Outcome.Late)} {Share(Outcome.None)}  " +
                     string.Join(" ", kindsOfRound.Select(k => Share(Outcome.Kill, k))));
             }
+        Decompose(chances, attack, distance, latency, fps, geometry, towers, Extra, lateness.Count > 0 ? lateness.Average() : extra, hits, kinds);
+    }
+
+    /// <summary>
+    /// Where the misses come from: the bars' forecast against better ones, every attack under way on the creep seen
+    /// (<see cref="Seen"/>) and the engine's own health ahead (red when a hit ordered now lands mid-way between the creep coming
+    /// into reach of the weakest roll and its death), with the simulated player (reaction 0.2 ± 0.04 s) and with perfect
+    /// execution (reaction exactly the lead, no spread).
+    /// </summary>
+    private static void Decompose(List<Life> chances, HeroAttack attack, double distance, double latency, double fps, CreepBarGeometry geometry,
+        List<Tower> towers, Func<Random, double> extra, double meanExtra, List<(double T, int Attacker, int Victim, double D)> hits, Dictionary<int, string> kinds)
+    {
+        const double lead = .15;
+        var timing = new LastHitTiming(lead, latency, Patient: true);
+        var blows = hits.GroupBy(h => h.Victim).ToDictionary(g => g.Key, g => g.Select(h => (h.T, Kind: kinds.GetValueOrDefault(h.Attacker, "hero"), h.D)).OrderBy(h => h.T).ToList());
+        Console.WriteLine($"{"forecast / player",-28} {"n",5} {"kill",6} {"early",6} {"late",6} {"never",6}");
+        foreach (var (name, forecast, reaction, spread) in new[] { ("bars / reaction 0.2±0.04", "bars", .2, .04), ("bars / exact 0.15", "bars", lead, 0),
+                     ("swings seen / reaction", "swings", .2, .04), ("engine / reaction 0.2±0.04", "engine", .2, .04), ("engine / exact 0.15", "engine", lead, 0) }) {
+            var rng = new Random(11);
+            var tally = new Dictionary<Outcome, int>();
+            foreach (var life in chances) {
+                var outcome = forecast switch {
+                    "engine" => Oracle(life, attack, distance, latency, reaction, spread, extra(rng), meanExtra, fps, rng),
+                    "bars" => Simulate(life, attack, distance, timing, latency, reaction, spread, extra(rng), fps, geometry, towers, rng),
+                    _ => Seen(life, blows.GetValueOrDefault(life.Unit.Id) ?? [], attack, distance, new LastHitTiming(lead, latency), reaction, spread, extra(rng), fps, geometry, rng),
+                };
+                tally[outcome] = tally.GetValueOrDefault(outcome) + 1;
+            }
+            int total = tally.Where(t => t.Key != Outcome.Unknown).Sum(t => t.Value);
+            string Share(Outcome o) => $"{100d * tally.GetValueOrDefault(o) / Math.Max(1, total),5:F1}%";
+            Console.WriteLine($"{name,-28} {total,5} {Share(Outcome.Kill)} {Share(Outcome.Early)} {Share(Outcome.Late)} {Share(Outcome.None)}");
+        }
+        // The exact player's late hits: the creep hits between the red frame and the landing, by what the attacker did a beat
+        // earlier (rhythm2: hit this creep the last two beats, rhythm1: the last beat only, late: hit anything off the beat, fresh: nothing).
+        var byAttacker = hits.GroupBy(h => h.Attacker).ToDictionary(g => g.Key, g => g.OrderBy(h => h.T).ToList());
+        var byVictim = hits.GroupBy(h => h.Victim).ToDictionary(g => g.Key, g => g.OrderBy(h => h.T).ToList());
+        string Class(double t, int a, int v)
+        {
+            string kind = kinds.GetValueOrDefault(a, "hero");
+            double period = kind switch { "tower" => .833, "siege" => 3, _ => 1 };
+            var mine = byAttacker.GetValueOrDefault(a) ?? [];
+            var prev = mine.LastOrDefault(h => h.T < t - .1);
+            if (prev.T == 0) return kind + ":fresh";
+            double gap = t - prev.T;
+            if (Math.Abs(gap - period) > .07) return kind + (gap < period + 1.5 ? ":late" : ":fresh");
+            if (prev.Victim != v) return kind + ":carry";
+            var prev2 = mine.LastOrDefault(h => h.T < prev.T - .1);
+            return kind + (prev2.T != 0 && prev2.Victim == v && Math.Abs(prev.T - prev2.T - period) <= .07 ? ":rhythm2" : ":rhythm1");
+        }
+        var random = new Random(11);
+        var classes = new Dictionary<string, int>();
+        int lates = 0;
+        foreach (var life in chances) {
+            if (Simulate(life, attack, distance, timing, latency, lead, 0, extra(random), fps, geometry, towers, random, out double red, out double land) != Outcome.Late) continue;
+            lates++;
+            foreach (var h in byVictim.GetValueOrDefault(life.Unit.Id) ?? [])
+                if (h.T > red && h.T <= Math.Min(land, life.End)) { string k = Class(h.T, h.Attacker, h.Victim); classes[k] = classes.GetValueOrDefault(k) + 1; }
+        }
+        Console.WriteLine($"late with bars / exact ({lates}), hits from red to landing: " + string.Join(", ", classes.OrderByDescending(c => c.Value).Select(c => $"{c.Key} {c.Value}")));
+    }
+
+    /// <summary>
+    /// The screen's runs of hits (<see cref="CreepHitHistory.Chain"/>) on creeps below 60 % health: how often a run of n drops
+    /// gets its next beat while the creep lives, how far off the beat it comes, and how often a new run starts.
+    /// </summary>
+    private static void Calibrate(List<Life> lives, double fps, CreepBarGeometry geometry)
+    {
+        var tally = new Dictionary<(string Kind, int N), (int Go, int Stop)>();
+        var offsets = new List<double>();
+        double exposure = 0;
+        var starts = new List<double>();
+        double continuedHp = 0;
+        var runOf = new List<int>();
+        foreach (var life in lives) {
+            double end = Math.Min(life.End, life.Cut);
+            if (life.Frames.Count == 0 || double.IsInfinity(end)) continue;
+            double perPixel = life.Frames[0].Max / geometry.Span;
+            double? tower = life.Kind is "ours" or "theirs" ? .833 : null;
+            var drops = new List<CreepHitHistory.Drop>();
+            var low = new List<bool>();
+            int index = 0, last = -1;
+            for (double t = life.Frames[0].T; t < end; t += 1 / fps) {
+                while (index + 1 < life.Frames.Count && life.Frames[index + 1].T <= t) index++;
+                var f = life.Frames[index];
+                int fill = f.Hp >= f.Max ? geometry.Inner : Math.Max(1, (int)Math.Ceiling(f.Hp / (double)f.Max * geometry.Span - 1e-9));
+                if (last >= 0 && fill < last) { drops.Add(new(t, last - fill)); low.Add(f.Hp < .6 * f.Max); }
+                last = fill;
+                if (f.Hp < .6 * f.Max) exposure += 1 / fps;
+            }
+            var runs = CreepHitHistory.Chain(drops, perPixel, tower, runOf);
+            for (int r = 0; r < runs.Count; r++) {
+                var beats = Enumerable.Range(0, drops.Count).Where(j => runOf[j] == r).ToList();
+                double period = runs[r].Period > 0 ? runs[r].Period : tower is double w && drops[beats[0]].Pixels * perPixel >= 50 ? w : 1;
+                string kind = period == 1 ? "creep" : period == 3 ? "siege" : "tower";
+                if (low[beats[0]]) starts.Add(drops[beats[0]].Pixels * perPixel);
+                for (int k = 0; k < beats.Count; k++) {
+                    if (!low[beats[k]]) continue;
+                    var key = (kind, Math.Min(k + 1, 3));
+                    var (go, stop) = tally.GetValueOrDefault(key);
+                    if (k + 1 < beats.Count) {
+                        tally[key] = (go + 1, stop);
+                        offsets.Add(drops[beats[k + 1]].At - drops[beats[k]].At - period);
+                        continuedHp += drops[beats[k + 1]].Pixels * perPixel;
+                    }
+                    else if (drops[beats[k]].At + period + CreepHitHistory.Tolerance < end) tally[key] = (go, stop + 1);
+                }
+            }
+        }
+        Console.WriteLine("runs below 60 %: next beat came / stopped: " + string.Join(", ", tally.OrderBy(t => t.Key).Select(t =>
+            $"{t.Key.Kind} n{t.Key.N}{(t.Key.N == 3 ? "+" : "")} {100d * t.Value.Go / Math.Max(1, t.Value.Go + t.Value.Stop):F0}% of {t.Value.Go + t.Value.Stop}")));
+        offsets.Sort();
+        starts.Sort();
+        if (offsets.Count > 0 && starts.Count > 0)
+            Console.WriteLine($"  off the beat p10 {offsets[offsets.Count / 10]:F3} p50 {offsets[offsets.Count / 2]:F3} p90 {offsets[offsets.Count * 9 / 10]:F3}; " +
+                $"new runs {starts.Count / exposure:F2}/s, HP p10 {starts[starts.Count / 10]:F0} p50 {starts[starts.Count / 2]:F0} p90 {starts[starts.Count * 9 / 10]:F0}; " +
+                $"HP/s from new runs {starts.Sum() / exposure:F1}, from repeats {continuedHp / exposure:F1}");
+    }
+
+    /// <summary>
+    /// The player of <see cref="Simulate"/> when the screen also showed every attack under way on the creep: a melee creep's
+    /// swing from 0.47 s before its hit, a ranged creep's swing and flight from about 0.9 s, siege creeps' and towers' from 1.1 and
+    /// 1.2 s. Red when those hits bring the bar's health within the weakest roll by the time the own hit lands.
+    /// </summary>
+    private static Outcome Seen(Life life, List<(double T, string Kind, double D)> blows, HeroAttack attack, double distance, LastHitTiming timing,
+        double reaction, double spread, double extra, double fps, CreepBarGeometry geometry, Random rng)
+    {
+        if (attack.Against(life.Unit.Name) is not { } hit || life.Frames.Count == 0) return Outcome.Unknown;
+        static double Visible(string kind) => kind switch { "melee" => .467, "ranged" => .9, "siege" => 1.1, "tower" => 1.2, _ => 0 };
+        double regen = CreepKinds.Regen(life.Unit.Name), horizon = timing.Horizon(attack, distance);
+        int index = 0;
+        for (double t = life.Frames[0].T; t < life.End; t += 1 / fps) {
+            while (index + 1 < life.Frames.Count && life.Frames[index + 1].T <= t) index++;
+            var f = life.Frames[index];
+            if (f.Hp <= 0) break;
+            int fill = f.Hp >= f.Max ? geometry.Inner : Math.Max(1, (int)Math.Ceiling(f.Hp / (double)f.Max * geometry.Span - 1e-9));
+            var bar = new CreepHealthBar(0, 0, 12, fill, geometry.Inner, geometry.Span, false, false);
+            double until = t + horizon - CreepHitHistory.Tolerance, foretold = 0;
+            foreach (var b in blows)
+                if (b.T > t && b.T <= until && b.T - Visible(b.Kind) <= t) foretold += b.D;
+            if (bar.MostHp(f.Max) + regen * horizon - foretold > hit.Least) continue;
+            double land = t + Math.Max(.08, reaction + spread * Gaussian(rng)) + timing.Latency + attack.DelayAt(distance) + extra;
+            if (land >= life.End) return Outcome.Late;
+            return life.HpBefore(land) <= hit.Least + rng.NextDouble() * (hit.Most - hit.Least) ? Outcome.Kill : Outcome.Early;
+        }
+        return Outcome.None;
+    }
+
+    /// <summary>The player of <see cref="Simulate"/> with red numbers from the engine's health ahead, aimed at the middle of the window.</summary>
+    private static Outcome Oracle(Life life, HeroAttack attack, double distance, double latency, double reaction, double spread, double extra,
+        double meanExtra, double fps, Random rng)
+    {
+        if (attack.Against(life.Unit.Name) is not { } hit || life.Frames.Count == 0) return Outcome.Unknown;
+        var open = life.Frames.FirstOrDefault(f => f.Hp <= hit.Least);
+        if (open.Max == 0 || open.T >= life.End) return Outcome.None;
+        double start = life.Frames[0].T, delay = attack.DelayAt(distance);
+        double red = Math.Max(start, (open.T + life.End) / 2 - reaction - latency - delay - meanExtra);
+        red = start + Math.Ceiling((red - start) * fps) / fps;
+        double land = red + Math.Max(.08, reaction + spread * Gaussian(rng)) + latency + delay + extra;
+        if (land >= life.End) return Outcome.Late;
+        return life.HpBefore(land) <= hit.Least + rng.NextDouble() * (hit.Most - hit.Least) ? Outcome.Kill : Outcome.Early;
     }
 
     /// <summary>
@@ -187,8 +349,14 @@ internal static class LastHitEval
 
     /// <summary>One player and one creep: the first red frame, a reaction, the order's way to the server, the swing and the flight.</summary>
     private static Outcome Simulate(Life life, HeroAttack attack, double distance, LastHitTiming? timing, double latency, double reaction, double spread,
-        double extra, double fps, CreepBarGeometry geometry, List<Tower> towers, Random rng)
+        double extra, double fps, CreepBarGeometry geometry, List<Tower> towers, Random rng) =>
+        Simulate(life, attack, distance, timing, latency, reaction, spread, extra, fps, geometry, towers, rng, out _, out _);
+
+    /// <param name="red">The first red frame's time, or NaN; <paramref name="land"/> when the player's hit lands.</param>
+    private static Outcome Simulate(Life life, HeroAttack attack, double distance, LastHitTiming? timing, double latency, double reaction, double spread,
+        double extra, double fps, CreepBarGeometry geometry, List<Tower> towers, Random rng, out double red, out double land)
     {
+        red = land = double.NaN;
         if (attack.Against(life.Unit.Name) is not { } hit || life.Frames.Count == 0) return Outcome.Unknown;
         var history = new CreepHitHistory();
         double regen = CreepKinds.Regen(life.Unit.Name);
@@ -204,7 +372,8 @@ internal static class LastHitEval
                 .Select(w => (double?)w.Interval).FirstOrDefault();
             if (!CreepLabels.Kills(bar, f.Max, regen, attack, LastHitTiming.Roll(hit, timing), history, t, timing, distance, tower)) continue;
             double press = Math.Max(.08, reaction + spread * Gaussian(rng));
-            double land = t + press + latency + attack.DelayAt(distance) + extra;
+            red = t;
+            land = t + press + latency + attack.DelayAt(distance) + extra;
             if (land >= life.Cut) return Outcome.Unknown;
             if (land >= life.End) return Outcome.Late;
             return life.HpBefore(land) <= hit.Least + rng.NextDouble() * (hit.Most - hit.Least) ? Outcome.Kill : Outcome.Early;
@@ -244,7 +413,7 @@ internal static class LastHitEval
     }
 
     /// <summary>Seconds between one attacker's consecutive hits on one creep, and how often it hits again while the creep lives.</summary>
-    private static void Rhythms(List<(double T, int Attacker, int Victim)> hits, Dictionary<int, string> kinds, List<Life> lives)
+    private static void Rhythms(List<(double T, int Attacker, int Victim, double D)> hits, Dictionary<int, string> kinds, List<Life> lives)
     {
         var ends = lives.GroupBy(l => l.Unit.Id).ToDictionary(g => g.Key, g => g.Max(l => l.End));
         foreach (var group in hits.Where(h => kinds.ContainsKey(h.Attacker)).GroupBy(h => kinds[h.Attacker])) {
@@ -267,7 +436,7 @@ internal static class LastHitEval
 
     /// <returns>The lab hero's unit name.</returns>
     private static string? Read(string file, HeroAttackTable table, List<Life> lives, List<Tower> towers, List<Order> orders,
-        List<(double T, int Attacker, int Victim)> hits, Dictionary<int, string> kinds)
+        List<(double T, int Attacker, int Victim, double D)> hits, Dictionary<int, string> kinds)
     {
         var units = new Dictionary<int, Unit>();
         var alive = new Dictionary<int, Life>();
@@ -311,7 +480,7 @@ internal static class LastHitEval
                     break;
                 case "dmg": {
                     int a = r.GetProperty("a").GetInt32(), v = r.GetProperty("v").GetInt32();
-                    if (r.GetProperty("inflictor").GetInt32() < 0 && units.ContainsKey(v)) hits.Add((t, a, v));
+                    if (r.GetProperty("inflictor").GetInt32() < 0 && units.ContainsKey(v)) hits.Add((t, a, v, r.GetProperty("d").GetDouble()));
                     if (a == heroId && heroId >= 0 && alive.TryGetValue(v, out var life)) life.Cut = Math.Min(life.Cut, t);
                     break;
                 }

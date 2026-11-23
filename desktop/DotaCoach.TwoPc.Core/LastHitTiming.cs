@@ -73,6 +73,38 @@ public sealed class CreepHitHistory
         }
     }
 
+    /// <summary>
+    /// One attacker's hits as the drops show them: <see cref="Count"/> similar drops one <see cref="Period"/> apart, the last at
+    /// <see cref="Last"/> taking <see cref="Pixels"/>. A lone drop's period is not known yet (0).
+    /// </summary>
+    public readonly record struct Run(double Last, double Period, int Pixels, int Count);
+
+    /// <summary>
+    /// The drops (oldest first) chained into runs: each drop of a hit's size extends the run whose next beat it falls on, the
+    /// closest one, or starts a run of its own. <paramref name="runOf"/> gets every drop's run, -1 for drops too small to be a hit.
+    /// </summary>
+    public static List<Run> Chain(IReadOnlyList<Drop> drops, double perPixel, double? towerInterval, List<int>? runOf = null)
+    {
+        var runs = new List<Run>();
+        runOf?.Clear();
+        foreach (var drop in drops) {
+            double amount = drop.Pixels * perPixel;
+            if (amount < MinHit) { runOf?.Add(-1); continue; }
+            int best = -1; double bestOff = Tolerance, bestPeriod = 0;
+            for (int r = 0; r < runs.Count; r++) {
+                var run = runs[r];
+                if (!Similar(run.Pixels, drop.Pixels, perPixel)) continue;
+                foreach (double period in run.Count >= 2 ? new[] { run.Period } : Periods(amount, towerInterval)) {
+                    double off = Math.Abs(drop.At - run.Last - period);
+                    if (off <= bestOff) { best = r; bestOff = off; bestPeriod = period; }
+                }
+            }
+            if (best < 0) { runs.Add(new(drop.At, 0, drop.Pixels, 1)); runOf?.Add(runs.Count - 1); }
+            else { runs[best] = new(drop.At, bestPeriod, drop.Pixels, runs[best].Count + 1); runOf?.Add(best); }
+        }
+        return runs;
+    }
+
     /// <summary>Tower shots take 70-80 off a lane creep, so only big drops can be a tower's; creep hits can be any size (several at once).</summary>
     private static IEnumerable<double> Periods(double amount, double? towerInterval)
     {
