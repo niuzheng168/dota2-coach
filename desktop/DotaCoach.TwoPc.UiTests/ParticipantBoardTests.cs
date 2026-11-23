@@ -40,10 +40,12 @@ internal static partial class Program
                 c.Measure(new Size(c.Width, c.Height)); c.Arrange(new Rect(0, 0, c.Width, c.Height)); c.UpdateLayout();
                 return c;
             }
+            static FrameworkElement[] Tagged(Canvas c, string tag) => c.Children.OfType<FrameworkElement>().Where(e => Equals(e.Tag, tag)).ToArray();
+            static Canvas WardMap(Canvas screen) => screen.Children.OfType<Canvas>().Single(c => Tagged(c, "ward-seen").Length + Tagged(c, "ward-guess").Length > 0);
             var mixed = Draw(board, route);
             var gear = mixed.Children.OfType<StackPanel>().Single();
-            var map = mixed.Children.OfType<Canvas>().Single(c => c.Children.OfType<Polygon>().Any());
-            var guess = map.Children.OfType<Ellipse>().Single(); var seen = map.Children.OfType<Polygon>().Single();
+            var map = WardMap(mixed);
+            var guess = Tagged(map, "ward-guess").Single(); var seen = Tagged(map, "ward-seen").Single();
             bool Near(double a, double b) => Math.Abs(a - b) < .01;
             var dots = new LaneMap742(1213, [new("top",3,"fog",-4736,-4736,455,1210,-4700,-3900),
                 new("mid",2,"seen",400,520,0,1213), new("bot",2,"march",6000,-5500,700,Spawn:1200),
@@ -60,25 +62,34 @@ internal static partial class Program
             Check(Draw(withWaves,equipment:false,wards:false,waves:false).Children.Count==0 &&
                 Draw(withWaves,equipment:false,wards:false,physicalWidth:w+10).Children.Count==0 &&
                 Draw(withWaves,route,wards:false).Children.OfType<Canvas>().Count()==2,
-                "local switch, uncalibrated viewport and route/board separation also apply to wave-only maps");
+                "local switch, a box confirmed for another size and route/board separation also apply to wave-only maps");
+            var local = new GameOverlaySettings().Minimap(w, h);
+            var unboxed = Draw(withWaves with { Minimap = null },equipment:false,wards:false).Children.OfType<Canvas>().Single();
+            Check(Near(Canvas.GetLeft(unboxed)*dpi,local.Left) && Near(Canvas.GetTop(unboxed)*dpi,local.Top) && Near(unboxed.Width*dpi,local.Size) &&
+                unboxed.Children.OfType<Ellipse>().Any(e=>Equals(e.Tag,"wave-seen")),
+                $"without a confirmed box the waves use this machine's minimap setting, like the wards, at {h}p/{dpi}x");
             Check(Near(Canvas.GetLeft(gear), 4 * DisplayGeometry.OverlayUnit(h, dpi)) &&
                 mixed.Children.OfType<Canvas>().Count() == 2 && Near(Canvas.GetLeft(map) * dpi, m.Left) &&
                 Near(Canvas.GetTop(map) * dpi, m.Top) && Near(map.Width * dpi, m.Size) && map.ClipToBounds && !map.IsHitTestVisible,
                 $"left equipment, independent route and confirmed {(right ? "right" : "left")} custom ward HUD at {h}p/{dpi}x");
-            Check(guess.StrokeDashArray is { Count: > 0 } && seen.StrokeDashArray is null or { Count: 0 } &&
-                Children(map).OfType<TextBlock>().Any(t => t.Text == "?") &&
-                Children(map).OfType<TextBlock>().Any(t => t.Text.Contains("目击") && t.Text.Contains("推测")) &&
+            double unit = DisplayGeometry.OverlayUnit(h, dpi);
+            Check(guess is Canvas { Children.Count: > 0 } eye && eye.Children.OfType<Shape>().All(s => s.StrokeDashArray is null or { Count: 0 }) &&
+                guess.Width <= 11 * unit && guess.Height < guess.Width && seen is Polygon { Fill: null } &&
+                !Children(map).OfType<TextBlock>().Any(t => t.Text == "?") &&
+                Children(map).OfType<TextBlock>().Select(t => string.Concat(t.Inlines.OfType<System.Windows.Documents.Run>().Select(r => r.Text)))
+                    .Any(key => key.Contains("目击") && key.Contains("推测")) &&
                 new FrameworkElement[] { guess, seen }.All(e => Near((Canvas.GetLeft(e) + e.Width / 2) * dpi, .25 * m.Size) &&
                     Near((Canvas.GetTop(e) + e.Height / 2) * dpi, .75 * m.Size)),
-                "coincident sighting and estimated region stay distinct, at their own unmirrored source coordinates");
+                "a coincident sighting (empty diamond) and estimate (ward-icon-sized eye, no '?' badge) stay distinct, at their own unmirrored source coordinates");
             Check(Draw(board, equipment: false).Children.Cast<UIElement>().Single() is Canvas &&
                 Draw(board, wards: false).Children.Cast<UIElement>().Single() is StackPanel &&
                 Draw(board, route, false, false).Children.Cast<UIElement>().Single() is Canvas &&
-                Draw(board with { Heroes = [], Wards = null }).Children.OfType<Canvas>().Single().Children.OfType<Polygon>().Count() == 1 &&
-                Draw(board with { Heroes = [], SeenWards = null }).Children.OfType<Canvas>().Single().Children.OfType<Ellipse>().Count() == 1,
+                Draw(board with { Heroes = [], Wards = null }).Children.OfType<Canvas>().Single() is var sightOnly &&
+                Tagged(sightOnly, "ward-seen").Length == 1 && Tagged(sightOnly, "ward-guess").Length == 0 &&
+                Draw(board with { Heroes = [], SeenWards = null }).Children.OfType<Canvas>().Single() is var guessOnly &&
+                Tagged(guessOnly, "ward-guess").Length == 1 && Tagged(guessOnly, "ward-seen").Length == 0,
                 "turning off route, equipment or wards does not suppress or synthesize another subset");
-            var local = new GameOverlaySettings().Minimap(w, h);
-            var unconfirmed = Draw(board with { Minimap = null }, route).Children.OfType<Canvas>().Single(c => c.Children.OfType<Polygon>().Any());
+            var unconfirmed = WardMap(Draw(board with { Minimap = null }, route));
             var otherSize = Draw(board, physicalWidth: w + 1).Children.OfType<Canvas>().Single();
             Check(Near(Canvas.GetLeft(unconfirmed) * dpi, local.Left) && Near(Canvas.GetTop(unconfirmed) * dpi, local.Top) &&
                 Near(unconfirmed.Width * dpi, local.Size) && Near(Canvas.GetTop(otherSize) * dpi, local.Top) &&

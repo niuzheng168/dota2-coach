@@ -185,6 +185,13 @@ internal static class AuthorizedBoardTests
             BoardDelivery.Age(waveRead,1600,2000) is { LaneMap:null, Heroes.Length:1 } &&
             link.DisplayEnemies(waveRead,Playing with { InstalledBuild=9999 },1920,1080) is { LaneMap:null, Heroes.Length:1, SeenWards.Length:1 },
             "real TLS wave layer is independently leased; an incompatible build strips wave estimates, not equipment or existing ward marks");
+        host.Mailbox.SetEnemies(b with { Minimap = null, LaneMap = dots });
+        var unboxed = (await link.Enemies(default))!;
+        check(unboxed is { Minimap: null, LaneMap: not null } && link.DisplayEnemies(unboxed, Playing, 1920, 1080)?.LaneMap?.Marks[0].Kind == "fog",
+            "without a confirmed box the wave layer still reaches the game client, which places it with its own minimap setting like the wards");
+        host.Mailbox.SetEnemies(b with { Minimap = new(2560, 1440, 0, 1120, 320), LaneMap = dots });
+        check(await link.Enemies(default) is { LaneMap: null, Heroes.Length: 1, Wards.Length: 2 },
+            "a box confirmed for another window size strips only the wave layer");
         var pairing = host.Pair(IPAddress.Loopback);
         using (var old = new HttpClient(new HttpClientHandler { UseProxy=false, ServerCertificateCustomValidationCallback=(_,cert,_,_) =>
             cert?.GetCertHashString(System.Security.Cryptography.HashAlgorithmName.SHA256).Equals(pairing.Fingerprint,StringComparison.OrdinalIgnoreCase)==true }) {
