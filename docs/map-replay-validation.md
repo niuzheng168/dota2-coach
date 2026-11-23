@@ -110,7 +110,7 @@ Valve 这三条回放地址走 HTTP，哈希仅建立本地可复现性，不伪
 本次 Dota2ProTracker / STRATZ 网页返回访问挑战，没有绕过；使用的是可正常访问的 OpenDota API。
 目录发现只保留 API 职业赛事中有选手名、rank tier ≥80 的 Luna；匿名、缺段位或较低段位的条目不假定为高分样本。
 目录请求可能超时；脚本保存 `partial-error` 和已取得的候选，非零退出，不把旧目录冒充本次完整抓取。
-公开回放 URL 是否长期有效没有保证，故原始文件保存在本机 `.tmp/replays/`，不将整个回放提交到仓库。
+公开回放 URL 是否长期有效没有保证，故保留原始文件，不将整个回放提交到仓库。下文的历史 `.tmp/replays/` 在 Windows 现对应 `Z:\dota2coach\data\replays\`（见[录像工作目录](luna-hundred-study.md#录像工作目录)）。
 
 ### 输出
 

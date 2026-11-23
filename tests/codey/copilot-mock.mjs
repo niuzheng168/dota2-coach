@@ -23,7 +23,7 @@ export async function startMock(key, alternateKey, jpeg) {
         const data = models.map((id, i) => ({
           id, name: labels[i], vendor: 'OpenAI', model_picker_enabled: true, policy: { state: 'enabled' },
           supported_endpoints: [fixture.limited && i === 0 ? '/v1/responses' : '/responses'],
-          capabilities: { type: 'chat', supports: { vision: !(fixture.limited && i === 1) },
+          capabilities: { type: 'chat', supports: { vision: !(fixture.limited && i === 1), reasoning_effort: ['high', 'xhigh'] },
             limits: { max_prompt_tokens: 64000, vision: { max_prompt_image_size: fixture.imageLimit ?? 1024 * 1024 } } },
         }));
         return reply(200, { object: 'list', data: [...data, { ...data[0], id: 'hidden-fixture', model_picker_enabled: false }] });
@@ -60,6 +60,14 @@ export async function startMock(key, alternateKey, jpeg) {
         assert.equal(parts[1].detail, 'high');
       }
       const schema = body.text?.format;
+      if (schema?.type === 'json_object') {
+        assert.equal(image, false);
+        assert.equal(body.model, 'gpt-6.2-sol');
+        assert.equal(body.reasoning?.effort, 'xhigh');
+        calls.push(`POST /responses ${body.model} text replay_review ${body.reasoning.effort}`);
+        return reply(200, { id: 'resp-smoke-review', object: 'response', status: 'completed', model: body.model,
+          reasoning: body.reasoning, output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '{}' }] }] });
+      }
       if (schema) {
         assert.equal(schema.type, 'json_schema');
         assert.equal(schema.strict, true);

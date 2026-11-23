@@ -1,4 +1,7 @@
 import http from 'node:http';
+import { replayArea } from '../replays/storage.ts';
+import { readCoachMemory, readCoachMinute } from '../replays/daily-memory.ts';
+import { HEROES, validPatch } from '../replays/daily-study.ts';
 import fs from 'node:fs/promises';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { COMBAT, MAP } from '../tactics/combat-data.ts';
@@ -85,6 +88,21 @@ export function createSandboxServer(seed = 741, sessionToken?: string) {
       try{return json(200,JSON.parse(await fs.readFile(new URL('../../data/luna-farming-routes.json',import.meta.url),'utf8')));}
       catch{return json(503,{error:'职业回放路线资料尚未构建；请运行 replay:farming'});}
     }
+    if(url.pathname==='/api/farming-memory'){
+      if(req.method!=='GET'){res.setHeader('Allow','GET');return json(405,{error:'教练记忆只读'});}
+      const patch=url.searchParams.get('patch'),hero=url.searchParams.get('hero');
+      if(!validPatch(patch)||!hero||!Object.hasOwn(HEROES,hero))return json(400,{error:'需要明确的补丁号和英雄键'});
+      const id=url.searchParams.get('match'),minute=url.searchParams.get('minute');
+      if(id!==null||minute!==null){
+        if(!/^[1-9]\d{0,15}$/.test(id??'')||!Number.isSafeInteger(Number(id))||!/^(0|[1-9]\d{0,5})$/.test(minute??''))
+          return json(400,{error:'需要对局 ID 和从 0 开始的分钟'});
+        try{const row=readCoachMinute(patch,hero,Number(id),Number(minute));
+          return row?json(200,row):json(404,{error:'没有此分钟的实录'});}catch{return json(503,{error:'录像分钟证据不可读'});}
+      }
+      try{const memory=readCoachMemory(patch,hero);
+        return memory?json(200,memory):json(404,{error:'没有这个版本和英雄的记忆，不使用旧版替代'});}
+      catch{return json(503,{error:'录像记忆盘不可读'});}
+    }
     if(req.method==='GET'&&url.pathname==='/api/farming-study'){
       try{return json(200,JSON.parse(await fs.readFile(new URL('../../data/luna-hundred-index.json',import.meta.url),'utf8')));}
       catch{return json(503,{error:'100 场完整解析及逐场模型复盘尚未全部完成；不会展示假完成数量'});}
@@ -94,7 +112,7 @@ export function createSandboxServer(seed = 741, sessionToken?: string) {
         const id=Number(url.pathname.split('/').at(-1));
         const index=JSON.parse(await fs.readFile(new URL('../../data/luna-hundred-index.json',import.meta.url),'utf8'));
         if(!index.matches.some((m:any)=>m.matchId===id))return json(404,{error:'对局不在已核验研究集'});
-        return json(200,JSON.parse(await fs.readFile(new URL(`../../.tmp/replays/study/${id}.route.json`,import.meta.url),'utf8')));
+        return json(200,JSON.parse(await fs.readFile(`${replayArea()}/study/${id}.route.json`,'utf8')));
       }catch{return json(503,{error:'该回放的本地轨迹缓存不可用；请重新构建，不使用模拟轨迹替代'});}
     }
     if(req.method==='GET'&&url.pathname==='/api/sim/context')return json(200,{

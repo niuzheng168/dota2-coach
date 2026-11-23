@@ -10,6 +10,7 @@ import { basename, delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { coachUA, labels, models, startMock } from '../tests/codey/copilot-mock.mjs';
+import { createReviewClient, reviewProfile } from './replays/review-model.ts';
 
 const { values } = parseArgs({ options: {
   gateway: { type: 'string' }, 'routes-only': { type: 'boolean' }, evidence: { type: 'string' },
@@ -58,7 +59,7 @@ async function client(base, scenario, expectedPosts = []) {
   try {
     await runDotnet([join(artifacts, 'bin/CodeySmoke/release/CodeySmoke.dll'), scenario, base, keyFile, imageFile], `CloudCoach/${scenario}`);
     const trace = front().slice(offset);
-    assert.ok(trace.some(r => r.method === 'GET') && trace.every(r => r.status === 200 && goodWire(r)));
+    assert.ok(trace.some(r => r.method === 'GET') && trace.every(r => r.status === 200 && r.ua === coachUA && goodWire(r)));
     assert.equal(trace.filter(r => r.method === 'POST').length, expectedPosts.length);
     assert.deepEqual(mock.calls.slice(mark).filter(line => line.startsWith('POST ')), expectedPosts);
     result.passed = true;
@@ -88,7 +89,7 @@ function payload(model, image = false) {
   return { model, input: [{ role: 'user', content }], store: false, stream: false, service_tier: 'auto' };
 }
 const front = () => readFileSync(audit, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
-const goodWire = r => r.ua === coachUA && !r.otherKey && !r.blocked && r.bearer === (r.status !== 401);
+const goodWire = r => [coachUA, 'DotaCoach-Replay'].includes(r.ua) && !r.otherKey && !r.blocked && r.bearer === (r.status !== 401);
 
 async function withGateway(mock, exercise) {
   const app = dirname(gateway);
@@ -149,6 +150,15 @@ try {
       assert.equal(mock.calls.at(-1), post(id, kind, 'probe'));
     }
     console.log('PASS actual routes: 401 without bearer; normalized catalog; 400 unlisted; native text + byte-identical image');
+    const replay = await createReviewClient(reviewProfile({}), { CODEY_MODEL_API_KEY: frontKey, DOTA_COACH_COPILOT_BASE_URL: base });
+    const offset = front().length, mark = mock.calls.length;
+    const result = await replay.generate('Return JSON.', 'Synthetic offline replay evidence.', AbortSignal.timeout(8000));
+    assert.equal(result.status, 'completed');
+    assert.deepEqual(mock.calls.slice(mark), [post('gpt-6.2-sol', 'text', 'replay_review xhigh')]);
+    const wire = front().slice(offset);
+    assert.deepEqual(wire.map(r => [r.method, r.path, r.status]), [['GET', '/v1/models', 200], ['POST', '/v1/responses', 200]]);
+    assert.ok(wire.every(r => r.ua === 'DotaCoach-Replay' && goodWire(r)));
+    console.log('PASS production replay client: installed Codey forwarded gpt-6.2-sol / xhigh to the isolated HTTP mock');
     if (!values['routes-only']) {
       await client(base, 'happy', models.flatMap(pair));
       mock.fixture.wrongEcho = true;

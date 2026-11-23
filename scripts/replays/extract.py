@@ -14,16 +14,13 @@ import json
 from pathlib import Path
 import time
 
-from gem.parser import ReplayParser
-from gem.state.entities import EntityOp
-
 NULL_HANDLE = 0xFFFFFF
 OFFSET = 16384
 NEUTRAL = "CDOTA_BaseNPC_Creep_Neutral"
 LANE = "CDOTA_BaseNPC_Creep_Lane"
 TOWER = "CDOTA_BaseNPC_Tower"
 SPAWNER = "CDOTA_NeutralSpawner"
-HERO_CLASSES = {"luna": "CDOTA_Unit_Hero_Luna", "troll_warlord": "CDOTA_Unit_Hero_TrollWarlord"}
+HERO_CLASSES = {"luna": "CDOTA_Unit_Hero_Luna", "troll_warlord": "CDOTA_Unit_Hero_TrollWarlord", "sven": "CDOTA_Unit_Hero_Sven"}
 
 
 def position(entity):
@@ -35,6 +32,8 @@ def position(entity):
 
 
 def extract(dem: Path, output: Path, expected_id: int, hero_key: str = "luna", route_core: bool = False):
+    from gem.parser import ReplayParser
+    from gem.state.entities import EntityOp
     if importlib.metadata.version("gem-dota") != "0.14.0":
         raise ValueError("Parser version must match the audited pin")
     if output.exists():
@@ -255,7 +254,7 @@ def extract(dem: Path, output: Path, expected_id: int, hero_key: str = "luna", r
         "camps": list(camps.values()), "spawners": list(spawners.values()), "towers": list(towers.values()),
         "creatures": list(creatures.values()), "heroPath": hero_path, "frames": frames,
         # Keep historical Luna facts byte-compatible; never label Troll events as Luna's.
-        ("lunaCombatLog" if hero_key == "luna" else "trollCombatLog"): logs,
+        {"luna": "lunaCombatLog", "troll_warlord": "trollCombatLog", "sven": "svenCombatLog"}[hero_key]: logs,
         "limitations": ["Replay all-map state is audit-only, not player-visible live context.",
                         "m_iMoveSpeed is a recorded base field, NOT necessarily effective speed with modifiers.",
                         "No heuristic camp-route classification, kill-credit proximity, or strategy selection.",
@@ -277,12 +276,19 @@ def extract(dem: Path, output: Path, expected_id: int, hero_key: str = "luna", r
 
 
 if __name__ == "__main__":
+    import sys
+    sys.dont_write_bytecode = True
+    from replay_storage import replay_area, set_replay_temp
     ap = argparse.ArgumentParser()
     ap.add_argument("match_id", type=int)
-    ap.add_argument("--root", type=Path, default=Path(".tmp/replays"))
+    ap.add_argument("--root", type=Path)
+    ap.add_argument("--output", type=Path, help="new facts file; allows multiple focal heroes from the same DEM")
     ap.add_argument("--hero", choices=HERO_CLASSES, default="luna")
     ap.add_argument("--route-core", action="store_true",
                     help="Focus per-second facts on the selected hero; retain terminal parity and spatial evidence.")
     args = ap.parse_args()
-    extract(args.root / f"{args.match_id}.dem", args.root / f"{args.match_id}.facts.json", args.match_id,
+    args.root = args.root or replay_area()
+    output = args.output or args.root / f"{args.match_id}.facts.json"
+    set_replay_temp(output.parent)
+    extract(args.root / f"{args.match_id}.dem", output, args.match_id,
             args.hero, args.route_core)

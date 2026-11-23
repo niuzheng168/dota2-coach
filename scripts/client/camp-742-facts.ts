@@ -1,5 +1,6 @@
 /** Offline audit plumbing shared only by the 7.42 camp research scripts. */
 import assert from 'node:assert/strict';
+import { replayArea } from '../../src/replays/storage.ts';
 import fs from 'node:fs';
 import { gameTimeAt } from '../../src/replays/farming-routes.ts';
 
@@ -18,13 +19,13 @@ export function save(name: string, data: unknown) {
   else fs.writeFileSync(f, text);
 }
 export function facts(m: any) {
-  const f = read(`.tmp/farm742/${m.id}.facts.json`);
+  const f = read(`${replayArea('farm742')}/${m.id}.facts.json`);
   assert(f.schemaVersion === 4 && f.complete && f.matchId === m.id && f.gameBuild === m.build &&
     f.demSha256 === m.demSha256 && f.postGameTick === f.frames.at(-1).tick && f.frames.at(-1).gameTime > 1200);
   return f;
 }
 export function details(f: any) {
-  const d = read(`.tmp/farm742-camps/${f.matchId}.damage.json`);
+  const d = read(`${replayArea('farm742-camps')}/${f.matchId}.damage.json`);
   assert(d.matchId === f.matchId && d.build === f.gameBuild && d.demSha256 === f.demSha256 &&
     d.endTick === f.postGameTick && d.bodyId === f.heroPath[0].id && d.hero === f.heroPath[0].unitName &&
     d.team === f.heroPath[0].team && gameTimeAt(f.clock, d.lastTick) > 1201);

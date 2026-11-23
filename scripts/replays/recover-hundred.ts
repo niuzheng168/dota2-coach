@@ -1,8 +1,9 @@
 /** Retry failed pro-source acquisitions separately; never mutate a running journal. */
+import { replayArea, replayChildEnv } from '../../src/replays/storage.ts';
 import fs from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { downloadReplay } from './download.ts';
-const root='.tmp/replays',read=async(p:string)=>JSON.parse(await fs.readFile(p,'utf8'));
+const root=replayArea(),read=async(p:string)=>JSON.parse(await fs.readFile(p,'utf8'));
 const progress=await read(`${root}/hundred-progress.json`),catalog=await read(`${root}/hundred-candidates.json`);
 const exists=(p:string)=>fs.stat(p).then(()=>true,()=>false);
 const prior=await exists(`${root}/hundred-recovered.json`)?await read(`${root}/hundred-recovered.json`):[];
@@ -11,7 +12,7 @@ const available=(await fs.readdir(`${root}/study`)).filter(f=>/^\d+\.route\.json
   .map(f=>Number(f.split('.')[0])).filter(id=>priority.has(id)).sort((a,b)=>priority.get(a)!-priority.get(b)!);
 const cutoff=available.length>=100?priority.get(available[99])!:Infinity;
 const run=(exe:string,args:string[])=>new Promise<void>((resolve,reject)=>{
-  const child=spawn(exe,args,{windowsHide:true,stdio:'ignore'});
+  const child=spawn(exe,args,{windowsHide:true,env:replayChildEnv(root),stdio:'ignore'});
   child.on('error',reject);child.on('close',code=>code===0?resolve():reject(new Error(`Child failed ${code}`)));
 });
 const results=[];
@@ -37,8 +38,8 @@ for(const failure of progress.failures){
         throw new Error('Outside 7.41f patch window');
       await downloadReplay(id,root,bytes);
     }
-    if(!await exists(`${root}/${id}.dem`))await run('.tmp/replay-tools/Scripts/python.exe',['scripts/replays/decompress.py',String(id)]);
-    if(!await exists(`${root}/${id}.facts.json`))await run('.tmp/replay-tools/Scripts/python.exe',['scripts/replays/extract.py',String(id)]);
+    if(!await exists(`${root}/${id}.dem`))await run('.tmp/replay-tools/Scripts/python.exe',['scripts/replays/decompress.py',String(id),'--root',root]);
+    if(!await exists(`${root}/${id}.facts.json`))await run('.tmp/replay-tools/Scripts/python.exe',['scripts/replays/extract.py',String(id),'--root',root]);
     await run(process.execPath,['scripts/replays/pack-study.ts',String(id)]);
     results.push({matchId:id,success:true,source});
   }catch(e){results.push({matchId:id,success:false,error:e instanceof Error?e.message:'Failed'});}

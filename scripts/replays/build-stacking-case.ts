@@ -1,8 +1,10 @@
+import { replayArea } from '../../src/replays/storage.ts';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {validateCampGeometry} from '../../src/replays/validation.ts';
+const replayDir=replayArea();
 const read=(f:string)=>JSON.parse(fs.readFileSync(f,'utf8'));
-const id=9089477184,facts=read(`.tmp/replays/${id}.facts.json`),detailBytes=fs.readFileSync(`.tmp/replays/study/${id}.stacking-detail.json`);
+const id=9089477184,facts=read(`${replayDir}/${id}.facts.json`),detailBytes=fs.readFileSync(`${replayDir}/study/${id}.stacking-detail.json`);
 const detail=JSON.parse(detailBytes.toString()),reference=read('data/dota2-map-reference.json');
 if(detail.matchId!==id||detail.build!==facts.gameBuild||!detail.complete)throw new Error('Wrong detail replay');
 const mapping=validateCampGeometry(facts,reference),by=new Map(mapping.rows.map((c:any)=>[c.spawnerIndex,c.id]));

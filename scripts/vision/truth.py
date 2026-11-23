@@ -26,10 +26,14 @@ def gsi_state(sample: dict) -> dict[int, tuple]:
 
 
 def main():
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "replays"))
+    from replay_storage import replay_area, set_replay_temp
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("dataset", type=Path, help="folder with captures.jsonl")
-    ap.add_argument("--replays", type=Path, default=Path(".tmp/replays"))
+    ap.add_argument("--replays", type=Path, default=replay_area())
     args = ap.parse_args()
+    set_replay_temp(args.replays)
     samples = [json.loads(line) for line in open(args.dataset / "captures.jsonl", encoding="utf-8")]
     by_replay = defaultdict(list)
     for s in samples:

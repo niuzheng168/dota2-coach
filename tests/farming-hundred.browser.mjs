@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {once} from 'node:events';
 import {createSandboxServer} from '../src/sandbox/server.ts';
+import {replayArea} from '../src/replays/storage.ts';
 const corpus=JSON.parse(await fs.readFile('data/luna-hundred-index.json','utf8'));
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
 const {server,token}=createSandboxServer();server.listen(0,'127.0.0.1');await once(server,'listening');
@@ -24,7 +25,7 @@ try{
     await page.locator('#replay-match').selectOption(String(m.matchId));
     await page.waitForFunction(id=>document.querySelector('#replay-meta').textContent.includes(String(id))&&document.querySelector('#replay-status').textContent.startsWith('已就绪'),m.matchId);
     assert.equal(await page.locator('#study-summary').textContent(),m.review.summary);
-    const full=JSON.parse(await fs.readFile(`.tmp/replays/study/${m.matchId}.route.json`,'utf8'));
+    const full=JSON.parse(await fs.readFile(`${replayArea()}/study/${m.matchId}.route.json`,'utf8'));
     const a=full.frames.find(f=>f.time>=600),b=full.frames.find(f=>f.time>=1200)||full.frames.at(-1);
     assert.equal(await page.locator('#replay-lane-gold').textContent(),String(b.gold[0]-a.gold[0]));
     assert.equal(await page.locator('#replay-neutral-gold').textContent(),String(b.gold[1]-a.gold[1]));

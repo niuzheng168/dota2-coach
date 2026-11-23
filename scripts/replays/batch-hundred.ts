@@ -1,11 +1,12 @@
 /** Finite, resumable two-worker acquisition. Failures are recorded, never counted. */
+import { replayArea, replayChildEnv } from '../../src/replays/storage.ts';
 import fs from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { downloadReplay } from './download.ts';
-const root='.tmp/replays',catalog=JSON.parse(await fs.readFile(`${root}/hundred-candidates.json`,'utf8'));
+const root=replayArea(),catalog=JSON.parse(await fs.readFile(`${root}/hundred-candidates.json`,'utf8'));
 const exists=(p:string)=>fs.stat(p).then(()=>true,()=>false);
 const run=(exe:string,args:string[])=>new Promise<void>((resolve,reject)=>{
-  const p=spawn(exe,args,{windowsHide:true,stdio:['ignore','pipe','pipe']});let output='';
+  const p=spawn(exe,args,{windowsHide:true,env:replayChildEnv(root),stdio:['ignore','pipe','pipe']});let output='';
   p.stdout.on('data',b=>{output=(output+b).slice(-5000);});p.stderr.on('data',b=>{output=(output+b).slice(-5000);});
   const timer=setTimeout(()=>p.kill(),600000);
   p.on('error',reject);p.on('close',code=>{clearTimeout(timer);code===0?resolve():reject(new Error(`Child exit ${code}: ${output.slice(-1500)}`));});
@@ -57,9 +58,9 @@ async function worker(){
       stage='archive';
       if(!await exists(`${root}/${id}.acquisition.json`))await downloadReplay(id,root,bytes);
       stage='decompress';
-      if(!await exists(`${root}/${id}.dem`))await run(python,['scripts/replays/decompress.py',String(id)]);
+      if(!await exists(`${root}/${id}.dem`))await run(python,['scripts/replays/decompress.py',String(id),'--root',root]);
       stage='parse';
-      if(!reused)await run(python,['scripts/replays/extract.py',String(id)]);
+      if(!reused)await run(python,['scripts/replays/extract.py',String(id),'--root',root]);
       stage='validate-and-pack';
       await run(process.execPath,['--max-old-space-size=4096','scripts/replays/pack-study.ts',String(id)]);
       const evidence=JSON.parse(await fs.readFile(`${root}/study/${id}.evidence.json`,'utf8'));

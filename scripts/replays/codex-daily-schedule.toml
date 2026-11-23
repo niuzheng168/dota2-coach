@@ -1,0 +1,17 @@
+# Codex desktop local automation definition. The per-user copy also needs
+# created_at and updated_at (Unix milliseconds). No tokens or match data here.
+version = 1
+id = "dota2-coach-daily-replay-study"
+kind = "cron"
+name = "Dota 2 每日录像复盘"
+status = "ACTIVE"
+rrule = "FREQ=DAILY;BYHOUR=0,2,4;BYMINUTE=5;BYSECOND=0"
+execution_environment = "local"
+cwds = ['C:\g\dota2-coach']
+prompt = '''
+在教练机的本地项目 C:\g\dota2-coach 执行每日 Dota 2 录像研究。以香港日期计数：00:05 主跑，02:05、04:05 只补当日缺口。只使用程序核验为当前精确补丁的顶分或职业比赛；露娜、巨魔战将、斯温各目标 20 场，不用旧版本或重复样本补数。
+
+在项目根目录运行一次 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File .\scripts\replays\run-daily.ps1 。等待进程完成；如果已有实例持锁，读取其状态即可，不另开进程。脚本负责版本、去重、账本、付费上限、真实录像解析，以及通过本机 Codey 的 GitHub Copilot / gpt-6.2-sol / xhigh 研究出装与打钱。不另行调用模型，不改代码、计划任务、凭证或权限。
+
+只使用 Z:\dota2coach\data\daily-study 存放研究数据及临时文件；Z 盘或服务不可用时报告阻塞，不改用 C 盘。读取 runs\<香港日期>\status.json（日期须与本轮匹配），用中文报告版本、三个英雄真正完成入库的数量、缺口和原因。退出码 2 表示未满额，不是全部失败；不要把已下载或仅解析的录像算成已复盘。既有长期记忆保留在 memory\<补丁>\<英雄>\ 下。
+'''

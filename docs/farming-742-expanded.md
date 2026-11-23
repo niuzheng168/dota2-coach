@@ -115,10 +115,11 @@
 ```powershell
 # 只读发布包内统计；无需网络或 .tmp
 node scripts/replays/pack-expanded-742.ts --summary
-# 采集中：只更新 .tmp/farm742-more/pack-cache 与 pack-preview*
+# 采集中：只更新工作根目录下的 farm742-more/pack-cache 与 pack-preview*
 node scripts/replays/pack-expanded-742.ts --partial
 # 采集负责人确认冻结本轮、所有 ID 均为终态后才发布；后续重试另封快照（complete:true 时可省 --final-progress）
-$seal = (Get-FileHash .tmp/farm742-more/progress.json -Algorithm SHA256).Hash.ToLowerInvariant()
+$work = node --input-type=module -e "import {replayArea} from './src/replays/storage.ts'; console.log(replayArea('farm742-more'))"
+$seal = (Get-FileHash (Join-Path $work progress.json) -Algorithm SHA256).Hash.ToLowerInvariant()
 node scripts/replays/pack-expanded-742.ts --publish "--final-progress=$seal"
 # 从原始输入冷复核三份发布物
 node scripts/replays/pack-expanded-742.ts --check --no-cache

@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { replayArea } from '../../src/replays/storage.ts';
 
-const here = '.tmp/farm742-more', prior = '.tmp/farm742', out = 'data/farming-742-tempo.json';
+const here = replayArea('farm742-more'), prior = replayArea('farm742'), out = 'data/farming-742-tempo.json';
 const items: Record<number, string> = { 145: 'bfury', 147: 'manta', 166: 'maelstrom', 172: 'mask_of_madness' };
 const heroes = { 48: 'luna', 95: 'troll_warlord' } as const;
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');

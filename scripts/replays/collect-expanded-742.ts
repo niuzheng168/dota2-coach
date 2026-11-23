@@ -5,9 +5,10 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { setTimeout as wait } from 'node:timers/promises';
 import { downloadReplay } from './download.ts';
+import { replayArea, replayChildEnv } from '../../src/replays/storage.ts';
 
 const run = promisify(execFile);
-const root = '.tmp/farm742-more', oldRoot = '.tmp/farm742';
+const root = replayArea('farm742-more'), oldRoot = replayArea('farm742');
 const python = fs.existsSync('.tmp/replay-tools/Scripts/python.exe') ? '.tmp/replay-tools/Scripts/python.exe' : '.tmp/replay-tools/bin/python';
 const read = (file: string) => JSON.parse(fs.readFileSync(file, 'utf8'));
 const cohort = read(`${root}/eligible.json`);
@@ -51,10 +52,10 @@ async function metadata(row: any) {
 async function acquire(row: any) {
   const id = row.match_id;
   if (original.get(id)?.hero === (row.hero_id === 48 ? 'luna' : 'troll_warlord') && exists(oldRoot, id, 'facts.json')) {
-    stage(id, 'reused', { root: oldRoot, error: null }); return;
+    stage(id, 'reused', { root: 'farm742', error: null }); return; // relative to the work root, not a machine path
   }
   if (exists(root, id, 'facts.json') && exists(root, id, 'acquisition.json')) {
-    stage(id, 'parsed', { root, error: null }); return;
+    stage(id, 'parsed', { root: 'farm742-more', error: null }); return;
   }
   let currentStage = 'download';
   try {
@@ -77,7 +78,7 @@ async function acquire(row: any) {
       }
       if (!exists(root, id, 'dem')) {
         currentStage = 'decompress';
-        await run(python, ['scripts/replays/decompress.py', String(id), '--root', root], { windowsHide: true, timeout: 150_000 });
+        await run(python, ['scripts/replays/decompress.py', String(id), '--root', root], { windowsHide: true, env: replayChildEnv(root), timeout: 150_000 });
       }
       stage(id, 'ready');
     });
@@ -85,9 +86,9 @@ async function acquire(row: any) {
       currentStage = 'parse'; stage(id, 'parsing');
       const hero = row.hero_id === 48 ? 'luna' : 'troll_warlord';
       const { stdout, stderr } = await run(python, ['scripts/replays/extract.py', String(id), '--root', root, '--hero', hero, '--route-core'],
-        { windowsHide: true, timeout: 900_000, maxBuffer: 2 * 1024**2 });
+        { windowsHide: true, env: replayChildEnv(root), timeout: 900_000, maxBuffer: 2 * 1024**2 });
       fs.writeFileSync(`${root}/${id}.parse.log`, stdout + stderr);
-      stage(id, 'parsed', { root, error: null });
+      stage(id, 'parsed', { root: 'farm742-more', error: null });
     });
   } catch (e: any) {
     const error = String(e.stderr || e.message || e).slice(-800);

@@ -177,7 +177,7 @@
 - 为恢复临时失败的高优先级样本，实际校验了 127 场，再选定 100 场；27 场较低优先级样本及初次失败记录仍保留在审计中。入选的 100 场含 9 场此前已缓存的回放，未重复下载它们。
 - 入选 100 份成功模型复盘记录：输入 **5,617,332** tokens、输出 **297,099** tokens。所有 127 份成功复盘合计 **7,670,533** tokens；这还不是完整账单用量，早期诊断、截断与限流重试不能由这些成功记录完全覆盖。没有估算美元费用。
 - 对全部入选复盘重新检查输入/提示散列，缓存复验通过、**新增 API 调用 0**。不存在规则选路回退。
-- 大文件位于本机 `.tmp/replays/`，不随 Git 迁移；地图全量轨迹缓存丢失时页面明确报错，不用模拟路线替代。迁移工作区时需要另行保留回放与解析缓存。Steam 账号文件未读取。
+- 大文件不随 Git 迁移；原 `.tmp/replays/` 在 Windows 上现使用[录像工作目录](#录像工作目录)。地图全量轨迹缓存丢失时页面明确报错，不用模拟路线替代。迁移工作区时需要另行保留回放与解析缓存。Steam 账号文件未读取。
 
 主要成果：
 
@@ -188,3 +188,28 @@
 - `.tmp/replays/study/<matchId>.route.json` / `.evidence.json` / `reviews/<matchId>.json`：细粒度轨迹、离线事实与模型响应。
 
 本机浏览入口为 `/farming-replays?study=100`，沿用沙盒会话鉴权。`replay:study:review` 是显式的离线 API 研究命令，不能在日常启动教练时自动执行。
+
+### 新录像复盘的默认模型
+
+新运行的文字复盘使用 **GitHub Copilot（本机 Codey 网关）／`gpt-6.2-sol`／`reasoning.effort=xhigh`**。这只影响对结构化录像数据的解读，不改变本地 DEM 解析、实战教练或上面已经发布的 100 份 Astra 复盘。
+
+启动自己的 Codey 网关，并给运行脚本的进程提供 `CODEY_MODEL_API_KEY`（模型网关密钥，不是 GitHub 登录令牌）。默认地址是 `http://127.0.0.1:4141/v1`；自定义回环端口可设置 `DOTA_COACH_COPILOT_BASE_URL`。
+
+```powershell
+npm run replay:study:review -- --check-model   # 只查目录，不发录像、不调用推理
+npm run replay:study:review -- --one           # 复盘首场；新配置没有缓存时会使用订阅额度
+```
+
+脚本只向目录中唯一标记为 `github-copilot`、支持原生 HTTP `/responses` 且列有所选 effort 的模型发送请求；不会自动降档或回退 Azure。可用 `REPLAY_REVIEW_PROVIDER`、`REPLAY_REVIEW_MODEL` 和 `REPLAY_REVIEW_REASONING_EFFORT` 显式覆盖。选回 `azure` 或 `openai` 时须与 `JUNGLE_PLANNER_PROVIDER` 的凭据匹配；不覆盖模型和 effort 时，沿用原规划器部署名和 `medium`。
+
+新复盘按 `reviews/<提供商>--<模型>--<effort>/` 分开缓存。`replay:study:publish` 要求同一配置的 100 份结果才发布，不会拿旧结果凑数。要从原有 Astra 缓存重建历史发布，可用 `npm run replay:study:publish -- --legacy`（不调用模型）。
+
+可选开发验证：`node scripts/test-codey-gateway.mjs --routes-only` 使用指定版本的本机 Codey 和模拟上游，检查转发出去的模型 ID 与 `xhigh`，不使用真实订阅。
+
+### 录像工作目录
+
+Windows 默认工作根目录为 `Z:\dota2coach\data`。普通下载、`.partial`、解压的 `.dem`、`.facts.json` 和进度文件在 `replays\`；分析子进程的临时目录在 `replays\tmp\`，轨迹、证据和按模型分开的复盘在 `replays\study\`。7.42 专项使用同一根下的 `farm742`、`farm742-more` 等目录。历史资料里的 `.tmp/replays` 对应现在的 `Z:\dota2coach\data\replays`。不用重新下载、搬移或删除已有数据。
+
+显式传给下载器的目录、Python 的 `--root` 优先。要让整套流程统一改用别处，在启动命令前设置进程环境变量，例如 `$env:DOTA_COACH_REPLAY_WORK_ROOT = 'D:\dota2coach\data'`。不修改系统 TEMP；所选盘不可用时不会回退到 C 盘。非 Windows 默认保留仓库 `.tmp`。发布的索引和报告仍按显式发布命令写入仓库。
+
+这只适用于 D2PT 离线研究。桌面端封存的私人对局使用独立解析器，不允许映射网络盘作为工作盘；模型密钥、工具和私人对局档案不会随研究缓存转移。

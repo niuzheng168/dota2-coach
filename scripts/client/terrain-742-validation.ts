@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { replayArea } from '../../src/replays/storage.ts';
 import { inflateSync } from 'node:zlib';
 import { loadTerrain742, openGnv742 } from '../../src/tactics/terrain-742.ts';
 import type { XY742 } from '../../src/tactics/terrain-742.ts';
@@ -185,7 +186,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
   let captures: Capture742[];
   if (args.includes('--from-captures')) {
     const ids = [9099209663, 9099283649, 9100049738];
-    captures = ids.map(id => read(`.tmp/farm742-terrain/${id}.trace.json`));
+    captures = ids.map(id => JSON.parse(fs.readFileSync(path.join(replayArea('farm742-terrain'), `${id}.trace.json`), 'utf8')));
     const bundle = { version: 1, sampleFormat, captures };
     if (args.includes('--check')) {
       const existing = read(tracesPath);

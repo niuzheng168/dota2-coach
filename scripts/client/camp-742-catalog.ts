@@ -1,5 +1,6 @@
 /** Observed spawn batches ≠ spawn probabilities. Gross entity bounty fields ≠ recipient credit. */
 import assert from 'node:assert/strict';
+import { replayArea } from '../../src/replays/storage.ts';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { gameTimeAt } from '../../src/replays/farming-routes.ts';
@@ -10,7 +11,7 @@ const comps = new Map<string, { units: string[]; observations: number; matches: 
 const bonus = new Map<number, { offsets: Set<string>; names: Set<string>; ids: Set<string>; builds: Set<number>;
   firstClock: number; lastClock: number; snapshots: number; witness: any }>();
 const samples = [];
-const noteBytes = fs.readFileSync('.tmp/farm742/patch.json'), notes = JSON.parse(noteBytes.toString('utf8'));
+const noteBytes = fs.readFileSync(`${replayArea('farm742')}/patch.json`), notes = JSON.parse(noteBytes.toString('utf8'));
 const notesSha256 = createHash('sha256').update(noteBytes).digest('hex');
 assert(notes.success && notes.patch_number === '7.42' && notes.patch_timestamp === routes.patch.from &&
   routes.patch.version === '7.42' && routes.patch.notesSha256 === notesSha256);

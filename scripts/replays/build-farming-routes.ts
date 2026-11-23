@@ -1,7 +1,9 @@
+import { replayArea } from '../../src/replays/storage.ts';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { farmingMatch } from '../../src/replays/farming-routes.ts';
 
+const replayDir=replayArea();
 const read=(file:string)=>JSON.parse(fs.readFileSync(file,'utf8'));
 const sha=(data:Buffer|string)=>createHash('sha256').update(data).digest('hex');
 const catalog=read('data/luna-farming-source-catalog.json');
@@ -12,7 +14,7 @@ for(const build of evidence.builds){
 }
 const matches=[];
 for(const source of catalog.matches){
-  const root=`.tmp/replays/${source.matchId}`,factsBytes=fs.readFileSync(root+'.facts.json'),apiBytes=fs.readFileSync(root+'.opendota.json');
+  const root=`${replayDir}/${source.matchId}`,factsBytes=fs.readFileSync(root+'.facts.json'),apiBytes=fs.readFileSync(root+'.opendota.json');
   const facts=JSON.parse(factsBytes.toString()),api=JSON.parse(apiBytes.toString()),acquisition=read(root+'.acquisition.json');
   if(facts.demSha256!==acquisition.demSha256||sha(apiBytes)!==acquisition.metadataSha256||
     !evidence.builds.some((b:any)=>b.build===facts.gameBuild)||api.start_time<evidence.from||

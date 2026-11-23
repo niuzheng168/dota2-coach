@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { replayArea } from '../../src/replays/storage.ts';
 import { gameTimeAt, recordedTrace, type TracePoint } from '../../src/replays/farming-routes.ts';
 
-const root = '.tmp/farm742';
+const root = replayArea('farm742');
 const output = 'data/farming-742-routes.json';
 const read = (file: string, directory = root) => {
   const raw = fs.readFileSync(path.join(directory, file), 'utf8');

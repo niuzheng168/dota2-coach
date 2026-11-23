@@ -4,6 +4,8 @@ One completed match, one **explicit user choice**: Download, or a local `.dem` /
 
 ## Parent handoff
 
+`pinned_v2/download.ts` and `pinned_v2/decompress.py` are the byte-pinned payload sources. The desktop worker always supplies its private local job directory. Use the research entry points in `scripts/replays/` for the D2PT replay share; it is not a permitted desktop scratch disk.
+
 **Ship the whole portable directory, not the bootstrap EXE alone.** The farm-enabled runtime is `.tmp/postgame-replay-v2/`; nothing here installs into a WPF package. The production pin for its `sha256.json` is **`BFE9801AFB125616B5C9208DA9CBD47A3BE48F0A59172C74DA7279980629D783`** (619 listed files). Check the manifest against that trusted value, check every member, and reject unlisted files/reparse points before launching. A manifest supplied by an untrusted download is not itself a trust anchor. The EXE needs no installed Python, Node, npm, .NET or network for local input.
 
 The original `.tmp/postgame-replay-v1/` remains unchanged. Runtime **v2** is not a new wire version: `schemaVersion:1` and all five event kinds remain. The updated native importer accepts original, unmodified v1 files (no `economy` key). See **[VALIDATION.md](VALIDATION.md)** for the real importer and field-parity results.

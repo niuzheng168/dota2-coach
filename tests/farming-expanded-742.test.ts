@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { compact, endpoints, type Hit742, type Row742 } from '../scripts/replays/study-742.ts';
@@ -67,8 +68,7 @@ test('route support is per match and side/MMR tier; unknowns, mixed same-tick or
 });
 
 test('short route-core replay: target-only frames suffice; terminal ten-player parity, map, interior times and completeness remain mandatory', async t => {
-  const root = '.tmp/farm742-more'; fs.mkdirSync(root, { recursive: true });
-  const dir = fs.mkdtempSync(`${root}/pack-test-`), id = 1234567890;
+  const dir = fs.mkdtempSync(path.join(tmpdir(), 'dota-pack-test-')), id = 1234567890;
   const name = (ext: string) => path.join(dir, `${id}.${ext}.json`);
   const write = (ext: string, v: unknown) => fs.writeFileSync(name(ext), JSON.stringify(v));
   try {

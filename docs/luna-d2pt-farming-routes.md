@@ -8,6 +8,8 @@
 
 ## 样本与来源
 
+下文 `.tmp/replays/` 是采集时的路径；Windows 现默认读写 `Z:\dota2coach\data\replays\`，见[录像工作目录](luna-hundred-study.md#录像工作目录)。
+
 入口：`https://dota2protracker.com/hero/Luna?section=matches`。
 页面设置 Carry、Pros Only、Pubs，关闭 Tournaments；在可见目录中明确选择六场
 **对局平均 MMR ≥ 8000** 的职业标识样本，未开启 Wins Only。

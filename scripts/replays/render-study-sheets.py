@@ -3,11 +3,13 @@ import json
 import sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
+from replay_storage import replay_area
 
 root = Path(".")
 index = json.loads(Path(sys.argv[1] if len(sys.argv) > 1 else "data/luna-hundred-index.json").read_text(encoding="utf8"))
 reference = json.loads((root / "data/dota2-map-reference.json").read_text(encoding="utf8"))
-background = Image.open(root / ".tmp/map-reference/dota-map-741f.png").convert("RGB")
+background_file = replay_area("map-reference") / "dota-map-741f.png"
+background = Image.open(background_file if background_file.is_file() else root / ".tmp/map-reference/dota-map-741f.png").convert("RGB")
 font = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 15)
 small = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 12)
 size, gap, header, footer = 390, 18, 54, 48
@@ -19,8 +21,8 @@ def project(x, y):
     return size / 2 + x * size / span, size / 2 - y * size / span
 
 
-output = root / ".tmp/replays/study/sheets"
-output.mkdir(exist_ok=True)
+output = replay_area() / "study/sheets"
+output.mkdir(parents=True, exist_ok=True)
 for page in range((len(index["matches"]) + 11) // 12):
     page_matches = index["matches"][page * 12:(page + 1) * 12]
     page_rows = (len(page_matches) + 2) // 3

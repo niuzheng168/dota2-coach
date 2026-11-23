@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { replayArea } from '../../src/replays/storage.ts';
 import { compact, endpoints, heroes, patchEvidence742, type Hero742, type Hit742, type Point742,
   type Row742, type Team742 } from './study-742.ts';
 
-const legacy = '.tmp/farm742', more = '.tmp/farm742-more', cacheDir = `${more}/pack-cache`;
+const legacy = replayArea('farm742'), more = replayArea('farm742-more'), cacheDir = `${more}/pack-cache`;
 const originalFile = 'data/farming-742-routes.json', studyFile = 'data/farming-742-expanded.json';
 const auditFile = 'data/farming-742-expanded-audit.json', docFile = 'docs/farming-742-expanded.md';
 const sha = (bytes: Buffer | string) => createHash('sha256').update(bytes).digest('hex');
@@ -39,7 +40,9 @@ function fileDigest(p: string) {
   } finally { fs.closeSync(fd); }
 }
 function save(target: string, text: string) {
-  const tmp = `${more}/pack-${randomUUID()}.next`;
+  // Cache/preview on the replay share; only explicit publication writes to the checkout.
+  // Stage beside the destination so replacement stays atomic across distinct work/publish volumes.
+  const tmp = path.join(path.dirname(target), `pack-${randomUUID()}.next`);
   fs.writeFileSync(tmp, text, { flag: 'wx' });
   try { fs.renameSync(tmp, target); } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
 }
@@ -153,7 +156,9 @@ function collect(mode: 'partial' | 'publish' | 'check', noCache: boolean, finalP
     assert.equal(hash(progressFile), sha(progressBytes!), 'Collection changed while packing');
     assert.equal(hash(`${more}/eligible.json`), eligibleSha256, 'Eligibility changed while packing');
   }
-  const provenance = { eligibleSha256, originalSha256: hash(originalFile), patchEvidenceRoot: patchRoot, buildsRoot: buildRoot };
+  // The stable labels are part of the published evidence; never publish the machine/share path.
+  const label = (dir: string) => `.tmp/${path.basename(dir)}`;
+  const provenance = { eligibleSha256, originalSha256: hash(originalFile), patchEvidenceRoot: label(patchRoot), buildsRoot: label(buildRoot) };
   const study = { version: 1, scope: old.scope, captureDateUTC: c.sources.map(s => new Date(s.checkedAt).toISOString().slice(0,10)).sort().at(-1),
     ...config, minimumMatchMmr: c.minimumMatchMmr, selection: c.selection, sources: c.sources, provenance, map: old.map,
     format: { ...old.format, ranking: undefined,
@@ -425,9 +430,10 @@ function renderReport(study: ReportStudy, audit: ReportAudit) {
       '相邻击杀间隔 ≤30 秒，不跨轨迹中断、死亡或时间窗；合并同地连续击杀，三站跨度 ≤90 秒。读的是击杀顺序，不是两站之间走过的每一步。',
     `- ${auditLink}包含所有候选的目录行、采集状态与错误、核验结论和证据散列。所有地图与轨迹仅供离线回放，不是实战可见信息。`,
     '```powershell\n# 只读发布包内统计；无需网络或 .tmp\nnode scripts/replays/pack-expanded-742.ts --summary\n' +
-      '# 采集中：只更新 .tmp/farm742-more/pack-cache 与 pack-preview*\nnode scripts/replays/pack-expanded-742.ts --partial\n' +
+      '# 采集中：只更新工作根目录下的 farm742-more/pack-cache 与 pack-preview*\nnode scripts/replays/pack-expanded-742.ts --partial\n' +
       '# 采集负责人确认冻结本轮、所有 ID 均为终态后才发布；后续重试另封快照（complete:true 时可省 --final-progress）\n' +
-      '$seal = (Get-FileHash .tmp/farm742-more/progress.json -Algorithm SHA256).Hash.ToLowerInvariant()\n' +
+      '$work = node --input-type=module -e "import {replayArea} from \'./src/replays/storage.ts\'; console.log(replayArea(\'farm742-more\'))"\n' +
+      '$seal = (Get-FileHash (Join-Path $work progress.json) -Algorithm SHA256).Hash.ToLowerInvariant()\n' +
       'node scripts/replays/pack-expanded-742.ts --publish "--final-progress=$seal"\n# 从原始输入冷复核三份发布物\n' +
       'node scripts/replays/pack-expanded-742.ts --check --no-cache\n# 原始 16 不受影响\nnode scripts/replays/study-742.ts --check\n```',
   ].join('\n\n') + '\n';

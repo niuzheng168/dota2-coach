@@ -1,15 +1,17 @@
 /** Descriptive measurements, not rules for choosing a farming route. */
+import { replayArea } from '../../src/replays/storage.ts';
 import fs from 'node:fs';
 import { farmingWindow } from '../../src/replays/farming-routes.ts';
+const replayDir=replayArea();
 const read=(f:string)=>JSON.parse(fs.readFileSync(f,'utf8'));
-const progress=read('.tmp/replays/hundred-progress.json');
+const progress=read(`${replayDir}/hundred-progress.json`);
 if(progress.completed.length!==100||!progress.complete)throw new Error('100 validated cases required');
 const quantile=(values:number[],q:number)=>{
   const a=values.filter(Number.isFinite).toSorted((a,b)=>a-b);if(!a.length)return null;
   const p=(a.length-1)*q;return a[Math.floor(p)]+(a[Math.ceil(p)]-a[Math.floor(p)])*(p-Math.floor(p));
 };
 const rows=progress.completed.map((source:any)=>{
-  const m=read(`.tmp/replays/study/${source.matchId}.route.json`),e=read(`.tmp/replays/study/${source.matchId}.evidence.json`);
+  const m=read(`${replayDir}/study/${source.matchId}.route.json`),e=read(`${replayDir}/study/${source.matchId}.evidence.json`);
   const itemAt=(name:string)=>m.frames.find((f:any)=>m.loadouts[f.loadout].items.some((i:any)=>i.name===name))?.time??null;
   const periods=[[300,600],[600,900],[900,1200],[1200,1500],[600,1200]].filter(([,to])=>m.duration>=to).map(([from,to])=>{
     const window=farmingWindow(m.frames,from,to),frames=m.frames.filter((f:any)=>f.time>=window.from&&f.time<window.to&&f.alive);

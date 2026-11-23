@@ -115,9 +115,13 @@ def extract(match_id, root, out):
 
 
 if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "replays"))
+    from replay_storage import replay_area, set_replay_temp
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("match_id", type=int)
-    ap.add_argument("--root", type=Path, default=Path(".tmp/farm742"))
-    ap.add_argument("--out", type=Path, default=Path(".tmp/farm742-camps"))
+    ap.add_argument("--root", type=Path, default=replay_area("farm742"))
+    ap.add_argument("--out", type=Path, default=replay_area("farm742-camps"))
     args = ap.parse_args()
+    set_replay_temp(args.out)
     extract(args.match_id, args.root, args.out)

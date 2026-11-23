@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+from replay_storage import replay_area
 from urllib.request import Request, urlopen
 
 
@@ -33,8 +34,8 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--capture", action="store_true")
     mode.add_argument("--check", action="store_true")
-    parser.add_argument("--root", type=Path, default=Path(".tmp/farm742-more"))
-    parser.add_argument("--previous", type=Path, default=Path(".tmp/farm742"))
+    parser.add_argument("--root", type=Path, default=replay_area("farm742-more"))
+    parser.add_argument("--previous", type=Path, default=replay_area("farm742"))
     args = parser.parse_args()
     root = args.root
     root.mkdir(parents=True, exist_ok=True)

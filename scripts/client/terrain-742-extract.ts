@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { replayArea, replayChildEnv } from '../../src/replays/storage.ts';
 import { crc32, deflateSync, inflateSync } from 'node:zlib';
 import { entityValues, extractSpeedPaths } from '../../src/replays/source2-map.ts';
 import { decodeGnv742, decodeTrees742, openGnv742, POLICY742 } from '../../src/tactics/terrain-742.ts';
@@ -11,7 +12,7 @@ import type { Blob742, Structure742 } from '../../src/tactics/terrain-742.ts';
 import { kvObject, numbers, parseKeyValues } from '../lib/valve-kv.ts';
 import { CLIP_RISE_RESERVE, sha742 as sha, surfaceGrid742 } from './terrain-742-physics.ts';
 
-const root = path.resolve(import.meta.dirname, '../..'), work = path.join(root, '.tmp/farm742-terrain');
+const root = path.resolve(import.meta.dirname, '../..'), work = replayArea('farm742-terrain');
 const file = (p: string) => path.join(root, p);
 const json = (p: string) => JSON.parse(fs.readFileSync(file(p), 'utf8'));
 const mapHash = '7fc24ff13fcbe6840e5b9d76beb23f681368ecd2aa8b32a1e31e3cda959bd304';
@@ -33,7 +34,7 @@ function extract(install: string, tool: string) {
   fs.mkdirSync(work, { recursive: true });
   const toolPin = json('data/dota2-client-tool-pin.json');
   assert.equal(sha(fs.readFileSync(tool)), toolPin.executableSha256, 'Unpinned Source2Viewer CLI');
-  const run = (args: string[]) => execFileSync(tool, args, { cwd: work, windowsHide: true, encoding: 'utf8',
+  const run = (args: string[]) => execFileSync(tool, args, { cwd: work, windowsHide: true, env: replayChildEnv(work), encoding: 'utf8',
     timeout: 120_000, maxBuffer: 100 * 1024 * 1024 });
   const game = path.join(install, 'game/dota'), vpk = path.join(game, 'maps/dota.vpk'), steam = path.join(game, 'steam.inf');
   const inf = fs.readFileSync(steam);

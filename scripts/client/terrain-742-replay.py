@@ -88,14 +88,18 @@ def capture(match, dem):
 
 
 if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, str(ROOT / "scripts/replays"))
+    from replay_storage import replay_area, set_replay_temp
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("match_id", type=int)
-    ap.add_argument("--dem-root", type=Path, default=ROOT / ".tmp/farm742")
+    ap.add_argument("--dem-root", type=Path, default=replay_area("farm742"))
+    ap.add_argument("--out", type=Path, default=replay_area("farm742-terrain"))
     args = ap.parse_args()
     study = json.loads((ROOT / "data/farming-742-routes.json").read_text(encoding="utf-8"))
     m = next(m for m in study["matches"] if m["id"] == args.match_id and m["build"] == 6989)
+    set_replay_temp(args.out)
     result = capture(m, args.dem_root / f"{args.match_id}.dem")
-    dest = ROOT / ".tmp/farm742-terrain" / f"{args.match_id}.trace.json"
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest = args.out / f"{args.match_id}.trace.json"
     dest.write_text(json.dumps(result, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"{dest.name}: {result['samples']} observed XYZ/state rows, {result['samplesSha256']}")

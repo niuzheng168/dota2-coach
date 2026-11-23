@@ -1,10 +1,12 @@
 /** Explicit offline paid-model study; no connection to live coaching or orders. */
+import { replayArea } from '../../src/replays/storage.ts';
 import fs from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { configuredResponsesClient } from '../../src/tactics/reasoning-planner.ts';
-const client=configuredResponsesClient();
-if(!client)throw new Error('Independent reasoning model is not configured; no rule fallback');
-const output='.tmp/replays/study/reviews';await fs.mkdir(output,{recursive:true});
+import { parseArgs } from 'node:util';
+import { createReviewClient, matchesReviewProfile, reviewDirectory, reviewProfile, ReviewTargetError } from './review-model.ts';
+const replayDir=replayArea();
+const {values:flags}=parseArgs({options:{one:{type:'boolean'},recovered:{type:'boolean'},'check-model':{type:'boolean'}}});
+const profile=reviewProfile(),client=await createReviewClient(profile),output=reviewDirectory(profile,replayDir);
 const exists=(f:string)=>fs.stat(f).then(()=>true,()=>false);
 const read=async(f:string)=>JSON.parse(await fs.readFile(f,'utf8'));
 const sha=(s:string)=>createHash('sha256').update(s).digest('hex');
@@ -18,7 +20,7 @@ const instructions=`你是离线 Dota 2 Luna 7.41f 录像研究员。只研究�
 const active=new Set<number>(),done=new Set<number>(),failures=new Map<number,string>();
 let totalCalls=0;
 async function review(id:number){
-  const evidence=await read(`.tmp/replays/study/${id}.evidence.json`);
+  const evidence=await read(`${replayDir}/study/${id}.evidence.json`);
   const map=await read('data/dota2-map-reference.json');
   const input={...evidence,
     worldSnapshotLegend:{heroes:['hero','team','alive','x','y','level','networth'],enemyLaneCreeps:['x','y','hp']},
@@ -32,8 +34,8 @@ async function review(id:number){
   const dest=`${output}/${id}.json`;
   if(await exists(dest)){
     const previous=await read(dest);
-    if(previous.inputSha256!==inputSha256||previous.instructionsSha256!==sha(instructions)||previous.model!==client!.model)
-      throw new Error('Review source/model changed');
+    if(previous.inputSha256!==inputSha256||previous.instructionsSha256!==sha(instructions)||!matchesReviewProfile(previous,profile))
+      throw new Error('Review source or model profile changed');
     return;
   }
   // One normal request plus one bounded retry. Never loop on a malformed reply.
@@ -43,9 +45,7 @@ async function review(id:number){
     try{
       const started=Date.now();
       console.log(JSON.stringify({reviewStarted:id,attempt,inputCharacters:inputText.length}));
-      const response=await client!.transport({model:client!.model,store:false,instructions,
-        input:[{role:'user',content:'研究以下实录数据，按指定 JSON 格式输出：\n'+inputText}],reasoning:{effort:'medium'},max_output_tokens:12000,
-        text:{format:{type:'json_object'}}},AbortSignal.timeout(240000));
+      const response=await client.generate(instructions,'研究以下实录数据，按指定 JSON 格式输出：\n'+inputText,AbortSignal.timeout(240000));
       await fs.mkdir(`${output}/attempts`,{recursive:true});
       await fs.writeFile(`${output}/attempts/${id}-${started}.json`,JSON.stringify({status:response.status,
         usage:response.usage,incomplete_details:response.incomplete_details,output:response.output})+'\n');
@@ -57,36 +57,43 @@ async function review(id:number){
       for(const row of [...result.observations,...result.counterexamples])
         if(!Array.isArray(row.evidenceIds)||!row.evidenceIds.length||row.evidenceIds.some((x:any)=>!allowed.has(x)))
           throw new Error('Unanchored model claim');
-      const record={version:1,matchId:id,model:client!.model,createdAt:new Date().toISOString(),
+      const record={version:2,matchId:id,...profile,createdAt:new Date().toISOString(),
         inputSha256,instructionsSha256:sha(instructions),elapsedMs:Date.now()-started,
         usage:response.usage,responseId:response.id,result,
         warning:'Model interpretations, not verified causality or a live recommendation. Evidence references validated; prose still requires review.'};
       await fs.writeFile(dest,JSON.stringify(record,null,2)+'\n',{flag:'wx'});
-      console.log(JSON.stringify({reviewed:id,model:client!.model,usage:response.usage,elapsedMs:record.elapsedMs}));
+      console.log(JSON.stringify({reviewed:id,...profile,usage:response.usage,elapsedMs:record.elapsedMs}));
       return;
     }catch(e){
       console.log(JSON.stringify({reviewAttemptFailed:id,attempt,error:e instanceof Error?e.message:'Request failed'}));
-      if(attempt===2)throw e;await new Promise(r=>setTimeout(r,e instanceof Error&&e.message.includes('429')?60000:5000));
+      if(e instanceof ReviewTargetError||attempt===2)throw e;await new Promise(r=>setTimeout(r,e instanceof Error&&e.message.includes('429')?60000:5000));
     }
   }
 }
-const single=process.argv.includes('--one');
-const recoveredMode=process.argv.includes('--recovered');
-const started=Date.now();
-while(Date.now()-started<4*3600_000){
-  const progress=recoveredMode
-    ? {completed:(await read('.tmp/replays/hundred-recovered.json')).filter((r:any)=>r.success),complete:true}
-    : await read('.tmp/replays/hundred-progress.json');
-  const candidates=progress.completed.map((m:any)=>m.matchId).filter((id:number)=>!done.has(id)&&!failures.has(id)&&!active.has(id));
-  const batch=candidates.slice(0,single?1:2);
-  if(batch.length)await Promise.all(batch.map(async(id:number)=>{
-    active.add(id);
-    try{await review(id);done.add(id);}
-    catch(e){failures.set(id,e instanceof Error?e.message:'Review failed');console.log(JSON.stringify({failedReview:id,error:failures.get(id)}));}
-    finally{active.delete(id);}
-  }));
-  await fs.writeFile(`${output}/${recoveredMode?'progress-recovered':'progress'}.json`,JSON.stringify({done:[...done],failures:[...failures],callsThisRun:totalCalls,updatedAt:new Date().toISOString()},null,2));
-  if(single||((progress.complete||progress.finishedAt)&&progress.completed.every((m:any)=>done.has(m.matchId)||failures.has(m.matchId))))break;
-  if(!batch.length)await new Promise(r=>setTimeout(r,10000));
+if(flags['check-model']){
+  if(!client.checkModel)throw new Error('--check-model is only available for the Copilot catalog');
+  await client.checkModel(AbortSignal.timeout(15000));
+  console.log(JSON.stringify({...profile,catalog:'confirmed',inferenceRequests:0}));
+}else await runStudy();
+
+async function runStudy(){
+  await fs.mkdir(output,{recursive:true});
+  const started=Date.now();
+  while(Date.now()-started<4*3600_000){
+    const progress=flags.recovered
+      ? {completed:(await read(`${replayDir}/hundred-recovered.json`)).filter((r:any)=>r.success),complete:true}
+      : await read(`${replayDir}/hundred-progress.json`);
+    const candidates=progress.completed.map((m:any)=>m.matchId).filter((id:number)=>!done.has(id)&&!failures.has(id)&&!active.has(id));
+    const batch=candidates.slice(0,flags.one?1:2);
+    if(batch.length)await Promise.all(batch.map(async(id:number)=>{
+      active.add(id);
+      try{await review(id);done.add(id);}
+      catch(e){if(e instanceof ReviewTargetError)throw e;failures.set(id,e instanceof Error?e.message:'Review failed');console.log(JSON.stringify({failedReview:id,error:failures.get(id)}));}
+      finally{active.delete(id);}
+    }));
+    await fs.writeFile(`${output}/${flags.recovered?'progress-recovered':'progress'}.json`,JSON.stringify({done:[...done],failures:[...failures],callsThisRun:totalCalls,updatedAt:new Date().toISOString()},null,2));
+    if(flags.one||((progress.complete||progress.finishedAt)&&progress.completed.every((m:any)=>done.has(m.matchId)||failures.has(m.matchId))))break;
+    if(!batch.length)await new Promise(r=>setTimeout(r,10000));
+  }
+  if(failures.size)process.exitCode=1;
 }
-if(failures.size)process.exitCode=1;

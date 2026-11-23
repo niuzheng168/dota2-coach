@@ -1,15 +1,25 @@
+import { replayArea } from '../../src/replays/storage.ts';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
+import { parseArgs } from 'node:util';
 import { farmingWindow } from '../../src/replays/farming-routes.ts';
+import { historicalReviews, matchesReviewProfile, reviewDirectory, reviewProfile } from './review-model.ts';
+const replayDir=replayArea();
 const read=(p:string)=>JSON.parse(fs.readFileSync(p,'utf8'));
-const progress=read('.tmp/replays/hundred-progress.json'),catalog=read('.tmp/replays/hundred-candidates.json');
+const {values}=parseArgs({options:{legacy:{type:'boolean'}}});
+const profile=values.legacy?null:reviewProfile();
+const reviewRoot=profile?reviewDirectory(profile,replayDir):historicalReviews(replayDir);
+const provenance=profile?{provider:profile.provider,reasoningEffort:profile.reasoningEffort}:{};
+const progress=read(`${replayDir}/hundred-progress.json`),catalog=read(`${replayDir}/hundred-candidates.json`);
 if(!progress.complete||progress.completed.length!==100||new Set(progress.completed.map((m:any)=>m.matchId)).size!==100)
   throw new Error('Exactly 100 validated unique replays are required before publishing');
 const matches=[],reviews=[],windows=[];
 const sourceOrder=new Map<number,number>(catalog.matches.map((m:any,i:number)=>[m.matchId,i]));
 for(const selected of progress.completed.toSorted((a:any,b:any)=>sourceOrder.get(a.matchId)!-sourceOrder.get(b.matchId)!)){
-  const root=`.tmp/replays/study/${selected.matchId}`;
-  const full=read(root+'.route.json'),review=read(`.tmp/replays/study/reviews/${selected.matchId}.json`);
+  const root=`${replayDir}/study/${selected.matchId}`;
+  const full=read(root+'.route.json'),review=read(`${reviewRoot}/${selected.matchId}.json`);
+  const expected=profile ? matchesReviewProfile(review,profile) : review.version===1 && review.model==='gpt-6-astra';
+  if(!expected)throw new Error('Review does not belong to the selected publication profile');
   if(!full.complete||!full.validation.lastHitParity||full.validation.camps!==28||full.validation.towers!==22||
     review.matchId!==full.matchId)throw new Error('Invalid published match');
   const nonempty=(v:any)=>typeof v==='string'&&v.trim().length>0;
@@ -48,7 +58,7 @@ const stats={matches:100,professionalLabelled:matches.filter(m=>m.providerPro).l
   full10to20Windows:windows.length,medianFarmPerMinute:quantile(windows.map(w=>w.farmPerMinute),.5),
   q25FarmPerMinute:quantile(windows.map(w=>w.farmPerMinute),.25),q75FarmPerMinute:quantile(windows.map(w=>w.farmPerMinute),.75),
   pooledLaneFraction:windows.reduce((n,w)=>n+w.laneGold,0)/windows.reduce((n,w)=>n+w.farmGold,0),
-  windowsWithOwnStacks:windows.filter(w=>w.stacks>0).length,modelReviews:reviews.length,model:reviews[0].model,usage};
+  windowsWithOwnStacks:windows.filter(w=>w.stacks>0).length,modelReviews:reviews.length,model:reviews[0].model,...provenance,usage};
 const notes=[
   '100 场不同 match ID；职业筛选标识优先，再按目录对局平均 MMR 选择。不是全球最高 100 场，也不是随机代表性样本。',
   '每场完整解析原始 replay，并核对 7.41f 官方时间窗口、客户端 build、28 野点、22 塔和 10 人终局补刀。',
@@ -64,8 +74,8 @@ const notes=[
 const result={version:1,patch:'7.41f',mode:'indexed-study',generatedAt:new Date().toISOString(),
   informationScope:'omniscient-offline-replay-only',stats,notes,matches};
 fs.writeFileSync('data/luna-hundred-index.json',JSON.stringify(result)+'\n');
-const recoveryResults=read('.tmp/replays/hundred-recovered.json');
+const recoveryResults=read(`${replayDir}/hundred-recovered.json`);
 fs.writeFileSync('data/luna-hundred-audit.json',JSON.stringify({version:1,catalog,progress,recoveryResults,stats,windows,
   reviewHashes:reviews.map(r=>({matchId:r.matchId,inputSha256:r.inputSha256,
-    resultSha256:createHash('sha256').update(JSON.stringify(r.result)).digest('hex'),model:r.model,usage:r.usage}))},null,2)+'\n');
+    resultSha256:createHash('sha256').update(JSON.stringify(r.result)).digest('hex'),model:r.model,...provenance,usage:r.usage}))},null,2)+'\n');
 console.log(JSON.stringify(stats,null,2));

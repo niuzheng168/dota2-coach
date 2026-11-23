@@ -1,8 +1,9 @@
 /** Import observed D2PT DOM rows, not undocumented browser/application state. */
+import { replayArea } from '../../src/replays/storage.ts';
 import fs from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 const sha=(b:Buffer|string)=>createHash('sha256').update(b).digest('hex');
-const root='.tmp/replays';
+const root=replayArea();
 const dom=JSON.parse(await fs.readFile(`${root}/d2pt-100-dom-catalog.json`,'utf8'));
 const patchSource='https://www.dota2.com/datafeed/patchnoteslist?language=english';
 const response=await fetch(patchSource,{signal:AbortSignal.timeout(30000)});

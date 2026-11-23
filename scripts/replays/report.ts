@@ -1,8 +1,10 @@
+import { replayArea } from '../../src/replays/storage.ts';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { MAP } from '../../src/tactics/combat-data.ts';
 import { frameAfter, lunaWindow, validateCampGeometry, validateTowers } from '../../src/replays/validation.ts';
 
+const replayDir=replayArea();
 const reference = JSON.parse(fs.readFileSync('data/dota2-map-reference.json', 'utf8'));
 const ids = process.argv.filter(a => /^\d{10}$/.test(a)).map(Number);
 if (!ids.length) throw new Error('Supply explicit downloaded match IDs (no unbounded crawling)');
@@ -15,9 +17,9 @@ const build = Number(steamInf.match(/^ServerVersion=(\d+)/m)?.[1]);
 if (!build || createHash('sha256').update(steamInf).digest('hex') !== sourcePins.steamInf.sha256)
   throw new Error('Missing/mismatched pinned steam.inf server version');
 for (const id of ids) {
-  const bytes = fs.readFileSync(`.tmp/replays/${id}.facts.json`);
-  const facts = JSON.parse(bytes.toString()), api = JSON.parse(fs.readFileSync(`.tmp/replays/${id}.opendota.json`, 'utf8'));
-  const acquisition = JSON.parse(fs.readFileSync(`.tmp/replays/${id}.acquisition.json`, 'utf8'));
+  const bytes = fs.readFileSync(`${replayDir}/${id}.facts.json`);
+  const facts = JSON.parse(bytes.toString()), api = JSON.parse(fs.readFileSync(`${replayDir}/${id}.opendota.json`, 'utf8'));
+  const acquisition = JSON.parse(fs.readFileSync(`${replayDir}/${id}.acquisition.json`, 'utf8'));
   if (facts.schemaVersion !== 4 || !facts.complete || facts.matchId !== id || api.match_id !== id ||
       facts.demSha256 !== acquisition.demSha256 || facts.gameBuild !== build)
     throw new Error('Replay schema/completeness/hash/build mismatch');

@@ -1,8 +1,10 @@
+import { replayArea } from '../../src/replays/storage.ts';
 import fs from 'node:fs/promises';
 import { replayUrl } from './download.ts';
 
 // Bounded public catalog discovery, not replay scraping behind a login/challenge.
 // Selection concerns corpus eligibility only; it does not encode a farming route.
+const replayDir=replayArea();
 const limit = Number(process.argv[2] || 3);
 if (!Number.isInteger(limit) || limit < 1 || limit > 10) throw new Error('Discovery limit must be 1–10');
 const pins = JSON.parse(await fs.readFile('data/dota2-replay-source-pins.json', 'utf8'));
@@ -40,6 +42,6 @@ try {
 const result = { source, checkedAt: new Date().toISOString(), patchWindow: pins.patchWindow, entries,
   status: discoveryError ? 'partial-error' : 'complete-bounded-query', error: discoveryError,
   note: 'Professional league/provider name is recorded evidence, not independently authenticated identity or exact MMR. Subpatch is not certified until binary build is checked.' };
-await fs.mkdir('.tmp/replays', { recursive: true });
-await fs.writeFile('.tmp/replays/candidates.json', JSON.stringify(result, null, 2) + '\n');
+await fs.mkdir(replayDir, { recursive: true });
+await fs.writeFile(`${replayDir}/candidates.json`, JSON.stringify(result, null, 2) + '\n');
 console.log(JSON.stringify(result, null, 2));

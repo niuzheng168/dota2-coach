@@ -110,8 +110,9 @@ def build(stage, node):
     scripts = stage / "scripts" / "replays"
     (scripts / "postgame").mkdir(parents=True)
     (scripts / "package.json").write_bytes(b'{"type":"module"}\n')
+    # Keep the sealed, local-only v2 payload reproducible; research CLI storage is not a worker dependency.
     for name in ("download.ts", "decompress.py"):
-        source_text(HERE.parent / name, scripts / name)
+        source_text(HERE / "pinned_v2" / name, scripts / name)
     for name in ("cli.py", "worker.py", "timeline.py", "verify.py", "winlimits.py", "common.py", "acquire.mts"):
         source_text(HERE / name, scripts / "postgame" / name)
     # distlib's relative-shebang Windows launcher: a direct .exe, no shell or system Python.

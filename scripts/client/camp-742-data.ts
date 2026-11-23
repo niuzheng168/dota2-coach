@@ -4,10 +4,11 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { replayArea, replayChildEnv } from '../../src/replays/storage.ts';
 import { parseKeyValues, kvObject, numbers } from '../lib/valve-kv.ts';
 import type { KV } from '../lib/valve-kv.ts';
 
-const work = '.tmp/farm742-camps', dest = 'data/farming-742-camp-units.json';
+const work = replayArea('farm742-camps'), dest = 'data/farming-742-camp-units.json';
 const builds = [
   [6983, '7bf93721e36b447fa6d4128be329a006628d8d94', 'd5b66d82a6e6885670a4c4b8ea8d46e9fab3d3bc5a7e3fa04d9ffda25aa7e40a'],
   [6985, 'ff61ff289521d66a629f19fe502d3920ce08557d', '13654f32f11b961fff1f191637fc57a315e5b64c62b4e17bd1783548931b0f4e'],
@@ -52,7 +53,7 @@ if (install) {
   // A fresh extraction directory prevents stale files passing after an incomplete extraction.
   fs.mkdirSync(work, { recursive: true });
   const raw = fs.mkdtempSync(path.join(work, 'installed-'));
-  execFileSync(cli, ['-i', path.join(install, 'game/dota/pak01_dir.vpk'), '-f', Object.keys(files).join(','), '-o', raw, '-q']);
+  execFileSync(cli, ['-i', path.join(install, 'game/dota/pak01_dir.vpk'), '-f', Object.keys(files).join(','), '-o', raw, '-q'], { env: replayChildEnv(work) });
   for (const [name, digest] of Object.entries(files)) verify(path.join(raw, name), digest);
   verify(inf, builds[4][2]);
   console.log('Installed 6989: steam.inf and seven VPK members match (only CRLF→LF).');

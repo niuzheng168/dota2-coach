@@ -3,15 +3,20 @@ import argparse
 from dataclasses import asdict
 import json
 from pathlib import Path
-from gem.parser import ReplayParser
-from extract import position
+import sys
+sys.dont_write_bytecode = True
+from replay_storage import replay_area, set_replay_temp
 
 ap = argparse.ArgumentParser()
 ap.add_argument("match_id", type=int)
 ap.add_argument("--from-time", type=float, default=600)
 ap.add_argument("--to-time", type=float, default=900)
+ap.add_argument("--root", type=Path)
 args = ap.parse_args()
-root = Path(".tmp/replays")
+root = args.root or replay_area()
+set_replay_temp(root)
+from gem.parser import ReplayParser
+from extract import position
 p = ReplayParser(str(root / f"{args.match_id}.dem"))
 frames, logs, field_samples = [], [], {}
 last_tick = -10
@@ -53,6 +58,7 @@ for f in frames:
 logs = [{**e, "time": p.game_clock.game_time_at(e["tick"])} for e in logs]
 logs = [e for e in logs if args.from_time - 10 <= e["time"] <= args.to_time + 10]
 output = root / "study" / f"{args.match_id}.stacking-detail.json"
+output.parent.mkdir(parents=True, exist_ok=True)
 with output.open("x", encoding="utf8") as f:
     json.dump({"matchId": p.match_id, "build": p.game_build, "complete": True,
                "scope": "omniscient-offline-replay-only", "clock": asdict(p.game_clock),
