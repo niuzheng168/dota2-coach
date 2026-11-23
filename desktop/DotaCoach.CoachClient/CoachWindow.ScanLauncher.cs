@@ -24,7 +24,7 @@ internal sealed partial class CoachWindow
         scanPython.Text = preferences.ScanPython.Length > 0 ? preferences.ScanPython :
             scanFolder.Text.Length > 0 ? HeroScanProcess.FindPython(scanFolder.Text) ?? "" : "";
         scanFromWorkspace.IsChecked = preferences.ScanFromWorkspace;
-        panel.Children.Add(Ui.Label(@"视觉扫描（窗口上方启动）：本机素材工作目录，含 .tmp\vision-assets")); panel.Children.Add(scanFolder);
+        panel.Children.Add(Ui.Label(@"视觉扫描（在主页启动）：本机素材工作目录，含 .tmp\vision-assets")); panel.Children.Add(scanFolder);
         panel.Children.Add(Ui.Label(@"装有视觉依赖的 Python（如 .tmp\vision-tools\Scripts\python.exe）")); panel.Children.Add(scanPython);
         panel.Children.Add(scanFromWorkspace);
         panel.Children.Add(Ui.Text("默认运行随教练端提供的脚本，不从素材目录执行代码。两种启动方式都限本队视角；不会自动启动扫描。", 12, Brushes.LightGray));

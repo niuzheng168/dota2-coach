@@ -53,6 +53,10 @@ internal static partial class Program
                     await StatusOnly(statusOutput, Assembly.Load("DotaCoach.CoachClient").GetType("DotaCoach.TwoPc.CoachWindow")!, typeof(GameWindowUi), isolated: true);
                     Console.WriteLine($"Offline legacy status: {passed} checks passed.");
                 }
+                else if (args is ["--layout", var layoutOutput]) {
+                    await LayoutChecks(layoutOutput, Assembly.Load("DotaCoach.CoachClient").GetType("DotaCoach.TwoPc.CoachWindow")!);
+                    Console.WriteLine($"Home page and settings groups of both clients: {passed} checks passed.");
+                }
                 else if (args is ["--real-dota"]) { await RealDota(); Console.WriteLine($"Real Dota window pipeline: {passed} checks passed."); }
                 else if (args.FirstOrDefault()?.StartsWith("--", StringComparison.Ordinal) == true)
                     throw new ArgumentException("Unknown UI test option or missing arguments: " + args[0]);
@@ -147,6 +151,21 @@ internal static partial class Program
     }
     private static void Click(Window w, string content) => Children(w).OfType<Button>()
         .Single(b => Equals(b.Content, content)).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    // AppPages (TwoPc.SharedUi) names its parts; both clients compile their own copy, so tests go by name.
+    private static FrameworkElement HomePage(Window w) => Children(w).OfType<FrameworkElement>().Single(e => e.Name == "HomePage");
+    private static FrameworkElement SettingsPage(Window w) => Children(w).OfType<FrameworkElement>().Single(e => e.Name == "SettingsPage");
+    private static string[] SettingsGroups(Window w) => Children(w).OfType<FrameworkElement>()
+        .Where(e => e.Name == "SettingsGroup").Select(e => (string)e.Tag).ToArray();
+    private static FrameworkElement SettingsGroup(Window w, string name) => Children(w).OfType<FrameworkElement>()
+        .Single(e => e.Name == "SettingsGroup" && Equals(e.Tag, name));
+    /// <summary>Opens the settings page on one group through the real buttons.</summary>
+    private static void ShowGroup(Window w, string name)
+    {
+        if (SettingsPage(w).Visibility != Visibility.Visible) Click(w, "设置");
+        Children(w).OfType<Button>().Single(b => Equals(b.Tag, "SettingsTab") && Equals(b.Content, name))
+            .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+    }
+    private static void ShowHome(Window w) { if (HomePage(w).Visibility != Visibility.Visible) Click(w, "返回主页"); }
     private static void SelectSource(Window game, string prefix)
     {
         var source = Field<ComboBox>(game, "source");
@@ -171,10 +190,10 @@ internal static partial class Program
     {
         var controls = Children(game).ToArray();
         var source = Field<ComboBox>(game, "source");
-        if (!controls.OfType<Expander>().Select(e => e.Header as string).SequenceEqual([
-                "小兵血量：本机实时显示", "游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度",
-                Features.VideoUpload ? "设置：画面来源、视频、Dota 目录" : "设置：Dota 目录", "Debug"]) ||
-            !controls.OfType<Button>().Any(b => Equals(b.Content, "连接")) || !controls.OfType<Button>().Any(b => Equals(b.Content, "显示小兵血量")) ||
+        if (!SettingsGroups(game).SequenceEqual(Features.VideoUpload ? ["游戏内显示", "小兵血量", "Dota 与 GSI", "开发测试", "调试"] :
+                ["游戏内显示", "小兵血量", "Dota 与 GSI", "调试"]))
+            throw new Exception("The released game client has no connection-mode or video settings: no picture may leave the game machine");
+        if (!controls.OfType<Button>().Any(b => Equals(b.Content, "连接")) || !controls.OfType<Button>().Any(b => Equals(b.Content, "显示小兵血量")) ||
             controls.OfType<Button>().Any(b => b.Content is "试算" or "开始本机练习" or "停止显示血量") ||
             typeof(GameWindowUi).Assembly.GetType("DotaCoach.TwoPc.LastHitPractice") != null)
             throw new Exception("The normal client must retain local creep HP but must not ship the experimental practice UI or worker");
@@ -258,6 +277,7 @@ internal static partial class Program
         await MinuteLiveLoopTests();
         var coachType = Assembly.Load("DotaCoach.CoachClient").GetType("DotaCoach.TwoPc.CoachWindow")!;
         var gameType = Assembly.Load("DotaCoach.GameClient").GetType("DotaCoach.TwoPc.GameWindowUi")!;
+        await LayoutChecks(output, coachType);
         string debugRoot = Path.GetFullPath(Path.Combine(output, "debug"));
         var coach = OfflineCoach(coachType, Path.Combine(output, "coach-settings.json"), debugRoot);
         string videoSettings = Path.GetFullPath(Path.Combine(output, "game-video.json"));
@@ -267,17 +287,14 @@ internal static partial class Program
         // Inspect the normal client's replacement for the retired practice pane. Opening local HP settings
         // must not start a screen scan, GSI or a connection; the tower calculation lives in LastHitTests.
         coach.Show(); game.Show();
-        await Wait(() => Children(coach).Concat(Children(game)).OfType<Expander>().All(e => !e.IsExpanded) &&
-            Children(coach).OfType<Expander>().Select(e => e.Header as string).SequenceEqual(
-                ["模型设置", "小地图校准", "Plus 实时观战（实验）", "对局档案与复盘", "Debug"]),
-            "all settings, including the match review launcher, start collapsed");
+        await Wait(() => HomePage(coach).Visibility == Visibility.Visible && HomePage(game).Visibility == Visibility.Visible &&
+            SettingsPage(coach).Visibility == Visibility.Collapsed && SettingsPage(game).Visibility == Visibility.Collapsed,
+            "both clients open on their home page");
         CheckGameControls(game);
-        var hp = Children(game).OfType<Expander>().Single(e => Equals(e.Header, "小兵血量：本机实时显示"));
-        hp.IsExpanded = true;
+        ShowGroup(game, "小兵血量"); ShowHome(game);
         await Wait(() => Field<Button>(game, "creepHpButton").IsEnabled && Field<IAsyncDisposable?>(game, "creepHp") == null &&
             Field<CancellationTokenSource?>(game, "active") == null && Field<GsiReceiver?>(game, "gsi") == null,
-            "opening the local creep HP controls does not start capture, pairing or GSI");
-        hp.IsExpanded = false;
+            "opening the local creep HP help does not start capture, pairing or GSI");
         await Wait(() => DebugSwitch(coach).IsChecked != true && DebugSwitch(game).IsChecked != true &&
             !Directory.Exists(debugRoot), "Debug is opt-in and creates no recording directory while off");
         DebugSwitch(coach).IsChecked = true; DebugSwitch(game).IsChecked = true;
@@ -432,8 +449,7 @@ internal static partial class Program
         Click(coach, "发送测试提醒");
         await Wait(() => Field<TextBlock>(game, "caption").Text.Contains("双机链路测试") && Field<TextBlock>(coach, "notice").Text.StartsWith("已发送"),
             "the coach's test subtitle reaches the game client without video");
-        var plus = Children(coach).OfType<Expander>().Single(e => Equals(e.Header, "Plus 实时观战（实验）"));
-        plus.IsExpanded = true; Render(coach, Path.Combine(output, "coach-status-only.png")); plus.IsExpanded = false;
+        ShowGroup(coach, "Plus 观战与扫描"); Render(coach, Path.Combine(output, "coach-status-only.png")); ShowHome(coach);
         Render(game, Path.Combine(output, "game-status-only.png"));
         var board = HudBoard(MinimapLayout.Suggest(1280, 720));
         // The coach's tick republishes its own (here empty) last-known panel; hold the fixture panel instead.
@@ -623,8 +639,10 @@ internal static partial class Program
             using var stream = File.Create(Path.Combine(output, "enemy-panel-1080p-real-icons.png")); encoder.Save(stream);
         }
 
-        var section = (Expander)((Border)panel.Parent).Parent;
-        section.IsExpanded = true; Render(game, Path.Combine(output, "game-overlay.png")); section.IsExpanded = false;
+        ShowGroup(game, "游戏内显示");
+        await Wait(() => SettingsGroup(game, "游戏内显示").IsVisible && Children(SettingsGroup(game, "游戏内显示")).Contains(panel),
+            "the overlay style panel is the visible 游戏内显示 settings group");
+        Render(game, Path.Combine(output, "game-overlay.png")); ShowHome(game);
         Click(game, "恢复默认");
         await Wait(() => GameOverlaySettings.Load(file) == new GameOverlaySettings() && overlay.Settings == new GameOverlaySettings() &&
             Member<Slider>(panel, "x").Value == 50, "恢复默认 restores and saves the default style");
@@ -933,6 +951,36 @@ internal static partial class Program
             host.Mailbox.Icon(session, "item_blink") is { Length: > 0 } && host.Mailbox.Icon(session, "item_bfury") == null &&
             Field<TextBlock>(w, "alertStatus").Text.Contains("已推送 1 名敌方英雄"),
             "the scanner's enemy panel and its icons are published to the game machine");
+        // v0.6.1 regression (match 9101186642: the panel withdrawn 378 times): whatever the scanner and Plus do, the
+        // game machine keeps every enemy's last reading until the match ends. Poll the mailbox like the game client.
+        async Task Holds(string why, int level, Action change) {
+            change();
+            long until = Environment.TickCount64 + 3000;
+            bool updated = false;
+            while (Environment.TickCount64 < until) {
+                var t = host.Mailbox.Issue(session);
+                host.Mailbox.Accept(new(session, t.Id, sequence++, "dota2", 3840, 2160, new OwnState("9876543210", "npc_dota_hero_luna",
+                    "dire", 143, true, 1200, 500, 1, 2, [], []), 10, Witness(143)), jpeg);
+                for (int i = 0; i < 2; i++) {
+                    var shown = host.Mailbox.Enemies(session);
+                    if (shown is not { Heroes: [{ Hero: "npc_dota_hero_razor", Level: var l, Items: ["item_blink", ..] }] } || l < 11 || updated && l != level)
+                        throw new Exception("Enemy panel withdrawn or rolled back: " + why);
+                    updated |= l == level;
+                    await Task.Delay(250);
+                }
+            }
+            if (!updated) throw new Exception("Enemy panel not updated: " + why);
+            passed++; Console.WriteLine("PASS " + why);
+        }
+        string Scan(int clock, int level, bool stopped = false) => JsonSerializer.Serialize(new { version = 2, run = "a1",
+            written = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0, stopped, mode = "team-view", matchId = "9876543210", ownTeam = 3,
+            clock, gsiAge = 0, selecting = true, enemies = new[] { new { hero = "npc_dota_hero_razor", level, age = 0.5,
+                items = new string?[] { "item_blink", null, null, null, null, null }, neutral = (string?)null } } });
+        await Holds("a scanner write a second ahead of the player's GSI updates the panel instead of withdrawing it", 12,
+            () => File.WriteAllText(live, Scan(144, 12)));
+        await Holds("a stopped scanner and a silent Plus feed leave the last reading on the game machine", 12,
+            () => File.WriteAllText(live, Scan(144, 12, stopped: true)));
+        await Holds("a deleted scanner file leaves the last reading on the game machine", 12, () => File.Delete(live));
         Field<CheckBox>(w, "enemyPanel").IsChecked = false;
         await Wait(() => host.Mailbox.Enemies(session) == null && Field<TextBlock>(w, "alertStatus").Text.Contains("对手面板已关") &&
             LiveCoachSettings.Load(Path.Combine(output, "spectator-settings.json")).EnemyPanel == false,

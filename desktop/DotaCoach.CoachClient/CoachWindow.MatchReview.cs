@@ -12,12 +12,10 @@ internal sealed partial class CoachWindow
 {
     private MatchReviewWindow? matchReviewWindow;
 
-    // Body for the caller's Ui.Section. Constructing or expanding it does not even list the archive.
-    private FrameworkElement BuildMatchReview()
+    // The home page's review button. Constructing it does not even list the archive.
+    private Button BuildMatchReview()
     {
-        var panel = new StackPanel();
-        panel.Children.Add(Ui.Text("查看本机保存的历局。按游戏时间回看当时知道了什么；已验证结束后，可另看录像全图。", 12, Brushes.LightGray));
-        panel.Children.Add(Ui.Button("打开对局复盘窗口", (_, _) => {
+        var open = Ui.Button("打开对局复盘窗口", (_, _) => {
             if (closing) return;
             try {
                 if (!matchState.CanAudit || matchArchive == null) {
@@ -36,8 +34,9 @@ internal sealed partial class CoachWindow
             } catch (Exception e) {
                 matchReviewWindow = null; notice.Text = "无法打开复盘窗口：" + MatchReviewText.Clean(e.Message, 180);
             }
-        }));
-        return panel;
+        });
+        open.ToolTip = "查看本机保存的历局。按游戏时间回看当时知道了什么；已验证结束后，可另看录像全图。";
+        return open;
     }
 
     // Called by the owner BEFORE disposing matchArchive; no child process, import or background read survives it.

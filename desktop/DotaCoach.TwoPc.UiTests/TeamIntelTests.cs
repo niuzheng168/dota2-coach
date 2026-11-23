@@ -20,13 +20,13 @@ internal static partial class Program
         Set(w, "visionLoss", new VisionLossTracker { MinVisibleMs = 0, GoneMs = 1 });
         object Unit(string n, int team, double x, double y, int vision) => new { unitname = n, team, xpos = x, ypos = y, visionrange = vision };
         var crop = new FarmPlayerTelemetry(true, true, false, Epoch: Guid.NewGuid());
-        async Task Packet(int clock, object units, string side = "dire", bool full = false)
+        async Task Packet(int clock, object units, string side = "dire", bool full = false, int plusLead = 0)
         {
             var ticket = host.Mailbox.Issue(session);
             host.Mailbox.AcceptMinuteState(new(session, ticket.Id, sequence++, "dota2-gsi", 3840, 2160,
                 new(match, me, "dire", clock, true, 1200, 500, 100, 200, [], [], crop), 10,
                 new(match, "dire", me, clock, "playing", false) { AgeMs = 10 }), 500);
-            var packet = new { auth = new { token }, map = new { clock_time = clock, matchid = match, game_state = "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS" },
+            var packet = new { auth = new { token }, map = new { clock_time = clock + plusLead, matchid = match, game_state = "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS" },
                 player = new { team_name = "spectator" }, hero = full ? (object)new { team2 = new { player0 = new { name = lion } } } : new { id = 0 },
                 buildings = new Dictionary<string, object> { [side] = new { } }, minimap = units };
             using var reply = await http.PostAsync("/spectator", new StringContent(JsonSerializer.Serialize(packet)));
@@ -77,5 +77,21 @@ internal static partial class Program
             enemies = new[] { Row(lion, 1), Row(other, 0) } }));
         await Wait(() => Team()?.EquipmentObservedClock == 150 && archive.Read(match).Count(f => f.Kind == "ward-alert") == 2,
             "a genuinely new scan after a view switch can restore equipment, but not re-announce its four old charge entries");
+
+        // v0.6.1 regression (match 9101186642: 1180 resets): this machine's Plus feed routinely shows the next second
+        // before the player's whole-second GSI arrives. That is the same timeline, not a reason to reset the team view.
+        long generation = Field<long>(w, "sightGeneration");
+        const string axe = "npc_dota_hero_axe";
+        var withAxe = new { h = Unit(lion, 2, -2500, 1200, 1800), a = Unit(axe, 2, 1500, 1500, 1800) };
+        for (int clock = 151; clock <= 153; clock++) await Packet(clock, withAxe, plusLead: 1);
+        await Wait(() => Team()?.SightObservedClock == 153 && Field<long>(w, "sightGeneration") == generation,
+            "a Plus packet one second ahead of the player's GSI keeps the team view: no per-second reset");
+        // Plus alerts reach the photo-free game client: a markerless subtitle on the dota2-gsi lane.
+        Field<CheckBox>(w, "enemyVision").IsChecked = true;
+        await Packet(154, seen, plusLead: 1); await Packet(155, seen, plusLead: 1);
+        await Wait(() => host.Mailbox.Poll(session) is { Kind: "local-vision-observation", Marker: null, Route: null } r &&
+            r.Message.Contains("离开视野") && host.Mailbox.Latest()?.Meta.Source == "dota2-gsi" && Field<long>(w, "sightGeneration") == generation,
+            "an enemy leaving vision is pushed as a subtitle to the GSI-only game client");
+        Field<CheckBox>(w, "enemyVision").IsChecked = false;
     }
 }

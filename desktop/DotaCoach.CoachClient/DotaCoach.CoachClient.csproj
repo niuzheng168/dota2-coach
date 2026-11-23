@@ -6,13 +6,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>0.6.2</Version>
+    <Version>0.6.3</Version>
     <ApplicationManifest>../DotaCoach.Desktop/app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DotaCoach.TwoPc.Core/DotaCoach.TwoPc.Core.csproj" />
     <Compile Include="../TwoPc.SharedUi/Ui.cs" Link="Ui.cs" />
     <Compile Include="../TwoPc.SharedUi/DebugPanel.cs" Link="DebugPanel.cs" />
+    <Compile Include="../TwoPc.SharedUi/AppPages.cs" Link="AppPages.cs" />
     <Content Include="../../data/luna-live-lessons.json;../../data/dota2-dictionary.json">
       <Link>data/%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

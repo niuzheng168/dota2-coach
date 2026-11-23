@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <PlatformTarget>x64</PlatformTarget>
-    <Version>0.6.2</Version>
+    <Version>0.6.3</Version>
     <ApplicationManifest>../DotaCoach.Desktop/app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
@@ -17,6 +17,7 @@
     <ProjectReference Include="../DotaCoach.TwoPc.Core/DotaCoach.TwoPc.Core.csproj" />
     <Compile Include="../TwoPc.SharedUi/Ui.cs" Link="Ui.cs" />
     <Compile Include="../TwoPc.SharedUi/DebugPanel.cs" Link="DebugPanel.cs" />
+    <Compile Include="../TwoPc.SharedUi/AppPages.cs" Link="AppPages.cs" />
     <Compile Include="../DotaCoach.Desktop/GameWindow.cs" Link="GameWindow.cs" />
     <Content Include="../../data/dota2-hero-attack.json">
       <Link>data/%(Filename)%(Extension)</Link>

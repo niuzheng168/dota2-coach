@@ -43,6 +43,7 @@ internal sealed partial class GameWindowUi : Window
     private static bool UsesParticipantLane(LinkMode mode) => mode is LinkMode.ParticipantGsi or LinkMode.ParticipantWithLocalHp;
     private static bool SendsVideo(LinkMode mode) => mode is LinkMode.Video or LinkMode.DiagnosticVideo;
     private readonly TextBlock modeNote = Ui.Text("", 12, Brushes.LightGray);
+    private readonly AppPages pages;
     private readonly TextBlock status = Ui.Text("未连接 · 不采集画面", 16, Ui.Accent);
     private readonly TextBlock metrics = Ui.Text("", 12, Brushes.LightGray);
     private readonly ComboBox fpsChoice = Ui.Choice(), resolutionChoice = Ui.Choice(), encoderChoice = Ui.Choice(), captureChoice = Ui.Choice();
@@ -102,18 +103,17 @@ internal sealed partial class GameWindowUi : Window
         if (e2e == null) overlayPanel = new OverlayPanel(overlaySettingsFile ?? GameOverlaySettings.DefaultPath, overlay);
         videoSettingsPath = videoSettingsFile ?? GameVideoSettings.DefaultPath;
         videoSettings = GameVideoSettings.Load(videoSettingsPath);
-        Title = "Dota Coach · 游戏端 v0.6.2";
+        Title = "Dota Coach · 游戏端 v0.6.3";
         Width = Math.Min(1120, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(900, SystemParameters.WorkArea.Height - 40);
         MinWidth = 760; MinHeight = 600; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         preview.MinHeight = 140;
         Background = Ui.Background; FontFamily = new FontFamily("Segoe UI, Microsoft YaHei UI");
-        var root = new Grid { Margin = new Thickness(24) };
-        root.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        root.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
-        root.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        // Home: pairing, connection state, the latest reminder and the everyday switches. The rest is grouped settings.
+        var home = new Grid();
+        home.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        home.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
         var top = new StackPanel();
-        top.Children.Add(Ui.Text("游戏端", 26, Ui.Accent));
         top.Children.Add(modeNote);
         top.Children.Add(Ui.Label("配对码（在教练端点“复制配对码”；含密钥，勿外传）"));
         connect = Ui.Button("连接", async (_, _) => { if (busy || active != null) await Stop(); else await Start(); });
@@ -121,23 +121,32 @@ internal sealed partial class GameWindowUi : Window
         top.Children.Add(Ui.Row(pairing, connect));
         top.Children.Add(status); top.Children.Add(metrics); top.Children.Add(gsiStatus);
         if (e2e == null) ShowLaunchOptions(); else ShowGsi();
-        root.Children.Add(top);
-        preview.Children.Add(image); preview.Children.Add(marks); Grid.SetRow(preview, 1); root.Children.Add(preview);
-        var bottom = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
-        bottom.Children.Add(caption);
+        top.Children.Add(caption);
         creepHpButton = Ui.Button("显示小兵血量", async (_, _) => await ToggleCreepHp());
         if (e2e == null) {
-            var panel = new StackPanel();
-            panel.Children.Add(Ui.Text("只给半血以下的兵标血量；你的英雄一刀必能打死（正补、反补）时数字变红。塔下的兵需要先垫刀时，" +
-                "血条右边的黄字是要垫几刀，垫完等塔打到变红再补。默认血条、无边框或窗口模式。Dota 画面只在本机显卡上识别，不传给教练端；显卡有空闲时每帧刷新，显卡被游戏占满时限 60 帧以免拖慢游戏；切出 Dota 时隐藏。", 12));
-            panel.Children.Add(creepHpButton); panel.Children.Add(creepHpStatus);
-            bottom.Children.Add(Ui.Section("小兵血量：本机实时显示", panel));
+            top.Children.Add(Ui.Text("小兵血量（只在本机识别，不上传）", 17, Ui.Accent));
+            top.Children.Add(Ui.Row(creepHpStatus, creepHpButton));
             Loaded += async (_, _) => { if (CreepHpLog != null) await ToggleCreepHp(); };
         }
-        if (overlayPanel != null) bottom.Children.Add(Ui.Section("游戏内显示：字幕和对手面板的开关、位置、大小、颜色、透明度", overlayPanel));
-        bottom.Children.Add(Ui.Section(developerModes ? "设置：画面来源、视频、Dota 目录" : "设置：Dota 目录", BuildSettings(root.RowDefinitions[1])));
-        bottom.Children.Add(Ui.Section("Debug", debug.View));
-        Grid.SetRow(bottom, 2); root.Children.Add(bottom); Content = root;
+        if (overlayPanel != null) {
+            top.Children.Add(Ui.Text("游戏里显示", 17, Ui.Accent));
+            top.Children.Add(overlayPanel.Switches);
+        }
+        home.Children.Add(top);
+        preview.Children.Add(image); preview.Children.Add(marks); Grid.SetRow(preview, 1); home.Children.Add(preview);
+        var (developer, dota) = BuildSettings(home.RowDefinitions[1]);
+        pages = new AppPages("游戏端", home);
+        if (overlayPanel != null) pages.Add("游戏内显示", overlayPanel, "字幕、对手面板和眼位的位置、大小、颜色和透明度。改动立即生效。");
+        if (e2e == null) {
+            var hp = new StackPanel();
+            hp.Children.Add(Ui.Text("只给半血以下的兵标血量；你的英雄一刀必能打死（正补、反补）时数字变红。塔下的兵需要先垫刀时，" +
+                "血条右边的黄字是要垫几刀，垫完等塔打到变红再补。默认血条、无边框或窗口模式。Dota 画面只在本机显卡上识别，不传给教练端；显卡有空闲时每帧刷新，显卡被游戏占满时限 60 帧以免拖慢游戏；切出 Dota 时隐藏。", 12));
+            pages.Add("小兵血量", hp, "在主页开关；这里是说明。");
+            pages.Add("Dota 与 GSI", dota, "连接时自动写入本人 GSI 配置。");
+        }
+        if (developerModes) pages.Add("开发测试", developer, "只在 UI 测试和本地机器人局验收中出现；正式版没有画面模式。");
+        pages.Add("调试", debug.View, "排查问题时才打开；记录只存本机。");
+        Content = new Border { Child = pages, Margin = new Thickness(24) };
         preview.SizeChanged += (_, _) => DrawMark();
         reminderTimer.Tick += (_, _) => {
             if (e2e != null && !closing && File.Exists(System.IO.Path.Combine(e2e.Directory, "stop-requested"))) { Close(); return; }
@@ -216,7 +225,7 @@ internal sealed partial class GameWindowUi : Window
                 try {
                     if (GsiSetup.Install(dotaInstall.Text.Trim(), gsi.Config, GsiState).Changed)
                         gsiNote = "已写入自身GSI：带 -gamestateintegration 完全重启 Dota 一次后，才能区分近战/远程/攻城兵。";
-                } catch { gsiNote = "自动写入GSI配置失败（检查“设置”里的 Dota 目录），只能显示百分比。"; }
+                } catch { gsiNote = "自动写入GSI配置失败（检查「设置 → Dota 与 GSI」里的 Dota 目录），只能显示百分比。"; }
             }
             if (closing || gsiOnlyConnection) return;
             string? log = CreepHpLog;
@@ -309,7 +318,7 @@ internal sealed partial class GameWindowUi : Window
                     gsi.UseDotaInstall(dotaInstall.Text.Trim());
                     bool changed = GsiSetup.Install(dotaInstall.Text.Trim(), gsi.Config, GsiState).Changed;
                     gsiText = changed ? "自身GSI配置已写入/更新：请完全退出并重启 Dota 一次。" : "自身GSI配置已就绪，等待对局数据";
-                } catch { gsiText = "自动写入GSI配置失败（目录/权限，或同名文件被改过；不会覆盖），请检查“设置”里的 Dota 目录。"; }
+                } catch { gsiText = "自动写入GSI配置失败（目录/权限，或同名文件被改过；不会覆盖），请检查「设置 → Dota 与 GSI」里的 Dota 目录。"; }
                 ShowLaunchOptions();
             }
             if (e2e != null && !exported) {
@@ -340,7 +349,8 @@ internal sealed partial class GameWindowUi : Window
         active?.Dispose(); active = null; running = null;
         SetIdle(true); ClearReminder();
     }
-    private StackPanel BuildSettings(RowDefinition previewRow)
+    /// <summary>The developer group (connection modes and video) and the Dota folder group.</summary>
+    private (StackPanel Developer, StackPanel Dota) BuildSettings(RowDefinition previewRow)
     {
         var panel = new StackPanel();
         source.Items.Add("Dota 2 游戏视频（采集并传送画面）");
@@ -374,12 +384,13 @@ internal sealed partial class GameWindowUi : Window
         source.SelectedIndex = (int)(e2e == null ? LinkMode.ParticipantWithLocalHp : LinkMode.Video);
         source.IsEnabled = developerModes && e2e == null;
         UpdateMode(); // Also when the selector is absent and SelectionChanged never fires.
+        var dota = new StackPanel();
         if (e2e == null) {
-            panel.Children.Add(Ui.Label("Dota 安装目录（连接时自动写入自身GSI配置）"));
-            panel.Children.Add(dotaInstall);
-            panel.Children.Add(Ui.Button("复制启动参数", (_, _) => CopyLaunchOptions()));
+            dota.Children.Add(Ui.Label("Dota 安装目录（连接时自动写入自身GSI配置）"));
+            dota.Children.Add(dotaInstall);
+            dota.Children.Add(Ui.Button("复制启动参数", (_, _) => CopyLaunchOptions()));
         }
-        return panel;
+        return (panel, dota);
     }
     private StackPanel BuildVideoSettings()
     {

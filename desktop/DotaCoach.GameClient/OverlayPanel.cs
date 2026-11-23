@@ -12,7 +12,8 @@ namespace DotaCoach.TwoPc;
 /// <summary>
 /// What the player sees over Dota: which subtitles show and their position, size, colours and see-through, and
 /// the enemy panel's place, size and see-through. Every change applies at once, previews over Dota and is saved
-/// on this machine only.
+/// on this machine only. The four show/hide switches are a separate element (<see cref="Switches"/>) for the
+/// home page; the panel itself is the "游戏内显示" settings group.
 /// </summary>
 internal sealed class OverlayPanel : StackPanel
 {
@@ -23,8 +24,8 @@ internal sealed class OverlayPanel : StackPanel
         ("天蓝", "#87CEFA"), ("黑色", "#000000"), ("深蓝黑", "#081018"), ("深灰", "#303030"), ("深蓝", "#0A2540")];
     private readonly string path;
     private readonly AdviceOverlay overlay;
-    private readonly CheckBox advice = Check("AI 打钱建议"), alerts = Check("对手提醒（离开视野、插眼，Plus 观战）"), title = Check("标题行（来源与“未经核验”）"),
-        enemies = Check("显示对手面板"), wards = Check("显示已授权的目击与推测眼位"), minimapRight = Check("小地图在右侧");
+    private readonly CheckBox advice = Check("AI 打钱建议"), alerts = Check("对手提醒（离开视野、插眼）"), title = Check("标题行（来源与“未经核验”）"),
+        enemies = Check("对手装备面板"), wards = Check("眼位（目击与推测）"), minimapRight = Check("小地图在右侧");
     private readonly Slider x = Range(0, 100), y = Range(0, 100),
         size = Range(GameOverlaySettings.MinSize, GameOverlaySettings.MaxSize), width = Range(GameOverlaySettings.MinWidth, GameOverlaySettings.MaxWidth),
         textOpacity = Range(GameOverlaySettings.MinTextOpacity, 100), backgroundOpacity = Range(0, 100),
@@ -35,6 +36,8 @@ internal sealed class OverlayPanel : StackPanel
     private readonly DispatcherTimer saver = new() { Interval = TimeSpan.FromMilliseconds(400) };
     private bool loading;
     public GameOverlaySettings Current { get; private set; }
+    /// <summary>Show or hide AI advice, Plus alerts, the enemy panel and ward marks: the home page's everyday switches.</summary>
+    public WrapPanel Switches { get; } = new();
 
     public OverlayPanel(string file, AdviceOverlay target)
     {
@@ -45,31 +48,30 @@ internal sealed class OverlayPanel : StackPanel
             combo.SelectionChanged += (_, _) => Changed();
         }
         foreach (var box in new[] { advice, alerts, title, enemies, wards, minimapRight }) { box.Checked += (_, _) => Changed(); box.Unchecked += (_, _) => Changed(); }
-        Children.Add(Ui.Label("游戏内显示哪些字幕（只管这台机器怎么显示；推不推送、显示几秒在教练端设置）"));
-        var kinds = new WrapPanel(); kinds.Children.Add(advice); kinds.Children.Add(alerts); kinds.Children.Add(title);
-        Children.Add(kinds);
+        foreach (var box in new[] { advice, alerts, enemies, wards }) Switches.Children.Add(box);
+        Children.Add(Ui.Label("字幕（显示哪些字幕在主页勾选；只管这台机器怎么显示，推不推送、显示几秒在教练端设置）"));
+        Children.Add(title);
         Children.Add(Ui.Columns(
             Cell("左右位置", x, v => v switch { 0 => "最左", 50 => "居中", 100 => "最右", _ => v + "%" }),
             Cell("上下位置", y, v => v switch { 0 => "最上", 50 => "正中", 100 => "最下", _ => v + "%" }),
             Cell("字号", size, v => v + "%"), Cell("最大宽度", width, v => v + "% 画面宽")));
         Children.Add(Ui.Columns(Labeled("文字颜色", textColor), Labeled("标题颜色", titleColor), Labeled("背景颜色", backgroundColor),
             Cell("文字不透明度", textOpacity, v => v + "%"), Cell("背景不透明度", backgroundOpacity, v => v == 0 ? "全透明" : v + "%")));
-        Children.Add(Ui.Label("对手面板：教练端授权的队伍视野中上次读到的等级和装备，显示在游戏左侧。未见不补猜。"));
-        var shown = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; shown.Children.Add(enemies);
-        Children.Add(Ui.Columns(shown,
+        Children.Add(Ui.Label("对手面板：教练端推送的上次读到的等级和装备，显示在游戏左侧，到本局结束。未见不补猜。"));
+        Children.Add(Ui.Columns(
             Cell("上下位置", enemyY, v => v switch { 0 => "最上", 50 => "正中", 100 => "最下", _ => v + "%" }),
             Cell("大小", enemySize, v => v + "%"), Cell("不透明度", enemyOpacity, v => v + "%")));
         Children.Add(Ui.Label("眼位：◆ 表示队伍视角实际目击（绿边己方、红边敌方）；虚线圈和 ? 只表示推测区域。金色侦察、蓝色岗哨，和装备、分钟路线分别显示。"));
         var mapChecks = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        mapChecks.Children.Add(wards); mapChecks.Children.Add(minimapRight);
+        mapChecks.Children.Add(minimapRight);
         Children.Add(Ui.Columns(mapChecks, Cell("小地图大小", minimapSize, v => v == 100 ? "默认" : v + "%")));
         Children.Add(Ui.Row(status,
             Ui.Button("预览 8 秒", (_, _) => { overlay.Preview(PreviewMs); status.Text = PreviewNote(); }),
             Ui.Button("恢复默认", (_, _) => { Fill(new()); Changed(); })));
         Children.Add(Ui.Text("改动立即生效并保存在本机。调整时示例字幕和对手面板会在 Dota 画面上显示 8 秒：Dota 用无边框窗口，" +
             "放在另一块屏幕上调最方便（本窗口在前台时也会显示预览）。只隐藏字幕，地图路线圈照常显示。" +
-            "装备缺图时显示上次读到的名字与栏位。本机左右、大小偏好只调整未连接时的蓝色虚线参考框；" +
-            "实战眼位和路线必须在教练端按游戏实际 HUD 校准，不用此框代替。", 11, Brushes.LightGray));
+            "装备缺图时显示上次读到的名字与栏位。教练端没有确认小地图框时，眼位按「小地图在右侧」和「小地图大小」画，" +
+            "请用预览的蓝框对准游戏里的小地图；分钟路线仍须在教练端校准。", 11, Brushes.LightGray));
         Fill(Current);
         overlay.Settings = Current;
         saver.Tick += (_, _) => Flush();

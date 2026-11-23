@@ -17,6 +17,8 @@ internal static class AuthorizedBoardTests
 
     public static async Task Run(Action<bool, string> check)
     {
+        // The user's rule since v0.6.2: the released game client sends no pictures. Only UI tests turn this on.
+        check(!Features.VideoUpload, "the game client's picture modes are off unless a developer test switches them on");
         Shape(check);
         KnownBoard(check);
         Mailbox(check);

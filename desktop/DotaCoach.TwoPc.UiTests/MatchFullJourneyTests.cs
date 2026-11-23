@@ -74,8 +74,7 @@ internal static partial class Program
                         "owner has a fresh private archive before any synthetic packets are sent");
                     coach.ShowInTaskbar = false; coach.ShowActivated = false;
                     coach.WindowStartupLocation = WindowStartupLocation.Manual; coach.Left = -16000; coach.Show();
-                    Children(coach).OfType<Expander>().Single(e => Equals(e.Header, "对局档案与复盘")).IsExpanded = true;
-                    Click(coach, "打开对局复盘窗口");
+                    Click(coach, "打开对局复盘窗口"); // on the home page
                     var review = coach.OwnedWindows.Cast<Window>().Single();
                     await Wait(() => Named<TextBlock>(review, "MatchStatus").Text.Contains("尚无本机档案"), "real review opens on the empty isolated catalog");
                     await Record(coach, review, archive, scan, id);

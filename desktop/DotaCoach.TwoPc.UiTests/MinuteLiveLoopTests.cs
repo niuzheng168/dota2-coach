@@ -103,7 +103,7 @@ internal static partial class Program
                     "ordinary configured coach receives metadata but never starts its legacy image model");
                 Mode(true);
                 Field<CheckBox>(w, "subtitles").IsChecked = false; // Real operator switch: routes without captions.
-                Children(w).OfType<Expander>().Single(e => Equals(e.Header, "小地图校准")).IsExpanded = true;
+                ShowGroup(w, "小地图校准");
                 await State(540);
                 Click(w, "预设：右下"); await MinuteTicks(timer);
                 Check(!Offered() && Quiet(0), "minute mode and a right-hand draft do not authorize a request");

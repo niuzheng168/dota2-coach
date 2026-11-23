@@ -20,7 +20,7 @@ internal sealed partial class CoachWindow
     private static readonly string[] CopilotIds = [CopilotGateway.Astra, CopilotGateway.Sol];
     private const string UncheckedCatalog = "尚未核实此代理提供哪些模型。请先刷新清单，再保存模型设置以启用推理。";
     private const string DraftHint = "模型设置尚未保存。旧请求已取消，旧标记已撤回；当前不会推理。";
-    private string modelSetupHint = "请在「模型设置」中选择服务并保存。";
+    private string modelSetupHint = "请在「设置 → AI 模型」中选择服务并保存。";
     private bool modelEditsPending;
     // Only IDs from our two-item allowlist. Neither the listing nor its authorization survives a restart.
     private string[]? listedModels;

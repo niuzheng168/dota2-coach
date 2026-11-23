@@ -70,7 +70,7 @@ internal sealed partial class CoachWindow
         }
         hint = $"对局 {p.MatchId} · {frame.Meta.SourceWidth}×{frame.Meta.SourceHeight}";
         if (preferences.LayoutFor(frame) is not { } layout || MinuteDraft(frame)) {
-            hint += "：请在「小地图校准」核对原始像素并点「确认校准」。预设和自动左下框都不算确认。"; return null;
+            hint += "：请在「设置 → 小地图校准」核对原始像素并点「确认校准」。预设和自动左下框都不算确认。"; return null;
         }
         hint += $" · 已校准：左 {layout.Left:0.##}、上 {layout.Top:0.##}、边长 {layout.Size:0.##}";
         return new(frame.Meta.SessionId, p.MatchId, p.Hero, p.Team, layout);

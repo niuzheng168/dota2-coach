@@ -42,11 +42,11 @@ internal sealed partial class CoachWindow : Window
     private readonly TextBlock detail = Ui.Text("", 12, Brushes.LightGray);
     private readonly TextBlock notice = Ui.Text("先启动接收，再复制配对码到游戏端。", 13, Ui.Accent);
     private readonly TextBlock visionText = Ui.Text("");
-    private readonly TextBlock previewTitle = Ui.Text("等待游戏端画面", 20, Ui.Accent);
+    private readonly TextBlock previewTitle = Ui.Text("等待游戏端连接", 14, Brushes.LightGray);
     private readonly Image image = new() { Stretch = Stretch.Uniform };
     private readonly Grid preview = new() { Background = Brushes.Black, Visibility = Visibility.Collapsed };
     private readonly RowDefinition previewRow = new() { Height = GridLength.Auto };
-    private readonly Expander? calibrationSection;
+    private readonly AppPages pages;
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly CancellationTokenSource stop = new();
     private CoachHost? host;
@@ -149,17 +149,16 @@ internal sealed partial class CoachWindow : Window
         }
         try { heroNames = new HeroNames(System.IO.Path.Combine(AppContext.BaseDirectory, "data", "dota2-dictionary.json")); }
         catch { /* Alerts fall back to internal hero names. */ }
-        Title = "Dota Coach · 教练端 v0.6.2";
+        Title = "Dota Coach · 教练端 v0.6.3";
         Width = Math.Min(1320, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(940, SystemParameters.WorkArea.Height - 40);
         MinWidth = 1000; MinHeight = 640; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = Ui.Background; FontFamily = new FontFamily("Segoe UI, Microsoft YaHei UI");
-        var root = new Grid { Margin = new Thickness(24) };
-        root.ColumnDefinitions.Add(new() { Width = new GridLength(340) });
-        root.ColumnDefinitions.Add(new() { Width = new GridLength(20) });
-        root.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
+        var home = new Grid();
+        home.ColumnDefinitions.Add(new() { Width = new GridLength(400) });
+        home.ColumnDefinitions.Add(new() { Width = new GridLength(24) });
+        home.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
         var left = new StackPanel();
-        left.Children.Add(Ui.Text("教练端", 26, Ui.Accent));
         left.Children.Add(Ui.Text("游戏端只传本人 GSI，不传画面。对手装备、眼位、字幕和分钟路线推送到游戏里显示；赛后按时间复盘。", 12, Brushes.LightGray));
         var ips = NetworkInterface.GetAllNetworkInterfaces().Where(n => n.OperationalStatus == OperationalStatus.Up)
             .SelectMany(n => n.GetIPProperties().UnicastAddresses).Select(a => a.Address)
@@ -178,59 +177,59 @@ internal sealed partial class CoachWindow : Window
                     .Where(a => Wire.IsLan(a) && !IPAddress.IsLoopback(a)).Select(a => a.ToString()).FirstOrDefault();
             if (preferred != null && ips.Contains(preferred)) address.SelectedItem = preferred;
         }
-        left.Children.Add(Ui.Label("本机地址 / 端口（跨机请选局域网IP，不要选WSL虚拟网卡；127.0.0.1 只用于同机）"));
-        port.Width = 90;
-        left.Children.Add(Ui.Row(address, port));
+        // Home: connection, Plus/scanner state and the everyday switches. Everything set once lives in grouped settings.
         listen = Ui.Button("启动接收", async (_, _) => { if (busy || host != null) await Stop(); else await Start(); });
-        var connection = new WrapPanel();
-        connection.Children.Add(listen);
-        connection.Children.Add(Ui.Button("复制配对码", (_, _) => CopyPairing()));
-        connection.Children.Add(Ui.Button("撤销配对", (_, _) => {
+        left.Children.Add(status); left.Children.Add(detail); left.Children.Add(notice);
+        var everyday = new WrapPanel();
+        everyday.Children.Add(Ui.Button("复制配对码", (_, _) => CopyPairing()));
+        if (e2e == null) everyday.Children.Add(BuildMatchReview());
+        left.Children.Add(everyday);
+        var switches = new StackPanel();
+        var connection = new StackPanel();
+        connection.Children.Add(Ui.Label("本机地址 / 端口（跨机请选局域网IP，不要选WSL虚拟网卡；127.0.0.1 只用于同机）"));
+        port.Width = 90;
+        connection.Children.Add(Ui.Row(address, port));
+        var connectionButtons = new WrapPanel();
+        connectionButtons.Children.Add(listen);
+        connectionButtons.Children.Add(Ui.Button("撤销配对", (_, _) => {
             host?.Revoke(); matchState.Disconnect(); CancelDecision(); ResetMinuteFarmConfirmation(); ClearView();
             notice.Text = "旧配对已撤销；请重新复制配对码。";
         }));
-        if (e2e == null) connection.Children.Add(scanButton = Ui.Button("启动视觉扫描", async (_, _) => await ToggleScan()));
-        left.Children.Add(connection);
-        left.Children.Add(status); left.Children.Add(detail); left.Children.Add(notice);
-        if (e2e == null) left.Children.Add(scanState);
-        var switches = new StackPanel();
+        connectionButtons.Children.Add(Ui.Button("发送测试提醒", (_, _) => SendTest()));
+        connection.Children.Add(connectionButtons);
+        var right = new Grid();
+        right.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        right.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        right.RowDefinitions.Add(previewRow);
+        var vision = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        vision.Children.Add(Ui.Text(e2e == null ? "AI 自动教练" : "AI 本地机器人局验收", 20, Ui.Accent));
+        vision.Children.Add(switches);
+        vision.Children.Add(visionText);
+        if (e2e != null) vision.Children.Add(Ui.Text("LOCAL BOT E2E：已显式配置Foundry云模型；真实图像和自身GSI会送往该服务并计费。仅本地局，非最优路线保证。", 12, Brushes.LightGray));
+        right.Children.Add(vision);
+        Grid.SetRow(previewTitle, 1); right.Children.Add(previewTitle);
+        preview.Children.Add(image); preview.Children.Add(calibrationMarks);
+        Grid.SetRow(preview, 2); right.Children.Add(preview);
+        home.Children.Add(new ScrollViewer { Content = left, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        Grid.SetColumn(right, 2); home.Children.Add(right);
+        pages = new AppPages("教练端", home);
+        pages.Add("连接", connection, "接收服务随教练端启动；换地址或端口后要重新复制配对码。");
         if (e2e == null) {
+            left.Children.Add(Ui.Text("Plus 观战与对手信息", 17, Ui.Accent));
+            var plusSettings = BuildSpectatorPanel(left);
             var modelSettings = new StackPanel(); BuildAutomaticControls(switches, modelSettings);
-            left.Children.Add(Ui.Section("模型设置", modelSettings));
-            var calibration = new StackPanel(); BuildCalibration(calibration);
-            calibrationSection = Ui.Section("小地图校准", calibration);
-            calibrationSection.Expanded += (_, _) => DrawCalibration();
-            calibrationSection.Collapsed += (_, _) => DrawCalibration();
-            left.Children.Add(calibrationSection);
-            left.Children.Add(Ui.Section("Plus 实时观战（实验）", BuildSpectatorPanel()));
-            left.Children.Add(Ui.Section("对局档案与复盘", BuildMatchReview()));
             var share = new CheckBox { Content = "允许分钟模型读取本队当时已知的装备、视野和推测眼位",
                 IsChecked = preferences.ModelTeamKnowledge, Foreground = Brushes.White };
             share.Checked += (_, _) => SaveMatchSharing(true); share.Unchecked += (_, _) => SaveMatchSharing(false);
             modelSettings.Children.Add(share);
             modelSettings.Children.Add(Ui.Text("仅勾选后，这些信息会随本人状态发给所选模型服务。全图录像永远不进实战模型。", 12, Brushes.LightGray));
+            var calibration = new StackPanel(); BuildCalibration(calibration);
+            pages.Add("Plus 观战与扫描", plusSettings, "本机 Dota 用另一个账号对好友实时观战；首次使用先在这里配置一次。");
+            pages.Add("AI 模型", modelSettings, "模型服务、调用频率，以及 AI 结果推送到游戏的方式。");
+            pages.Add("小地图校准", calibration, "只有镜像 HUD 或放大过小地图才需要。");
         }
-        var diagnostics = new StackPanel();
-        diagnostics.Children.Add(debug.View);
-        diagnostics.Children.Add(Ui.Button("发送测试提醒", (_, _) => SendTest()));
-        left.Children.Add(Ui.Section("Debug", diagnostics));
-        var scroll = new ScrollViewer { Content = left, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        root.Children.Add(scroll);
-
-        var right = new Grid();
-        right.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        right.RowDefinitions.Add(previewRow);
-        right.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        right.Children.Add(previewTitle);
-        preview.Children.Add(image); preview.Children.Add(calibrationMarks);
-        Grid.SetRow(preview, 1); right.Children.Add(preview);
-        var vision = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
-        vision.Children.Add(Ui.Text(e2e == null ? "AI 自动教练" : "AI 本地机器人局验收", 20, Ui.Accent));
-        vision.Children.Add(switches);
-        vision.Children.Add(visionText);
-        if (e2e != null) vision.Children.Add(Ui.Text("LOCAL BOT E2E：已显式配置Foundry云模型；真实图像和自身GSI会送往该服务并计费。仅本地局，非最优路线保证。", 12, Brushes.LightGray));
-        Grid.SetRow(vision, 2); right.Children.Add(vision); Grid.SetColumn(right, 2); root.Children.Add(right);
-        Content = root;
+        pages.Add("调试", debug.View, "排查问题时才打开；记录只存本机。");
+        Content = new Border { Child = pages, Margin = new Thickness(24) };
         preview.SizeChanged += (_, _) => DrawCalibration();
         timer.Tick += (_, _) => Refresh(); timer.Start();
         // Status / GSI-only sessions need the normal state tick, not a render-rate image poll.
@@ -321,17 +320,15 @@ internal sealed partial class CoachWindow : Window
         Clipboard.SetText(host.Pair(IPAddress.Parse((string)address.SelectedItem)).Encode());
         notice.Text = "配对码已复制（含密钥）。只粘贴到你的游戏端；换地址/重启后重新复制。";
     }
-    private StackPanel BuildSpectatorPanel()
+    /// <summary>The Plus settings group. The live state, scan button and the three "push to the game" switches go on
+    /// <paramref name="home"/>: they are what the coach looks at and flips during a match.</summary>
+    private StackPanel BuildSpectatorPanel(StackPanel home)
     {
         visionLoss.Map = wardTracker.Map;
-        var panel = new StackPanel();
-        panel.Children.Add(Ui.Text("本机 Dota 用账号 B 对好友“实时观战”。只记录与游戏机同局同阵营的队伍视角；以下开关只控制游戏端显示，不控制记录或模型授权。", 12, Brushes.LightGray));
-        panel.Children.Add(Ui.Label("本机 Dota 安装目录")); panel.Children.Add(spectatorInstall);
-        var buttons = new WrapPanel();
-        buttons.Children.Add(Ui.Button("一键配置观战 GSI", async (_, _) => await StartSpectator()));
-        buttons.Children.Add(Ui.Button("复制启动参数", (_, _) => spectatorSetup.Text = Ui.CopyLaunchOptions(SteamLaunch.Inspect())));
-        panel.Children.Add(buttons); panel.Children.Add(spectatorSetup); panel.Children.Add(spectatorLive);
-        panel.Children.Add(Ui.Label("推送到游戏机（只用队伍视角看得到的信息）"));
+        home.Children.Add(spectatorLive);
+        scanButton = Ui.Button("启动视觉扫描", async (_, _) => await ToggleScan());
+        home.Children.Add(Ui.Row(scanState, scanButton));
+        home.Children.Add(Ui.Label("推送到游戏机（只用队伍视角看得到的信息）"));
         enemyPanel.IsChecked = panelOn = preferences.EnemyPanel;
         enemyVision.IsChecked = visionAlertsOn = preferences.EnemyVisionAlerts;
         enemyWards.IsChecked = preferences.EnemyWards;
@@ -340,7 +337,15 @@ internal sealed partial class CoachWindow : Window
             toggles.Children.Add(toggle);
             toggle.Checked += (_, _) => SaveAlertToggles(); toggle.Unchecked += (_, _) => SaveAlertToggles();
         }
-        panel.Children.Add(toggles); panel.Children.Add(alertStatus);
+        home.Children.Add(toggles); home.Children.Add(alertStatus);
+
+        var panel = new StackPanel();
+        panel.Children.Add(Ui.Text("本机 Dota 用账号 B 对好友“实时观战”。只记录与游戏机同局同阵营的队伍视角；主页的推送开关只控制游戏端显示，不控制记录或模型授权。", 12, Brushes.LightGray));
+        panel.Children.Add(Ui.Label("本机 Dota 安装目录")); panel.Children.Add(spectatorInstall);
+        var buttons = new WrapPanel();
+        buttons.Children.Add(Ui.Button("一键配置观战 GSI", async (_, _) => await StartSpectator()));
+        buttons.Children.Add(Ui.Button("复制启动参数", (_, _) => spectatorSetup.Text = Ui.CopyLaunchOptions(SteamLaunch.Inspect())));
+        panel.Children.Add(buttons); panel.Children.Add(spectatorSetup);
         panel.Children.Add(Ui.Text("面板一直显示敌方英雄上次读到的等级、装备和读取年龄，到本局结束；新的读数需在本机前台观战并启动视觉扫描。" +
             "守卫数量减少也可能是转交、丢弃或卖掉。7.42 常见眼位只给候选，不当作目击；确认过小地图框时按框画，否则按游戏端自己的小地图设置。" +
             "离开视野不能区分阵亡和进迷雾；这类字幕不会盖住正在显示的分钟路线。" +
@@ -509,7 +514,7 @@ internal sealed partial class CoachWindow : Window
         if (!snapshot.Connected)
         {
             ClearView(); CancelDecision();
-            previewTitle.Text = "等待新画面 · 不显示过期截图";
+            previewTitle.Text = "等待游戏端连接";
             return;
         }
         if (displayed is { } previous && (previous.Meta.SessionId != snapshot.SessionId ||
@@ -657,25 +662,29 @@ internal sealed partial class CoachWindow : Window
         }
         finally { if (decisionStop == deadline) decisionStop = null; visionInFlight = null; deciding = false; }
     }
-    /// <summary>On/off switches sit with the AI output; model and timing details live in a collapsed section.</summary>
+    /// <summary>The AI master switch and minute mode sit with the AI output on the home page; where results go,
+    /// the model service and its timing live in the AI settings group.</summary>
     private void BuildAutomaticControls(StackPanel switches, StackPanel settings)
     {
         automatic.IsChecked = preferences.AutomaticAdvice; subtitles.IsChecked = preferences.Subtitles;
         mapMarkers.IsChecked = preferences.MinimapMarkers; autoMinimap.IsChecked = preferences.AutoMinimap;
-        var toggles = new WrapPanel();
-        foreach (var toggle in new[] { automatic, subtitles, mapMarkers }) { toggle.Margin = new Thickness(0, 0, 16, 4); toggles.Children.Add(toggle); }
         foreach (var toggle in new[] { automatic, subtitles, mapMarkers, autoMinimap }) {
             toggle.Checked += (_, _) => SaveFeatureToggles(); toggle.Unchecked += (_, _) => SaveFeatureToggles();
         }
-        switches.Children.Add(toggles); BuildMinuteSetup(switches); switches.Children.Add(autoStatus);
-        switches.Children.Add(Ui.Text("推理可能计费或消耗配额。普通模式发送画面和自身 GSI；分钟模式默认只发本人数据和模拟候选，另行授权才加入队伍资料。不控制英雄。", 12, Brushes.LightGray));
+        automatic.Margin = new Thickness(0, 0, 16, 4);
+        switches.Children.Add(automatic); BuildMinuteSetup(switches); switches.Children.Add(autoStatus);
 
         interval.Text = preferences.IntervalSeconds.ToString(); requestLimit.Text = preferences.RequestLimit.ToString();
         subtitleSeconds.Text = preferences.SubtitleSeconds.ToString(); modelTimeout.Text = preferences.ModelTimeoutSeconds.ToString();
+        settings.Children.Add(Ui.Label("AI 结果推送到游戏（分钟路线需要「小地图路线」）"));
+        var outputs = new WrapPanel();
+        foreach (var toggle in new[] { subtitles, mapMarkers }) { toggle.Margin = new Thickness(0, 0, 16, 4); outputs.Children.Add(toggle); }
+        settings.Children.Add(outputs);
         BuildProviderControls(settings);
         settings.Children.Add(Ui.Label("普通模式间隔（秒） / 本次启动请求上限（两种模式共用，失败也计数）")); settings.Children.Add(Ui.Columns(interval, requestLimit));
         settings.Children.Add(Ui.Label("字幕显示（秒，1–15） / 模型超时（秒，8–20）")); settings.Children.Add(Ui.Columns(subtitleSeconds, modelTimeout));
         settings.Children.Add(Ui.Button("保存模型设置", (_, _) => ConfigureModel(save: true)));
+        settings.Children.Add(Ui.Text("推理可能计费或消耗配额。分钟模式默认只发本人数据和模拟候选，勾选下方授权才加入队伍资料。不控制英雄。", 12, Brushes.LightGray));
     }
     private void BuildCalibration(StackPanel panel)
     {
@@ -768,8 +777,8 @@ internal sealed partial class CoachWindow : Window
     private void DrawCalibration()
     {
         calibrationMarks.Children.Clear();
-        bool show = displayed is { HasImage: true } || displayed is { Meta.Source: "dota2-gsi", Meta.SourceWidth: > 0, Meta.SourceHeight: > 0 } &&
-            calibrationSection?.IsExpanded == true;
+        // The game client sends no pictures: the preview (and the box drawn over it) exists only for developer video.
+        bool show = displayed is { HasImage: true };
         SetPreviewVisible(show);
         if (e2e != null) return;
         if (displayed is not { Meta.IsLegacyStatus: false, Meta.Source: "dota2" or "dota2-gsi", Meta.SourceWidth: > 0, Meta.SourceHeight: > 0 } f) {
@@ -778,7 +787,7 @@ internal sealed partial class CoachWindow : Window
         bool draft = draftLayout?.IsValidFor(f.Meta.SourceWidth, f.Meta.SourceHeight) == true;
         var confirmed = preferences.LayoutFor(f);
         var layout = draft ? draftLayout : preferences.EffectiveLayout(f);
-        mapStatus.Text = (!f.HasImage ? "仅 GSI，无底图；请对照游戏实际 HUD。 " : "") +
+        mapStatus.Text = (!f.HasImage ? "游戏端不传画面：请对照游戏里实际的小地图。 " : "") +
             $"游戏窗口 {f.Meta.SourceWidth}×{f.Meta.SourceHeight}：" +
             (draft ? "蓝框是预览，点“确认校准”保存。" : confirmed != null ? "已保存此分辨率的校准。" :
              layout != null ? "使用自动默认框（虚线）。没对准小地图时请校准。" :
