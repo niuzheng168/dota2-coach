@@ -321,7 +321,7 @@ public sealed partial class GameLink : IDisposable
             if (receipt.LaneMap == null) return receipt;
             if (ReferenceEquals(waveReceipt, receipt)) {
                 if (now() < waveUntil && receipt.SessionId == SessionId && ackFailure == null && BoardDelivery.WaveWitness(receipt, local) &&
-                    local!.Hero == currentCapture?.MatchPhase?.Hero && receipt.Minimap?.IsValidFor(width, height) == true) return receipt;
+                    local!.Hero == currentCapture?.MatchPhase?.Hero && (receipt.Minimap == null || receipt.Minimap.IsValidFor(width, height))) return receipt;
                 waveReceipt = null;
             }
             return BoardDelivery.Legacy(receipt);

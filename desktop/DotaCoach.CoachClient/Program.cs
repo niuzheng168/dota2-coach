@@ -226,7 +226,7 @@ internal sealed partial class CoachWindow : Window
             var calibration = new StackPanel(); BuildCalibration(calibration);
             pages.Add("Plus 观战与扫描", plusSettings, "本机 Dota 用另一个账号对好友实时观战；首次使用先在这里配置一次。");
             pages.Add("AI 模型", modelSettings, "模型服务、调用频率，以及 AI 结果推送到游戏的方式。");
-            pages.Add("小地图校准", calibration, "显示兵线推演或分钟路线前，先确认当前分辨率的小地图框。");
+            pages.Add("小地图校准", calibration, "分钟路线要先确认当前分辨率的小地图框；眼位和兵线没确认时按游戏端自己的小地图设置画。");
         }
         pages.Add("调试", debug.View, "排查问题时才打开；记录只存本机。");
         Content = new Border { Child = pages, Margin = new Thickness(24) };
@@ -481,10 +481,10 @@ internal sealed partial class CoachWindow : Window
             matchState.ExpireTeamSources();
             ShowLaneWaves(pairedFrame);
             // The game machine always gets the last-known panel of its match: equipment rows age instead of
-            // disappearing. A confirmed minimap box places the wards; without one the game uses its own HUD setting.
+            // disappearing. A confirmed minimap box places the wards and waves; without one the game uses its own HUD setting.
             var layout = pairedFrame == null ? null : preferences.LayoutFor(pairedFrame);
             var panel = knownBoard.Board(Environment.TickCount64, preferences.EnemyPanel, preferences.EnemyWards, layout);
-            if (preferences.LaneWavesOnMap && layout != null && pairedFrame != null &&
+            if (preferences.LaneWavesOnMap && pairedFrame != null &&
                 matchState.ForGame(pairedFrame, false, false, layout, laneWaves: true, confirmedWaveMap: MinuteFarmArmedFor(pairedFrame)) is { LaneMap: not null } waves &&
                 (panel == null || panel.MatchId == waves.MatchId && panel.Team == waves.Team))
                 panel = panel == null ? waves : waves with { Heroes = panel.Heroes, Wards = panel.Wards, SeenWards = panel.SeenWards };

@@ -372,7 +372,7 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
             var marks = !wards || layout == null || estimates == null || !Held(estimateAt, estimateClock) ? [] : estimates.Where(w => w.Left > elapsed)
                 .Select(w => w with { Age = w.Age + elapsed, Left = w.Left - elapsed }).ToArray();
             var seen = wards && layout != null && observedWards != null && Held(wardsAt, wardClock) ? observedWards.ToArray() : [];
-            var waveMap = laneWaves && layout != null ? GameWaves(frame!, confirmedWaveMap) : null;
+            var waveMap = laneWaves ? GameWaves(frame!, confirmedWaveMap) : null;
             if (eq.Length + marks.Length + seen.Length == 0 && waveMap == null) return null;
             // A UI refresh is not new evidence. Pin the original participant frame and the shortest
             // remaining source lease so a final poll (or a reconnect racing publication) cannot renew it.

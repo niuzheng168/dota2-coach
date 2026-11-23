@@ -62,18 +62,18 @@ internal sealed class OverlayPanel : StackPanel
         Children.Add(Ui.Columns(
             Cell("上下位置", enemyY, v => v switch { 0 => "最上", 50 => "正中", 100 => "最下", _ => v + "%" }),
             Cell("大小", enemySize, v => v + "%"), Cell("不透明度", enemyOpacity, v => v + "%")));
-        Children.Add(Ui.Label("眼位：◆ 表示队伍视角实际目击（绿边己方、红边敌方）；虚线圈和 ? 只表示推测区域。金色侦察、蓝色岗哨，和装备、分钟路线分别显示。"));
+        Children.Add(Ui.Label("眼位：黄色眼睛是推测的敌方眼位（有瞳孔是侦查、空心是岗哨，淡的是备选）；◇ 框住队伍视角实际看到的守卫（绿己方、红敌方）。和装备、分钟路线分别显示。"));
         var mapChecks = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         mapChecks.Children.Add(minimapRight);
         Children.Add(Ui.Columns(mapChecks, Cell("小地图大小", minimapSize, v => v == 100 ? "默认" : v + "%")));
         Children.Add(waves);
-        Children.Add(Ui.Text("兵线需教练端确认小地图框。● 是实见的小兵，○ 是进雾后的短时估计，△ 是理论增援，× 是交汇。", 11, Brushes.LightGray));
+        Children.Add(Ui.Text("兵线和眼位画在同一个小地图框里。● 是实见的小兵，○ 是进雾后的短时估计，△ 是理论增援，× 是交汇。", 11, Brushes.LightGray));
         Children.Add(Ui.Row(status,
             Ui.Button("预览 8 秒", (_, _) => { overlay.Preview(PreviewMs); status.Text = PreviewNote(); }),
             Ui.Button("恢复默认", (_, _) => { Fill(new()); Changed(); })));
         Children.Add(Ui.Text("改动立即生效并保存在本机。调整时示例字幕和对手面板会在 Dota 画面上显示 8 秒：Dota 用无边框窗口，" +
             "放在另一块屏幕上调最方便（本窗口在前台时也会显示预览）。只隐藏字幕，地图路线圈照常显示。" +
-            "装备缺图时显示上次读到的名字与栏位。教练端没有确认小地图框时，眼位按「小地图在右侧」和「小地图大小」画，" +
+            "装备缺图时显示上次读到的名字与栏位。教练端没有确认小地图框时，眼位和兵线按「小地图在右侧」和「小地图大小」画，" +
             "请用预览的蓝框对准游戏里的小地图；分钟路线仍须在教练端校准。", 11, Brushes.LightGray));
         Fill(Current);
         overlay.Settings = Current;

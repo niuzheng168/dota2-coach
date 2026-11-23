@@ -68,7 +68,7 @@ public static class Wire
         (board.SeenWards == null || board.SeenWards.Length <= MaxSeenWards && board.SeenWards.All(w =>
             w is { Kind: "observer" or "sentry", Team: "radiant" or "dire" } &&
             Finite(w.X, -16_000, 16_000) && Finite(w.Y, -16_000, 16_000))) &&
-        (board.LaneMap == null || board.MatchId != null && board.Minimap != null && board.LaneMap.Valid());
+        (board.LaneMap == null || board.MatchId != null && board.LaneMap.Valid());
     /// <summary>A small PNG, checked from its header before any image decoder sees network data.</summary>
     public static bool IsIcon(ReadOnlySpan<byte> data)
     {

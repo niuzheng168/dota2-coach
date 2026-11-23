@@ -100,14 +100,17 @@ internal static partial class Program
             "an enemy leaving vision is pushed as a subtitle to the GSI-only game client");
         Field<CheckBox>(w, "enemyVision").IsChecked = false;
         var hud = MinimapLayout.Suggest(3840, 2160, true);
-        Set(w, "preferences", Field<LiveCoachSettings>(w, "preferences") with { LaneWavesOnMap = true, Calibrations = [hud] });
+        // v0.6.4 regression: the user's coach had no confirmed box, and the waves never left it. They go where the wards go.
+        Set(w, "preferences", Field<LiveCoachSettings>(w, "preferences") with { LaneWavesOnMap = true, Calibrations = [] });
         var creep = new { enemy = Unit("npc_dota_creep_goodguys_ranged", 2, -6040, 380, 750) };
         await Packet(157, creep, plusLead: 1);
-        await Wait(() => host.Mailbox.Enemies(session)?.LaneMap is { Clock: 157 } first && first.Marks.All(m => m.X != -6040 || m.Kind != "seen"),
-            "a leading Plus wave packet is not backdated into the participant's previous second");
+        await Wait(() => host.Mailbox.Enemies(session) is { Minimap: null, LaneMap: { Clock: 157 } first } && first.Marks.All(m => m.X != -6040 || m.Kind != "seen"),
+            "waves are published without a confirmed minimap box; a leading Plus wave packet is not backdated into the participant's previous second");
+        Set(w, "preferences", Field<LiveCoachSettings>(w, "preferences") with { Calibrations = [hud] });
         await Packet(158, new { }, plusLead: 1);
-        await Wait(() => host.Mailbox.Enemies(session)?.LaneMap?.Marks.Any(m => m.Kind == "seen" && m.X == -6040 && m.SeenAt == 158) == true,
-            "the paired coach publishes the early sighting once the player reaches its game second, even with equipment/ward delivery off");
+        await Wait(() => host.Mailbox.Enemies(session) is { Minimap: var box, LaneMap: { } sighted } && box == hud &&
+            sighted.Marks.Any(m => m.Kind == "seen" && m.X == -6040 && m.SeenAt == 158),
+            "the paired coach publishes the early sighting once the player reaches its game second, even with equipment/ward delivery off; a confirmed box goes with it");
         await Packet(159, new { }, plusLead: 1);
         await Wait(() => host.Mailbox.Enemies(session)?.LaneMap?.Marks.Any(m => m.Kind == "fog" && m.SeenAt == 158) == true,
             "the next game second projects the missing individual without new vision");
