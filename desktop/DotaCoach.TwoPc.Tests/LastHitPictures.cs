@@ -17,7 +17,7 @@ internal static partial class LastHitEval
     /// the fixed set of chances with each one's expected kill per forecast (reacting player).
     /// </summary>
     private static void Pictures(List<Life> chances, string directory, CreepDamageModel? model, string golden, double[] margins, int repeats,
-        string chancesOut, HeroAttack attack, double distance, double latency, double fps, CreepBarGeometry geometry, List<Tower> towers, Func<Random, double> extra, double meanExtra,
+        string chancesOut, string anchors, HeroAttack attack, double distance, double latency, double fps, CreepBarGeometry geometry, List<Tower> towers, Func<Random, double> extra, double meanExtra,
         List<(double T, int Attacker, int Victim, double D)> hits, Dictionary<int, string> kinds)
     {
         const double lead = .15;
@@ -51,7 +51,12 @@ internal static partial class LastHitEval
             product.Add(red);
             if (model != null) forecasts.Add(Forecast(model, seen));
         }
-        if (model != null) Accuracy(model, sightings, hits, kinds);
+        if (model != null) {
+            Accuracy(model, sightings, hits, kinds, null);
+            if (anchors.Length > 0)
+                Accuracy(model, sightings, hits, kinds, File.ReadLines(anchors).Skip(1).Select(l => l.Split(','))
+                    .Select(c => (int.Parse(c[0]), int.Parse(c[1]))).ToHashSet());
+        }
 
         var blows = hits.GroupBy(h => h.Victim).ToDictionary(g => g.Key, g => g.Select(h => (h.T, Kind: kinds.GetValueOrDefault(h.Attacker, "hero"), h.D)).OrderBy(h => h.T).ToList());
         var rows = new List<(string Name, Func<int, Random, double, double, double, Outcome> Play)> {
@@ -123,7 +128,8 @@ internal static partial class LastHitEval
             resampled[b] = d / n;
         }
         Array.Sort(resampled);
-        Console.WriteLine($"    {name} vs pictures / rhythms: {100 * rounds.Sum(r => r.D) / kills.Length:+0.0;-0.0} points over {kills.Length} chances in {rounds.Length} rounds, " +
+        Console.WriteLine($"    {name} vs pictures / rhythms: expected kills {baseline.Sum():F1} -> {kills.Sum():F1} of {kills.Length}, " +
+            $"{100 * rounds.Sum(r => r.D) / kills.Length:+0.0;-0.0} points over {kills.Length} chances in {rounds.Length} rounds, " +
             $"95% {100 * resampled[50]:+0.0;-0.0}..{100 * resampled[1949]:+0.0;-0.0}; rounds better {rounds.Count(r => r.D > 1e-9)}, worse {rounds.Count(r => r.D < -1e-9)}, " +
             $"even {rounds.Count(r => Math.Abs(r.D) <= 1e-9)}");
         Console.WriteLine("      round:chances:kill difference " + string.Join(" ", rounds.Select(r => $"{r.Round}:{r.N}:{r.D:+0.##;-0.##;0}")));
@@ -166,29 +172,31 @@ internal static partial class LastHitEval
     }
 
     /// <summary>
-    /// The model's error on every matched bar of the recording (the training machine's measure): the creep and tower damage
-    /// that came in the next 0.3 and 1 s against the forecast, and against forecasting none.
+    /// The model's error on every matched bar of the recording (the training machine's measure), or only on the training
+    /// machine's own samples (<paramref name="anchors"/>: picture and unit): the creep and tower damage that came in the next
+    /// 0.3, 0.5, 0.8 and 1 s against the forecast, and against forecasting none.
     /// </summary>
     private static void Accuracy(CreepDamageModel model, Dictionary<int, List<Sighting>> sightings, List<(double T, int Attacker, int Victim, double D)> hits,
-        Dictionary<int, string> kinds)
+        Dictionary<int, string> kinds, HashSet<(int Picture, int Unit)>? anchors)
     {
         var taken = hits.Where(h => kinds.ContainsKey(h.Attacker)).GroupBy(h => h.Victim).ToDictionary(g => g.Key, g => g.OrderBy(h => h.T).ToList());
-        double[] windows = [.3, 1], error = new double[2], none = new double[2];
+        double[] windows = [.3, .5, .8, 1], error = new double[4], none = new double[4];
         int n = 0;
         foreach (var (unit, seen) in sightings) {
             var forecast = Forecast(model, seen);
             var mine = taken.GetValueOrDefault(unit) ?? [];
             for (int k = 0; k < seen.Count; k++) {
+                if (anchors != null && !anchors.Contains((seen[k].Picture, unit))) continue;
                 n++;
-                for (int w = 0; w < 2; w++) {
+                for (int w = 0; w < windows.Length; w++) {
                     double truth = mine.Where(h => h.T > seen[k].T && h.T <= seen[k].T + windows[w]).Sum(h => h.D);
                     error[w] += Math.Abs(CreepDamageModel.Until(forecast[k], windows[w]) - truth);
                     none[w] += truth;
                 }
             }
         }
-        Console.WriteLine($"model on {n} matched bars, mean absolute error of the damage to come: 0.3 s {error[0] / n:F2} HP (none {none[0] / n:F2}), " +
-            $"1 s {error[1] / n:F2} HP (none {none[1] / n:F2})");
+        Console.WriteLine($"model on {n} {(anchors != null ? "of the training machine's samples" : "matched bars")}, mean absolute error of the damage to come " +
+            "(HP, forecasting none in brackets): " + string.Join(", ", windows.Select((w, i) => $"{w} s {error[i] / n:F2} ({none[i] / n:F2})")));
     }
 
     /// <summary>Per unit, its bar in every picture where the labels matched one to it, oldest first; and the pictures' height.</summary>

@@ -10,7 +10,8 @@ using DotaCoach.TwoPc;
 /// simulated player's: a creep's life is cut at the first of them. Last, the same creeps with better foresight than the bars
 /// give (every attack under way seen, the engine's future health), to tell what limits the red numbers.
 ///   --last-hit-eval [--synthetic N | TRACE.jsonl ...] [--hero NAME] [--level N] [--distance D] [--fps F] [--height H] [--extra S] [--latency S]
-///                   [--pictures DIR [--model WEIGHTS.json] [--golden GOLDEN.json] [--margins M,...] [--repeats N] [--chances-out FILE]]
+///                   [--pictures DIR [--model WEIGHTS.json] [--golden GOLDEN.json] [--margins M,...] [--repeats N] [--chances-out FILE] [--rounds FIRST-LAST]
+///                    [--anchors CSV]]
 ///                   (see <see cref="Pictures"/>)
 /// </summary>
 internal static partial class LastHitEval
@@ -101,9 +102,11 @@ internal static partial class LastHitEval
                     string.Join(" ", kindsOfRound.Select(k => Share(Outcome.Kill, k))));
             }
         Decompose(chances, attack, distance, latency, fps, geometry, towers, Extra, lateness.Count > 0 ? lateness.Average() : extra, hits, kinds);
+        // Only arena rounds FIRST-LAST, e.g. to leave out rounds the training machine set aside.
+        var span = Option("--rounds", "1-1000").Split('-').Select(int.Parse).ToArray();
         if (Option("--pictures", "") is { Length: > 0 } pictures)
-            Pictures(chances, pictures, Option("--model", "") is { Length: > 0 } model ? new CreepDamageModel(model) : null, Option("--golden", ""),
-                Option("--margins", "-20,-10,0,10,20").Split(',').Select(double.Parse).ToArray(), int.Parse(Option("--repeats", "20")), Option("--chances-out", ""),
+            Pictures(chances.Where(l => l.Round >= span[0] && l.Round <= span[1]).ToList(), pictures, Option("--model", "") is { Length: > 0 } model ? new CreepDamageModel(model) : null, Option("--golden", ""),
+                Option("--margins", "-20,-10,0,10,20").Split(',').Select(double.Parse).ToArray(), int.Parse(Option("--repeats", "20")), Option("--chances-out", ""), Option("--anchors", ""),
                 attack, distance, latency, fps, geometry, towers, Extra, lateness.Count > 0 ? lateness.Average() : extra, hits, kinds);
     }
 
