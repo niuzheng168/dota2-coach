@@ -1,7 +1,8 @@
 """Score hud_recognizer.py against the labels captured with each frame.
 
 Level, health, mana and items come from the client's GSI at the paused moment
-(captures.jsonl); attributes from the replay itself (truth.jsonl, when present).
+(captures.jsonl); attributes from the replay itself (truth.jsonl, when present); the
+portrait's stats column (damage, armor, move speed...) from hand labels (--stats-labels).
 Frames from replays used for calibration should be left out with --exclude.
 """
 from __future__ import annotations
@@ -37,8 +38,12 @@ def main():
     ap.add_argument("--calibration", type=Path, default=Path(".tmp/vision-assets/hud-1080.npz"))
     ap.add_argument("--report", type=Path)
     ap.add_argument("--any-hero", action="store_true", help="identify the hero among all heroes, not the match's ten")
+    ap.add_argument("--stats-labels", type=Path, help="JSONL of {image, stats: {damage, bonusDamage, attackSpeed, armor, "
+                    "magicResist, moveSpeed}} read off the frames by hand (armor with its bonus): neither GSI nor truth.jsonl has them")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
+    stat_labels = {r["image"]: r["stats"] for r in map(json.loads, open(args.stats_labels, encoding="utf-8"))} \
+        if args.stats_labels else {}
     hud = HudRecognizer(args.assets, args.calibration)
     score, errors, started = defaultdict(Counter), [], time.monotonic()
     frames = 0
@@ -87,6 +92,8 @@ def main():
                     expected = None if not hero["alive"] else shown if shown is not None and abs(shown - v) <= 0.55 \
                         else math.floor(v + 0.5)
                     check("attributes", expected, shown, [k, v, got["ocr"].get(k)])
+            for k, v in stat_labels.get(row["image"], {}).items():
+                check("stats." + k, v, (got["stats"] or {}).get(k), got["ocr"].get("damage" if k == "bonusDamage" else k))
             for slot in SLOTS:
                 want = (items.get(slot) or {}).get("name", "empty")
                 if want.startswith("item_recipe_"):

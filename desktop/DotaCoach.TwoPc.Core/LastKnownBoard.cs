@@ -1,7 +1,7 @@
 namespace DotaCoach.TwoPc;
 
 /// <summary>
-/// The game machine's enemy panel as the coach last knew it. Every enemy keeps its last read level and items,
+/// The game machine's enemy panel as the coach last knew it. Every enemy keeps its last read level, items and stats,
 /// aged on the paired player's game clock, until another match or team starts or the match ends. A late, stale
 /// or missing scanner write, a Plus packet gap or a restarted scanner never blanks a row that was already read.
 /// Ward guesses stay until their own lifetime runs out; sighted wards only while Plus keeps reporting them.
@@ -15,8 +15,9 @@ public sealed class LastKnownBoard
     private double clock = double.NegativeInfinity;
     private long participantAt;
     private string[] order = [];
-    // ReadAt: game clock of the reading (scan clock - age); null = listed but never read.
+    // ReadAt: game clock of the reading (scan clock - age); null = listed but never read. Stats keep their own reading.
     private readonly Dictionary<string, (EnemyHero Row, double? ReadAt)> rows = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (EnemyStats Stats, double ReadAt)> stats = new(StringComparer.Ordinal);
     private (WardMark[] Marks, double At)? estimates;
     private (ObservedWard[] Wards, long At)? seen;
 
@@ -27,7 +28,7 @@ public sealed class LastKnownBoard
     public void Clear()
     {
         match = team = null; clock = double.NegativeInfinity; order = [];
-        rows.Clear(); estimates = null; seen = null;
+        rows.Clear(); stats.Clear(); estimates = null; seen = null;
     }
     /// <summary>The paired player's match, team and game clock from its latest frame. Another match or team starts empty.</summary>
     public void Participant(string matchId, string side, double gameClock, long now)
@@ -43,9 +44,12 @@ public sealed class LastKnownBoard
         // A restarted scanner may list fewer enemies at first: heroes it no longer lists keep their place after it.
         order = heroes.Select(h => h.Hero).Concat(order).Distinct(StringComparer.Ordinal).Take(5).ToArray();
         foreach (var h in heroes) {
-            bool read = h.Age is double age && double.IsFinite(age) && (h.Level != null || h.Items != null || h.Neutral != null);
-            double? at = read ? scanClock - h.Age!.Value : null;
-            var row = h with { Items = h.Items?.ToArray(), Age = null };
+            if (h.Stats is { Age: double statsAge } read && double.IsFinite(statsAge) &&
+                (!stats.TryGetValue(h.Hero, out var known) || scanClock - statsAge >= known.ReadAt - 1))
+                stats[h.Hero] = (read with { Age = null }, scanClock - statsAge);
+            bool readRow = h.Age is double age && double.IsFinite(age) && (h.Level != null || h.Items != null || h.Neutral != null);
+            double? at = readRow ? scanClock - h.Age!.Value : null;
+            var row = h with { Items = h.Items?.ToArray(), Age = null, Stats = null };
             if (!rows.TryGetValue(h.Hero, out var old)) { rows[h.Hero] = (row, at); continue; }
             if (at is not double readAt) continue;
             // A level-only read (the scanner restarted and has not reached the items yet) doesn't drop known items.
@@ -74,7 +78,8 @@ public sealed class LastKnownBoard
         if (match == null || now - participantAt is < 0 or >= ParticipantMs) return null;
         var heroes = !equipment ? [] : order.Where(rows.ContainsKey).Select(h => {
             var (row, readAt) = rows[h];
-            return row with { Items = row.Items?.ToArray(), Age = readAt is double at ? Math.Clamp(clock - at, 0, 86_400) : null };
+            return row with { Items = row.Items?.ToArray(), Age = readAt is double at ? Math.Clamp(clock - at, 0, 86_400) : null,
+                Stats = stats.TryGetValue(h, out var s) ? s.Stats with { Age = Math.Clamp(clock - s.ReadAt, 0, 86_400) } : null };
         }).ToArray();
         WardMark[]? marks = null;
         if (wards && estimates is { } guesses) {

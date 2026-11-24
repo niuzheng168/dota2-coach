@@ -172,7 +172,7 @@ internal sealed partial class AdviceOverlay : Window
             }
             var (w, h) = viewport ?? (r?.SourceWidth ?? 0, r?.SourceHeight ?? 0);
             if (MapParts(board, style, w, h) is { } selected && WardLayout(selected, w, h, style) is { } layout) {
-                var layer = WardLayer(selected, layout.Size * canvas.Width / w, layout.Size * canvas.Height / h, unit);
+                var layer = WardLayer(selected, layout.Size * canvas.Width / w, layout.Size * canvas.Height / h, unit, icon);
                 Canvas.SetLeft(layer, layout.Left * canvas.Width / w); Canvas.SetTop(layer, layout.Top * canvas.Height / h);
                 canvas.Children.Add(layer);
             }
@@ -325,13 +325,17 @@ internal sealed partial class AdviceOverlay : Window
     }
 
     private static readonly EnemyBoard SampleBoard = new([
-        new("npc_dota_hero_razor", 12, ["item_power_treads", "item_black_king_bar", "item_blink", "item_magic_wand", null, null], null, 2),
-        new("npc_dota_hero_juggernaut", 14, ["item_phase_boots", "item_bfury", "item_manta", null, null, null], null, 35),
-        new("npc_dota_hero_lion", 9, ["item_tranquil_boots", "item_blink", "item_ward_observer", null, null, null], null, 95),
+        new("npc_dota_hero_razor", 12, ["item_power_treads", "item_black_king_bar", "item_blink", "item_magic_wand", null, null], null, 2) {
+            Stats = new(68, 24, 160, 9, 25, 345, 40, 38, 27, 2) },
+        new("npc_dota_hero_juggernaut", 14, ["item_phase_boots", "item_bfury", "item_manta", null, null, null], null, 35) {
+            Stats = new(70, 81, 230, 14, 25, 360, 42, 61, 30, 35) },
+        new("npc_dota_hero_lion", 9, ["item_tranquil_boots", "item_blink", "item_ward_observer", null, null, null], null, 95) {
+            Stats = new(58, 0, 110, 4, 25, 380, 31, 22, 36, 95) },
         new("npc_dota_hero_pudge", null, null, null, null)]);
     /// <summary>
     /// The enemy panel at the game's left edge, one row per enemy: head icon, level, the six item slots and the
-    /// neutral item, and how long ago they were read (shown from 30 s; rows a minute old are dimmed).
+    /// neutral item, attack damage, armor and move speed, and how long ago they were read (shown from 30 s; rows a
+    /// minute old are dimmed).
     /// </summary>
     private static StackPanel EnemyPanel(EnemyBoard board, GameOverlaySettings style, double unit, Func<string, ImageSource?> icon)
     {
@@ -363,6 +367,8 @@ internal sealed partial class AdviceOverlay : Window
                 neutral.Margin = new Thickness(3 * u, 0, .5 * u, 0);
                 line.Children.Add(neutral);
             }
+            if (hero.Stats is { } stats && StatsText(stats) is { Length: > 0 } values)
+                line.Children.Add(Text(values, 9.5 * u, Brushes.White));
             string age = Age(hero.Age);
             if (age.Length == 0 && board.MatchId != null) age = "刚读"; // A last read, never an assertion of current inventory.
             if (age.Length > 0) line.Children.Add(Text(age, 9 * u, Brushes.LightGray));
@@ -391,8 +397,12 @@ internal sealed partial class AdviceOverlay : Window
     /// <summary>Bucket last-read ages at 30 s and then by minute; each GSI tick need not repaint the equipment HWND.</summary>
     private static string Age(double? seconds) => seconds switch {
         null => "未见", < 30 => "", < 60 => "30秒前", var s => $"{(int)(s / 60)}分前" };
+    /// <summary>Attack damage with its green bonus, armor and move speed; the other stats stay on the coach.</summary>
+    private static string StatsText(EnemyStats s) => string.Join("  ", new[] {
+        s.Damage is int damage ? $"攻{damage}" + (s.BonusDamage is int bonus and not 0 ? bonus.ToString("+0;-0") : "") : null,
+        s.Armor is int armor ? $"甲{armor}" : null, s.MoveSpeed is int speed ? $"速{speed}" : null }.Where(t => t != null));
     private static string Describe(EnemyBoard? board) => board == null ? "" : string.Join(";", board.Heroes.Select(h =>
-        $"{h.Hero},{h.Level},{string.Join(",", h.Items ?? [])},{h.Neutral},{Age(h.Age)},{h.Age >= 60}"));
+        $"{h.Hero},{h.Level},{string.Join(",", h.Items ?? [])},{h.Neutral},{(h.Stats is { } s ? StatsText(s) : "")},{Age(h.Age)},{h.Age >= 60}"));
     private static SolidColorBrush Brush(string hex, int opacity = 100)
     {
         var (red, green, blue) = GameOverlaySettings.Rgb(hex);

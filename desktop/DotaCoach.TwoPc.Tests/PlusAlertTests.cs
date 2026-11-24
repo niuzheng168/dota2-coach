@@ -16,7 +16,7 @@ internal static class PlusAlertTests
         var names = new HeroNames();
         SpectatorSnapshot Snap(long at, params (string Name, int Team, double X, double Y, double Vision)[] units) =>
             new(at, "team-view", 600 + at / 1000.0, "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS", false, "9000000001", 2, 0,
-                units.Select(u => new MinimapUnit(u.Name, u.Team, u.X, u.Y, 0, u.Vision, "minimap_enemyicon"))
+                units.Select(u => new MinimapUnit(u.Name, u.Team, u.X, u.Y, null, u.Vision, "minimap_enemyicon"))
                     .Append(new MinimapUnit("npc_dota_hero_luna", 2, -6000, -6000, 0, 1800, "minimap_herocircle_self")).ToArray(), ["radiant"], []);
         var razor = ("npc_dota_hero_razor", 3, 200.0, 100.0, 1800.0);
         List<PlusAlert> Feed(VisionLossTracker tracker, long from, long to, bool visible) {
@@ -24,42 +24,74 @@ internal static class PlusAlertTests
             for (long t = from; t <= to; t += 500) found.AddRange(tracker.Update(visible ? Snap(t, razor) : Snap(t), names));
             return found;
         }
-        var tracker = new VisionLossTracker();
+        var tracker = new VisionLossTracker { GoneMs = 3000 };
         check(Feed(tracker, 0, 4000, true).Count == 0 && Feed(tracker, 4500, 6500, false).Count == 0, "no alert before the hero has been gone 3 s");
         var gone = Feed(tracker, 7000, 12000, false);
         check(gone.Count == 1 && gone[0].Text == "razor 离开视野 · 最后在中路" && gone[0].At == 7000, "one alert per absence, with the last area");
 
-        tracker = new VisionLossTracker();
+        tracker = new VisionLossTracker { GoneMs = 3000 };
         Feed(tracker, 0, 4000, true); Feed(tracker, 4500, 6000, false);
         check(Feed(tracker, 6500, 9000, true).Count == 0 && Feed(tracker, 9500, 11500, false).Count == 0, "a flicker at the edge of vision is not an absence");
-        tracker = new VisionLossTracker();
+        tracker = new VisionLossTracker { GoneMs = 3000 };
         Feed(tracker, 0, 1500, true);
         check(Feed(tracker, 2000, 8000, false).Count == 0, "a glimpse shorter than 3 s is not announced");
 
-        tracker = new VisionLossTracker();
+        tracker = new VisionLossTracker { GoneMs = 3000 };
         Feed(tracker, 0, 4000, true); Feed(tracker, 4500, 8000, false);   // announced at 7000
         Feed(tracker, 8500, 12000, true);
         check(Feed(tracker, 12500, 16000, false).Count == 0, "the same hero is not announced again within 20 s");
         Feed(tracker, 16500, 30000, true);
         check(Feed(tracker, 30500, 34000, false).Count == 1, "after the cooldown the next absence is announced");
 
-        tracker = new VisionLossTracker();
+        tracker = new VisionLossTracker { GoneMs = 3000 };
         for (long t = 0; t <= 4000; t += 500) tracker.Update(Snap(t, ("npc_dota_hero_razor", 3, 200, 100, 1800), ("npc_dota_hero_lion", 2, 0, 0, 1800)), names);
         var zero = new List<PlusAlert>();
         for (long t = 4500; t <= 8000; t += 500) zero.AddRange(tracker.Update(Snap(t, ("npc_dota_hero_razor", 3, 200, 100, 0)), names));
         check(zero.Count == 1 && zero[0].Hero == "npc_dota_hero_razor", "allies never alert; a zero-vision entry is not a sighting");
-        var full = new VisionLossTracker();
+        var full = new VisionLossTracker { GoneMs = 3000 };
         for (long t = 0; t <= 9000; t += 500)
             full.Update(Snap(t, t <= 4000 ? [razor] : []) with { Mode = "full-spectator" }, names);
-        var paused = new VisionLossTracker();
+        var paused = new VisionLossTracker { GoneMs = 3000 };
         Feed(paused, 0, 4000, true);
         check(full.Update(Snap(9500) with { Mode = "full-spectator" }, names).Count == 0 &&
               paused.Update(Snap(9000) with { Paused = true }, names).Count == 0, "delayed/full spectating and a paused game never alert");
 
-        var outage = new VisionLossTracker();
+        var outage = new VisionLossTracker { GoneMs = 3000 };
         Feed(outage, 0, 4000, true);
         check(Feed(outage, 7000, 8500, false).Count == 0 && Feed(paused, 9500, 12000, false).Count == 0,
             "silence or pause for the disappearance window is not a vision-loss observation");
+
+        // --- The user's default (2026-11-24): five seconds out of sight, set in the coach; the place it faced.
+        var waiting = new VisionLossTracker();
+        Feed(waiting, 0, 4000, true);
+        check(Feed(waiting, 4500, 8500, false).Count == 0 && Feed(waiting, 9000, 9000, false).Count == 1 &&
+              new LiveCoachSettings().VisionLossSeconds == 5, "by default an enemy is announced after 5 s out of sight");
+        var longer = new VisionLossTracker();
+        Feed(longer, 0, 4000, true);
+        longer.GoneMs = 8000;
+        check(Feed(longer, 4500, 11500, false).Count == 0 && Feed(longer, 12000, 12000, false).Count == 1,
+            "a changed delay applies to an absence already being timed");
+        bool refused = false;
+        try { new LiveCoachSettings { VisionLossSeconds = 31 }.Validate(); } catch (ArgumentException) { refused = true; }
+        check(refused, "a delay outside 1–30 s is not saved");
+        var facing = new VisionLossTracker();
+        var west = new List<PlusAlert>();
+        for (long t = 0; t <= 9000; t += 500)
+            west.AddRange(facing.Update(t <= 4000 ? Snap(t) with { Minimap = [.. Snap(t).Minimap,
+                new MinimapUnit("npc_dota_hero_razor", 3, 200, 100, 180, 1800, "minimap_enemyicon")] } : Snap(t), names));
+        check(west is [{ Text: "razor 离开视野 · 最后在中路，朝我方野区" }], "the subtitle names the first other place the hero faced as it vanished");
+
+        // --- The user's choice (2026-11-24): an enemy that vanished as the friend team's kill count rose was killed; no subtitle.
+        int Said(Func<long, (int Radiant, int Dire)> kills) {
+            var tracker = new VisionLossTracker();
+            int n = 0;
+            for (long t = 0; t <= 12000; t += 500) n += tracker.Update((t <= 4000 ? Snap(t, razor) : Snap(t)) with { Kills = kills(t) }, names).Count;
+            return n;
+        }
+        check(Said(t => (t < 4500 ? 3 : 4, 2)) == 0 && Said(t => (t < 4000 ? 3 : 4, 2)) == 0,
+            "an enemy that vanished as the friend team's kill count rose (just before or after) is taken as killed");
+        check(Said(t => (3, t < 4500 ? 2 : 3)) == 1 && Said(t => (t < 1000 ? 3 : 4, 2)) == 1 && Said(t => (t < 7000 ? 3 : 4, 2)) == 1,
+            "a kill by the enemy team, or a rise well before or after the hero vanished, doesn't silence it");
 
         // --- The enemy panel from the scanner's live file.
         string dir = Path.Combine(Path.GetTempPath(), "dotacoach-plus-" + Guid.NewGuid().ToString("N"));
@@ -121,6 +153,17 @@ internal static class PlusAlertTests
             Write("team-view", "9000000001", now / 1000.0, false, [Row("npc_dota_hero_lion", null, new string?[6], 0)]);
             check(ScanFeed.Poll(file, "9000000001", now).Board?.Heroes is [{ Items.Length: 6, Age: 0 }],
                 "six explicitly observed empty slots are different from unknown equipment");
+            object Stats(int? armor, double? age) => new { damage = 161, bonusDamage = 82, attackSpeed = 272, armor, magicResist = 33, moveSpeed = 429,
+                strength = 92, agility = (int?)null, intelligence = 78, age };
+            Write("team-view", "9000000001", now / 1000.0, false, [new { hero = "npc_dota_hero_luna", level = 20, age = 2.0,
+                items = new string?[6], neutral = (string?)null, stats = Stats(24, 1.25) }]);
+            check(ScanFeed.Poll(file, "9000000001", now).Board?.Heroes is [{ Stats: { Damage: 161, BonusDamage: 82, Armor: 24, MoveSpeed: 429,
+                    Agility: null, Age: 1.25 } }], "the HUD stats column comes with its own read age; an unread value stays unknown");
+            foreach (var bad in new[] { Stats(24, null), Stats(999, 1) }) {
+                Write("team-view", "9000000001", now / 1000.0, false, [new { hero = "npc_dota_hero_luna", level = 20, age = 2.0,
+                    items = new string?[6], neutral = (string?)null, stats = bad }]);
+                check(ScanFeed.Poll(file, "9000000001", now).Board == null, "stats without a read age or beyond the HUD's range are refused");
+            }
             Write("team-view", "9000000001", now / 1000.0, true, rows);
             var stopped = ScanFeed.Poll(file, "9000000001", now);
             check(stopped is { Status.Running: false, Status.Sample: null, Board: null, Wards.Count: 0 } && stopped.Status.Text.Contains("已停止"),

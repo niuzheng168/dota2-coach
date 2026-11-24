@@ -22,7 +22,7 @@ internal static partial class Program
         [new("npc_dota_hero_lion", "observer", .25, .75, 0, 1, 12, 40, Rough: true)],
         BoardMatch, "radiant", m, [new("sentry", "dire", -4736, -4736)]);
 
-    private static async Task ParticipantBoardChecks()
+    private static async Task ParticipantBoardChecks(string? output = null)
     {
         void Check(bool ok, string why) { if (!ok) throw new Exception(why); passed++; Console.WriteLine("PASS " + why); }
         foreach (var (w, h, dpi) in new[] { (1280, 720, 1d), (3840, 2160, 2d) })
@@ -33,9 +33,9 @@ internal static partial class Program
             var target = new ScreenMark((m.Left + m.Size * .7) / w, (m.Top + m.Size * .4) / h);
             var route = new Reminder("minute", "session", 4, MinuteFarmContext.Kind, "空点跳过", target,
                 w, h, 5000, m, false, [target], ["有野再打"], FarmMinute: 10);
-            Canvas Draw(EnemyBoard b, Reminder? r = null, bool equipment = true, bool wards = true, int? physicalWidth = null, bool waves = true) {
+            Canvas Draw(EnemyBoard b, Reminder? r = null, bool equipment = true, bool wards = true, int? physicalWidth = null, bool waves = true, bool fog = true) {
                 var c = new Canvas { Width = w / dpi, Height = h / dpi };
-                AdviceOverlay.Compose(c, r, new() { ShowEnemies = equipment, ShowWards = wards, ShowLaneWaves = waves }, DisplayGeometry.OverlayUnit(h, dpi),
+                AdviceOverlay.Compose(c, r, new() { ShowEnemies = equipment, ShowWards = wards, ShowLaneWaves = waves, ShowFog = fog }, DisplayGeometry.OverlayUnit(h, dpi),
                     b, viewport: (physicalWidth ?? w, h));
                 c.Measure(new Size(c.Width, c.Height)); c.Arrange(new Rect(0, 0, c.Width, c.Height)); c.UpdateLayout();
                 return c;
@@ -57,6 +57,25 @@ internal static partial class Program
                 wl.Children.OfType<Ellipse>().Any(e=>Equals(e.Tag,"wave-uncertainty") && e.StrokeDashArray.Count>0) &&
                 wl.Children.OfType<Polygon>().Any(e=>Equals(e.Tag,"wave-march")) && wl.Children.OfType<TextBlock>().Any(e=>e.Text=="~7s"),
                 $"actual game compositor: separate observed/fog/march/ETA shapes at confirmed {(right?"right":"left")} {h}p/{dpi}x");
+            // 2026-11-24: the panel's attack/armor/speed and enemies that left vision (last sighting, facing, likely circle).
+            var foggy = board with { Heroes = [board.Heroes[0] with { Stats = new(161, 82, 272, 24, 33, 429, 92, 132, 78, 2) }],
+                Fog = [new("npc_dota_hero_razor", -4736, -4736, 90, 4), new("npc_dota_hero_pudge", 0, 0, null, 15)] };
+            var fogged = Draw(foggy, wards: false);
+            var fogMap = fogged.Children.OfType<Canvas>().Single();
+            var ring = fogMap.Children.OfType<Ellipse>().Single(e => e.StrokeDashArray is { Count: > 0 });
+            Check(Near((Canvas.GetLeft(ring) + ring.Width / 2) * dpi, .25 * m.Size) &&
+                Near((Canvas.GetTop(ring) + ring.Height / 2) * dpi, (9472 - (-4736 + 600)) / 18944.0 * m.Size) &&
+                Near(ring.Width / 2 * dpi, 1050 / 18944.0 * m.Size) && fogMap.Children.OfType<Line>().Count() == 1 &&
+                Children(fogMap).OfType<TextBlock>().Count(t => t.Text is "4″" or "15″") == 2 &&
+                Children(fogged.Children.OfType<StackPanel>().Single()).OfType<TextBlock>().Any(t => t.Text == "攻161+82  甲24  速429") &&
+                Draw(foggy with { Heroes = [] }, wards: false, fog: false).Children.Count == 0,
+                $"panel stats and fog marks: the circle 4 s ahead along the facing, none after 10 s, a facing line only with a yaw ({h}p/{dpi}x)");
+            if (output != null && w == 3840 && !right) {
+                fogged.Background = new SolidColorBrush(Color.FromRgb(40, 52, 44)); fogged.UpdateLayout();
+                var shot = new RenderTargetBitmap((int)fogged.Width, (int)fogged.Height, 96, 96, PixelFormats.Pbgra32); shot.Render(fogged);
+                var png = new PngBitmapEncoder(); png.Frames.Add(BitmapFrame.Create(shot));
+                using var file = File.Create(Path.Combine(output, "fog-and-stats.png")); png.Save(file);
+            }
             Check(Draw(withWaves,equipment:false,wards:false,waves:false).Children.Count==0 &&
                 Draw(withWaves,equipment:false,wards:false,physicalWidth:w+10).Children.Count==0 &&
                 Draw(withWaves,route,wards:false).Children.OfType<Canvas>().Count()==2,

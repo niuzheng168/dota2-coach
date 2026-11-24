@@ -5,8 +5,17 @@ namespace DotaCoach.TwoPc;
 // World XY (+Y north) in observations; a candidate from the ward tracker uses its separately labelled
 // minimap coordinates (+Y south). A missing observation is not an empty inventory or a destroyed ward.
 public sealed record ObservedWard(string Kind, string Team, double X, double Y);
-public sealed record MatchSightHero(string Hero, string Team, double X, double Y);
-public sealed record FarmEquipment(string Hero, int? Level, string?[]? Items, string? Neutral, double? LastSeenClock);
+/// <summary>Yaw: where the hero faced at that sample, whole world degrees (0 = +x east, 90 = +y north); not a destination.</summary>
+public sealed record MatchSightHero(string Hero, string Team, double X, double Y,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? Yaw = null);
+public sealed record FarmEquipment(string Hero, int? Level, string?[]? Items, string? Neutral, double? LastSeenClock)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public FarmStats? Stats { get; init; }
+}
+/// <summary>The enemy's HUD stats column as read at ReadClock (game seconds), buffs and debuffs of that moment included.</summary>
+public sealed record FarmStats(int? Damage, int? BonusDamage, int? AttackSpeed, int? Armor, int? MagicResist, int? MoveSpeed,
+    int? Strength, int? Agility, int? Intelligence, double ReadClock);
 public sealed record FarmWardEstimate(string Hero, string Kind, int Rank, double Share, double WorldX, double WorldY,
     double EstimatedClock, double ExpiresClock, bool Rough);
 public sealed record FarmTeamKnowledge(double KnowledgeClock, double? EquipmentObservedClock, FarmEquipment[] LastReadEquipment,
@@ -226,7 +235,8 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
             // Persist reads/changes, not an identical packet at every render. Rounded last-seen clocks preserve
             // the distinction between a new read and a scanner echo of the same aged inventory.
             var eq = JsonSerializer.Serialize(heroes.Select(h => new { h.Hero, h.Level, h.Items, h.Neutral,
-                lastSeenClock = h.Age is double age ? (double?)Math.Floor(observedClock - age) : null }), Wire.Json);
+                lastSeenClock = h.Age is double age ? (double?)Math.Floor(observedClock - age) : null,
+                stats = h.Stats is { } s ? s with { Age = Math.Floor(observedClock - s.Age!.Value) } : null }), Wire.Json);
             if (eq != eqSignature) {
                 Write(observedClock, "team-vision", "equipment", new { available = true, heroes }); eqSignature = eq;
             }
@@ -317,7 +327,8 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
     {
         lock (gate) {
             if (!SourceOK(matchId, team, observedClock) || observedClock < sightClock || heroes == null || heroes.Length > 10 ||
-                heroes.Any(h => h == null || !Hero(h.Hero) || !Team(h.Team) || !Wire.Finite(h.X, -16000, 16000) || !Wire.Finite(h.Y, -16000, 16000))) return;
+                heroes.Any(h => h == null || !Hero(h.Hero) || !Team(h.Team) || !Wire.Finite(h.X, -16000, 16000) || !Wire.Finite(h.Y, -16000, 16000) ||
+                    h.Yaw is < 0 or >= 360)) return;
             var next = heroes.OrderBy(h => h.Hero, StringComparer.Ordinal).ToArray();
             bool changed = sight == null || !next.Select(h => (h.Hero, h.Team)).SequenceEqual(sight.Select(h => (h.Hero, h.Team)));
             sight = next; sightClock = observedClock; sightAt = now();
@@ -367,7 +378,8 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
             bool tracked = equipmentRows != null && Held(scanAt, scanClock);
             double elapsed = clock - estimateClock;
             var eq = !equipment || !tracked ? [] : equipmentRows!.Select(h => Copy(h) with {
-                Age = h.Age is double a ? Math.Min(86400, a + clock - scanClock) : null }).ToArray();
+                Age = h.Age is double a ? Math.Min(86400, a + clock - scanClock) : null,
+                Stats = h.Stats is { Age: double s } stats ? stats with { Age = Math.Min(86400, s + clock - scanClock) } : null }).ToArray();
             var layout = (wards || laneWaves) && calibrated?.IsValidFor(frame!.Meta.SourceWidth, frame.Meta.SourceHeight) == true ? calibrated : null;
             var marks = !wards || layout == null || estimates == null || !Held(estimateAt, estimateClock) ? [] : estimates.Where(w => w.Left > elapsed)
                 .Select(w => w with { Age = w.Age + elapsed, Left = w.Left - elapsed }).ToArray();
@@ -395,7 +407,9 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
             bool sc = equipmentRows != null && Held(scanAt, scanClock), est = estimates != null && Held(estimateAt, estimateClock);
             bool ws = observedWards != null && Held(wardsAt, wardClock), sh = sight != null && Held(sightAt, sightClock);
             var intel = !includeTeam ? null : new FarmTeamKnowledge(clock, sc ? scanClock : null,
-                sc ? equipmentRows!.Select(h => new FarmEquipment(h.Hero, h.Level, h.Items?.ToArray(), h.Neutral, h.Age is double a ? scanClock - a : null)).ToArray() : [],
+                sc ? equipmentRows!.Select(h => new FarmEquipment(h.Hero, h.Level, h.Items?.ToArray(), h.Neutral, h.Age is double a ? scanClock - a : null) {
+                    Stats = h.Stats is { Age: double read } s ? new(s.Damage, s.BonusDamage, s.AttackSpeed, s.Armor, s.MagicResist, s.MoveSpeed,
+                        s.Strength, s.Agility, s.Intelligence, scanClock - read) : null }).ToArray() : [],
                 sh ? sightClock : null, sh ? sight!.ToArray() : [], ws ? wardClock : null, ws ? observedWards!.ToArray() : [],
                 est ? estimateClock : null, est ? estimates!.Where(w => w.Left > clock - estimateClock)
                     .OrderBy(w => w.Rank).ThenByDescending(w => w.Share).Take(12).Select(w => new FarmWardEstimate(w.Hero,

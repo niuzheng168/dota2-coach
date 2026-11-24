@@ -25,7 +25,7 @@ public static class BoardDelivery
         } catch (JsonException) { return null; }
     }
     // Standard build 6989 overview: posX=-9472, posY=9472, span=18944. No side mirroring.
-    private const int WorldEdge = 9472;
+    public const int WorldEdge = 9472;
     public static ScreenMark? OnOverview(ObservedWard w) => OnOverview(w.X, w.Y);
     public static ScreenMark? OnOverview(double x, double y) =>
         Wire.Finite(x, -WorldEdge, WorldEdge) && Wire.Finite(y, -WorldEdge, WorldEdge) ?
@@ -60,19 +60,29 @@ public static class BoardDelivery
     {
         double seconds = Math.Max(0, elapsedMs) / 1000d;
         return board with {
-            Heroes = board.Heroes.Select(h => h with { Items = h.Items?.ToArray(), Age = h.Age is double a ? Math.Min(86_400, a + seconds) : null }).ToArray(),
+            Heroes = board.Heroes.Select(h => h with { Items = h.Items?.ToArray(), Age = h.Age is double a ? Math.Min(86_400, a + seconds) : null,
+                Stats = h.Stats is { Age: double s } stats ? stats with { Age = Math.Min(86_400, s + seconds) } : h.Stats }).ToArray(),
             Wards = board.Wards?.Where(w => w.Left > seconds).Select(w => w with {
                 Age = Math.Min(86_400, w.Age + seconds), Left = w.Left - seconds }).ToArray(),
             SeenWards = board.SeenWards?.ToArray(), LaneMap = board.LaneMap?.Age(elapsedMs), RemainingMs = remainingMs,
+            Fog = board.Fog?.Select(f => f with { Seconds = Math.Round(f.Seconds + seconds, 1) }).Where(f => f.Seconds <= FogTracker.MaxSeconds).ToArray(),
         };
     }
     internal static bool HasIcon(EnemyBoard? board, string key) =>
-        board?.Heroes.Any(h => h.Hero == key || h.Neutral == key || h.Items?.Contains(key) == true) == true;
+        board?.Heroes.Any(h => h.Hero == key || h.Neutral == key || h.Items?.Contains(key) == true) == true ||
+        board?.Fog?.Any(f => f.Hero == key) == true;
     internal static bool Empty(EnemyBoard board) =>
-        board.Heroes.Length == 0 && board.Wards is not { Length: > 0 } && board.SeenWards is not { Length: > 0 } && board.LaneMap == null;
+        board.Heroes.Length == 0 && board.Wards is not { Length: > 0 } && board.SeenWards is not { Length: > 0 } && board.LaneMap == null &&
+        board.Fog is not { Length: > 0 };
     internal static EnemyBoard? Legacy(EnemyBoard? board) {
         if (board?.LaneMap == null) return board;
         var legacy = board with { LaneMap = null };
         return Empty(legacy) ? null : legacy;
+    }
+    /// <summary>For a game client up to v0.6.4, whose closed schema rejects a whole board with enemy stats or fog marks.</summary>
+    internal static EnemyBoard? WithoutStatsOrFog(EnemyBoard? board) {
+        if (board == null || board.Fog == null && board.Heroes.All(h => h.Stats == null)) return board;
+        var basic = board with { Fog = null, Heroes = board.Heroes.Select(h => h with { Stats = null }).ToArray() };
+        return Empty(basic) ? null : basic;
     }
 }

@@ -36,6 +36,8 @@ public sealed record GameOverlaySettings
     public bool ShowWards { get; init; } = true;
     /// <summary>Short-lived lane estimates are only displayed on a coach-confirmed HUD.</summary>
     public bool ShowLaneWaves { get; init; } = true;
+    /// <summary>Enemies that left the friend team's vision: last sighting, facing and the circle they are probably in.</summary>
+    public bool ShowFog { get; init; } = true;
     /// <summary>Dota's minimap is on the right (the HUD option to flip it).</summary>
     public bool MinimapRight { get; init; }
     /// <summary>Minimap size, % of the default HUD's (raise it for Dota's extra-large minimap).</summary>

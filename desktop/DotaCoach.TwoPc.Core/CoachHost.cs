@@ -76,6 +76,7 @@ public sealed class CoachHost : IAsyncDisposable
         app.MapGet("/v1/reminder", (HttpContext c) => Results.Json(new { reminder = Mailbox.Poll(Session(c)) }, Wire.Json));
         app.MapGet("/v1/enemies", (HttpContext c) => {
             var board = Mailbox.Enemies(Session(c));
+            if (c.Request.Query["fog"] != "1") board = BoardDelivery.WithoutStatsOrFog(board);
             return Results.Json(new { enemies = c.Request.Query["waves"] == "1" ? board : BoardDelivery.Legacy(board) }, Wire.Json);
         });
         app.MapGet("/v1/icon/{key}", (HttpContext c, string key) =>

@@ -58,10 +58,11 @@ internal static class MinuteModelInputAuditTests
                 var state = new LiveMatchState(archive, () => t);
                 state.ObserveFrame(Sample(600.1, 900, 15));
                 var origin = Sample(600.625, 813, 27); state.ObserveFrame(origin);
-                state.ObserveTeam(id, "radiant", 600.25, new([new(enemy, 8, ["item_sheepstick", null, null, null, null, null], null, 1.5)],
+                state.ObserveTeam(id, "radiant", 600.25, new([new(enemy, 8, ["item_sheepstick", null, null, null, null, null], null, 1.5) {
+                    Stats = new(60, 12, 140, 7, 25, 315, 22, 18, 30, 1.5) }],
                     [new(enemy, "observer", .3, .4, 0, .6, 4, 50)]));
                 state.ObserveWards(id, "radiant", 600.25, [new("sentry", "dire", 77, 80)]);
-                state.ObserveSight(id, "radiant", 600.25, [new(enemy, "dire", -501, 220)]);
+                state.ObserveSight(id, "radiant", 600.25, [new(enemy, "dire", -501, 220, 135)]);
                 state.ObserveLaneWaves(origin, new(t, "team-view", 600, "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS", false, id, 2, 0,
                     [new("npc_dota_creep_goodguys_melee", 2, -363, -254, null, 750, null),
                      new("npc_dota_creep_badguys_ranged", 3, -185, -109, null, 750, null)], [], []), confirmed: true);
@@ -103,6 +104,10 @@ internal static class MinuteModelInputAuditTests
                 check(sent[0].GetProperty("teamKnowledge").GetProperty("laneWaves").GetProperty("lanes")[1].GetProperty("basis").GetString() == "seen-close" &&
                     !sent[1].GetRawText().Contains("seen-close") && JsonElement.DeepEquals(sent[0].GetProperty("emptyLaneMeetings"), sent[1].GetProperty("emptyLaneMeetings")),
                     "sharing off still gets identical clock-only baseline, no team sightings; opt-in sends and archives frozen wave evidence");
+                var team = sent[0].GetProperty("teamKnowledge");
+                check(team.GetProperty("lastReadEquipment")[0].GetProperty("stats") is var st && st.GetProperty("armor").GetInt32() == 7 &&
+                    st.GetProperty("readClock").GetDouble() == 598.75 && team.GetProperty("visibleAtSightSample")[0].GetProperty("yaw").GetInt32() == 135,
+                    "opt-in team knowledge carries enemy HUD stats with their read clock and the sighted heroes' facing, and archives them");
                 check(options.GetArrayLength() == 2 && options[0].GetProperty("stops")[0].GetProperty("costBasis").ValueKind == JsonValueKind.Null &&
                     options[1].GetProperty("stops")[0].GetProperty("packWindowSeconds").GetInt32() == 33 &&
                     sent[0].GetProperty("historicalPrior").ValueKind == JsonValueKind.Object && !sent[1].TryGetProperty("teamKnowledge", out _) &&
@@ -114,6 +119,8 @@ internal static class MinuteModelInputAuditTests
                     d => d["input"]!["options"]![1]!["stops"]![0]!["pixels"] = true,
                     d => d["input"]!["teamKnowledge"]!["lastReadEquipment"]![0]!["steamId"] = "private",
                     d => d["input"]!["teamKnowledge"]!["laneWaves"]!["lanes"]![1]!["minimap"] = "raw",
+                    d => d["input"]!["teamKnowledge"]!["lastReadEquipment"]![0]!["stats"]!["health"] = 900,
+                    d => d["input"]!["teamKnowledge"]!["visibleAtSightSample"]![0]!["yaw"] = 400,
                     d => d["input"]!["emptyLaneMeetings"]![0]!["meeting"]!["steamId"] = "private",
                     d => d["input"]!["options"] = new JsonArray(new JsonNode?[33]), d => d["includesTeamKnowledge"] = false,
                     d => d["input"] = "arbitrary blob", d => d["inputSequence"] = long.MaxValue,

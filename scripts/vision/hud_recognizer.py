@@ -36,6 +36,37 @@ ATTRIBUTE_ROW = (1061, 1079)
 ATTRIBUTE_SPAN = (558, 712)  # where the icons are searched, right of the magnifier
 MAGNIFIER = 546  # left edge of the portrait magnifier, the leftmost column a value can reach
 ATTRIBUTE_HUES = {"strength": ((0, 12), (168, 180)), "agility": ((40, 85),), "intelligence": ((88, 110),)}
+# The stats column on the portrait's right edge, top to bottom: attack damage, attack speed, armor, magic resistance and
+# move speed, each value right-aligned against its grey icon and drawn over the animated portrait art. Damage and armor
+# may carry a bonus after the white base value, green "+N" or red "-N". A damage bonus moves the four rows below it 2 px
+# down and an armor bonus the two below armor another 2 px, so where the icons sit tells whether a bonus is drawn (it
+# did in all 135 labelled frames). Top row of each value's digits (9 rows tall) when neither bonus is drawn:
+STAT_ROWS = {"damage": 948, "attackSpeed": 971, "armor": 991, "magicResist": 1014, "moveSpeed": 1037}
+STAT_DOWN = 2
+STAT_TEXT = (600, 683)  # columns the values are looked for in; the icons start at 684
+STAT_ICONS = (684, 695)
+# Icon rows without a bonus: attack speed's hand and armor's shield, then magic resistance's ring and move speed's boot.
+# Each pair is scored at both possible places by its grey pixels; the better place must lead by STAT_ICON_LEAD (the
+# smallest leads seen were 46 and 26).
+STAT_ICON_ROWS = (((969, 980), (990, 998)), ((1013, 1021), (1036, 1045)))
+STAT_ICON_LEAD = 12
+# A column belongs to a value where its digit rows are lit (white digits peak at 204, the bonus colours higher) and
+# contrast with the dark outline just above or below. Columns that are also lit 2-3 rows outside the digits are portrait
+# art. Digits are tabular, 7 px apart, with at most 5 empty columns between them (after a 1), so a value ends at a wider
+# gap; art within STAT_CLEAR columns left of it may hide its first digit, and the value is not read. Neither is one with
+# a fainter stem there (6 of the 9 digit rows at least STAT_FAINT[0], contrast STAT_FAINT[1]): resampled to 1080 rows
+# from 1440 or 900, a leading 1 went too soft to count and the OCR read "123" as "23", which fits its width.
+STAT_LIT, STAT_CONTRAST, STAT_GAP, STAT_CLEAR = 160, 90, 7, 6
+STAT_FAINT = (120, 60)
+# The drawn width must fit the characters read, which catches a digit lost by the OCR ("77" read as "7") or added from
+# the art: 7 px per digit less 2, a minus 5 more, the space and sign before a bonus 7 (a red minus 5), a percent sign 11.
+STAT_WIDTH_SLACK = 2
+# The OCR batches crops of like shape and pads each batch to its widest, which changes what it reads in narrow crops;
+# the values' crops are all padded on the left with black to one width (on 242 frames: 43 damage and 7 armor values
+# unread instead of 47 and 8, every value read the same).
+STAT_CROP_WIDTH = 64
+STAT_RANGES = {"damage": (1, 999), "bonusDamage": (-999, 9999), "attackSpeed": (1, 1000), "armor": (-100, 300),
+               "magicResist": (-100, 100), "moveSpeed": (100, 1000)}
 BAR_ENDS = (714, 1125)  # the left end moves with the left block, the right end with the panel
 # (health top, health bottom, mana top, mana bottom). A barrier adds a thin bar above health and
 # both bars shrink to make room.
@@ -432,7 +463,7 @@ class HudRecognizer:
 
     def read(self, image: np.ndarray, heroes: set[str] | None = None, full: bool = True) -> dict:
         """`heroes`: the heroes in this match, when known, for naming the HUD's hero. Without `full`
-        only whose HUD it is, level, health, mana and alive are read (items and attributes are None)."""
+        only whose HUD it is, level, health, mana and alive are read (items, attributes and stats are None)."""
         frame, x = normalize(image)
         gray = np.zeros(frame.shape[:2], np.uint8)
         cv2.cvtColor(frame[HUD_TOP:], cv2.COLOR_BGR2GRAY, dst=gray[HUD_TOP:])  # only the HUD is read
@@ -469,11 +500,13 @@ class HudRecognizer:
         # A dead hero's HUD covers the attributes with the buyback panel.
         dead = bars["health"][2] == 0
         attributes = None if dead or not full else self.attribute_spans(frame, dl)
+        stats = None if dead or not full else self.stat_spans(frame, dl)
         centre = ((BAR_ENDS[0] + dl) + (BAR_ENDS[1] + dr)) // 2
         crops = {"level": frame[box(LEVEL, dl)], "name": frame[box(NAME, dl)]}
         crops |= {k: frame[ATTRIBUTE_ROW[0]:ATTRIBUTE_ROW[1], x0:x1] for k, (x0, x1) in (attributes or {}).items()
                   if x1 - x0 >= 5}
         crops |= {k: frame[y0:y1 + 1, centre - BAR_TEXT:centre + BAR_TEXT] for k, (y0, y1, _) in bars.items()}
+        crops |= {k: self.stat_crop(frame, s, dl) for k, s in (stats or {}).items() if s}
         text = dict(zip(crops, self.ocr(list(crops.values()))))
         values = {k: ratio(text[k][0], fill) for k, (_, _, fill) in bars.items()}
         # Abilities all on cooldown can leave the icons undecided; the name label then decides. A
@@ -488,6 +521,7 @@ class HudRecognizer:
             "hero": hero["hero"], "heroMatch": hero,
             "level": number(text["level"][0], 1, 30),
             "attributes": full and {k: number(text[k][0], 0, 999, last=True) if k in text else None for k in ATTRIBUTE_HUES} or None,
+            "stats": None if stats is None else stat_values(stats, text),
             **values,
             "fill": {k: round(fill, 4) for k, (_, _, fill) in bars.items()},
             "items": items,
@@ -569,6 +603,83 @@ class HudRecognizer:
             start = s[0] - 1 - run[-1]
         return {"strength": (max(MAGNIFIER + dl, start - 2), s[0] - 1), "agility": (s[1] + 2, a[0] - 1),
                 "intelligence": (a[1] + 2, i[0] - 1)}
+
+    @staticmethod
+    def stat_spans(frame: np.ndarray, dl: int) -> dict[str, dict | None]:
+        """Where each stats column value is drawn: {"y": its top digit row, "x0", "x1": its first and last column,
+        "bonus": whether a bonus follows the base value, and then "split": the bonus's first column and "sign": +1 green,
+        -1 red, None unclear}. None for a value the portrait art may hide part of; all None when the icons' rows are unclear."""
+        top, bottom = STAT_ICON_ROWS[0][0][0] - 2, STAT_ICON_ROWS[-1][-1][1] + 2 * STAT_DOWN + 3
+        hsv = cv2.cvtColor(frame[top:bottom, STAT_ICONS[0] + dl:STAT_ICONS[1] + dl], cv2.COLOR_BGR2HSV)
+        grey = np.zeros(bottom, np.float32)
+        grey[top:] = ((hsv[..., 1] < 45) & (hsv[..., 2] > 110) & (hsv[..., 2] < 215)).sum(1)
+        shifts, down = [], 0
+        for icons in STAT_ICON_ROWS:
+            # Grey pixels in the icons' rows, less those in the two rows above and below each icon.
+            score = {d: sum(grey[a + d:b + d + 1].sum() - grey[a + d - 2:a + d].sum() - grey[b + d + 1:b + d + 3].sum()
+                            for a, b in icons) for d in (down, down + STAT_DOWN)}
+            if abs(score[down] - score[down + STAT_DOWN]) < STAT_ICON_LEAD:
+                return dict.fromkeys(STAT_ROWS)
+            down = max(score, key=score.get)
+            shifts.append(down)
+        rows = {"damage": 0, "attackSpeed": shifts[0], "armor": shifts[0], "magicResist": shifts[1], "moveSpeed": shifts[1]}
+        out = {}
+        for name, row in STAT_ROWS.items():
+            y = row + rows[name]
+            span = HudRecognizer.stat_span(frame, y, dl)
+            out[name] = span and {"y": y, "x0": span[0], "x1": span[1],
+                                  "bonus": name == "damage" and shifts[0] > 0 or name == "armor" and shifts[1] > shifts[0]}
+            if out[name] and out[name]["bonus"]:
+                out[name]["split"], out[name]["sign"] = HudRecognizer.stat_bonus(frame, y, *span)
+        return out
+
+    @staticmethod
+    def stat_crop(frame: np.ndarray, span: dict, dl: int) -> np.ndarray:
+        """A value's OCR crop: its rows from 3 columns before it to the icon, on black up to STAT_CROP_WIDTH."""
+        crop = frame[span["y"] - 4:span["y"] + 14, span["x0"] - 3:STAT_TEXT[1] + dl]
+        out = np.zeros((crop.shape[0], max(STAT_CROP_WIDTH, crop.shape[1]), 3), np.uint8)
+        out[:, out.shape[1] - crop.shape[1]:] = crop
+        return out
+
+    @staticmethod
+    def stat_span(frame: np.ndarray, y: int, dl: int) -> tuple[int, int] | None:
+        """First and last column of the stats value whose digits start at row `y`: the lit columns that end at the icon,
+        up to a gap wider than any between two characters. None when art left of it may hide a digit."""
+        x0 = STAT_TEXT[0] + dl
+        value = frame[y - 3:y + 12, x0:STAT_TEXT[1] + dl].max(2)
+        digits, outlined, outside = value[3:12], value[2:13], value[[0, 1, 13, 14]]
+        contrast = outlined.max(0) - outlined.min(0)
+        structured = contrast >= STAT_CONTRAST
+        art = (outside >= STAT_LIT).any(0) & structured
+        faint = ((digits >= STAT_FAINT[0]).sum(0) >= 6) & (contrast >= STAT_FAINT[1])
+        columns = np.flatnonzero((digits >= STAT_LIT).any(0) & structured & ~(art | np.r_[art[1:], False] | np.r_[False, art[:-1]]))
+        if not len(columns) or columns[-1] < value.shape[1] - 7:  # values end 2-5 px before the icon
+            return None
+        start = end = columns[-1]
+        for c in columns[::-1]:
+            if start - c > STAT_GAP:
+                break
+            start = c
+        if art[max(0, start - STAT_CLEAR):start].any() or faint[max(0, start - STAT_CLEAR):max(0, start - 2)].any():
+            return None  # (the two columns next to the value hold its own soft edge)
+        return x0 + int(start), x0 + int(end)
+
+    @staticmethod
+    def stat_bonus(frame: np.ndarray, y: int, x0: int, x1: int) -> tuple[int | None, int | None]:
+        """First column and sign of the bonus that ends a value: the run of green (+) or red (-) columns reaching its end."""
+        b, g, r = (frame[y:y + 9, x0:x1 + 1, i].astype(np.int16) for i in range(3))
+        green = ((g - np.maximum(r, b) >= 50) & (g >= STAT_LIT)).any(0)
+        red = ((r - np.maximum(g, b) >= 50) & (r >= STAT_LIT)).any(0)
+        sign, colour = (1, green) if green.sum() > red.sum() else (-1, red)
+        columns = np.flatnonzero(colour)
+        if not len(columns) or columns[-1] < len(colour) - 3 or (red if sign > 0 else green).sum() > 1:
+            return None, None
+        start = columns[-1]
+        for c in columns[::-1]:
+            if start - c > STAT_GAP:
+                break
+            start = c
+        return x0 + int(start), sign
 
     @staticmethod
     def bars(frame: np.ndarray, dl: int, dr: int) -> dict[str, tuple[int, int, float]]:
@@ -666,6 +777,50 @@ def ratio(text: str, fill: float) -> dict | None:
         return None
     _, _, current, maximum = min(fits)
     return {"current": current, "max": maximum}
+
+
+# What the recognizer returns for look-alike characters: full-width and Chinese signs, the letter O.
+STAT_CHARS = str.maketrans({"O": "0", "o": "0", "十": "+", "＋": "+", "一": "-", "—": "-", "–": "-", "－": "-", "％": "%"})
+
+
+def stat_text(text: str, span: dict, percent: bool = False) -> tuple[int, int] | None:
+    """(base, signed bonus) of an OCR'd stats column value, the bonus 0 when none is drawn. None unless the text is
+    exactly such a value and its characters fill the drawn width (see STAT_WIDTH_SLACK)."""
+    t = re.sub(r"\s+", "", text.translate(STAT_CHARS)).rstrip(".,")
+    width = span["x1"] - span["x0"] + 1
+    whole = lambda *parts: not any(len(p) > 1 and p[0] == "0" for p in parts)
+    if not span["bonus"]:
+        m = re.fullmatch(r"(-?)(\d+)" + ("%" if percent else ""), t)
+        if not m or not whole(m[2]) or abs(width - (7 * len(m[2]) - 2 + 5 * bool(m[1]) + 11 * percent)) > STAT_WIDTH_SLACK:
+            return None
+        return int(m[1] + m[2]), 0
+    m, sign, split = re.fullmatch(r"(-?)(\d+)([+\-]?)(\d+)", t), span["sign"], span["split"]
+    if m is None or sign is None or m[3] and (m[3] == "+") != (sign > 0):
+        return None
+    # How many digits the base has follows from where the coloured bonus starts, 7 px per digit and 3 (2 before a red
+    # minus) for the space and the sign's unlit edge: the OCR may drop the sign or the space.
+    lead = split - span["x0"] - (2 if sign > 0 else 1) - 5 * bool(m[1])
+    count, digits = round(lead / 7), m[2] + m[4]
+    if (abs(lead - 7 * count) > STAT_WIDTH_SLACK or not 0 < count < len(digits) or m[3] and len(m[2]) != count
+            or abs(width - (7 * (len(digits) + 1) - 2 * (sign < 0) + 5 * bool(m[1]))) > STAT_WIDTH_SLACK
+            or not whole(digits[:count], digits[count:])):
+        return None
+    return int(m[1] + digits[:count]), sign * int(digits[count:])
+
+
+def stat_values(spans: dict, text: dict) -> dict:
+    """Attack damage (the white base) and its bonus, attack speed, armor (base and bonus together), magic resistance
+    and move speed from the stats column; None for each value not read with confidence or outside STAT_RANGES."""
+    read = {name: stat_text(text[name][0], span, name == "magicResist") if span and name in text else None
+            for name, span in spans.items()}
+    fit = lambda key, v: v if v is not None and STAT_RANGES[key][0] <= v <= STAT_RANGES[key][1] else None
+    damage, bonus = read["damage"] or (None, None)
+    if fit("damage", damage) is None or fit("bonusDamage", bonus) is None:
+        damage = bonus = None
+    armor = read["armor"] and sum(read["armor"])
+    return {"damage": damage, "bonusDamage": bonus, "attackSpeed": fit("attackSpeed", read["attackSpeed"] and read["attackSpeed"][0]),
+            "armor": fit("armor", armor), "magicResist": fit("magicResist", read["magicResist"] and read["magicResist"][0]),
+            "moveSpeed": fit("moveSpeed", read["moveSpeed"] and read["moveSpeed"][0])}
 
 
 def calibrate(datasets: list[Path], reference: Path, out: Path, replays: set[str] | None = None):

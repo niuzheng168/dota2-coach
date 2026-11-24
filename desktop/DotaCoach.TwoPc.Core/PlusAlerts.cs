@@ -45,23 +45,28 @@ public sealed class HeroNames
 /// <summary>
 /// Enemy heroes leaving the friend team's vision, from this coach machine's own Plus spectator GSI: an enemy
 /// seen for at least <see cref="MinVisibleMs"/> and then missing for <see cref="GoneMs"/> is announced with the
-/// area it was last seen in, at most once per <see cref="CooldownMs"/>. Brief flickers at the edge of vision do
-/// not count. GSI cannot tell a death from walking into fog, so a hero killed in sight is announced too.
+/// area it was last seen in and the place it faced, at most once per <see cref="CooldownMs"/>. Brief flickers at the
+/// edge of vision do not count. GSI cannot tell a death from walking into fog: an enemy that vanished as the friend
+/// team's kill count rose (within <see cref="FogTracker.KillWindow"/> s) is taken as killed and not announced
+/// (the user's choice, 2026-11-24; about a fifth of these subtitles in 47 replays were deaths).
 /// </summary>
 public sealed class VisionLossTracker
 {
+    /// <summary>The user's default (2026-11-24): three seconds announced too often. The coach's setting overrides it.</summary>
+    public const int DefaultGoneMs = 5000, MaxGoneSeconds = 30;
     public int MinVisibleMs { get; init; } = 3000;
-    public int GoneMs { get; init; } = 3000;
+    public int GoneMs { get; set; } = DefaultGoneMs;
     public int CooldownMs { get; init; } = 20000;
     /// <summary>The 7.42 map for place names (camps, towers, objectives); without it the coarse <see cref="MapArea"/>.</summary>
     public CoachMap? Map { get; set; }
-    private sealed class Sighting { public long RunStart, LastVisible, LastAlert = long.MinValue / 2; public double X, Y; public bool Announced; }
+    private sealed class Sighting { public long RunStart, LastVisible, LastAlert = long.MinValue / 2; public double X, Y; public int? Yaw; public bool Announced; }
     private readonly Dictionary<string, Sighting> heroes = new(StringComparer.Ordinal);
+    private readonly List<long> kills = []; // receipts of unclaimed rises of the friend team's kill count
     private string? match;
-    private int ownTeam;
+    private int ownTeam, lastKills = -1;
     private long? lastReceipt;
 
-    public void Clear() { heroes.Clear(); match = null; ownTeam = 0; lastReceipt = null; }
+    public void Clear() { heroes.Clear(); kills.Clear(); match = null; ownTeam = 0; lastKills = -1; lastReceipt = null; }
 
     public List<PlusAlert> Update(SpectatorSnapshot s, HeroNames names)
     {
@@ -70,8 +75,15 @@ public sealed class VisionLossTracker
         if (now < lastReceipt) return alerts;
         if (!TeamViewEvidence.IsTeamView(s)) { Clear(); return alerts; }
         // Missing packets are not evidence that a previously visible enemy walked into fog.
-        if (s.MatchId != match || s.OwnTeam != ownTeam || now - lastReceipt >= TeamViewEvidence.FreshMs) heroes.Clear();
+        if (s.MatchId != match || s.OwnTeam != ownTeam || now - lastReceipt >= TeamViewEvidence.FreshMs) {
+            heroes.Clear(); kills.Clear(); lastKills = -1; // a rise during the gap names no one
+        }
         match = s.MatchId; ownTeam = s.OwnTeam!.Value; lastReceipt = now;
+        if (s.Kills is var (radiant, dire)) {
+            int own = ownTeam == 2 ? radiant : dire;
+            if (lastKills >= 0) for (int k = lastKills; k < own && kills.Count < 10; k++) kills.Add(now);
+            lastKills = own;
+        }
         // Illusions and clones share the hero's name; the first entry stands for it, as on the scan page.
         foreach (var unit in TeamViewEvidence.VisibleHeroes(s).Where(u => u.Team != ownTeam)) {
             if (!heroes.TryGetValue(unit.Name, out var h)) {
@@ -79,17 +91,41 @@ public sealed class VisionLossTracker
                 heroes[unit.Name] = h = new() { RunStart = now };
             }
             else if (h.Announced || now - h.LastVisible >= GoneMs) { h.RunStart = now; h.Announced = false; }
-            h.LastVisible = now; h.X = unit.X; h.Y = unit.Y;
+            h.LastVisible = now; h.X = unit.X; h.Y = unit.Y; h.Yaw = TeamViewEvidence.Facing(unit.Yaw);
+        }
+        // Each rise claims the unannounced enemy that vanished nearest to it, before or after; its absence is closed silently.
+        long window = (long)(FogTracker.KillWindow * 1000);
+        kills.RemoveAll(k => now - k > window);
+        while (kills.Count > 0 && heroes.Values.Where(h => !h.Announced && h.LastVisible < now && Math.Abs(h.LastVisible - kills[0]) <= window)
+                   .OrderBy(h => Math.Abs(h.LastVisible - kills[0])).FirstOrDefault() is { } killed) {
+            killed.Announced = true; kills.RemoveAt(0);
         }
         foreach (var (hero, h) in heroes) {
             if (h.Announced || h.LastVisible == now || now - h.LastVisible < GoneMs) continue;
             h.Announced = true; // one alert per absence, even when the cooldown suppresses it
             if (h.LastVisible - h.RunStart < MinVisibleMs || now - h.LastAlert < CooldownMs) continue;
             h.LastAlert = now;
-            alerts.Add(new(now, "vision-lost", hero, $"{names[hero]} 离开视野 · 最后在{Map?.Describe(h.X, h.Y, ownTeam) ?? MapArea.Name(h.X, h.Y, ownTeam)}"));
+            string place = Place(h.X, h.Y);
+            alerts.Add(new(now, "vision-lost", hero, $"{names[hero]} 离开视野 · 最后在{place}" +
+                (Ahead(h.X, h.Y, h.Yaw, place) is { } toward ? "，朝" + toward : "")));
         }
         return alerts;
     }
+    private string Place(double x, double y) => Map?.Describe(x, y, ownTeam) ?? MapArea.Name(x, y, ownTeam);
+    /// <summary>The first differently named place along the hero's last facing, or null. A facing is where the hero
+    /// looked as it vanished, not proof of where it went.</summary>
+    private string? Ahead(double x, double y, int? yaw, string place)
+    {
+        if (yaw is not int degrees) return null;
+        double a = degrees * Math.PI / 180;
+        foreach (double d in HeadingSteps) {
+            double px = x + d * Math.Cos(a), py = y + d * Math.Sin(a);
+            if (Math.Abs(px) > 8200 || Math.Abs(py) > 8200) return null; // off the playable map
+            if (Place(px, py) is var next && next != place) return next;
+        }
+        return null;
+    }
+    private static readonly double[] HeadingSteps = [1200, 2000, 2800];
 }
 
 /// <summary>Source time, never the time at which the coach happened to poll the file.</summary>
@@ -110,8 +146,8 @@ public sealed record ScanStamp(string Run, long WrittenMs, string MatchId, int O
 public sealed record ScanStatus(bool Running, string Text, ScanStamp? Sample = null);
 
 /// <summary>
-/// The enemy panel found by scripts/vision/hero_scan.py on this machine, read from its live file: enemy levels
-/// and items from Plus team view, for the match being spectated. The panel's icons sit in icons/ beside the file.
+/// The enemy panel found by scripts/vision/hero_scan.py on this machine, read from its live file: enemy levels,
+/// items and HUD stats from Plus team view, for the match being spectated. The panel's icons sit in icons/ beside the file.
 /// </summary>
 public static class ScanFeed
 {
@@ -161,7 +197,7 @@ public static class ScanFeed
             // v0.4.8 stamps the envelope in whole GSI seconds, but individual reads within that second are precise.
             var wards = Wards(enemies, !hasGsiAge && clock == Math.Floor(clock) ? Math.Min(43_200, clock + .99) : clock);
             // A roster without a single HUD read is a running scanner, not an available empty inventory.
-            if (!board.Heroes.Any(h => h.Level != null || h.Items != null || h.Neutral != null) && !wards.Values.Any(r => r.Length != 0))
+            if (!board.Heroes.Any(h => h.Level != null || h.Items != null || h.Neutral != null || h.Stats != null) && !wards.Values.Any(r => r.Length != 0))
                 return (new(true, "视觉扫描运行中，等待读取可见敌方英雄"), null, none);
             double observed = wards.Values.SelectMany(rs => rs).Select(r => r.Clock).Append(clock).Max();
             return (new(true, "视觉扫描运行中", stamp with { WardClock = observed }), board, wards);

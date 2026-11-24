@@ -62,8 +62,8 @@ public sealed record WardGuess(string Id, string Hero, string Kind, int Count, d
 /// Guesses where enemy wards went, from Plus team view only. hero_scan.py reads each visible enemy's ward counts with
 /// its items; when a later read has fewer wards than the one before, the wards were used in between. The enemy's
 /// track on this coach's own Plus GSI minimap bounds where: within cast range of where it was seen, or of any point it
-/// could have walked to while out of sight. In sight as the count dropped, the mark goes a cast range ahead of where the
-/// hero was then. Otherwise common 7.42 spots of that team are scored on the track (<see cref="WardModel"/>); with none
+/// could have walked to while out of sight. In sight as the count dropped, the mark goes just ahead of where the hero was
+/// then, the way it faced. Otherwise common 7.42 spots of that team are scored on the track (<see cref="WardModel"/>); with none
 /// fitting, the place it vanished is marked roughly.
 /// A count can also drop when a ward is handed to an ally, dropped or sold; these look the same.
 /// </summary>
@@ -84,14 +84,20 @@ public sealed class WardTracker
     // Reads timed to a fraction of a second, by the scanner's and this coach's own GSI arrival times.
     private const double ExactSlack = 0.3;
     // In sight between reads at most this far apart, the mark goes where the hero stood halfway (track points within
-    // AnchorNear s of then), moved AnchorAhead along the way it walked in the second before. In 47 replays with reads
-    // as the scanner takes them since 2026-11-22, that was within 600 of the real ward for 95 % of such guesses (79 %
-    // for the best-fitting common spot) and within 300 for about 60 %; the ward lies within 600 of the hero placing it.
-    private const double AnchorWindow = 4, AnchorNear = 0.75, AnchorAhead = 350, AnchorShare = 0.9;
+    // AnchorNear s of then), moved AnchorFacing the way it faced then: a hero turns to the spot it wards, often without
+    // walking. In the 47 replays with reads as the scanner takes them since 2026-11-22, the mark was within 300 of the real
+    // ward for 82 % of such guesses (62 % moving AnchorAhead the way it walked in the second before, used without a
+    // facing) and within 600 for 98 % (96 %); the ward lies within 600 of the hero placing it.
+    private const double AnchorWindow = 4, AnchorNear = 0.75, AnchorAhead = 350, AnchorFacing = 300, AnchorShare = 0.9;
     private readonly CoachMap? map;
     private readonly WardSpots? spots;
     private readonly object gate = new();
-    private sealed class Track { public readonly List<(double Clock, double X, double Y)> Points = new(); }
+    private sealed class Track
+    {
+        public readonly List<(double Clock, double X, double Y)> Points = new();
+        public readonly List<(double Clock, int Yaw)> Facings = new();
+    }
+    private const double AnchorKeep = 30; // facings are only used for in-sight anchors, within seconds of a read
     private readonly Dictionary<string, Track> tracks = new(StringComparer.Ordinal);
     private readonly Dictionary<string, WardReading> last = new(StringComparer.Ordinal);
     private readonly List<WardGuess> guesses = new();
@@ -135,6 +141,11 @@ public sealed class WardTracker
                     p.Add((clock, unit.X, unit.Y));
                 while (p.Count > 0 && clock - p[0].Clock > KeepSeconds) p.RemoveAt(0);
                 if (p.Count > 4096) p.RemoveRange(0, p.Count - 4096);
+                // Every packet's facing: a hero turns to the spot it wards, often without walking.
+                var f = track.Facings;
+                if (TeamViewEvidence.Facing(unit.Yaw) is int yaw && (f.Count == 0 || clock > f[^1].Clock)) f.Add((clock, yaw));
+                while (f.Count > 0 && clock - f[0].Clock > AnchorKeep) f.RemoveAt(0);
+                if (f.Count > 1024) f.RemoveRange(0, f.Count - 1024);
             }
             if (eyes.Count == 0 || clock - eyes[^1].Clock >= 1 || clock < eyes[^1].Clock)
                 eyes.Add((clock, s.Minimap.Where(u => u.Team == ownTeam && u.Vision > 0).Select(u => (u.X, u.Y, u.Vision!.Value * VisionShare)).ToArray()));
@@ -257,7 +268,7 @@ public sealed class WardTracker
         var candidates = new List<WardCandidate>();
         double share = 1;
         // In sight all along a short window: the hero's own position says more than any common spot.
-        if (gaps.Count == 0 && end - after <= AnchorWindow && Anchor(track, (after + end) / 2) is var (ax, ay)) {
+        if (gaps.Count == 0 && end - after <= AnchorWindow && Anchor(track, t?.Facings ?? [], (after + end) / 2) is var (ax, ay)) {
             candidates.Add(new(ax, ay, AnchorShare, map.Describe(ax, ay, ownTeam)));
             share = 1 - AnchorShare;
         }
@@ -286,9 +297,9 @@ public sealed class WardTracker
     }
     /// <summary>
     /// Where the hero stood at <paramref name="mid"/> (between the track points around it, at most AnchorNear away),
-    /// moved AnchorAhead along its way in the second before: a ward goes down a cast range ahead of a hero walking to it.
+    /// moved AnchorFacing the way it faced then (without a facing, AnchorAhead along its way in the second before).
     /// </summary>
-    private static (double X, double Y)? Anchor(List<(double Clock, double X, double Y)> track, double mid)
+    private static (double X, double Y)? Anchor(List<(double Clock, double X, double Y)> track, List<(double Clock, int Yaw)> facings, double mid)
     {
         int b = track.FindLastIndex(p => p.Clock <= mid && p.Clock >= mid - AnchorNear);
         int a = track.FindIndex(p => p.Clock > mid && p.Clock <= mid + AnchorNear);
@@ -299,6 +310,11 @@ public sealed class WardTracker
             (x, y) = (track[b].X + u * (track[a].X - track[b].X), track[b].Y + u * (track[a].Y - track[b].Y));
         }
         else (x, y) = b >= 0 ? (track[b].X, track[b].Y) : (track[a].X, track[a].Y);
+        if (facings.Where(f => Math.Abs(f.Clock - mid) <= AnchorNear).OrderBy(f => Math.Abs(f.Clock - mid)).Select(f => (int?)f.Yaw).FirstOrDefault() is int yaw) {
+            double r = yaw * Math.PI / 180;
+            return (x + Math.Cos(r) * AnchorFacing, y + Math.Sin(r) * AnchorFacing);
+        }
+        // A minimap without yaw (recordings before 2026-11-24): the way it walked in the second before.
         if (track.FindIndex(p => p.Clock >= mid - 1 && p.Clock <= mid - 0.35) is >= 0 and int k) {
             double vx = x - track[k].X, vy = y - track[k].Y, n = double.Hypot(vx, vy);
             if (n >= 60) (x, y) = (x + vx / n * AnchorAhead, y + vy / n * AnchorAhead);

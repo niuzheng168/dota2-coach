@@ -22,7 +22,8 @@ internal static class LiveMatchStateTests
                 hasPlayer ? Player(clock) with { MatchId = id } : null, hasPlayer ? 0 : null,
                 new(id, "radiant", luna, clock, phase, false)), [], ms, ms);
         var hud = MinimapLayout.Suggest(1920, 1080, true);
-        EnemyBoard Board(string item = "item_blink") => new([new(enemy, 9, [item, null, null, null, null, null], null, 4)],
+        EnemyBoard Board(string item = "item_blink") => new([new(enemy, 9, [item, null, null, null, null, null], null, 4) {
+                Stats = new(55, 0, 120, 5, 25, 330, 20, 17, 24, 4) }],
             [new(enemy, "observer", .25, .75, 0, .8, 2, 80)]);
         try {
             using (var archive = new MatchArchive(root)) {
@@ -36,7 +37,7 @@ internal static class LiveMatchStateTests
                 var b = Board();
                 state.ObserveTeam(match, "radiant", 598, b);
                 state.ObserveWards(match, "radiant", 597, [new("sentry", "dire", -2100, 125)]);
-                state.ObserveSight(match, "radiant", 598, [new(enemy, "dire", -1600, 192)]);
+                state.ObserveSight(match, "radiant", 598, [new(enemy, "dire", -1600, 192, 270)]);
                 state.ObserveWardReadings(match, "radiant", 598, enemy, [new(596.5, 1, 0, 0, 595), new(597.8, 0, 0, 0, 597.6)]);
                 state.NoteTeam(match, "radiant", 598, "ward-alert", enemy, "推测放下侦查守卫，非目击");
                 state.NoteTeam(match, "radiant", 598, "vision-alert", enemy, "离开上路视野");
@@ -66,6 +67,10 @@ internal static class LiveMatchStateTests
                     facts.Any(x => x is { Source: "team-vision", Kind: "ward-observed", Clock: 597, KnownAt: 600 }) &&
                     facts.Count(x => x.Kind == "ward-charges" && x.Source == "team-vision") == 2 &&
                     !facts.Any(f => f.KnownAt < 600), "observation time is not retroactive knowledge; evidence labels survive disk read");
+                check(facts.Any(x => x.Kind == "team-sight" && x.Data.GetProperty("heroes")[0].GetProperty("yaw").GetInt32() == 270) &&
+                    facts.Any(x => x.Kind == "equipment" && x.Data.GetProperty("heroes")[0].GetProperty("stats").GetProperty("moveSpeed").GetInt32() == 330) &&
+                    state.StorageWarning == null && eq.Heroes[0].Stats is { Armor: 5, Age: 6 },
+                    "sighted heroes' facing and enemy stats meet the archive allowlist; stats age on the game panel like the items");
                 ms += 300; var newer = Frame(601); state.ObserveFrame(newer);
                 state.ObserveTeam(match, "radiant", 601, Board("item_sheepstick"));
                 check(frozen.TeamKnowledge.LastReadEquipment[0].Items![0] == "item_blink" && state.ForFarm(first, true) == null &&

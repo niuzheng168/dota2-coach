@@ -24,7 +24,7 @@ internal sealed class IconCache
     public int Count => images.Count;
     /// <summary>Names on the board that neither this client nor its bundle has, to ask the coach for.</summary>
     public string[] Missing(EnemyBoard board, long now) => board.Heroes
-        .SelectMany(h => (h.Items ?? []).Append(h.Neutral).Prepend(h.Hero)).OfType<string>().Distinct()
+        .SelectMany(h => (h.Items ?? []).Append(h.Neutral).Prepend(h.Hero)).Concat((board.Fog ?? []).Select(f => f.Hero)).OfType<string>().Distinct()
         .Where(key => !images.ContainsKey(key) && !FromBundle(key) && (!failed.TryGetValue(key, out long at) || now - at >= RetryMs)).ToArray();
     public void Add(string key, byte[]? png, long now)
     {
