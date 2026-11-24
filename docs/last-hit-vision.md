@@ -49,6 +49,16 @@ python scripts/lasthit/vision/train.py OUT DATA_DIR... [--test DATA_DIR...] [--e
 - 输出 `model.pt`、`model.onnx`（输入 `near`/`far`：uint8 `[n, 12, 128, 128]`，输出 `damage`：`[n, 10]`）、`log.jsonl`、`predictions.npz`。
 - 环境：Python 3.12、PyTorch（CUDA）、numpy、pillow、onnx、onnxscript、onnxruntime。`--limit 600` 可在任何机器上几分钟内跑通一遍。
 
+## 交给训练机：`scripts/lasthit/vision/pack.py`
+
+训练不在开发机上做，交给另一台 A100 上的会话；数据经 Azure Blob 传过去（私有容器，SAS 由训练机会话用本机临时 RSA 公钥加密后发来，私钥只在本机）。
+
+```powershell
+python scripts/lasthit/vision/pack.py Z:/dota2coach/data/lasthit-vision rec1 .tmp/upload
+```
+
+每段录制打成 `runs/REC/`：轨迹、同步文件、日志、`frames.jsonl`、`labels.jsonl` 原样，图片按约 1.5 GiB 一片打成不压缩的 tar（成员路径 `REC/NNNNNN.jpg`），最后写 `manifest.json`（每个文件的字节数和 SHA-256）；全部传完再放 `_SUCCESS`。已录：rec1 露娜、rec2 主宰、rec3 卓尔游侠，各 40 回合、约 19 分钟、3.4 万张图；试传用 rec2 开头 4 分钟（rec2-head4m，7193 张）。
+
 ## 还没做
 
 - 用模型预测代替血条节奏，接回 `--last-hit-eval` 算补到率（离线），再接进游戏端（ONNX Runtime + 显卡）实测延迟和补到率。
