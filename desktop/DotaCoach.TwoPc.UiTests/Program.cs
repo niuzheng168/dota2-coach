@@ -521,7 +521,7 @@ internal static partial class Program
             "bundled icons load from the program folder; missing or broken ones are asked from the coach");
 
         // A saved local preview ruler is NOT a calibration. Render the same four legacy estimate cases
-        // only on a match-labelled, confirmed HUD: even the best estimate is hollow, not a sighting.
+        // only on a match-labelled, confirmed HUD: even the best estimate is a yellow guess icon, not a sighting.
         WardMark[] marks = [new("npc_dota_hero_lion", "observer", .25, .25, 0, .6, 20, 340), new("npc_dota_hero_lion", "observer", .75, .25, 1, .3, 20, 340),
             new("npc_dota_hero_lion", "sentry", .25, .75, 0, 1, 50, 370), new("npc_dota_hero_pudge", "ward", .75, .75, 0, 1, 380, 40, Rough: true)];
         var confirmed = new MinimapLayout(1280, 720, 10, 410, 300);
@@ -546,13 +546,21 @@ internal static partial class Program
             var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(wardBitmap)); encoder.Save(stream);
         }
         byte[] Pixel(int x, int y) { int i = (y * 300 + x) * 4; return wardPixels[i..(i + 4)]; }
-        bool Rim(int x, int y, Func<byte[], bool> color) => Enumerable.Range(x - 20, 41).Any(i =>
-            Enumerable.Range(y - 20, 41).Any(j => color(Pixel(i, j))));
-        bool Gold(byte[] p) => p is [< 60, > 75, > 100, > 100];
-        await Wait(() => new[] { (75, 75), (225, 75), (75, 225), (225, 225) }.All(v => Pixel(v.Item1, v.Item2)[3] == 0) &&
-            Rim(75, 75, Gold) && Rim(225, 75, Gold) && Rim(75, 225, p => p is [> 100, > 65, < 60, > 100]) &&
-            Rim(225, 225, p => p is [> 80, > 80, > 80, > 80]) && Pixel(187, 187) is [> 160, > 120, < 60, > 180],
-            "observer/sentry, lower-ranked and rough guesses have coloured rims and empty centres; only the observed sentry has a filled centre");
+        bool Near(int x, int y, Func<byte[], bool> color) => Enumerable.Range(x - 9, 19).Any(i =>
+            Enumerable.Range(y - 9, 19).Any(j => color(Pixel(i, j))));
+        // Pbgra32 is premultiplied: the guess yellow #FFD43B keeps R > G > 3 B at any opacity.
+        bool Yellow(byte[] p, int alpha) => p[3] >= alpha && p[2] > p[1] && p[1] > 3 * p[0] && p[1] > p[3] / 2;
+        bool Strong(byte[] p) => Yellow(p, 200);
+        await Wait(() => new[] { (75, 75), (225, 75), (75, 225), (225, 225) }.All(v =>
+                Pixel(v.Item1 - 12, v.Item2)[3] == 0 && Pixel(v.Item1 + 12, v.Item2)[3] == 0 &&
+                Pixel(v.Item1, v.Item2 - 10)[3] == 0 && Pixel(v.Item1, v.Item2 + 10)[3] == 0) &&
+            Near(75, 75, Strong) && Pixel(75, 75) is [< 60, < 60, < 60, > 180] &&
+            Near(225, 75, p => Yellow(p, 90)) && !Near(225, 75, p => p[3] > 160) &&
+            Near(75, 225, Strong) && Pixel(75, 225)[3] == 0 &&
+            Yellow(Pixel(225, 225), 60) && !Near(225, 225, p => p[3] > 160) &&
+            Pixel(187, 187)[3] == 0 && Near(187, 187, p => p is [< 40, < 90, > 150, > 150]),
+            "guesses are ward-icon-sized yellow eyes: observer with a dark pupil, faint alternative, hollow sentry, faint rough/expiring guess; " +
+            "the observed enemy sentry is an empty red-edged diamond");
 
         const int W = 1280, H = 720;
         var alert = new Reminder("a", "s", 1, "local-vision-observation", "剃刀 离开视野 · 最后在中路；主宰 新装备 狂战斧", null, W, H, 3000);

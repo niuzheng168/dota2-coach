@@ -45,13 +45,14 @@ public static class BoardDelivery
     internal static bool Fresh(MatchWitness? witness, long bound, long instant) =>
         MatchWitness.Valid(witness, instant - bound) && instant - bound < MatchWitness.MaxAgeMs - witness!.AgeMs;
 
-    // Equipment is last-known until match end; a wave is a short-lived projection in one calibrated frame.
+    // Equipment is last-known until match end; a wave is a short-lived projection in one frame. Like the wards it
+    // needs no confirmed box (the game client then uses its own minimap setting), but a box it carries must fit.
     internal static bool WaveWitness(EnemyBoard b, MatchWitness? w) =>
         b.LaneMap is { } map && w is { Phase: "playing" } && Live(w) && w.Team == b.Team && w.MatchId == b.MatchId &&
         w.InstalledBuild is null or MinuteFarmContext.SupportedBuild && w.Clock >= map.Clock && w.Clock - map.Clock < LaneMap742.Lease / 1000d;
     internal static bool WaveFrame(EnemyBoard b, FrameMeta m, bool origin = false) =>
         m.Source is "dota2" or "dota2-gsi" && WaveWitness(b, m.MatchPhase) &&
-        InstalledBuild(m) is null or MinuteFarmContext.SupportedBuild && b.Minimap?.IsValidFor(m.SourceWidth, m.SourceHeight) == true &&
+        InstalledBuild(m) is null or MinuteFarmContext.SupportedBuild && (b.Minimap == null || b.Minimap.IsValidFor(m.SourceWidth, m.SourceHeight)) &&
         (!origin || b.LaneMap!.Clock == Math.Floor(m.MatchPhase!.Clock));
 
     // Age all last reads while the panel is held. Never invent an age for a never-read hero,

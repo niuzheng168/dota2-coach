@@ -69,7 +69,7 @@ public static class Wire
         (board.SeenWards == null || board.SeenWards.Length <= MaxSeenWards && board.SeenWards.All(w =>
             w is { Kind: "observer" or "sentry", Team: "radiant" or "dire" } &&
             Finite(w.X, -16_000, 16_000) && Finite(w.Y, -16_000, 16_000))) &&
-        (board.LaneMap == null || board.MatchId != null && board.Minimap != null && board.LaneMap.Valid()) &&
+        (board.LaneMap == null || board.MatchId != null && board.LaneMap.Valid()) &&
         (board.Fog == null || board.MatchId != null && board.Fog.Length <= 5 && board.Fog.All(f => f != null && Hero(f.Hero) &&
             Finite(f.X, -16_000, 16_000) && Finite(f.Y, -16_000, 16_000) && f.Yaw is null or (>= 0 and < 360) &&
             Finite(f.Seconds, 0, FogTracker.MaxSeconds)) && board.Fog.Select(f => f.Hero).Distinct(StringComparer.Ordinal).Count() == board.Fog.Length);

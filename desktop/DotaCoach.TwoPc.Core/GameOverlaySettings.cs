@@ -34,7 +34,7 @@ public sealed record GameOverlaySettings
     public int EnemyOpacity { get; init; } = 75;
     /// <summary>Show sightings and candidate wards on the minimap (the coach-confirmed box, else this machine's setting below).</summary>
     public bool ShowWards { get; init; } = true;
-    /// <summary>Short-lived lane estimates are only displayed on a coach-confirmed HUD.</summary>
+    /// <summary>Short-lived lane estimates, placed like the wards: the coach-confirmed box, else this machine's setting below.</summary>
     public bool ShowLaneWaves { get; init; } = true;
     /// <summary>Enemies that left the friend team's vision: last sighting, facing and the circle they are probably in.</summary>
     public bool ShowFog { get; init; } = true;

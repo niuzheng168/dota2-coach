@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -95,9 +96,10 @@ internal sealed partial class AdviceOverlay
         } else wardWindow?.Withdraw();
     }
 
+    // A wave belongs to the coach's frame: a box confirmed for another size drops it. Without a box it goes where the wards go.
     private static EnemyBoard? MapParts(EnemyBoard? b, GameOverlaySettings style, int width, int height) => b == null ? null : b with {
         Wards = style.ShowWards ? b.Wards : null, SeenWards = style.ShowWards ? b.SeenWards : null,
-        LaneMap = style.ShowLaneWaves && b.Minimap?.IsValidFor(width, height) == true ? b.LaneMap : null,
+        LaneMap = style.ShowLaneWaves && (b.Minimap == null || b.Minimap.IsValidFor(width, height)) ? b.LaneMap : null,
         Fog = style.ShowFog ? b.Fog : null };
     private static int WaveKey(LaneMap742? map) {
         if (map == null) return 0;
@@ -113,13 +115,15 @@ internal sealed partial class AdviceOverlay
         board.Fog?.Any(f => BoardDelivery.OnOverview(f.X, f.Y) != null) != true ? null :
         board.Minimap?.IsValidFor(width, height) == true ? board.Minimap : style.Minimap(width, height);
 
-    // Estimates are hollow dashed regions with '?', including rank 0. Seen wards are a solid diamond at the
-    // actual observed world point. One category cannot turn into the other, even at an identical coordinate.
+    // Estimates look like Dota's own minimap ward icon at about its size, in yellow: an eye with a pupil for an
+    // observer, a hollow eye for a sentry, no pupil when the kind is unknown. The alternatives are smaller and
+    // fainter than the first choice. A seen ward is a thin, empty diamond around the actual observed world point, so
+    // the game's icon underneath stays visible. One category cannot turn into the other, even at an identical coordinate.
+    private static readonly Brush GuessInk = (Brush)Brush("#FFD43B").GetAsFrozen(), EyeEdge = (Brush)Brush("#0A0E12", 90).GetAsFrozen();
     private static Canvas WardLayer(EnemyBoard board, double width, double height, double unit, Func<string, ImageSource?>? icon = null)
     {
         var map = new Canvas { Width = width, Height = height, ClipToBounds = true, IsHitTestVisible = false };
         double u = Math.Min(unit, Math.Min(width, height) / 90);
-        static Brush ColorOf(string kind) => kind switch { "observer" => Brushes.Gold, "sentry" => Brushes.DeepSkyBlue, _ => Brushes.White };
         var boxes = new List<Rect>();
         void Place(FrameworkElement element, double x, double y) {
             Canvas.SetLeft(element, x); Canvas.SetTop(element, y); map.Children.Add(element);
@@ -127,34 +131,27 @@ internal sealed partial class AdviceOverlay
         if (board.LaneMap is { } waves) DrawWaves(map, waves, board.Team!, u, boxes);
         if (board.Fog is { } fog) DrawFog(map, fog, u, icon, boxes);
         foreach (var m in (board.Wards ?? []).Where(w => w.Left > 0).OrderByDescending(w => w.Rank)) {
-            double x = m.X * width, y = m.Y * height, size = (m.Rough ? 25 : m.Rank == 0 ? 18 : 14) * u;
-            var color = ColorOf(m.Kind);
-            var box = new Rect(x - size / 2, y - size / 2, size, size); boxes.Add(box);
-            double opacity = (m.Rank == 0 ? 1 : .82) * (m.Left < 60 ? .66 : 1);
-            Place(new Ellipse { Width = size, Height = size, Stroke = color, StrokeThickness = 1.8 * u,
-                Fill = Brushes.Transparent, StrokeDashArray = new DoubleCollection { 2, 1.6 }, Opacity = opacity }, box.X, box.Y);
-            // Keep the question legible at the edge of the HUD and away from a sighting at the same point.
-            double q = 10 * u;
-            var question = new Border { Width = q, Height = q, Background = Brush("#081018", 92), CornerRadius = new(q / 2),
-                Child = new TextBlock { Text = "?", Foreground = color, FontSize = 9 * u, FontWeight = FontWeights.Bold,
-                    TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
-            double qx = Math.Clamp(box.Right - 2 * u, 0, width - q), qy = Math.Clamp(box.Top - q / 2, 0, height - q);
-            Place(question, qx, qy); boxes.Add(new Rect(qx, qy, q, q));
+            var eye = Eye(m.Kind, (m.Rank == 0 ? 10.5 : 8) * u);
+            eye.Opacity = (m.Rank == 0 ? .9 : .5) * (m.Rough ? .75 : 1) * (m.Left < 60 ? .6 : 1);
+            var box = new Rect(m.X * width - eye.Width / 2, m.Y * height - eye.Height / 2, eye.Width, eye.Height); boxes.Add(box);
+            Place(eye, box.X, box.Y);
         }
         foreach (var w in board.SeenWards ?? []) {
             if (BoardDelivery.OnOverview(w) is not { } point) continue; // Don't clamp an off-map world reading to the HUD edge.
-            double x = point.X * width, y = point.Y * height, radius = 4.3 * u, d = 2 * radius;
+            double x = point.X * width, y = point.Y * height, radius = 6 * u, d = 2 * radius;
             var box = new Rect(x - radius, y - radius, d, d); boxes.Add(box);
             Place(new Polygon { Width = d, Height = d, Points = new() { new(radius, 0), new(d, radius), new(radius, d), new(0, radius) },
-                Fill = ColorOf(w.Kind), Stroke = w.Team == board.Team ? Brushes.LimeGreen : Brushes.OrangeRed, StrokeThickness = 1.5 * u }, box.X, box.Y);
+                Stroke = w.Team == board.Team ? Brushes.LimeGreen : Brushes.OrangeRed, StrokeThickness = u, Opacity = .85, Tag = "ward-seen" }, box.X, box.Y);
         }
         bool estimated = board.Wards?.Any(m => m.Left > 0) == true, seen = board.SeenWards?.Any(w => BoardDelivery.OnOverview(w) != null) == true;
-        string legend = string.Join("  ", new[] { seen ? "◆ 目击" : null, estimated ? "? 推测" : null,
-            board.LaneMap != null ? "兵 ●见 ○雾 △波 ×汇" : null,
-            board.Fog?.Any(f => BoardDelivery.OnOverview(f.X, f.Y) != null) == true ? "红圈 离开视野后可能在" : null }.Where(t => t != null));
-        var key = new Border { Background = Brush("#081018", 90), CornerRadius = new(2 * u), Padding = new Thickness(2 * u, 0, 2 * u, 0),
-            Child = new TextBlock { Text = legend, Foreground = Brushes.White, FontSize = 10 * u, FontWeight = FontWeights.SemiBold,
-                MaxWidth = Math.Max(1, width - 6*u), TextWrapping = TextWrapping.Wrap } };
+        var legend = new TextBlock { Foreground = Brushes.White, FontSize = 8.5 * u, FontWeight = FontWeights.SemiBold,
+            MaxWidth = Math.Max(1, width - 6*u), TextWrapping = TextWrapping.Wrap };
+        foreach (var (text, ink) in new[] { (seen ? "◇ 目击" : null, Brushes.White), (estimated ? "◉ 推测" : null, GuessInk),
+            (board.LaneMap != null ? "兵 ●见 ○雾 △波 ×汇" : null, Brushes.White),
+            (board.Fog?.Any(f => BoardDelivery.OnOverview(f.X, f.Y) != null) == true ? "红圈 离开视野后可能在" : null, Brushes.OrangeRed) }.Where(t => t.Item1 != null))
+            legend.Inlines.Add(new Run((legend.Inlines.Count > 0 ? "  " : "") + text) { Foreground = ink });
+        var key = new Border { Background = Brush("#081018", 75), CornerRadius = new(2 * u), Padding = new Thickness(2 * u, 0, 2 * u, 0),
+            Child = legend };
         key.Measure(new Size(width, height));
         double pad = u, right = width - key.DesiredSize.Width - pad, bottom = height - key.DesiredSize.Height - pad;
         var corners = new[] { new Point(pad, bottom), new Point(right, bottom), new Point(pad, pad), new Point(right, pad) };
@@ -162,6 +159,27 @@ internal sealed partial class AdviceOverlay
         // Keep the key even on a crowded HUD, but never paint its backing on top of an observation.
         Panel.SetZIndex(key, -1); Place(key, corner.X, corner.Y);
         return map;
+    }
+    // Drawn after the client's minimap_ward_obs / minimap_ward_invis sprites: a dark-edged almond, about 3:4.
+    private static Canvas Eye(string kind, double width)
+    {
+        double w = width, h = width * .74, edge = w * .09;
+        var almond = new PathGeometry([new PathFigure(new Point(0, h / 2), [
+            new QuadraticBezierSegment(new Point(w / 2, -h * .45), new Point(w, h / 2), true),
+            new QuadraticBezierSegment(new Point(w / 2, h * 1.45), new Point(0, h / 2), true)], true)]);
+        var eye = new Canvas { Width = w, Height = h, Tag = "ward-guess" };
+        if (kind == "sentry") {
+            eye.Children.Add(new Path { Data = almond, Stroke = EyeEdge, StrokeThickness = 3 * edge, StrokeLineJoin = PenLineJoin.Round });
+            eye.Children.Add(new Path { Data = almond, Stroke = GuessInk, StrokeThickness = 1.6 * edge, StrokeLineJoin = PenLineJoin.Round });
+            return eye;
+        }
+        eye.Children.Add(new Path { Data = almond, Fill = GuessInk, Stroke = EyeEdge, StrokeThickness = edge, StrokeLineJoin = PenLineJoin.Round });
+        if (kind == "observer") {
+            double pupil = h * .5;
+            var dot = new Ellipse { Width = pupil, Height = pupil, Fill = EyeEdge };
+            Canvas.SetLeft(dot, (w - pupil) / 2); Canvas.SetTop(dot, (h - pupil) / 2); eye.Children.Add(dot);
+        }
+        return eye;
     }
 
     // Under the wards: the circle an enemy that left vision is probably in (dashed red, first seconds only), a short line
