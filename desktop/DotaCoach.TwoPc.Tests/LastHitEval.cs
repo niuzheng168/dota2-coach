@@ -10,8 +10,9 @@ using DotaCoach.TwoPc;
 /// simulated player's: a creep's life is cut at the first of them. Last, the same creeps with better foresight than the bars
 /// give (every attack under way seen, the engine's future health), to tell what limits the red numbers.
 ///   --last-hit-eval [--synthetic N | TRACE.jsonl ...] [--hero NAME] [--level N] [--distance D] [--fps F] [--height H] [--extra S] [--latency S]
+///                   [--pictures DIR [--model WEIGHTS.json] [--golden GOLDEN.json] [--margins M,...]]   (see <see cref="Pictures"/>)
 /// </summary>
-internal static class LastHitEval
+internal static partial class LastHitEval
 {
     private sealed record Unit(int Id, string Name, int Team);
     private sealed class Life(Unit unit, string kind)
@@ -27,6 +28,13 @@ internal static class LastHitEval
             int lo = 0, hi = Frames.Count - 1, found = -1;
             while (lo <= hi) { int mid = (lo + hi) / 2; if (Frames[mid].T < t) { found = mid; lo = mid + 1; } else hi = mid - 1; }
             return found < 0 ? Frames[0].Hp : Frames[found].Hp;
+        }
+        /// <summary>The last frame at or before <paramref name="t"/> (the first before the first).</summary>
+        public (double T, int Hp, int Max, double X, double Y) FrameAt(double t)
+        {
+            int lo = 0, hi = Frames.Count - 1, found = 0;
+            while (lo <= hi) { int mid = (lo + hi) / 2; if (Frames[mid].T <= t) { found = mid; lo = mid + 1; } else hi = mid - 1; }
+            return Frames[found];
         }
     }
     private enum Outcome { Kill, Early, Late, None, Unknown }
@@ -90,6 +98,10 @@ internal static class LastHitEval
                     string.Join(" ", kindsOfRound.Select(k => Share(Outcome.Kill, k))));
             }
         Decompose(chances, attack, distance, latency, fps, geometry, towers, Extra, lateness.Count > 0 ? lateness.Average() : extra, hits, kinds);
+        if (Option("--pictures", "") is { Length: > 0 } pictures)
+            Pictures(chances, pictures, Option("--model", "") is { Length: > 0 } model ? new CreepDamageModel(model) : null, Option("--golden", ""),
+                Option("--margins", "-20,-10,0,10,20").Split(',').Select(double.Parse).ToArray(), attack, distance, latency, fps, geometry, towers, Extra,
+                lateness.Count > 0 ? lateness.Average() : extra, hits, kinds);
     }
 
     /// <summary>
@@ -440,6 +452,10 @@ internal static class LastHitEval
     {
         var units = new Dictionary<int, Unit>();
         var alive = new Dictionary<int, Life>();
+        // Entity indices are reused by later waves; older recordings did not describe the new entity, which is left out.
+        var described = new HashSet<int>();
+        var undescribed = new HashSet<int>();
+        int reused = 0;
         string? hero = null, round = "lane"; int team = 0, heroId = -1;
         var pending = new Dictionary<int, JsonElement>();
         var idle = new Dictionary<double, bool>(); // order time -> the hero was not attacking then
@@ -460,6 +476,7 @@ internal static class LastHitEval
                     var u = new Unit(r.GetProperty("id").GetInt32(), r.GetProperty("name").GetString()!, r.GetProperty("team").GetInt32());
                     units[u.Id] = u;
                     kinds[u.Id] = CreepKinds.IsSiege(u.Name) ? "siege" : u.Name.Contains("_ranged") ? "ranged" : "melee";
+                    described.Add(u.Id); undescribed.Remove(u.Id);
                     break;
                 }
                 case "f":
@@ -467,6 +484,7 @@ internal static class LastHitEval
                         int id = c[0].GetInt32();
                         if (!alive.TryGetValue(id, out var life)) {
                             if (!units.TryGetValue(id, out var u)) continue;
+                            if (!described.Remove(id)) { if (undescribed.Add(id)) reused++; continue; }
                             lives.Add(alive[id] = life = new(u, round));
                         }
                         life.Frames.Add((t, c[1].GetInt32(), c[2].GetInt32(), c[3].GetDouble(), c[4].GetDouble()));
@@ -500,6 +518,7 @@ internal static class LastHitEval
             }
         }
         foreach (var life in alive.Values) life.End = life.Frames[^1].T + 1 / 30d;
+        if (reused > 0) Console.WriteLine($"{file}: {reused} creeps at a reused entity index without a description left out");
         return hero;
     }
 

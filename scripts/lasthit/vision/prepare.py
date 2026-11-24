@@ -36,7 +36,8 @@ def read_trace(path):
         r = json.loads(line)
         k = r["k"]
         if k == "unit":
-            units[r["id"]] = (r["name"], r["team"])
+            # Entity indices are reused by later waves: every entity that held the index, from when it was described.
+            units.setdefault(r["id"], []).append((r["t"], r["name"], r["team"]))
         elif k == "tower":
             towers.add(r["id"])
         elif k == "round":
@@ -48,7 +49,10 @@ def read_trace(path):
         elif k == "launch":
             launches.setdefault(r["a"], []).append((r["t"], r["v"]))
         elif k == "kill":
-            deaths[r["v"]] = r["t"]
+            deaths.setdefault(r["v"], []).append(r["t"])
+            units.setdefault(r["v"], []).append((r["t"], None, None))
+        elif k == "gone":
+            units.setdefault(r["id"], []).append((r["t"], None, None))
         elif k == "f":
             if not states or states[-1][0] != r["t"]:
                 states.append((r["t"], {}))
@@ -57,6 +61,17 @@ def read_trace(path):
     for lst in list(hits.values()) + list(swings.values()) + list(launches.values()):
         lst.sort()
     return units, towers, rounds, hits, swings, launches, deaths, states
+
+
+def unit_at(units, u, t):
+    """(name, team) of the entity holding index u at server time t, or None: not described yet, or dead or removed since
+    (older recordings reused an index without describing the new entity)."""
+    held = None
+    for since, name, team in units.get(u, []):
+        if since > t or since == t and name is None:
+            break
+        held = (name, team) if name is not None else None
+    return held
 
 
 def crop_picture(job):
@@ -125,7 +140,7 @@ def main():
         state = states[max(0, bisect.bisect_right(state_times, t) - 1)][1]
         rnd = rounds[max(0, bisect.bisect_right(round_times, t) - 1)][1] if rounds else 0
         for bar, u in zip(frames[i]["bars"], lab["bars"]):
-            if u < 0 or (i, u) not in crop_of or u not in state:
+            if u < 0 or (i, u) not in crop_of or u not in state or unit_at(units, u, t) is None:
                 continue
             stack = []
             for s in steps:
@@ -138,7 +153,7 @@ def main():
                 if attacker in units or attacker in towers:
                     target[min(a.bins - 1, int((ht - t) / bin_width))] += d
             hp, mx = state[u]
-            name, team = units[u]
+            name, team = unit_at(units, u, t)
             # The creep's own swing under way: seconds since it began, and where its target stands relative to it.
             windup, aim = -1.0, (0.0, 0.0)
             mine = swings.get(u, [])
@@ -154,7 +169,7 @@ def main():
             stacks.append(stack)
             targets.append(target)
             facts.append([i, u, t, rnd, hp, mx, KINDS[unit_kind(name)], team, bar[4], windup, aim[0], aim[1],
-                          deaths.get(u, 1e9) - t])
+                          next((d for d in deaths.get(u, []) if d >= t), 1e9) - t])
     np.savez_compressed(os.path.join(a.out, "samples.npz"), stacks=np.array(stacks, np.int32), targets=np.array(targets, np.float32),
                         facts=np.array(facts, np.float64), fields=np.array(SAMPLE_FIELDS), steps=np.array(steps),
                         spec=np.array([a.near, a.far, a.size, a.bins, a.horizon]))

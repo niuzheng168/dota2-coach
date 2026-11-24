@@ -138,11 +138,13 @@ local function record(t, list)
         index(call(hero, "GetAttackTarget")), call(hero, "IsAttacking") and 1 or 0))
 end
 
+-- Entity indices are reused by later waves: a unit is described again whenever its index holds a new entity.
 local named = {}
 local function describe(e)
     local id = e:entindex()
-    if named[id] then return end
-    named[id] = true
+    if named[id] == e then return end
+    named[id] = e
+    healths[id] = nil
     out(string.format('{"k":"unit","t":%.4f,"id":%d,"name":"%s","team":%d,"armor":%s,"dmin":%s,"dmax":%s,"spa":%s,"point":%s,"proj":%s}',
         now(), id, e:GetUnitName(), e:GetTeamNumber(), num(call(e, "GetPhysicalArmorValue", false)), num(call(e, "GetBaseDamageMin")),
         num(call(e, "GetBaseDamageMax")), num(call(e, "GetSecondsPerAttack", false) or call(e, "GetSecondsPerAttack")),

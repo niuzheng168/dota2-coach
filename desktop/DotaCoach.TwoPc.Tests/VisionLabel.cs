@@ -20,7 +20,19 @@ internal static class VisionLabel
 
     public static void Run(string trace, string directory)
     {
-        var units = new Dictionary<int, Unit>();
+        // Entity indices are reused by later waves: per index every entity that held it from its description on, and null from
+        // its death or removal (older recordings did not describe the next entity at the same index).
+        var units = new Dictionary<int, List<(double T, Unit? Unit)>>();
+        void Held(int id, double t, Unit? unit) { if (!units.TryGetValue(id, out var list)) units[id] = list = []; list.Add((t, unit)); }
+        Unit? UnitAt(int id, double t)
+        {
+            Unit? held = null;
+            foreach (var (since, unit) in units.GetValueOrDefault(id) ?? []) {
+                if (since > t || since == t && unit == null) break;
+                held = unit;
+            }
+            return held;
+        }
         var server = new List<(double T, List<(int Id, int Hp, int Max, double X, double Y)> Creeps)>();
         var heroes = new SortedList<double, (int Id, string Name, int Team, double X, double Y)>();
         var towers = new List<(int Id, string Name, int Team, double X, double Y)>();
@@ -30,7 +42,9 @@ internal static class VisionLabel
             var r = doc.RootElement;
             switch (r.GetProperty("k").GetString()) {
                 case "begin": ownTeam = r.GetProperty("team").GetInt32(); break;
-                case "unit": units[r.GetProperty("id").GetInt32()] = new(r.GetProperty("id").GetInt32(), r.GetProperty("name").GetString()!, r.GetProperty("team").GetInt32()); break;
+                case "unit": Held(r.GetProperty("id").GetInt32(), r.GetProperty("t").GetDouble(), new(r.GetProperty("id").GetInt32(), r.GetProperty("name").GetString()!, r.GetProperty("team").GetInt32())); break;
+                case "kill": Held(r.GetProperty("v").GetInt32(), r.GetProperty("t").GetDouble(), null); break;
+                case "gone": Held(r.GetProperty("id").GetInt32(), r.GetProperty("t").GetDouble(), null); break;
                 case "tower": towers.Add((r.GetProperty("id").GetInt32(), r.GetProperty("name").GetString()!, r.GetProperty("team").GetInt32(), r.GetProperty("x").GetDouble(), r.GetProperty("y").GetDouble())); break;
                 case "f": {
                     double t = r.GetProperty("t").GetDouble();
@@ -77,7 +91,8 @@ internal static class VisionLabel
             var geometry = new CreepBarGeometry(f.Height);
             var bars = f.Bars.Select(b => new CreepHealthBar(b[0], b[1], b[2], b[3], geometry.Inner, geometry.Span, b[4] == 1, b[5] == 1)).ToList();
             var state = server[State(t)].Creeps;
-            var minimap = state.Where(c => units.ContainsKey(c.Id)).Select(c => (c.Id, Unit: new MinimapUnit(units[c.Id].Name, units[c.Id].Team, c.X, c.Y, null, null, null))).ToList();
+            var minimap = state.Select(c => (c.Id, c.X, c.Y, Held: UnitAt(c.Id, t))).Where(c => c.Held != null)
+                .Select(c => (c.Id, Unit: new MinimapUnit(c.Held!.Name, c.Held.Team, c.X, c.Y, null, null, null))).ToList();
             var owners = minimap.ToDictionary(m => m.Unit, m => m.Id, (IEqualityComparer<MinimapUnit>)ReferenceEqualityComparer.Instance);
             var matched = matcher.Match(bars, minimap.Select(m => m.Unit).ToList(), ownTeam, f.Width, f.Height);
             return (matched.Select(m => m != null && owners.TryGetValue(m, out int id) ? id : -1).ToArray(), matcher.LookAt);
