@@ -6,7 +6,8 @@ using DotaCoach.TwoPc;
 /// the game client found in each picture, and where every unit stands on screen, at the picture's server time.
 ///   --vision-label TRACE.jsonl DIR   (reads TRACE.jsonl, TRACE.sync.jsonl, DIR/frames.jsonl; writes DIR/labels.jsonl)
 /// Server time: the sync file pairs each server frame with when its console line arrived on the pictures' QPC clock; the
-/// least difference is the offset (the console's delay is then near zero). How much later the picture shows that state
+/// least difference over the next few seconds of arrivals is the offset (the console's delay is then near zero). It steps up
+/// when the server stalls (one recording lost 0.75 s of game time once), so it is taken per picture, from arrivals after it. How much later the picture shows that state
 /// (the client's interpolation and drawing) is fitted: the shift at which the most matched bars show exactly the fill the
 /// engine's health draws. Bars are matched like the product matches them to GSI units (<see cref="CreepUnitMatcher"/>),
 /// with the engine's positions in place of GSI's; screen positions are bar centres (<see cref="CameraModel.Screen"/>).
@@ -45,12 +46,24 @@ internal static class VisionLabel
             }
         }
         string syncFile = Path.ChangeExtension(trace, null) + ".sync.jsonl";
-        double offset = File.ReadLines(syncFile).Select(l => JsonDocument.Parse(l).RootElement).Min(r => r.GetProperty("q").GetDouble() - r.GetProperty("t").GetDouble());
+        var arrivals = File.ReadLines(syncFile).Select(l => JsonDocument.Parse(l).RootElement)
+            .Select(r => (Q: r.GetProperty("q").GetDouble(), D: r.GetProperty("q").GetDouble() - r.GetProperty("t").GetDouble())).OrderBy(a => a.Q).ToArray();
+        // The least difference among arrivals in the 3 s after q (the last ones' for pictures after them).
+        double Offset(double q)
+        {
+            int lo = 0, hi = arrivals.Length;
+            while (lo < hi) { int mid = (lo + hi) / 2; if (arrivals[mid].Q < q) lo = mid + 1; else hi = mid; }
+            double least = double.MaxValue;
+            for (int k = Math.Min(lo, arrivals.Length - 1); k < arrivals.Length && (arrivals[k].Q <= q + 3 || least == double.MaxValue); k++) least = Math.Min(least, arrivals[k].D);
+            return least;
+        }
+        double offset = arrivals.Min(a => a.D);
+        var steps = arrivals.Where((a, k) => k > 0 && Offset(a.Q) - Offset(arrivals[k - 1].Q) > .02).Select(a => $"{a.Q - arrivals[0].Q:F0}s:+{Offset(a.Q) - offset:F3}");
         var frames = File.ReadLines(Path.Combine(directory, "frames.jsonl")).Select(l => JsonDocument.Parse(l).RootElement).Where(r => r.TryGetProperty("file", out _))
             .Select(r => new Frame(r.GetProperty("i").GetInt32(), r.GetProperty("file").GetString()!, r.GetProperty("at").GetDouble(), r.GetProperty("width").GetInt32(),
                 r.GetProperty("height").GetInt32(), r.GetProperty("bars").EnumerateArray().Select(b => b.EnumerateArray().Select(v => v.GetInt32()).ToArray()).ToArray()))
             .OrderBy(f => f.I).ToList();
-        Console.WriteLine($"{server.Count} server frames, {frames.Count} pictures, offset {offset:F4} s");
+        Console.WriteLine($"{server.Count} server frames, {frames.Count} pictures, offset {offset:F4} s; server stalls (offset steps) at " + string.Join(" ", steps));
 
         int State(double t)
         {
@@ -75,7 +88,7 @@ internal static class VisionLabel
             var matcher = new CreepUnitMatcher();
             int agree = 0, damaged = 0;
             foreach (var f in sample) {
-                double t = f.At - offset - lag;
+                double t = f.At - Offset(f.At) - lag;
                 var (ids, _) = Match(matcher, f, t);
                 var state = server[State(t)].Creeps.ToDictionary(c => c.Id);
                 var geometry = new CreepBarGeometry(f.Height);
@@ -99,7 +112,7 @@ internal static class VisionLabel
         int matchedBars = 0, totalBars = 0;
         using var output = new StreamWriter(Path.Combine(directory, "labels.jsonl"));
         foreach (var f in frames) {
-            double t = f.At - offset - bestLag;
+            double t = f.At - Offset(f.At) - bestLag;
             var (ids, look) = Match(all, f, t);
             matchedBars += ids.Count(i => i >= 0); totalBars += ids.Length;
             // Every unit's bar centre on screen at the look-at point (null without one): creeps, heroes, towers.
