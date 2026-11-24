@@ -12,10 +12,12 @@ internal static partial class LastHitEval
     /// in their last second. Two forecasts of the hits to come: the rhythms of <see cref="CreepHitHistory"/> (the product's), and
     /// with <paramref name="model"/> its damage in each tenth of the next second from the bar's last two seconds, red when the
     /// bar's health less that damage by the landing is within the weakest roll plus a margin. The simulated player is
-    /// <see cref="Decompose"/>'s; the same creeps on the simulated screen and with better foresight for comparison.
+    /// <see cref="Decompose"/>'s; the same creeps on the simulated screen and with better foresight for comparison. These are
+    /// replays of a recording with a simulated player, not hit rates of a person in a match. <paramref name="chancesOut"/> gets
+    /// the fixed set of chances with each one's expected kill per forecast (reacting player).
     /// </summary>
-    private static void Pictures(List<Life> chances, string directory, CreepDamageModel? model, string golden, double[] margins, HeroAttack attack,
-        double distance, double latency, double fps, CreepBarGeometry geometry, List<Tower> towers, Func<Random, double> extra, double meanExtra,
+    private static void Pictures(List<Life> chances, string directory, CreepDamageModel? model, string golden, double[] margins, int repeats,
+        string chancesOut, HeroAttack attack, double distance, double latency, double fps, CreepBarGeometry geometry, List<Tower> towers, Func<Random, double> extra, double meanExtra,
         List<(double T, int Attacker, int Victim, double D)> hits, Dictionary<int, string> kinds)
     {
         const double lead = .15;
@@ -70,20 +72,61 @@ internal static partial class LastHitEval
         rows.Add(("swings seen", (i, rng, reaction, spread, x) => Seen(lives[i].Life, blows.GetValueOrDefault(lives[i].Life.Unit.Id) ?? [], attack, distance,
             new LastHitTiming(lead, latency), reaction, spread, x, fps, geometry, rng)));
         rows.Add(("engine", (i, rng, reaction, spread, x) => Oracle(lives[i].Life, attack, distance, latency, reaction, spread, x, meanExtra, fps, rng)));
-        foreach (var (player, reaction, spread) in new[] { ("reaction 0.2±0.04", .2, .04), ("exact 0.15", lead, 0d) }) {
-            Console.WriteLine($"{"forecast / " + player,-36} {"n",5} {"kill",6} {"early",6} {"late",6} {"never",6}");
-            foreach (var (name, play) in rows) {
-                var rng = new Random(11);
-                var tally = new Dictionary<Outcome, int>();
+        var roundOf = lives.Select(l => l.Life.Round).ToArray();
+        var players = new[] { ("reaction 0.2+/-0.04", .2, .04), ("exact 0.15", lead, 0d) };
+        var first = new double[rows.Count][];
+        foreach (var (player, reaction, spread) in players) {
+            Console.WriteLine($"{"forecast / " + player,-36} {"n",5} {"kill",6} {"early",6} {"late",6} {"never",6}   (mean of {repeats} draws per creep)");
+            var kills = new double[rows.Count][];
+            for (int r = 0; r < rows.Count; r++) {
+                var share = new double[Enum.GetValues<Outcome>().Length];
+                kills[r] = new double[lives.Count];
+                int total = 0;
                 for (int i = 0; i < lives.Count; i++) {
-                    var outcome = play(i, rng, reaction, spread, extra(rng));
-                    tally[outcome] = tally.GetValueOrDefault(outcome) + 1;
+                    bool known = false;
+                    for (int d = 0; d < repeats; d++) {
+                        // The same draws (extra delay, reaction, roll) for this creep under every forecast: differences are the forecasts'.
+                        var rng = new Random(i * 7919 + d * 104729 + 11);
+                        var outcome = rows[r].Play(i, rng, reaction, spread, extra(rng));
+                        if (outcome == Outcome.Unknown) continue;
+                        known = true;
+                        share[(int)outcome] += 1d / repeats;
+                        if (outcome == Outcome.Kill) kills[r][i] += 1d / repeats;
+                    }
+                    if (known) total++;
                 }
-                int total = tally.Where(t => t.Key != Outcome.Unknown).Sum(t => t.Value);
-                string Share(Outcome o) => $"{100d * tally.GetValueOrDefault(o) / Math.Max(1, total),5:F1}%";
-                Console.WriteLine($"  {name,-34} {total,5} {Share(Outcome.Kill)} {Share(Outcome.Early)} {Share(Outcome.Late)} {Share(Outcome.None)}");
+                string Share(Outcome o) => $"{100d * share[(int)o] / Math.Max(1, total),5:F1}%";
+                Console.WriteLine($"  {rows[r].Name,-34} {total,5} {Share(Outcome.Kill)} {Share(Outcome.Early)} {Share(Outcome.Late)} {Share(Outcome.None)}");
             }
+            for (int r = 2; r < rows.Count - 2; r++) Paired(rows[r].Name, kills[r], kills[1], roundOf);
+            if (player == players[0].Item1) first = kills;
         }
+        if (chancesOut.Length > 0)
+            File.WriteAllLines(chancesOut, lives.Select((l, i) => JsonSerializer.Serialize(new { round = l.Life.Round, unit = l.Life.Unit.Id, name = l.Life.Unit.Name,
+                start = l.Life.Frames[0].T, end = l.Life.End, sightings = l.Seen.Count,
+                kill = rows.Select((row, r) => (row.Name, first[r][i])).ToDictionary(x => x.Name, x => Math.Round(x.Item2, 3)) })));
+    }
+
+    /// <summary>
+    /// One forecast's kills against the product's on the same creeps and draws: the difference, by round too (a round is one
+    /// wave under one camera, the independent unit), a 95 % interval from resampling rounds, rounds better, worse and even.
+    /// </summary>
+    private static void Paired(string name, double[] kills, double[] baseline, int[] roundOf)
+    {
+        var rounds = roundOf.Distinct().Order().Select(r => (Round: r, N: roundOf.Count(x => x == r),
+            D: Enumerable.Range(0, kills.Length).Where(i => roundOf[i] == r).Sum(i => kills[i] - baseline[i]))).ToArray();
+        var rng = new Random(5);
+        var resampled = new double[2000];
+        for (int b = 0; b < resampled.Length; b++) {
+            double d = 0; int n = 0;
+            for (int k = 0; k < rounds.Length; k++) { var r = rounds[rng.Next(rounds.Length)]; d += r.D; n += r.N; }
+            resampled[b] = d / n;
+        }
+        Array.Sort(resampled);
+        Console.WriteLine($"    {name} vs pictures / rhythms: {100 * rounds.Sum(r => r.D) / kills.Length:+0.0;-0.0} points over {kills.Length} chances in {rounds.Length} rounds, " +
+            $"95% {100 * resampled[50]:+0.0;-0.0}..{100 * resampled[1949]:+0.0;-0.0}; rounds better {rounds.Count(r => r.D > 1e-9)}, worse {rounds.Count(r => r.D < -1e-9)}, " +
+            $"even {rounds.Count(r => Math.Abs(r.D) <= 1e-9)}");
+        Console.WriteLine("      round:chances:kill difference " + string.Join(" ", rounds.Select(r => $"{r.Round}:{r.N}:{r.D:+0.##;-0.##;0}")));
     }
 
     /// <summary>The player of <see cref="Simulate"/> on the pictures: reacting to the first red one.</summary>

@@ -10,16 +10,19 @@ using DotaCoach.TwoPc;
 /// simulated player's: a creep's life is cut at the first of them. Last, the same creeps with better foresight than the bars
 /// give (every attack under way seen, the engine's future health), to tell what limits the red numbers.
 ///   --last-hit-eval [--synthetic N | TRACE.jsonl ...] [--hero NAME] [--level N] [--distance D] [--fps F] [--height H] [--extra S] [--latency S]
-///                   [--pictures DIR [--model WEIGHTS.json] [--golden GOLDEN.json] [--margins M,...]]   (see <see cref="Pictures"/>)
+///                   [--pictures DIR [--model WEIGHTS.json] [--golden GOLDEN.json] [--margins M,...] [--repeats N] [--chances-out FILE]]
+///                   (see <see cref="Pictures"/>)
 /// </summary>
 internal static partial class LastHitEval
 {
     private sealed record Unit(int Id, string Name, int Team);
-    private sealed class Life(Unit unit, string kind)
+    private sealed class Life(Unit unit, string kind, int round = 0)
     {
         public readonly Unit Unit = unit;
         /// <summary>The arena round it fought in: open, ours (under the Radiant tower), theirs; "lane" elsewhere.</summary>
         public readonly string Kind = kind;
+        /// <summary>The arena round's number (0 outside the arena).</summary>
+        public readonly int Round = round;
         public readonly List<(double T, int Hp, int Max, double X, double Y)> Frames = [];
         /// <summary>Death; the first hit of the lab hero (later outcomes are unknown).</summary>
         public double End = double.PositiveInfinity, Cut = double.PositiveInfinity;
@@ -100,8 +103,8 @@ internal static partial class LastHitEval
         Decompose(chances, attack, distance, latency, fps, geometry, towers, Extra, lateness.Count > 0 ? lateness.Average() : extra, hits, kinds);
         if (Option("--pictures", "") is { Length: > 0 } pictures)
             Pictures(chances, pictures, Option("--model", "") is { Length: > 0 } model ? new CreepDamageModel(model) : null, Option("--golden", ""),
-                Option("--margins", "-20,-10,0,10,20").Split(',').Select(double.Parse).ToArray(), attack, distance, latency, fps, geometry, towers, Extra,
-                lateness.Count > 0 ? lateness.Average() : extra, hits, kinds);
+                Option("--margins", "-20,-10,0,10,20").Split(',').Select(double.Parse).ToArray(), int.Parse(Option("--repeats", "20")), Option("--chances-out", ""),
+                attack, distance, latency, fps, geometry, towers, Extra, lateness.Count > 0 ? lateness.Average() : extra, hits, kinds);
     }
 
     /// <summary>
@@ -456,7 +459,7 @@ internal static partial class LastHitEval
         var described = new HashSet<int>();
         var undescribed = new HashSet<int>();
         int reused = 0;
-        string? hero = null, round = "lane"; int team = 0, heroId = -1;
+        string? hero = null, round = "lane"; int team = 0, heroId = -1, number = 0;
         var pending = new Dictionary<int, JsonElement>();
         var idle = new Dictionary<double, bool>(); // order time -> the hero was not attacking then
         int heroTarget = -1;
@@ -466,7 +469,7 @@ internal static partial class LastHitEval
             double t = r.TryGetProperty("t", out var tv) ? tv.GetDouble() : 0;
             switch (r.GetProperty("k").GetString()) {
                 case "begin": hero = r.GetProperty("hero").GetString(); team = r.GetProperty("team").GetInt32(); break;
-                case "round": round = r.GetProperty("kind").GetString()!; break;
+                case "round": round = r.GetProperty("kind").GetString()!; number = r.GetProperty("n").GetInt32(); break;
                 case "tower":
                     if (table.Tower(r.GetProperty("name").GetString()!) is { } stats)
                         towers.Add(new(r.GetProperty("team").GetInt32(), r.GetProperty("x").GetDouble(), r.GetProperty("y").GetDouble(), stats.Interval));
@@ -485,7 +488,7 @@ internal static partial class LastHitEval
                         if (!alive.TryGetValue(id, out var life)) {
                             if (!units.TryGetValue(id, out var u)) continue;
                             if (!described.Remove(id)) { if (undescribed.Add(id)) reused++; continue; }
-                            lives.Add(alive[id] = life = new(u, round));
+                            lives.Add(alive[id] = life = new(u, round, number));
                         }
                         life.Frames.Add((t, c[1].GetInt32(), c[2].GetInt32(), c[3].GetDouble(), c[4].GetDouble()));
                     }
