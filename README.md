@@ -2,7 +2,7 @@
 
 游戏机运行 `DotaCoach.GameClient`：在自己的 Dota 窗口看小兵血量、对手装备、眼位和路线。教练机运行 `DotaCoach.CoachClient`：接收本人 GSI，可接入 Dota Plus 队伍视角、调用模型，并在赛后复盘。两端通过配对的 TLS 连接通信，可在同一台 Windows 电脑上试用。
 
-**v0.6.4** 可以在游戏端小地图上看三路兵线和预计交汇点。请两端一起升级，在教练端「设置 → 小地图校准」确认 HUD 框。无 Plus 时显示理论兵波；有同局同阵营的队伍视野时，另标出实见小兵和进雾后的短时估计。游戏端仍不传画面，对手装备面板保留到局末。赛后录像和每日复盘不参与实时兵线估算。
+**v0.6.5** 用上 Plus 队伍视角里的英雄朝向：敌人离开视野后，游戏端小地图标出它最后的位置、面朝方向和前 10 秒大概所在的范围；离开视野字幕默认看不到 5 秒才发，带「朝…」，刚被我方击杀的不报。对手面板加上次读到的攻击、护甲、移速。推测的眼位画成黄色小眼睛，目击的守卫用空心菱形框住；兵线不必先确认小地图框。请两端一起升级（旧游戏端连新教练端时不显示属性和离开视野位置）。游戏端仍不传画面，对手装备面板保留到局末。
 
 ## 我想做什么？
 
@@ -56,7 +56,7 @@ dotnet run --project desktop/DotaCoach.TwoPc.UiTests -c Release -- .tmp/twopc-ui
 
 ```powershell
 .\desktop\build-twopc.ps1
-.\desktop\verify-match-release.ps1 -Directory .\dist\twopc\v0.6.4
+.\desktop\verify-match-release.ps1 -Directory .\dist\twopc\v0.6.5
 ```
 
 版本取两端项目一致的 `<Version>`；默认输出 `dist/twopc/v<版本>/`，已存在即拒绝覆盖，可另选 `-OutputDirectory`。包内 `README.md` 是对局档案手册，`MODEL-PROVIDERS.md` 和 `MINUTE-FARM.md` 分别讲模型和分钟路线。另附 `NO-VIDEO.md`、`CREEP-HP.md`、`PLUS-ALERTS.md`、`ENEMY-WARDS.md`、`GAME-OVERLAY.md`；`USAGE.md` 保留 v0.4.3 的历史说明。本机已提取图标时，游戏端包可带图标（仅供自用）；未附的图标向教练端请求。
@@ -73,6 +73,7 @@ dotnet run --project desktop/DotaCoach.TwoPc.UiTests -c Release -- .tmp/twopc-ui
 
 | 版本 | 内容 |
 |---|---|
+| [v0.6.5](docs/twopc-enemy-wards.md#敌人离开视野字幕和小地图位置2026-11-24) | 离开视野的小地图位置和朝向，字幕默认 5 秒、不报刚阵亡的；对手面板攻击／护甲／移速；推测眼位改黄色眼睛，兵线不必先校准小地图框。 |
 | [v0.6.4](docs/twopc-game-overlay.md#兵线小地图) | 游戏端兵线、进雾估计和交汇倒计时；另有[按补丁、英雄、分钟保存的离线录像复盘](docs/daily-replay-memory.md)。 |
 | [v0.6.1](docs/twopc-model-providers.md) | 教练端选择 Foundry 或 Codey / GitHub Copilot。 |
 | [v0.6.0](docs/twopc-match-information.md) | 对局档案、按授权显示装备与眼位、赛后回放对照。 |

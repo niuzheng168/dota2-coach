@@ -141,8 +141,8 @@ $manifest = [ordered]@{
     debugRecordingOptIn = $true; debugMaximumBytes = 2L * 1024 * 1024 * 1024; debugMaximumMinutes = 120
     plusSpectatorObservationOnly = $true; plusSpectatorPort = 3220
     matchArchive = [ordered]@{ live = "participant-and-matched-team-vision"; clock = "event-and-first-known";
-        wardEvidence = @("seen", "inferred", "postgame-replay"); gameProjection = "selected-equipment-wards-and-calibrated-lane-symbols";
-        laneHud = @{ build = 6989; defaultAfterCalibration = $true; individualMemoryGameSeconds = 12;
+        wardEvidence = @("seen", "inferred", "postgame-replay"); gameProjection = "selected-equipment-wards-lane-symbols-and-fog-marks";
+        laneHud = @{ build = 6989; defaultOn = $true; requiresConfirmedMinimap = $false; individualMemoryGameSeconds = 12;
             lastContactMemoryGameSeconds = 30; rawSpectatorOrReplaySent = $false };
         extraTeamContextForModelDefault = $false; replayCanReachLive = $false }
     postgameReplay = [ordered]@{ package = "coach-only"; portableWorkerManifestSha256 = $pin; requiresVerifiedEnd = $true }
@@ -155,8 +155,10 @@ $manifest = [ordered]@{
     visionScanButton = $true; wardMarksMaxUnseenSeconds = 15
     clientLayout = [ordered]@{ home = "status-and-everyday-switches"; coachSettings = @("connection", "plus-and-scanner", "ai-model", "minimap-calibration", "debug");
         gameSettings = @("overlay-style", "creep-hp-help", "dota-and-gsi", "debug") }
-    wardReads = "sub-second-per-change"; wardCarrierItemsEverySeconds = 0.4; wardInSightMark = "hero-ahead-350"
-    wardSpotWeights = "fitted-47-replays"
+    wardReads = "sub-second-per-change"; wardCarrierItemsEverySeconds = 0.4; wardInSightMark = "hero-facing-300-else-ahead-350"
+    wardSpotWeights = "fitted-47-replays"; wardGuessMark = "yellow-eye"; wardSeenMark = "hollow-diamond"
+    enemyPanelStats = @("attack", "armor", "move-speed"); visionLossSubtitleDelaySeconds = 5; visionLossSkipsKillsWithinSeconds = 1.5
+    fogMarks = [ordered]@{ circleSeconds = 10; withdrawnAfterSeconds = 20; defaultOn = $true; olderGameClientsStripped = $true }
     sourceCommit = (& git -C (Join-Path $PSScriptRoot "..") rev-parse HEAD)
     sourceDirty = [bool](& git -C (Join-Path $PSScriptRoot "..") status --porcelain)
 }
