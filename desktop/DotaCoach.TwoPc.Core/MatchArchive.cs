@@ -437,10 +437,13 @@ public sealed class MatchArchive : IDisposable
     private static bool Token(JsonElement e) => Text(e) && e.GetString() is { Length: > 0 and <= 100 } s &&
         s.All(c => char.IsAsciiLetterOrDigit(c) || c == '_');
     private static readonly Field StateEntry = Partial(("name slot", Maybe(Token)), ("cooldown", Maybe(Number)), ("level", Maybe(Integer)));
+    private const string StatNames = "damage bonusDamage attackSpeed armor magicResist moveSpeed strength agility intelligence";
     private static readonly Field Equipment = Partial(("hero neutral", Maybe(Token)), ("level", Maybe(Integer)),
-        ("age", Maybe(Number)), ("items", Maybe(ArrayOf(40, Maybe(Token)))));
+        ("age", Maybe(Number)), ("items", Maybe(ArrayOf(40, Maybe(Token)))),
+        ("stats", Maybe(Exact((StatNames, Maybe(Int32)), ("age", Number)))));
     private static readonly Field Side = OneOf("radiant", "dire");
-    private static readonly Field VisibleHero = Exact(("hero", Token), ("team", Side), ("x y", Number));
+    private static readonly Field VisibleHero = Exact(("hero", Token), ("team", Side), ("x y", Number),
+        ("yaw?", e => Int32(e) && e.GetInt32() is >= 0 and < 360));
     private static readonly Field SeenWard = Exact(("kind", OneOf("observer", "sentry")), ("team", Side), ("x y", Number));
     private static readonly Field Estimate = Partial(("hero kind", Token), ("x y share age left", Number), ("rank", Integer), ("rough", Boolean));
     private static readonly Field Stop = Partial(("id label kind costBasis", Text), ("x y", Number),
@@ -477,7 +480,8 @@ public sealed class MatchArchive : IDisposable
         var prior = Exact(("hero", OneOf("luna", "troll_warlord")), ("fromMinute toMinuteExclusive replayMatches matchedMinutes laneOnly campOnly both neither", Int32));
         var economy = Exact(("gold netWorth lastHits denies kills deaths assists gpm xpm", Maybe(Int32)));
         var equipment = Exact(("hero", Token), ("level", Maybe(Int32)), ("items", Maybe(ArrayOf(6, Maybe(Token)))),
-            ("neutral", Maybe(Token)), ("lastSeenClock", Maybe(Number)));
+            ("neutral", Maybe(Token)), ("lastSeenClock", Maybe(Number)),
+            ("stats?", Exact((StatNames, Maybe(Int32)), ("readClock", Number))));
         var ward = Exact(("hero", Token), ("kind", OneOf("observer", "sentry", "ward")), ("rank", Int32), ("rough", Boolean),
             ("share worldX worldY estimatedClock expiresClock", Number));
         var road = OneOf("top", "mid", "bot");

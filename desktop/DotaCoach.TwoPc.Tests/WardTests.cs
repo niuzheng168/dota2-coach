@@ -275,7 +275,7 @@ internal static class WardTests
         List<PlusAlert> alerts = [];
         for (long t = 0; t <= 9000; t += 500) {
             tick = t;
-            var units = t <= 4000 ? new[] { new MinimapUnit("npc_dota_hero_razor", 3, 4649, -3699, 0, 1800, null) } : [];
+            var units = t <= 4000 ? new[] { new MinimapUnit("npc_dota_hero_razor", 3, 4649, -3699, null, 1800, null) } : [];
             alerts.AddRange(tracker.Update(new(t, "team-view", 600 + t / 1000.0, "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS", false, "9000000001", 2, 0,
                 units, ["radiant"], []), names));
         }

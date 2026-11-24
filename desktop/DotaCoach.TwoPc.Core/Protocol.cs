@@ -59,7 +59,8 @@ public static class Wire
         (board.Minimap == null || board.Minimap.IsValidFor(board.Minimap.SourceWidth, board.Minimap.SourceHeight)) &&
         heroes.All(h => h != null && Hero(h.Hero) &&
             h.Level is null or (>= 1 and <= 30) && (h.Items == null || h.Items.Length == 6 && h.Items.All(Item)) && Item(h.Neutral) &&
-            (h.Age is double age ? Finite(age, 0, 86_400) : h.Level == null && h.Items == null && h.Neutral == null)) &&
+            (h.Age is double age ? Finite(age, 0, 86_400) : h.Level == null && h.Items == null && h.Neutral == null) &&
+            (h.Stats == null || h.Stats.Valid())) &&
         heroes.Select(h => h.Hero).Distinct(StringComparer.Ordinal).Count() == heroes.Length &&
         (board.Wards == null || board.Wards.Length <= MaxWardMarks && board.Wards.All(w =>
             w is { Kind: "observer" or "sentry" or "ward", Rank: >= 0 and < WardTracker.MaxCandidates } && Hero(w.Hero) &&
@@ -68,7 +69,10 @@ public static class Wire
         (board.SeenWards == null || board.SeenWards.Length <= MaxSeenWards && board.SeenWards.All(w =>
             w is { Kind: "observer" or "sentry", Team: "radiant" or "dire" } &&
             Finite(w.X, -16_000, 16_000) && Finite(w.Y, -16_000, 16_000))) &&
-        (board.LaneMap == null || board.MatchId != null && board.LaneMap.Valid());
+        (board.LaneMap == null || board.MatchId != null && board.LaneMap.Valid()) &&
+        (board.Fog == null || board.MatchId != null && board.Fog.Length <= 5 && board.Fog.All(f => f != null && Hero(f.Hero) &&
+            Finite(f.X, -16_000, 16_000) && Finite(f.Y, -16_000, 16_000) && f.Yaw is null or (>= 0 and < 360) &&
+            Finite(f.Seconds, 0, FogTracker.MaxSeconds)) && board.Fog.Select(f => f.Hero).Distinct(StringComparer.Ordinal).Count() == board.Fog.Length);
     /// <summary>A small PNG, checked from its header before any image decoder sees network data.</summary>
     public static bool IsIcon(ReadOnlySpan<byte> data)
     {
@@ -149,9 +153,26 @@ public sealed record Reminder(string Id, string SessionId, long FrameSequence, s
 /// <summary>
 /// One enemy in the game machine's enemy panel, from Plus team view only: the level and items last read while
 /// the friend team saw the hero, and how many seconds ago that was. Null = never read. Items are the six main
-/// slots in order (null = empty).
+/// slots in order (null = empty). Stats, when read, carry their own age.
 /// </summary>
-public sealed record EnemyHero(string Hero, int? Level, string?[]? Items, string? Neutral, double? Age);
+public sealed record EnemyHero(string Hero, int? Level, string?[]? Items, string? Neutral, double? Age)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public EnemyStats? Stats { get; init; }
+}
+/// <summary>
+/// The stats column of an enemy's HUD as last read (with its items) and how many seconds ago: attack damage and its
+/// bonus, attack speed, armor, magic resistance (%), move speed, and the three attributes. Whatever buffs and debuffs
+/// the hero had at that read are included. A null value was unreadable in that read, not zero.
+/// </summary>
+public sealed record EnemyStats(int? Damage, int? BonusDamage, int? AttackSpeed, int? Armor, int? MagicResist, int? MoveSpeed,
+    int? Strength, int? Agility, int? Intelligence, double? Age)
+{
+    internal bool Valid() => Age is double age && Wire.Finite(age, 0, 86_400) &&
+        Damage is null or (>= 1 and <= 999) && BonusDamage is null or (>= -999 and <= 9999) && AttackSpeed is null or (>= 1 and <= 1000) &&
+        Armor is null or (>= -100 and <= 300) && MagicResist is null or (>= -100 and <= 100) && MoveSpeed is null or (>= 100 and <= 1000) &&
+        new[] { Strength, Agility, Intelligence }.All(v => v is null or (>= 0 and <= 999));
+}
 /// <summary>A candidate, never a sighting. X/Y are fractions across the minimap from its top left, not world coordinates.</summary>
 public sealed record WardMark(string Hero, string Kind, double X, double Y, int Rank, double Share, double Age, double Left, bool Rough = false);
 /// <summary>Only the selected subsets. Team is the paired participant's team, not the enemy team.
@@ -162,6 +183,9 @@ public sealed record EnemyBoard(EnemyHero[] Heroes, WardMark[]? Wards = null, st
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public LaneMap742? LaneMap { get; init; }
+    /// <summary>Enemies that left the friend team's vision: last sighting, facing and seconds since (world XY).</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public FogHero[]? Fog { get; init; }
     // Filled by the mailbox, never inferred from a scanner. A poll cannot start a new publication lease.
     public string? SessionId { get; init; }
     public long FrameSequence { get; init; }

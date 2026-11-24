@@ -81,8 +81,9 @@ internal sealed partial class AdviceOverlay
             double scale = layer.Scale, side = map.Size / scale, unit = DisplayGeometry.OverlayUnit(game.Height, scale);
             string key = string.Join("|", side, unit, selected.MatchId, selected.Team, WaveKey(selected.LaneMap),
                 string.Join(";", (selected.Wards ?? []).Select(m => $"{m.Hero},{m.Kind},{m.X:R},{m.Y:R},{m.Rank},{m.Rough},{m.Left < 60}")),
-                string.Join(";", (selected.SeenWards ?? []).Select(w => $"{w.Kind},{w.Team},{w.X:R},{w.Y:R}")));
-            layer.SetContent(key, () => WardLayer(selected, side, side, unit));
+                string.Join(";", (selected.SeenWards ?? []).Select(w => $"{w.Kind},{w.Team},{w.X:R},{w.Y:R}")),
+                string.Join(";", (selected.Fog ?? []).Select(f => $"{f.Hero},{f.X:R},{f.Y:R},{f.Yaw},{(int)f.Seconds}")), Icons.Count);
+            layer.SetContent(key, () => WardLayer(selected, side, side, unit, k => Icons[k]));
             layer.Place(game, map.Left, map.Top, map.Size, map.Size);
         } else if (Settings.ShowWards && !boardSession && ReferenceEquals(board, SampleBoard)) {
             // The style preview outlines where this machine's HUD setting puts the minimap.
@@ -98,7 +99,8 @@ internal sealed partial class AdviceOverlay
     // A wave belongs to the coach's frame: a box confirmed for another size drops it. Without a box it goes where the wards go.
     private static EnemyBoard? MapParts(EnemyBoard? b, GameOverlaySettings style, int width, int height) => b == null ? null : b with {
         Wards = style.ShowWards ? b.Wards : null, SeenWards = style.ShowWards ? b.SeenWards : null,
-        LaneMap = style.ShowLaneWaves && (b.Minimap == null || b.Minimap.IsValidFor(width, height)) ? b.LaneMap : null };
+        LaneMap = style.ShowLaneWaves && (b.Minimap == null || b.Minimap.IsValidFor(width, height)) ? b.LaneMap : null,
+        Fog = style.ShowFog ? b.Fog : null };
     private static int WaveKey(LaneMap742? map) {
         if (map == null) return 0;
         var hash = new HashCode(); hash.Add(map.Clock);
@@ -109,7 +111,8 @@ internal sealed partial class AdviceOverlay
     // size under 游戏内显示) places the marks, as in v0.4.8. Marks are fractions of the minimap, not screen points.
     private static MinimapLayout? WardLayout(EnemyBoard board, int width, int height, GameOverlaySettings style) =>
         board.MatchId == null || board.Team == null || width <= 0 || height <= 0 ||
-        board.LaneMap == null && board.Wards?.Any(w => w.Left > 0) != true && board.SeenWards?.Any(w => BoardDelivery.OnOverview(w) != null) != true ? null :
+        board.LaneMap == null && board.Wards?.Any(w => w.Left > 0) != true && board.SeenWards?.Any(w => BoardDelivery.OnOverview(w) != null) != true &&
+        board.Fog?.Any(f => BoardDelivery.OnOverview(f.X, f.Y) != null) != true ? null :
         board.Minimap?.IsValidFor(width, height) == true ? board.Minimap : style.Minimap(width, height);
 
     // Estimates look like Dota's own minimap ward icon at about its size, in yellow: an eye with a pupil for an
@@ -117,7 +120,7 @@ internal sealed partial class AdviceOverlay
     // fainter than the first choice. A seen ward is a thin, empty diamond around the actual observed world point, so
     // the game's icon underneath stays visible. One category cannot turn into the other, even at an identical coordinate.
     private static readonly Brush GuessInk = (Brush)Brush("#FFD43B").GetAsFrozen(), EyeEdge = (Brush)Brush("#0A0E12", 90).GetAsFrozen();
-    private static Canvas WardLayer(EnemyBoard board, double width, double height, double unit)
+    private static Canvas WardLayer(EnemyBoard board, double width, double height, double unit, Func<string, ImageSource?>? icon = null)
     {
         var map = new Canvas { Width = width, Height = height, ClipToBounds = true, IsHitTestVisible = false };
         double u = Math.Min(unit, Math.Min(width, height) / 90);
@@ -126,6 +129,7 @@ internal sealed partial class AdviceOverlay
             Canvas.SetLeft(element, x); Canvas.SetTop(element, y); map.Children.Add(element);
         }
         if (board.LaneMap is { } waves) DrawWaves(map, waves, board.Team!, u, boxes);
+        if (board.Fog is { } fog) DrawFog(map, fog, u, icon, boxes);
         foreach (var m in (board.Wards ?? []).Where(w => w.Left > 0).OrderByDescending(w => w.Rank)) {
             var eye = Eye(m.Kind, (m.Rank == 0 ? 10.5 : 8) * u);
             eye.Opacity = (m.Rank == 0 ? .9 : .5) * (m.Rough ? .75 : 1) * (m.Left < 60 ? .6 : 1);
@@ -143,7 +147,8 @@ internal sealed partial class AdviceOverlay
         var legend = new TextBlock { Foreground = Brushes.White, FontSize = 8.5 * u, FontWeight = FontWeights.SemiBold,
             MaxWidth = Math.Max(1, width - 6*u), TextWrapping = TextWrapping.Wrap };
         foreach (var (text, ink) in new[] { (seen ? "◇ 目击" : null, Brushes.White), (estimated ? "◉ 推测" : null, GuessInk),
-            (board.LaneMap != null ? "兵 ●见 ○雾 △波 ×汇" : null, Brushes.White) }.Where(t => t.Item1 != null))
+            (board.LaneMap != null ? "兵 ●见 ○雾 △波 ×汇" : null, Brushes.White),
+            (board.Fog?.Any(f => BoardDelivery.OnOverview(f.X, f.Y) != null) == true ? "红圈 离开视野后可能在" : null, Brushes.OrangeRed) }.Where(t => t.Item1 != null))
             legend.Inlines.Add(new Run((legend.Inlines.Count > 0 ? "  " : "") + text) { Foreground = ink });
         var key = new Border { Background = Brush("#081018", 75), CornerRadius = new(2 * u), Padding = new Thickness(2 * u, 0, 2 * u, 0),
             Child = legend };
@@ -175,5 +180,41 @@ internal sealed partial class AdviceOverlay
             Canvas.SetLeft(dot, (w - pupil) / 2); Canvas.SetTop(dot, (h - pupil) / 2); eye.Children.Add(dot);
         }
         return eye;
+    }
+
+    // Under the wards: the circle an enemy that left vision is probably in (dashed red, first seconds only), a short line
+    // the way it faced, and its head where it was last seen with the seconds since, fading as the sighting ages.
+    private static void DrawFog(Canvas map, FogHero[] fog, double u, Func<string, ImageSource?>? icon, List<Rect> boxes)
+    {
+        double scale = map.Width; // the overview's span maps onto the square minimap
+        foreach (var f in fog.OrderByDescending(f => f.Seconds)) {
+            if (BoardDelivery.OnOverview(f.X, f.Y) is not { } at) continue;
+            double x = at.X * map.Width, y = at.Y * map.Height, fade = 1 - .45 * Math.Clamp(f.Seconds / FogTracker.MaxSeconds, 0, 1);
+            if (FogTracker.Circle(f) is var (cx, cy, radius) && BoardDelivery.OnOverview(cx, cy) is { } centre) {
+                double r = radius / (2.0 * BoardDelivery.WorldEdge) * scale;
+                var ring = new Ellipse { Width = 2 * r, Height = 2 * r, Stroke = Brushes.OrangeRed, StrokeThickness = 1.3 * u,
+                    StrokeDashArray = new DoubleCollection { 3, 2 }, Fill = new SolidColorBrush(Color.FromArgb(28, 255, 69, 0)), Opacity = .85 * fade };
+                Panel.SetZIndex(ring, -2);
+                Canvas.SetLeft(ring, centre.X * map.Width - r); Canvas.SetTop(ring, centre.Y * map.Height - r); map.Children.Add(ring);
+            }
+            if (f.Yaw is int yaw) {
+                double a = yaw * Math.PI / 180, length = 9 * u;
+                map.Children.Add(new Line { X1 = x, Y1 = y, X2 = x + length * Math.Cos(a), Y2 = y - length * Math.Sin(a),
+                    Stroke = Brushes.OrangeRed, StrokeThickness = 1.6 * u, Opacity = fade });
+            }
+            double side = 9 * u;
+            FrameworkElement head = icon?.Invoke(f.Hero) is { } image
+                ? new Border { Width = side, Height = side, BorderBrush = Brushes.OrangeRed, BorderThickness = new(u),
+                    Child = new Image { Source = image, Stretch = Stretch.UniformToFill } }
+                : new Ellipse { Width = side * .7, Height = side * .7, Fill = Brushes.OrangeRed, Stroke = Brushes.Black, StrokeThickness = .6 * u };
+            head.Opacity = fade;
+            head.Measure(new Size(side, side));
+            var box = new Rect(x - head.Width / 2, y - head.Height / 2, head.Width, head.Height); boxes.Add(box);
+            Canvas.SetLeft(head, box.X); Canvas.SetTop(head, box.Y); map.Children.Add(head);
+            var age = new TextBlock { Text = $"{(int)f.Seconds}″", FontSize = 7.5 * u, FontWeight = FontWeights.Bold, Foreground = Brushes.White,
+                Background = Brush("#081018", 80), Opacity = fade };
+            Canvas.SetLeft(age, Math.Clamp(box.Right, 0, Math.Max(0, map.Width - 12 * u))); Canvas.SetTop(age, Math.Clamp(box.Bottom - 4 * u, 0, map.Height - 9 * u));
+            map.Children.Add(age);
+        }
     }
 }

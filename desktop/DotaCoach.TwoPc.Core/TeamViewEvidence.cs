@@ -30,6 +30,8 @@ public static class TeamViewEvidence
         Wire.Finite(current, -3600, 43_200) && Wire.Finite(observed, current - MaxLagSeconds, current + MaxLeadSeconds);
     private static bool Located(MinimapUnit u) => u.Team is 2 or 3 && (u.X != 0 || u.Y != 0) &&
         Wire.Finite(u.X, -12_000, 12_000) && Wire.Finite(u.Y, -12_000, 12_000);
+    /// <summary>The minimap's yaw as whole world degrees 0–359 (0 = +x, 90 = +y; Dota reports anything from -180 to 360).</summary>
+    public static int? Facing(double? yaw) => yaw is double y && double.IsFinite(y) ? ((int)Math.Round(y) % 360 + 360) % 360 : null;
     public static IEnumerable<MinimapUnit> VisibleHeroes(SpectatorSnapshot s) => !IsTeamView(s) ? [] : s.Heroes
         .Where(u => Located(u) && u.Vision > 0 && Wire.ValidIconKey(u.Name))
         .DistinctBy(u => (u.Team, u.Name)).Take(10);

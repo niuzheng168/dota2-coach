@@ -96,7 +96,7 @@ internal sealed partial class CoachWindow
             "" => "启动中（正在加载识别模型）",
             var line when line.StartsWith("Waiting for the Dota window", StringComparison.Ordinal) => "等待本机 Dota 启动",
             var line when line.StartsWith("Dota window changed", StringComparison.Ordinal) => "Dota 窗口已变化，等待窗口恢复",
-            _ => "运行中 · 前台队伍视角下读取对手等级和装备",
+            _ => "运行中 · 前台队伍视角下读取对手等级、装备和属性",
         } : scan != null ? $"已退出（{scan.ExitCode}）{scan.LastError}" : scanNote == "已停止" ? "已停止" : scanBusy ? "正在启动或停止…" : "未启动";
         scanState.Text = "视觉扫描：" + state + (scanNote.Length == 0 || scanNote == state ? "" : "\n" + scanNote);
     }

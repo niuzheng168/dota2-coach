@@ -290,7 +290,7 @@ public sealed partial class GameLink : IDisposable
     public async Task<EnemyBoard?> Enemies(CancellationToken cancellation)
     {
         long started = now();
-        using var request = Request(HttpMethod.Get, "/v1/enemies?waves=1");
+        using var request = Request(HttpMethod.Get, "/v1/enemies?waves=1&fog=1");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(http.Timeout);
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);

@@ -12,6 +12,10 @@ internal sealed partial class CoachWindow
     private readonly CheckBox enemyWards = new() { Content = "可能的敌方眼位（推测）", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
     private readonly TextBlock waveStatus = Ui.Text("", 13);
     private readonly CheckBox laneOverlay = new() { Content = "兵线与迷雾推演（游戏端小地图）", Foreground = Brushes.White };
+    private readonly CheckBox fogOverlay = new() { Content = "对手离开视野后的可能位置（游戏端小地图）", Foreground = Brushes.White };
+    private readonly FogTracker fog = new();
+    // Enemies out of sight in the matched team view, for the board; null without a fresh matched view.
+    private (string Match, string Team, FogHero[] Heroes)? fogNow;
     private readonly WardTracker wardTracker = new(CoachMap.Bundled(), WardSpots.Bundled());
     private readonly TeamScanCursor scanCursor = new();
     private readonly object sightGate = new();
@@ -87,7 +91,7 @@ internal sealed partial class CoachWindow
         if (processedGeneration != generation) {
             earlyWavePackets.Clear();
             processedGeneration = generation;
-            wardTracker.Clear(); visionLoss.Clear(); alerts.Clear();
+            wardTracker.Clear(); visionLoss.Clear(); fog.Clear(); alerts.Clear();
             seenAllies.Clear(); scannedHeroes = null; pendingScan = null; scannerRun = null; wardCount = 0;
             lastEstimateAt = double.NegativeInfinity; lastAlert = panelText = "";
             matchState.WithdrawTeam(); // also covers a brief full view between two UI ticks
@@ -113,6 +117,7 @@ internal sealed partial class CoachWindow
             }
             panelText = (scan?.Status ?? scanStatus).Text + (knownBoard.Read > 0 ? $" · 游戏端面板 {knownBoard.Read} 名敌方英雄" : "");
         }
+        fogNow = null;
         if (!matched || own == null) {
             earlyWavePackets.Clear();
             matchState.WithdrawTeam();
@@ -138,7 +143,7 @@ internal sealed partial class CoachWindow
             // A packet already in the player's next second is known by the player's current one: never a future fact.
             double at = Math.Min(s.Clock!.Value, own.Clock);
             var heroes = TeamViewEvidence.VisibleHeroes(s)
-                .Select(u => new MatchSightHero(u.Name, TeamViewEvidence.Side(u.Team)!, u.X, u.Y)).ToArray();
+                .Select(u => new MatchSightHero(u.Name, TeamViewEvidence.Side(u.Team)!, u.X, u.Y, TeamViewEvidence.Facing(u.Yaw))).ToArray();
             foreach (var h in heroes.Where(h => h.Team == own.Team)) if (seenAllies.Count < 5) seenAllies.Add(h.Hero);
             matchState.ObserveSight(own.MatchId, own.Team, at, heroes);
             var wards = TeamViewEvidence.VisibleWards(s)
@@ -153,7 +158,9 @@ internal sealed partial class CoachWindow
                 var note = matchState.NoteTeam(own.MatchId, own.Team, at, "vision-alert", a.Hero, a.Text);
                 if (note != null && visionAlertsOn && LegacySubtitles(frame)) alerts.Add([note], now);
             }
+            fog.Sight(s);
         }
+        fogNow = (own.MatchId, own.Team, fog.Heroes());
         if (poll) {
             var scanned = knownBoard.Match == own.MatchId && scan is { } shared ? shared : ScanFeed.Poll(scanFile, own.MatchId, unix);
             scanStatus = scanned.Status;

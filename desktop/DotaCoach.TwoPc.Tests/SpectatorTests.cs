@@ -178,7 +178,7 @@ internal static class SpectatorTests
             gameRecorder.Spectator(team);
             gameRecorder.PlayerMinimap(SpectatorGsi.Parse(JsonDocument.Parse(Payload(new { }, new { }, null)).RootElement, 0));
             var inMatch = new SpectatorSnapshot(0, "player", 700, "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS", false, null, 2, 0,
-                [new("npc_dota_hero_razor", 3, 950.4, 950, null, 0, "minimap_herocircle")], ["radiant"], []);
+                [new("npc_dota_hero_razor", 3, 950.4, 950, -270, 0, "minimap_herocircle")], ["radiant"], []);
             gameRecorder.PlayerMinimap(inMatch); gameRecorder.PlayerMinimap(inMatch);
             await recorder.DisposeAsync(); await gameRecorder.DisposeAsync();
             string events = File.ReadAllText(Path.Combine(recorder.DirectoryPath, "events.jsonl"));
@@ -187,7 +187,7 @@ internal static class SpectatorTests
             check(!events.Contains("player-minimap"), "coach role never records player-mode minimap");
             string gameEvents = File.ReadAllText(Path.Combine(gameRecorder.DirectoryPath, "events.jsonl"));
             check(!gameEvents.Contains("spectator"), "game role never records spectator data");
-            check(Regex.Matches(gameEvents, "\"player-minimap\"").Count == 1 && gameEvents.Contains("[\"npc_dota_hero_razor\",3,950,950,0,\"minimap_herocircle\"]") &&
+            check(Regex.Matches(gameEvents, "\"player-minimap\"").Count == 1 && gameEvents.Contains("[\"npc_dota_hero_razor\",3,950,950,0,\"minimap_herocircle\",90]") &&
                 !gameEvents.Contains("\"menu\"") && !gameEvents.Contains("auth"), "player-mode minimap is typed, once per second, menus skipped");
         } finally {
             try { Directory.Delete(root, recursive: true); } catch { /* Best-effort temp cleanup. */ }

@@ -1,5 +1,5 @@
-"""Ward evaluation facts from a replay: every hero's position and ward counts, each team's vision sources, and the
-wards actually placed. Replay all-map data for offline evaluation of the coach's ward guesses only (never live input).
+"""Ward evaluation facts from a replay: every hero's position, facing and ward counts, each team's vision sources, and
+the wards actually placed. Replay all-map data for offline evaluation of the coach's ward guesses only (never live input).
 
     .tmp/replay-tools/Scripts/python.exe -I scripts/replays/extract-wards.py REPLAY.dem OUT.json
 
@@ -27,6 +27,12 @@ def position(e):
         return None
     cx, cy, x, y = values
     return [round(cx * 128 + x - OFFSET, 1), round(cy * 128 + y - OFFSET, 1)]
+
+
+def yaw(e):
+    """Facing in world degrees (0 = +x, 90 = +y), as the GSI minimap's "yaw" reports it; None when not networked."""
+    angles = e.get("CBodyComponent.m_angRotation")
+    return round(angles[1] % 360, 1) if angles is not None and len(angles) == 3 else None
 
 
 def extract(dem: Path, out: Path):
@@ -100,7 +106,7 @@ def extract(dem: Path, out: Path):
                 continue
             observer, sentry = ward_counts(e)
             rows.append({"hero": name(e), "team": e.get("m_iTeamNum"), "owner": e.get("m_hOwnerEntity"),
-                         "player": e.get("m_iPlayerID"), "x": pos[0], "y": pos[1],
+                         "player": e.get("m_iPlayerID"), "x": pos[0], "y": pos[1], "yaw": yaw(e),
                          "alive": e.get("m_lifeState") == 0, "observer": observer, "sentry": sentry})
         samples.append({"tick": p.tick, "heroes": rows})
         if p.tick >= state["nextSource"]:

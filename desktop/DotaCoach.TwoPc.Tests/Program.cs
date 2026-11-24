@@ -27,10 +27,11 @@ if (args is ["--copilot"]) {
     await CopilotContractTests.Run(Check); Console.WriteLine($"Offline Copilot contract checks: {passed} passed."); return;
 }
 if (args is ["--team-intel"]) {
-    PlusAlertTests.Run(Check); WardTests.Run(Check); TeamViewEvidenceTests.Run(Check); await HeroScanTests.Run(Check);
+    PlusAlertTests.Run(Check); FogTests.Run(Check); WardTests.Run(Check); TeamViewEvidenceTests.Run(Check); await HeroScanTests.Run(Check);
     Console.WriteLine($"Team evidence checks: {passed} passed."); return;
 }
 if (args is ["--ward-eval", .. var wardFiles]) { WardEval.Run(wardFiles); return; }
+if (args is ["--fog-eval", .. var fogFiles]) { FogEval.Run(fogFiles); return; }
 if (args is ["--ward-session", .. var sessionArgs] &&
     sessionArgs.Where(a => a is not ("--as-scanned" or "--whole-seconds")).ToArray() is [var wardSession, var wardTruth]) {
     WardSessionEval.Run(wardSession, wardTruth, sessionArgs.Contains("--as-scanned"), sessionArgs.Contains("--whole-seconds")); return;
@@ -632,7 +633,7 @@ await using (var gsiProbe = await GsiReceiver.Start(0)) {
 }
 await SpectatorTests.Run(Check);
 LastHitTests.Run(Check);
-PlusAlertTests.Run(Check);
+PlusAlertTests.Run(Check); FogTests.Run(Check);
 WardTests.Run(Check); TeamViewEvidenceTests.Run(Check); await HeroScanTests.Run(Check);
 OverlaySettingsTests.Run(Check);
 CreepHealthTests.Run(Check);

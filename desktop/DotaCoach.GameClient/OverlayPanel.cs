@@ -26,7 +26,7 @@ internal sealed class OverlayPanel : StackPanel
     private readonly AdviceOverlay overlay;
     private readonly CheckBox advice = Check("AI 打钱建议"), alerts = Check("对手提醒（离开视野、插眼）"), title = Check("标题行（来源与“未经核验”）"),
         enemies = Check("对手装备面板"), wards = Check("眼位（目击与推测）"), minimapRight = Check("小地图在右侧"),
-        waves = Check("在小地图显示兵线与迷雾推演");
+        waves = Check("在小地图显示兵线与迷雾推演"), fog = Check("在小地图显示对手离开视野后的可能位置");
     private readonly Slider x = Range(0, 100), y = Range(0, 100),
         size = Range(GameOverlaySettings.MinSize, GameOverlaySettings.MaxSize), width = Range(GameOverlaySettings.MinWidth, GameOverlaySettings.MaxWidth),
         textOpacity = Range(GameOverlaySettings.MinTextOpacity, 100), backgroundOpacity = Range(0, 100),
@@ -48,7 +48,7 @@ internal sealed class OverlayPanel : StackPanel
             foreach (var (name, hex) in Palette) combo.Items.Add(Swatch(name, hex));
             combo.SelectionChanged += (_, _) => Changed();
         }
-        foreach (var box in new[] { advice, alerts, title, enemies, wards, minimapRight, waves }) { box.Checked += (_, _) => Changed(); box.Unchecked += (_, _) => Changed(); }
+        foreach (var box in new[] { advice, alerts, title, enemies, wards, minimapRight, waves, fog }) { box.Checked += (_, _) => Changed(); box.Unchecked += (_, _) => Changed(); }
         foreach (var box in new[] { advice, alerts, enemies, wards }) Switches.Children.Add(box);
         Children.Add(Ui.Label("字幕（显示哪些字幕在主页勾选；只管这台机器怎么显示，推不推送、显示几秒在教练端设置）"));
         Children.Add(title);
@@ -58,7 +58,7 @@ internal sealed class OverlayPanel : StackPanel
             Cell("字号", size, v => v + "%"), Cell("最大宽度", width, v => v + "% 画面宽")));
         Children.Add(Ui.Columns(Labeled("文字颜色", textColor), Labeled("标题颜色", titleColor), Labeled("背景颜色", backgroundColor),
             Cell("文字不透明度", textOpacity, v => v + "%"), Cell("背景不透明度", backgroundOpacity, v => v == 0 ? "全透明" : v + "%")));
-        Children.Add(Ui.Label("对手面板：教练端推送的上次读到的等级和装备，显示在游戏左侧，到本局结束。未见不补猜。"));
+        Children.Add(Ui.Label("对手面板：教练端推送的上次读到的等级、装备、攻击/护甲/移速，显示在游戏左侧，到本局结束。未见不补猜。"));
         Children.Add(Ui.Columns(
             Cell("上下位置", enemyY, v => v switch { 0 => "最上", 50 => "正中", 100 => "最下", _ => v + "%" }),
             Cell("大小", enemySize, v => v + "%"), Cell("不透明度", enemyOpacity, v => v + "%")));
@@ -68,6 +68,8 @@ internal sealed class OverlayPanel : StackPanel
         Children.Add(Ui.Columns(mapChecks, Cell("小地图大小", minimapSize, v => v == 100 ? "默认" : v + "%")));
         Children.Add(waves);
         Children.Add(Ui.Text("兵线和眼位画在同一个小地图框里。● 是实见的小兵，○ 是进雾后的短时估计，△ 是理论增援，× 是交汇。", 11, Brushes.LightGray));
+        Children.Add(fog);
+        Children.Add(Ui.Text("对手看不到后：头像在最后位置，短线是当时面朝的方向，虚线红圈是它大概率所在的范围（前 10 秒，越来越大），20 秒后撤掉。是推测，不是目击。", 11, Brushes.LightGray));
         Children.Add(Ui.Row(status,
             Ui.Button("预览 8 秒", (_, _) => { overlay.Preview(PreviewMs); status.Text = PreviewNote(); }),
             Ui.Button("恢复默认", (_, _) => { Fill(new()); Changed(); })));
@@ -103,7 +105,7 @@ internal sealed class OverlayPanel : StackPanel
         TextOpacity = Whole(textOpacity), BackgroundOpacity = Whole(backgroundOpacity),
         ShowEnemies = enemies.IsChecked == true, EnemyY = Whole(enemyY), EnemySize = Whole(enemySize), EnemyOpacity = Whole(enemyOpacity),
         ShowWards = wards.IsChecked == true, MinimapRight = minimapRight.IsChecked == true, MinimapSize = Whole(minimapSize),
-        ShowLaneWaves = waves.IsChecked == true,
+        ShowLaneWaves = waves.IsChecked == true, ShowFog = fog.IsChecked == true,
     };
     private void Fill(GameOverlaySettings s)
     {
@@ -113,7 +115,7 @@ internal sealed class OverlayPanel : StackPanel
         textOpacity.Value = s.TextOpacity; backgroundOpacity.Value = s.BackgroundOpacity;
         enemies.IsChecked = s.ShowEnemies; enemyY.Value = s.EnemyY; enemySize.Value = s.EnemySize; enemyOpacity.Value = s.EnemyOpacity;
         wards.IsChecked = s.ShowWards; minimapRight.IsChecked = s.MinimapRight; minimapSize.Value = s.MinimapSize;
-        waves.IsChecked = s.ShowLaneWaves;
+        waves.IsChecked = s.ShowLaneWaves; fog.IsChecked = s.ShowFog;
         Select(textColor, s.TextColor); Select(titleColor, s.TitleColor); Select(backgroundColor, s.BackgroundColor);
         loading = false;
     }

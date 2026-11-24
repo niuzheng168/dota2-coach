@@ -26,7 +26,7 @@ internal static partial class Program
             coach.Show(); game.Show();
             var coachHome = HomePage(coach);
             Check(Labels<CheckBox>(coachHome).SequenceEqual(new[] { "自动教练", "7.42 分钟打钱（按游戏时钟，每分钟最多调用一次模型）",
-                    "对手等级和装备（游戏左侧面板）", "对手离开视野", "可能的敌方眼位（推测）" }.Order()) &&
+                    "对手等级、装备和属性（游戏左侧面板）", "对手离开视野", "可能的敌方眼位（推测）" }.Order()) &&
                 Labels<Button>(coachHome).SequenceEqual(new[] { "复制配对码", "打开对局复盘窗口", "启动视觉扫描",
                     "我确认本局为标准 dota 地图（7.42 / build 6989），小地图框已对准", "撤回本局确认（保留分钟模式）" }.Order()) &&
                 !Inputs(coachHome),
@@ -36,6 +36,8 @@ internal static partial class Program
                 Children(SettingsGroup(coach, "连接")).Contains(Field<Button>(coach, "listen")) &&
                 Children(SettingsGroup(coach, "Plus 观战与扫描")).Contains(Field<TextBox>(coach, "spectatorInstall")) &&
                 Children(SettingsGroup(coach, "Plus 观战与扫描")).Contains(Field<TextBox>(coach, "scanFolder")) &&
+                Children(SettingsGroup(coach, "Plus 观战与扫描")).Contains(Field<TextBox>(coach, "visionLossDelay")) &&
+                Children(SettingsGroup(coach, "Plus 观战与扫描")).Contains(Field<CheckBox>(coach, "fogOverlay")) &&
                 Children(SettingsGroup(coach, "AI 模型")).Contains(Field<ComboBox>(coach, "modelProvider")) &&
                 Children(SettingsGroup(coach, "AI 模型")).Contains(Field<CheckBox>(coach, "subtitles")) &&
                 Children(SettingsGroup(coach, "AI 模型")).Contains(Field<CheckBox>(coach, "mapMarkers")) &&

@@ -1,9 +1,10 @@
 """Live hero scanner for the coach machine's Dota spectator view.
 
 Cycles the spectator's selected hero and reads each hero's bottom HUD with hud_recognizer.py: level,
-health, mana, alive and items. Whose HUD a frame shows is read from the frame (ability icons, else
-the name label), not assumed from the selection. Where each hero was last seen comes from the same
-client's GSI minimap.
+health, mana, alive and items, and with the items the portrait's stats column (attack damage and its
+bonus, attack speed, armor, magic resistance, move speed) and strength, agility and intelligence. Whose
+HUD a frame shows is read from the frame (ability icons, else the name label), not assumed from the
+selection. Where each hero was last seen comes from the same client's GSI minimap.
 
 Selection: `keys` posts the spectator hotkeys (SpectatorCameraFocusPlayer1-10, 1-0 by default) to
 the Dota window. Dota acts on them only while it is the foreground window. Standalone scans try bringing
@@ -20,6 +21,9 @@ the state file says so in "mode", and live coaching must not use such data.
 Ward counts (observer, sentry, or unknown kind for grey icons) are read with every item read; the last few
 changes of each enemy's counts go to the live file with the game time of the first and latest read of each,
 to a fraction of a second: the coach client guesses where a ward went when an enemy's count drops.
+
+Each enemy's stats come from its latest item read that got attack damage, armor and move speed (values the
+recognizer was unsure of stay null), with their age in game seconds.
 
 Speed: heroes already matched to their player are selected one per captured frame; Dota shows a new
 selection about every 20 ms, at 60 Hz and 144 Hz alike, so a sweep of ten heroes takes ~0.2 s. A hero
@@ -59,7 +63,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # python -I leaves the script folder off the path
 from capture_replay import Console, INSTALL  # noqa: E402
-from hud_recognizer import SLOTS  # noqa: E402
+from hud_recognizer import ATTRIBUTE_HUES, SLOTS, STAT_RANGES  # noqa: E402
 import wgc  # noqa: E402
 
 GSI_NAME = "gamestate_integration_coach_hero_scan.cfg"
@@ -79,6 +83,10 @@ STREAM_TAIL = 0.07  # after the last streamed selection: its switch shows within
 RETRY_UNKNOWN = 2.0  # seconds between attempts at a player whose hero is still unknown
 STREAM_MISSED = 1.0  # a streamed hero not read for this long gets its own visit next cycle
 FRESH_GSI = 3.0
+# The enemy panel's stats: the stats column and the attributes below the portrait. A read replaces the kept one only
+# when it got the values the panel shows (STATS_NEEDED).
+STATS = (*STAT_RANGES, *ATTRIBUTE_HUES)
+STATS_NEEDED = ("damage", "armor", "moveSpeed")
 # Ends the run early (--stop-with-stdin): the coach client starts the scanner with a pipe as standard input
 # and closes it to stop the scan; the pipe also closes when the client exits or crashes.
 STOP = threading.Event()
@@ -679,6 +687,9 @@ class Scanner:
                                  # items drawn with the same icon (Dagon levels): the name is one of these
                                  "alt": {s: i["sameIcon"] for s, i in out["items"].items() if i and i.get("sameIcon")},
                                  "wards": out["wards"]}
+            values = settled and out["stats"] and {**out["stats"], **(out["attributes"] or dict.fromkeys(ATTRIBUTE_HUES))}
+            stats = values and game_time is not None and all(values[k] is not None for k in STATS_NEEDED) and \
+                {"at": at, "clock": clock, "time": game_time, **{k: values[k] for k in STATS}}
             # In Plus team view an enemy can stay on the HUD after the friend team loses sight of it (on 2026-11-21 Ancient
             # Apparition for 8 s): that is its last sighting, not now. Such reads would date the panel and the ward counts
             # the coach compares as current, so they only name the hero.
@@ -699,6 +710,8 @@ class Scanner:
                         record["items"] = items
                         if mode == "team-view" and teams[hero] != own:
                             self.item_slots.read(hero, items)
+                    if stats and stats["time"] >= (record.get("stats") or {}).get("time", -1e9):
+                        record["stats"] = stats
                 self.shown = hero
             if unseen:
                 self.stats["unseen"] += 1
@@ -710,6 +723,7 @@ class Scanner:
             if items:
                 entry["items"] = {k: v for k, v in items.items() if k not in ("at", "clock", "time")}
                 entry["time"] = items["time"]
+                entry["stats"] = values or None
             if self.args.truth:
                 entry["truth"] = self.feed.truth_at(at, hero)
             entry["mode"] = mode
@@ -740,13 +754,14 @@ class Scanner:
         out = {}
         for hero in sorted(set(heroes) | set(seen) | set(teams)):
             h, s = heroes.get(hero) or {}, seen.get(hero)
-            st, it, team = h.get("status"), h.get("items"), teams.get(hero)
+            st, it, sv, team = h.get("status"), h.get("items"), h.get("stats"), teams.get(hero)
             out[hero] = {
                 "team": team, "ally": None if feed["ownTeam"] is None or team is None else team == feed["ownTeam"],
                 "status": st and {"level": st["level"], "alive": st["alive"], "health": pair(st["health"]),
                                   "mana": pair(st["mana"]), "clock": st["clock"], "time": st["time"], "age": age(st)},
                 "items": it and {"slots": [it[s] for s in SLOTS], **({"alt": it["alt"]} if it["alt"] else {}),
                                  "clock": it["clock"], "age": age(it)},
+                "stats": sv and {**{k: sv[k] for k in STATS}, "clock": sv["clock"], "time": sv["time"], "age": age(sv)},
                 "seen": s and {"x": s["x"], "y": s["y"], **({"others": s["others"]} if "others" in s else {}),
                                "visible": hero in visible, "clock": s["clock"], "age": age(s)},
                 **({"truth": truth[hero]} if truth and hero in truth else {}),
@@ -767,7 +782,9 @@ class Scanner:
     def enemies(snap: dict, shown: dict, item_ages: dict, wards: dict) -> list[dict]:
         """The enemy panel on the game machine (Plus team view only), in player order: level and items as
         last read while the friend team saw the hero, and the age of that reading in seconds. Never-read
-        enemies are listed with nulls."""
+        enemies are listed with nulls. "stats" (once read: attack damage, bonus damage, attack speed, armor with
+        its bonus, magic resistance %, move speed, strength, agility, intelligence, each null when unsure) is the
+        latest read that got damage, armor and move speed; its "age" is in game seconds like "age"."""
         if (snap["mode"] != "team-view" or snap["ownTeam"] not in (2, 3) or not snap["liveReady"]
                 or snap["gsiAge"] is None or not 0 <= snap["gsiAge"] < FRESH_GSI):
             return []
@@ -782,9 +799,12 @@ class Scanner:
             age = round(max(0, snap["scanClock"] - status["time"]), 2) if level is not None else None
             if slots is not None:
                 age = max(age or 0, item_ages[hero])  # a fast level read doesn't make the older gear fresh
+            stats = snap["heroes"][hero].get("stats")
             out.append({"hero": hero, "level": level, "age": age,
                         "items": slots and list(slots[:6]), "neutral": slots and slots[6],
-                        **({"wards": wards[hero]} if hero in wards else {})})
+                        **({"wards": wards[hero]} if hero in wards else {}),
+                        **({"stats": {**{k: stats[k] for k in STATS}, "age": round(max(0, snap["scanClock"] - stats["time"]), 2)}}
+                           if stats else {})})
         return out
 
     def export_icons(self, enemies: list[dict]):

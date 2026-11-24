@@ -63,6 +63,8 @@ public sealed partial class CloudCoach
                 Unobserved waves, camp presence/stacks and path danger remain unknown; own territory is not proof of safety.
                 If teamKnowledge is supplied it is a frozen team-view projection known at knowledgeClock. Its hero
                 positions and ward sightings refer ONLY to the stated past sample game clocks; last-read items can be stale.
+                A hero's yaw is where it faced at that sample (world degrees, 0 = +x, 90 = +y), not where it went.
+                Equipment stats are HUD readings at their readClock, including temporary buffs and debuffs of that moment.
                 possibleEnemyWards are inferred candidates, not sightings. Never treat several candidates as several wards.
                 Missing information or a missing icon does not prove safety. No replay or full-spectator facts are supplied.
                 historicalPrior, if present, summarizes hero-body kill categories from sparse completed replays.

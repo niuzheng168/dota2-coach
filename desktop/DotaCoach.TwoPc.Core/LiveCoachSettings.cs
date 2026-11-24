@@ -37,6 +37,10 @@ public sealed record LiveCoachSettings
     public bool EnemyPanel { get; init; } = true;
     /// <summary>Plus live spectating: subtitle on the game machine when an enemy leaves the friend team's vision.</summary>
     public bool EnemyVisionAlerts { get; init; } = true;
+    /// <summary>How long an enemy must stay out of the friend team's vision before that subtitle (1–30 s).</summary>
+    public int VisionLossSeconds { get; init; } = VisionLossTracker.DefaultGoneMs / 1000;
+    /// <summary>Plus live spectating: where enemies that left vision may be now, from their last position, facing and speed.</summary>
+    public bool EnemyFogOnMap { get; init; } = true;
     /// <summary>Display inferred ward candidates. Does not enable/disable collection or authorize model input.</summary>
     public bool EnemyWards { get; init; } = false;
     public bool LaneWavesOnMap { get; init; } = true;
@@ -72,11 +76,12 @@ public sealed record LiveCoachSettings
         }
         if (IntervalSeconds is < 12 or > 300 || RequestLimit is < 1 or > 1000 ||
             SubtitleSeconds is < 1 or > Wire.MaxReminderMs / 1000 || ModelTimeoutSeconds is < 8 or > 20 ||
+            VisionLossSeconds is < 1 or > VisionLossTracker.MaxGoneSeconds ||
             Calibrations == null || Calibrations.Length > 16 ||
             Calibrations.Any(c => c == null || !c.IsValidFor(c.SourceWidth, c.SourceHeight)) ||
             Calibrations.GroupBy(c => (c.SourceWidth, c.SourceHeight)).Any(g => g.Count() > 1) ||
             new[] { ScanFolder, ScanPython }.Any(p => p == null || p.Length > 0 && !Path.IsPathFullyQualified(p)))
-            throw new ArgumentException("调用间隔/上限、字幕时长（1–15秒）、模型超时（8–20秒）、扫描路径或小地图校准无效。");
+            throw new ArgumentException("调用间隔/上限、字幕时长（1–15秒）、模型超时（8–20秒）、离开视野等待（1–30秒）、扫描路径或小地图校准无效。");
     }
     /// <summary>The user-confirmed calibration for this game resolution, if any.</summary>
     public MinimapLayout? LayoutFor(FrameView frame) =>

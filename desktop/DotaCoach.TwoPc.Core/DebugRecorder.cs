@@ -205,16 +205,17 @@ public sealed class DebugRecorder : IAsyncDisposable
             last = now(); return true;
         }
     }
-    // [unitname, team, x, y, visionrange, icon]: no player names or IDs are parsed at all.
+    // [unitname, team, x, y, visionrange, icon, yaw]: no player names or IDs are parsed at all.
     // 1200 units keeps one event under the 128 KiB record cap.
     private static IEnumerable<object?[]> Units(SpectatorSnapshot s) =>
-        s.Minimap.Take(1200).Select(u => new object?[] { u.Name, u.Team, Math.Round(u.X), Math.Round(u.Y), u.Vision, u.Image });
+        s.Minimap.Take(1200).Select(u => new object?[] { u.Name, u.Team, Math.Round(u.X), Math.Round(u.Y), u.Vision, u.Image, TeamViewEvidence.Facing(u.Yaw) });
     /// <summary>Coach-only, once per second: typed minimap units from this machine's own spectating Dota.</summary>
     public void Spectator(SpectatorSnapshot s)
     {
         if (role != "coach" || !Status.Recording || !Every(ref lastSpectator, 1000)) return;
         Enqueue("spectator-snapshot", new { mode = Text(s.Mode, 24), s.Clock, gameState = Text(s.GameState, 64), s.Paused,
             s.OwnTeam, s.GroupedPlayers, buildingTeams = s.BuildingTeams, eventTypes = s.EventTypes.Take(20).Select(e => Text(e, 40)),
+            kills = s.Kills is var (radiant, dire) ? new[] { radiant, dire } : null,
             units = Units(s),
             warning = "Dota Plus/spectator observation. Not admitted to the automatic coach; fog filtering is unverified.",
         });

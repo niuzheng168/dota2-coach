@@ -39,8 +39,13 @@ internal static class AuthorizedBoardTests
             b with { Wards = Enumerable.Repeat(guess, Wire.MaxWardMarks + 1).ToArray() },
             b with { SeenWards = [sight with { X = double.PositiveInfinity }] }, b with { SeenWards = [sight with { Team = "both" }] },
             b with { SeenWards = [sight with { Kind = "ward" }] }, b with { SeenWards = Enumerable.Repeat(sight, 65).ToArray() },
-            b with { Heroes = [b.Heroes[0] with { Age = null }] }, b with { Heroes = [b.Heroes[0], b.Heroes[0]] } })
-            check(!Wire.ValidBoard(bad), "invalid board scope, rows, candidate or sighting rejected");
+            b with { Heroes = [b.Heroes[0] with { Age = null }] }, b with { Heroes = [b.Heroes[0], b.Heroes[0]] },
+            b with { Heroes = [b.Heroes[0] with { Stats = new(161, 82, 272, 24, 33, 429, null, null, null, null) }] },
+            b with { Heroes = [b.Heroes[0] with { Stats = new(161, 82, 272, 24, 33, 2000, null, null, null, 1) }] },
+            b with { Fog = [new("npc_dota_creep_badguys_melee", 0, 0, 0, 1)] }, b with { Fog = [new(Enemy, 0, 0, 360, 1)] },
+            b with { Fog = [new(Enemy, 0, 0, 0, FogTracker.MaxSeconds + 1)] }, b with { Fog = [new(Enemy, 0, 0, 0, 1), new(Enemy, 9, 9, 0, 2)] },
+            b with { MatchId = null, Team = null, Minimap = null, SeenWards = null, Fog = [new(Enemy, 0, 0, 0, 1)] } })
+            check(!Wire.ValidBoard(bad), "invalid board scope, rows, candidate, sighting, stats or fog mark rejected");
 
         string json = JsonSerializer.Serialize(new { enemies = b with {
             SessionId = Guid.NewGuid().ToString("N"), FrameSequence = 5, RemainingMs = 2100 } }, Wire.Json);
@@ -82,7 +87,12 @@ internal static class AuthorizedBoardTests
         board.Equipment(Match, 641.5, [new(Enemy, 10, blink, null, 30)]);
         check(board.Board(now, true, true, null) is { Heroes: [{ Level: 12, Items: [_, "item_black_king_bar", ..] }, { Hero: Sven, Level: 9 }] },
             "an older reading cannot overwrite a newer one; a hero a write leaves out keeps its row");
-        board.Equipment("9034567892", 642, [new(Pudge, 5, blink, null, 0)]);
+        var read = new EnemyStats(70, 30, 180, 12, 25, 340, 30, 40, 20, .5);
+        board.Equipment(Match, 641.6, [new(Enemy, 12, bkb, null, 0.6) { Stats = read }]);
+        board.Equipment(Match, 641.8, [new(Enemy, 12, null, null, 0.1)]);
+        board.Equipment(Match, 641.9, [new(Enemy, 12, bkb, null, 0.3) { Stats = read with { Armor = 2, Age = 30 } }]);
+        check(board.Board(now, true, true, null) is { Heroes: [{ Stats: { Armor: 12, Damage: 70, Age: > .79 and < .81 } }, { Stats: null }] },
+            "stats keep their own reading: a write without them, or an older reading of them, leaves the last one in place");
         check(board.Board(now, true, true, null) is { Heroes: [{ Hero: Enemy }, { Hero: Sven }] }, "a scan of another match is ignored");
         check(board.Board(now, false, false, null) == null && board.Board(now, true, false, null) is { Wards: null, SeenWards: null },
             "the coach's toggles select equipment and wards independently");
@@ -200,6 +210,17 @@ internal static class AuthorizedBoardTests
             string legacy = await old.GetStringAsync("/v1/enemies");
             check(!legacy.Contains("laneMap") && BoardDelivery.Read(Encoding.UTF8.GetBytes(legacy)) is { Heroes.Length:1 },
                 "the legacy endpoint omits even the optional key so old strict game clients still receive their board");
+            // Since 2026-11-24: enemy stats and fog marks only for a game client that asks for them; v0.6.4 still gets its board.
+            var stats = new EnemyStats(161, 82, 272, 24, 33, 429, 92, 132, 78, 1.5);
+            host.Mailbox.SetEnemies(b with { Heroes = [b.Heroes[0] with { Stats = stats }], Fog = [new(Enemy, 1200, -300, 90, 3.2)] });
+            string v064 = await old.GetStringAsync("/v1/enemies?waves=1");
+            check(await link.Enemies(default) is { Heroes: [{ Stats: { Damage: 161, Armor: 24, MoveSpeed: 429, Age: >= 1.5 } }], Fog: [{ Yaw: 90, Seconds: >= 3.2 }] } &&
+                  !v064.Contains("stats") && !v064.Contains("fog") && BoardDelivery.Read(Encoding.UTF8.GetBytes(v064)) is { Heroes: [{ Level: 11 }] },
+                "stats and fog reach a client that asks; an older strict client gets the same board without them");
+            host.Mailbox.SetEnemies(b with { Heroes = [], Wards = null, SeenWards = null, Fog = [new(Enemy, 1200, -300, null, 12)] });
+            check(await link.Enemies(default) is { Fog: [{ Yaw: null }], Heroes: [] } &&
+                  JsonDocument.Parse(await old.GetStringAsync("/v1/enemies?waves=1")).RootElement.GetProperty("enemies").ValueKind == JsonValueKind.Null,
+                "a fog-only board is no board for an older client");
             host.Mailbox.SetEnemies(b with { Heroes=[],Wards=null,SeenWards=null,LaneMap=dots });
             var waveOnly = await link.Enemies(default);
             check(waveOnly is { LaneMap:not null, Heroes.Length:0 } &&

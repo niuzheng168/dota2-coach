@@ -609,12 +609,13 @@ internal sealed partial class GameWindowUi : Window
         try {
             while (!cancel.IsCancellationRequested) {
                 try {
-                    var board = overlay.Settings.ShowEnemies || overlay.Settings.ShowWards || overlay.Settings.ShowLaneWaves ? await link.Enemies(cancel) : null;
+                    var board = overlay.Settings.ShowEnemies || overlay.Settings.ShowWards || overlay.Settings.ShowLaneWaves || overlay.Settings.ShowFog
+                        ? await link.Enemies(cancel) : null;
                     answeredAt = Environment.TickCount64;
                     // Only this machine's own GSI can veto a panel: one positively naming another match is never drawn.
                     if (board != null && gsi?.LatestMatch() is { } local && local.MatchId != board.MatchId) board = null;
                     overlay.Enemies(board);
-                    if (board != null && overlay.Settings.ShowEnemies) {
+                    if (board != null && (overlay.Settings.ShowEnemies || overlay.Settings.ShowFog)) {
                         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancel);
                         budget.CancelAfter(500);
                         try {

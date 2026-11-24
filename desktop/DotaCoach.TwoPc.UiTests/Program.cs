@@ -37,7 +37,10 @@ internal static partial class Program
             try {
                 if (trial) { await PanelTrial(args[1], args[2]); Console.WriteLine($"Enemy panel trial on the real Dota window: {passed} checks passed."); }
                 else if (args.FirstOrDefault() == "--match-full-journey") await MatchFullJourney.Run(args);
-                else if (args is ["--participant-board"]) { await ParticipantBoardChecks(); Console.WriteLine($"Participant board: {passed} checks passed."); }
+                else if (args is ["--participant-board", .. var boardOutput] && boardOutput.Length <= 1) {
+                    if (boardOutput is [var dir]) Directory.CreateDirectory(dir);
+                    await ParticipantBoardChecks(boardOutput.FirstOrDefault()); Console.WriteLine($"Participant board: {passed} checks passed.");
+                }
                 else if (args is ["--wave-overlay", var input, var png]) WaveOverlayExample(input,png);
                 else if (args.FirstOrDefault() == "--minute-route") {
                     MinuteRouteChecks(args.ElementAtOrDefault(1) ?? ".tmp/minute-route-qa", args.ElementAtOrDefault(2));
@@ -274,7 +277,7 @@ internal static partial class Program
         await ModelProviderChecks();
         await LockedWriterUi(output);
         MinuteRouteChecks(output);
-        await ParticipantBoardChecks();
+        await ParticipantBoardChecks(output);
         await MinuteLiveLoopTests();
         var coachType = Assembly.Load("DotaCoach.CoachClient").GetType("DotaCoach.TwoPc.CoachWindow")!;
         var gameType = Assembly.Load("DotaCoach.GameClient").GetType("DotaCoach.TwoPc.GameWindowUi")!;

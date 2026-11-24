@@ -105,9 +105,11 @@ internal sealed partial class CoachWindow : Window
     private long delaySequence, nextSpectatorText;
     // Plus spectating on the game machine: a panel of enemy levels and items (hero_scan.py on this machine) and
     // subtitles when enemies leave the friend team's vision (this machine's own Plus GSI). Team-view data only.
-    private readonly CheckBox enemyPanel = new() { Content = "对手等级和装备（游戏左侧面板）", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
+    private readonly CheckBox enemyPanel = new() { Content = "对手等级、装备和属性（游戏左侧面板）", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
     private readonly CheckBox enemyVision = new() { Content = "对手离开视野", Foreground = Brushes.White, Margin = new Thickness(0, 0, 16, 4) };
     private readonly TextBlock alertStatus = Ui.Text("对手提醒：等待 Plus 队伍视角", 12, Brushes.LightGray);
+    private readonly TextBox visionLossDelay = Ui.Input();
+    private readonly TextBlock visionLossNote = Ui.Text("", 12, Brushes.LightGray);
     private readonly VisionLossTracker visionLoss = new();
     private readonly AlertComposer alerts = new();
     private HeroNames heroNames = new();
@@ -347,13 +349,25 @@ internal sealed partial class CoachWindow : Window
         buttons.Children.Add(Ui.Button("一键配置观战 GSI", async (_, _) => await StartSpectator()));
         buttons.Children.Add(Ui.Button("复制启动参数", (_, _) => spectatorSetup.Text = Ui.CopyLaunchOptions(SteamLaunch.Inspect())));
         panel.Children.Add(buttons); panel.Children.Add(spectatorSetup);
+        visionLoss.GoneMs = preferences.VisionLossSeconds * 1000;
+        visionLossDelay.Text = preferences.VisionLossSeconds.ToString(); visionLossDelay.Width = 90;
+        visionLossDelay.TextChanged += (_, _) => SaveVisionLossDelay();
+        panel.Children.Add(Ui.Label($"对手离开视野多少秒后提醒（1–{VisionLossTracker.MaxGoneSeconds}，默认 {VisionLossTracker.DefaultGoneMs / 1000}）"));
+        visionLossNote.VerticalAlignment = VerticalAlignment.Center; visionLossNote.Margin = new Thickness(12, 0, 0, 0);
+        panel.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Children = { visionLossDelay, visionLossNote } });
+        fogOverlay.IsChecked = preferences.EnemyFogOnMap;
+        panel.Children.Add(fogOverlay);
+        panel.Children.Add(Ui.Text($"敌方英雄看不到 {FogTracker.FlickerSeconds:0} 秒后，在游戏端小地图标出最后位置和面朝方向；前 {FogTracker.CircleSeconds:0} 秒画出它大概率所在的圆" +
+            $"（47 场录像里约七成落在圈内），{FogTracker.MaxSeconds:0} 秒后撤掉。刚被击杀的不画。", 12, Brushes.LightGray));
         panel.Children.Add(laneOverlay);
-        laneOverlay.Checked += (_, _) => SaveAlertToggles(); laneOverlay.Unchecked += (_, _) => SaveAlertToggles();
+        foreach (var toggle in new[] { laneOverlay, fogOverlay }) {
+            toggle.Checked += (_, _) => SaveAlertToggles(); toggle.Unchecked += (_, _) => SaveAlertToggles();
+        }
         panel.Children.Add(Ui.Label("兵线交汇（按游戏秒推演，不发送队友 ping）")); panel.Children.Add(waveStatus);
         panel.Children.Add(Ui.Text("空线基线假设同批小兵一路畅通；卡兵、拉兵、推线、塔火和上一波残兵都会改变实际交汇。", 12, Brushes.LightGray));
         panel.Children.Add(Ui.Text("面板一直显示敌方英雄上次读到的等级、装备和读取年龄，到本局结束；新的读数需在本机前台观战并启动视觉扫描。" +
             "守卫数量减少也可能是转交、丢弃或卖掉。7.42 常见眼位只给候选，不当作目击；确认过小地图框时按框画，否则按游戏端自己的小地图设置。" +
-            "离开视野不能区分阵亡和进迷雾；这类字幕不会盖住正在显示的分钟路线。" +
+            "离开视野时我方击杀数刚好增加的当作阵亡，不提醒（GSI 本身分不出阵亡和进迷雾，偶有误判）；字幕里的“朝…”是消失时面朝的地方，不是确定的去向；这类字幕不会盖住正在显示的分钟路线。" +
             (wardTracker.Map == null ? " 缺少 7.42 地图，无法推测眼位位置。" : ""), 12, Brushes.LightGray));
         AddScanLauncher(panel);
         return panel;
@@ -423,9 +437,20 @@ internal sealed partial class CoachWindow : Window
         panelOn = enemyPanel.IsChecked == true; visionAlertsOn = enemyVision.IsChecked == true;
         alerts.Clear(); // don't deliver an already queued, now disabled class of subtitle
         preferences = preferences with { EnemyPanel = panelOn, EnemyVisionAlerts = visionAlertsOn, EnemyWards = enemyWards.IsChecked == true,
-            LaneWavesOnMap = laneOverlay.IsChecked == true };
+            LaneWavesOnMap = laneOverlay.IsChecked == true, EnemyFogOnMap = fogOverlay.IsChecked == true };
         try { preferences.Save(settingsPath); }
         catch { notice.Text = "设置无法保存，当前开关仅本次有效。"; }
+    }
+    /// <summary>Applies at once: an absence already being timed is announced once the new delay has passed.</summary>
+    private void SaveVisionLossDelay()
+    {
+        if (!int.TryParse(visionLossDelay.Text.Trim(), out int seconds) || seconds is < 1 or > VisionLossTracker.MaxGoneSeconds) {
+            visionLossNote.Text = $"请填 1–{VisionLossTracker.MaxGoneSeconds} 的整数；仍按 {visionLoss.GoneMs / 1000} 秒提醒。"; return;
+        }
+        visionLoss.GoneMs = seconds * 1000;
+        preferences = preferences with { VisionLossSeconds = seconds };
+        try { preferences.Save(settingsPath); visionLossNote.Text = $"已保存：看不到满 {seconds} 秒才提醒。"; }
+        catch { visionLossNote.Text = "设置无法保存，仅本次有效。"; }
     }
     /// <summary>Point-free Plus subtitles require a matched participant and current team view. MatchState alone supplies board contents.</summary>
     private void UpdateAlerts(FrameView? frame)
@@ -488,6 +513,8 @@ internal sealed partial class CoachWindow : Window
                 matchState.ForGame(pairedFrame, false, false, layout, laneWaves: true, confirmedWaveMap: MinuteFarmArmedFor(pairedFrame)) is { LaneMap: not null } waves &&
                 (panel == null || panel.MatchId == waves.MatchId && panel.Team == waves.Team))
                 panel = panel == null ? waves : waves with { Heroes = panel.Heroes, Wards = panel.Wards, SeenWards = panel.SeenWards };
+            if (preferences.EnemyFogOnMap && fogNow is { Heroes.Length: > 0 } gone && (panel == null || panel.MatchId == gone.Match && panel.Team == gone.Team))
+                panel = (panel ?? new EnemyBoard([], null, gone.Match, gone.Team, layout)) with { Fog = gone.Heroes };
             host?.Mailbox.SetEnemies(panel);
             UpdateAlerts(pairedFrame); // Markerless Plus alerts reach the GSI-only game client; a live minute route keeps its slot.
         }

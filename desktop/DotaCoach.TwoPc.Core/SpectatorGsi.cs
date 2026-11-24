@@ -15,6 +15,8 @@ public sealed record SpectatorSnapshot(long ReceivedAt, string Mode, double? Clo
 {
     public bool Running => Clock != null && GameState is "DOTA_GAMERULES_STATE_PRE_GAME" or "DOTA_GAMERULES_STATE_GAME_IN_PROGRESS";
     public IEnumerable<MinimapUnit> Heroes => Minimap.Where(u => u.Name.StartsWith("npc_dota_hero_", StringComparison.Ordinal));
+    /// <summary>Hero kills of each side (map.radiant_score / dire_score), when the packet has them.</summary>
+    public (int Radiant, int Dire)? Kills { get; init; }
 }
 
 public static class SpectatorGsi
@@ -95,7 +97,10 @@ public static class SpectatorGsi
             mp.TryGetProperty("is_paused", out var bPause) && bPause.ValueKind != JsonValueKind.False);
         return new(receivedAt, mode, map is { } mc ? Number(mc, "clock_time", 43200) : null,
             map is { } ms ? Text(ms, "game_state") : null, paused,
-            match, ownTeam, grouped, units.ToArray(), buildings, events);
+            match, ownTeam, grouped, units.ToArray(), buildings, events) {
+            Kills = map is { } k && Number(k, "radiant_score", 1000) is double r && Number(k, "dire_score", 1000) is double d &&
+                r >= 0 && d >= 0 && r == Math.Truncate(r) && d == Math.Truncate(d) ? ((int)r, (int)d) : null
+        };
     }
 }
 

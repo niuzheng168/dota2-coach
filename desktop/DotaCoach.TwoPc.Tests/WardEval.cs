@@ -9,7 +9,7 @@ using System.Text.Json;
 /// the arrival of each second's first packet, one entry per change of the counts. --whole-seconds reads every enemy every
 /// 3.4 s with the whole-second clock, as the scanner did before. The friend team's eyes and own observer wards reach the
 /// tracker as its minimap would show them. The guesses are compared with the wards that enemy really placed in the window.
-///   dotnet run --project desktop/DotaCoach.TwoPc.Tests -c Release -- --ward-eval [--spots HELD-OUT.json] [--list] [--whole-seconds] .tmp/ward-eval/*.wards.json
+///   dotnet run --project desktop/DotaCoach.TwoPc.Tests -c Release -- --ward-eval [--spots HELD-OUT.json] [--list] [--whole-seconds] [--no-facing] .tmp/ward-eval/*.wards.json
 /// Pass spots built without the evaluated matches (build-ward-spots.ts --exclude), or their own wards are in the prior.
 /// Live recordings (scripts/vision/ward_live.py) bring each unit's own vision radius and the scanner's real HUD reads,
 /// used instead of the true counts unless --truth-counts. --list prints every guess with the wards it is matched to.
@@ -23,7 +23,7 @@ internal static class WardEval
     {
         var map = new CoachMap("data/dota2-coach-map.json");
         string spotsFile = "data/dota2-ward-spots-742.json";
-        bool list = false, truthCounts = false, whole = false;
+        bool list = false, truthCounts = false, whole = false, noFacing = false;
         string? featuresFile = null;
         var files = new List<string>();
         for (int i = 0; i < args.Length; i++)
@@ -33,6 +33,8 @@ internal static class WardEval
                 case "--truth-counts": truthCounts = true; break; // live recordings: the true counts instead of the scanner's
                 case "--whole-seconds": whole = true; break; // reads as hero_scan.py took them before 2026-11-22
                 case "--features": featuresFile = args[++i]; break;
+                case "--no-facing": noFacing = true; break; // the minimap without yaw, as before 2026-11-24
+
                 default: files.Add(args[i]); break;
             }
         var spots = new WardSpots(spotsFile);
@@ -48,7 +50,9 @@ internal static class WardEval
                 Heroes: s.GetProperty("heroes").EnumerateArray().Where(h => h.GetProperty("hero").ValueKind == JsonValueKind.String).Select(h =>
                     (Hero: h.GetProperty("hero").GetString()!, Team: h.GetProperty("team").GetInt32(), X: h.GetProperty("x").GetDouble(),
                      Y: h.GetProperty("y").GetDouble(), Alive: h.GetProperty("alive").GetBoolean(),
-                     Observer: h.GetProperty("observer").GetInt32(), Sentry: h.GetProperty("sentry").GetInt32())).ToArray())).ToArray();
+                     Observer: h.GetProperty("observer").GetInt32(), Sentry: h.GetProperty("sentry").GetInt32(),
+                     // Facing since 2026-11-24's extraction; older corpus files have none, like a minimap without yaw.
+                     Yaw: h.TryGetProperty("yaw", out var yaw) && yaw.ValueKind == JsonValueKind.Number ? yaw.GetDouble() : (double?)null)).ToArray())).ToArray();
             // Replays name the unit (tower or creep; radii below); live recordings give the vision radius Dota reported.
             var sources = root.GetProperty("sources").EnumerateArray().Select(s => (T: s.GetProperty("t").GetDouble(),
                 Units: s.GetProperty("units").EnumerateArray().Select(u => (Team: u[0].GetInt32(), X: u[1].GetDouble(), Y: u[2].GetDouble(),
@@ -85,7 +89,7 @@ internal static class WardEval
                     // The tracker cuts reported radii to WardTracker.VisionShare: hand it the radius that gives these eyes.
                     var units = heroes.Where(h => h.Team == own).Select(h => new MinimapUnit(h.Hero, own, h.X, h.Y, 0,
                             h.Alive ? (night ? 650 : 1350) / WardTracker.VisionShare : 0, null))
-                        .Concat(seen.Select(h => new MinimapUnit(h.Hero, h.Team, h.X, h.Y, 0, 1800, null)))
+                        .Concat(seen.Select(h => new MinimapUnit(h.Hero, h.Team, h.X, h.Y, noFacing ? null : h.Yaw, 1800, null)))
                         .Concat(others.Select(u => new MinimapUnit("npc_dota_creep", own, u.X, u.Y, 0,
                             u.Reported > 0 ? u.Reported : u.R / WardTracker.VisionShare, null)))
                         .Concat(observers.Select(w => new MinimapUnit("npc_dota_observer_wards", own, w.X, w.Y, 0, 1400 / WardTracker.VisionShare, null)))
@@ -166,7 +170,7 @@ internal static class WardEval
         foreach (var (low, high) in new[] { (-1.0, 0.0), (0.0, 5.0), (5.0, 15.0), (15.0, 60.0), (60.0, 1e9) }) {
             var part = windows.Where(w => w.Seconds > low && w.Seconds <= high).Select(w => w.Top).ToList();
             string span = low < 0 ? "never" : $"{low:F0}-{(high > 1e8 ? "∞" : high.ToString("F0"))} s";
-            Console.WriteLine($"  out of sight {span}: {part.Count} guesses, likeliest mark ≤600 {Share(part, 600)}, ≤1000 {Share(part, 1000)}");
+            Console.WriteLine($"  out of sight {span}: {part.Count} guesses, likeliest mark ≤300 {Share(part, 300)}, ≤600 {Share(part, 600)}, ≤1000 {Share(part, 1000)}");
         }
         var drawn = windows.Where(w => w.Seconds < WardTracker.UnsureSeconds).Select(w => w.Top).ToList();
         Console.WriteLine($"drawn on the minimap (out of sight under {WardTracker.UnsureSeconds:F0} s): {drawn.Count} guesses, likeliest mark ≤300 {Share(drawn, 300)}, ≤600 {Share(drawn, 600)}");
