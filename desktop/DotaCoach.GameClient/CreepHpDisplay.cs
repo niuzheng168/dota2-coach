@@ -40,6 +40,7 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
     private readonly bool excludeFromCapture;
     private readonly Func<LastHitTiming?>? timing;
     private readonly Action<Cue>? cues;
+    private readonly LabFrames? pictures;
     private readonly GpuPacing pacing = new();
     private readonly HeroAttackTable? attacks = HeroAttackTable.Bundled();
     private HeroLoadout? attackFor;
@@ -54,10 +55,12 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
     /// <param name="excludeFromCapture">Like the coach subtitles, keep the numbers out of recordings and screen captures.</param>
     /// <param name="timing">Read every frame: red numbers look ahead at the hits other units are about to land (null: only this frame's health).</param>
     /// <param name="cues">Lab only: told whenever a number turns red, by either rule.</param>
+    /// <param name="frames">Lab only: saves pictures of the Dota window, also while it is behind other windows.</param>
     public CreepHpDisplay(Action<Stats> report, Func<(SpectatorSnapshot Snapshot, int AgeMs)?> minimap, Func<HeroLoadout?> hero, bool excludeFromCapture = true,
-        Func<LastHitTiming?>? timing = null, Action<Cue>? cues = null)
+        Func<LastHitTiming?>? timing = null, Action<Cue>? cues = null, LabFrames? frames = null)
     {
         this.report = report; this.minimap = minimap; this.hero = hero; this.excludeFromCapture = excludeFromCapture; this.timing = timing; this.cues = cues;
+        pictures = frames;
         worker = Task.Factory.StartNew(Run, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
     }
 
@@ -139,6 +142,7 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
     {
         using var capture = new WindowCapture(gpu, game.Handle);
         using var scanner = new GpuCreepScanner(gpu);
+        using var reader = pictures == null ? null : new GpuFrameReader(gpu);
         var client = new Rect32 { Left = offset.Left, Top = offset.Top, Right = offset.Left + game.Width, Bottom = offset.Top + game.Height };
         var matcher = new CreepUnitMatcher();
         var tracks = new CreepTracks();
@@ -162,7 +166,7 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
             }
             using var frame = capture.Latest();
             bool front = GetForegroundWindow() == game.Handle;
-            if (!front && cues == null) {
+            if (!front && cues == null && pictures == null) {
                 // Alt+Tab: nothing over other applications; the capture keeps running so coming back is instant.
                 overlay.Hide(); labels.Clear(); Pause(20); continue;
             }
@@ -184,6 +188,12 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
             var matches = units is { } u && u.Snapshot.OwnTeam is int team
                 ? matcher.Match(found, u.Snapshot.Minimap, team, game.Width, game.Height) : new MinimapUnit?[found.Count];
             double at = frame.SystemRelativeTime / 1e7;
+            if (pictures != null && reader != null && pictures.Due(at)) {
+                int w = client.Right - client.Left, h = client.Bottom - client.Top;
+                var pixels = LabFrames.Rent(w, h);
+                reader.Read(frame, client, pixels);
+                pictures.Save(pixels, w, h, at, found);
+            }
             var hits = new CreepHitHistory?[found.Count];
             var names = tracks.Update(found, matches, now, at, hits);
             var view = Lane(units?.Snapshot);
@@ -226,7 +236,7 @@ internal sealed class CreepHpDisplay : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         stop.Cancel();
-        try { await worker; } finally { stop.Dispose(); }
+        try { await worker; } finally { stop.Dispose(); pictures?.Dispose(); }
     }
 
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();

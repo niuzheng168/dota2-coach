@@ -2,15 +2,20 @@
 -- game/dota_addons/coach_lasthit for one run of our OWN local -insecure game and removes it afterwards; it is never used in
 -- matchmaking. Rounds of lane waves clash in the mid lane (in the open, under the Radiant tier-1 tower, under the Dire one)
 -- with the player's hero behind the Radiant creeps. Every server frame the creeps' health, positions and targets are printed,
--- with every damage instance and kill, as [COACH_LASTHIT] JSON lines.
+-- with every damage instance and kill, and every attack's swing and attack point, as [COACH_LASTHIT] JSON lines.
 --   mode "record": the hero tries last hits and denies itself, ordering when the engine says the hit lands at or below its
 --                  weakest roll, with the others' incoming damage scaled at random so some orders come early, some late.
 --   mode "loop":   the hero only stands behind its creeps; the coach_attack console command (sent by the test harness when
 --                  the game client's number turns red, after a simulated reaction) orders its attack. Server-side only.
--- coach_config.lua (written by the runner) sets COACH_CONFIG = { hero, level, mode, rounds, seed }.
+--   vision:        record mode while the runner saves the screen for training a model on creep attacks; each round at a
+--                  random time of day.
+-- coach_config.lua (written by the runner) sets COACH_CONFIG = { hero, level, mode, rounds, seed, vision }.
 pcall(require, "coach_config")
 local cfg = COACH_CONFIG or {}
-local HERO, LEVEL, MODE, ROUNDS = cfg.hero or "npc_dota_hero_luna", cfg.level or 1, cfg.mode or "record", cfg.rounds or 60
+local HERO, LEVEL, MODE, ROUNDS, VISION = cfg.hero or "npc_dota_hero_luna", cfg.level or 1, cfg.mode or "record", cfg.rounds or 60, cfg.vision
+LinkLuaModifier("modifier_coach_watch", "modifiers/modifier_coach_watch", LUA_MODIFIER_MOTION_NONE)
+-- Without loading it here too the engine reports the modifier type unknown (custom game started from an uncompiled addon).
+require("modifiers/modifier_coach_watch")
 math.randomseed(cfg.seed or 1)
 
 local function out(s) print("[COACH_LASTHIT]" .. s) end
@@ -49,6 +54,9 @@ local busy                -- the hero's attack in flight: target, order time, la
 local round, roundUnits, roundEnd, nextRound, finished = 0, {}, nil, 0, false
 local lastMove, frames, standoff, lastLand = -1, 0, 140, -100
 
+-- Records this unit's attacks (modifier_coach_watch); true when the modifier took.
+local function watch(u) return pcall(function() return u:AddNewModifier(u, nil, "modifier_coach_watch", {}) end) end
+
 local function creeps()
     local list = {}
     for _, class in ipairs({ "npc_dota_creep_lane", "npc_dota_creep_siege" }) do
@@ -81,6 +89,7 @@ local function spawn(teamNumber, at, direction, siege)
         local u = CreateUnitByName(name, GetGroundPosition(p, nil), true, nil, nil, teamNumber)
         if u then
             grow(u)
+            watch(u)
             ExecuteOrderFromTable({ UnitIndex = u:entindex(), OrderType = DOTA_UNIT_ORDER_ATTACK_MOVE, Position = at + direction * 4000 })
             roundUnits[#roundUnits + 1] = u
         end
@@ -99,13 +108,15 @@ local function startRound()
     for _, e in ipairs(creeps()) do remove(e) end
     roundUnits, roundEnd = {}, nil
     local kind = KINDS[(round - 1) % #KINDS + 1]
+    if VISION then try("daytime", function() GameRules:SetTimeOfDay(math.random()) end) end
     local clash = kind == "ours" and R + lane * 450 or kind == "theirs" and D - lane * 450 or R + lane * (.38 * length)
     spawn(DOTA_TEAM_GOODGUYS, clash - lane * 650, lane, round % 3 == 0)
     spawn(DOTA_TEAM_BADGUYS, clash + lane * 650, lane * -1, round % 3 == 0)
     busy = nil
     hero:Stop()
     FindClearSpaceForUnit(hero, GetGroundPosition(clash - lane * (650 + standoff), hero), true)
-    out(string.format('{"k":"round","t":%.4f,"n":%d,"kind":"%s","x":%.0f,"y":%.0f,"clock":%.2f}', now(), round, kind, clash.x, clash.y, clock()))
+    out(string.format('{"k":"round","t":%.4f,"n":%d,"kind":"%s","x":%.0f,"y":%.0f,"clock":%.2f,"daytime":%s}', now(), round, kind, clash.x, clash.y, clock(),
+        num(call(GameRules, "GetTimeOfDay"))))
 end
 
 local function record(t, list)
@@ -267,6 +278,8 @@ local function setup()
     fountain = team == DOTA_TEAM_GOODGUYS and Vector(-7000, -6500, 0) or Vector(7000, 6400, 0)
     while hero:GetLevel() < LEVEL do hero:HeroLevelUp(false) end
     hero:AddNewModifier(hero, nil, "modifier_invulnerable", {})
+    local _, watched = watch(hero)
+    out(string.format('{"k":"watch","added":%s}', tostring(watched ~= nil)))
     -- Never auto-attack: no idle acquisition (control() also stops any attack it did not order).
     hero:SetIdleAcquire(false)
     try("acquire", function() hero:SetAcquisitionRange(0) end)
@@ -279,6 +292,7 @@ local function setup()
         local p = t:GetAbsOrigin()
         if t:GetUnitName() == "npc_dota_goodguys_tower1_mid" then R = p end
         if t:GetUnitName() == "npc_dota_badguys_tower1_mid" then D = p end
+        watch(t)
         out(string.format('{"k":"tower","id":%d,"name":"%s","team":%d,"x":%.0f,"y":%.0f}', t:entindex(), t:GetUnitName(), t:GetTeamNumber(), p.x, p.y))
     end
     if not R or not D then error("Mid tier-1 towers not found") end

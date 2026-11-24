@@ -353,6 +353,42 @@ public sealed unsafe class GpuNv12Scaler : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct Mapped { public nint Data; public uint RowPitch, DepthPitch; }
 }
 
+/// <summary>
+/// Last-hit lab only: a region of a captured frame read back as BGRA, rows packed, for the pictures a creep-attack model is
+/// trained on. Waits for the copy (about a millisecond for 1080p); never used while the player plays.
+/// </summary>
+public sealed unsafe class GpuFrameReader(GpuDevice gpu) : IDisposable
+{
+    private nint staging;
+    private int width, height;
+
+    /// <summary>Copies <paramref name="region"/> of <paramref name="frame"/> into <paramref name="pixels"/> (at least width × height × 4 bytes).</summary>
+    public void Read(CaptureFrame frame, Rect32 region, byte[] pixels)
+    {
+        int w = region.Right - region.Left, h = region.Bottom - region.Top;
+        if (pixels.Length < (long)w * h * 4) throw new ArgumentException("Pixel buffer too small", nameof(pixels));
+        if (staging == 0 || w != width || h != height) {
+            Release(staging); staging = 0;
+            staging = gpu.Texture(w, h, 87 /* B8G8R8A8 */, 3 /* staging */, 0, 0x20000 /* CPU read */);
+            width = w; height = h;
+        }
+        var box = new Box { Left = (uint)region.Left, Top = (uint)region.Top, Right = (uint)region.Right, Bottom = (uint)region.Bottom, Back = 1 };
+        nint context = gpu.Context;
+        // CopySubresourceRegion, then Map for reading (waits for the copy).
+        ((delegate* unmanaged[Stdcall]<nint, nint, uint, uint, uint, uint, nint, uint, Box*, void>)Slot(context, 46))(context, staging, 0, 0, 0, 0, frame.Texture, 0, &box);
+        Mapped m;
+        Hr(((delegate* unmanaged[Stdcall]<nint, nint, uint, int, uint, Mapped*, int>)Slot(context, 14))(context, staging, 0, 1, 0, &m));
+        try {
+            fixed (byte* destination = pixels)
+                for (int y = 0; y < h; y++) Buffer.MemoryCopy((byte*)m.Data + (long)y * m.RowPitch, destination + (long)y * w * 4, w * 4, w * 4);
+        } finally { ((delegate* unmanaged[Stdcall]<nint, nint, uint, void>)Slot(context, 15))(context, staging, 0); }
+    }
+
+    public void Dispose() { Release(staging); staging = 0; }
+    [StructLayout(LayoutKind.Sequential)] private struct Box { public uint Left, Top, Front, Right, Bottom, Back; }
+    [StructLayout(LayoutKind.Sequential)] private struct Mapped { public nint Data; public uint RowPitch, DepthPitch; }
+}
+
 /// <summary>High-resolution waitable timer: frame pacing above 64 fps without spinning a core.</summary>
 public sealed unsafe class PreciseTimer : IDisposable
 {

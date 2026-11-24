@@ -25,12 +25,13 @@ internal static class Program
         }
         // --creep-hp-log <file>: start the creep HP display at once and append its per-second rates (on-site measurement).
         // Lab only (scripts/lasthit/lab.ts --loop): [--lead S --latency S [--singles] [--patient]] looks ahead with that timing, [--cues PORT]
-        // sends every number turning red to that local UDP port.
+        // sends every number turning red to that local UDP port, [--frames DIR] saves pictures of the Dota window there (LabFrames).
         if (args is ["--creep-hp-log", var log, .. var lab]) {
             string? Option(string name) { int i = Array.IndexOf(lab, name); return i >= 0 && i + 1 < lab.Length ? lab[i + 1] : null; }
             var timing = Option("--lead") is { } lead && Option("--latency") is { } latency
                 ? new LastHitTiming(double.Parse(lead, System.Globalization.CultureInfo.InvariantCulture), double.Parse(latency, System.Globalization.CultureInfo.InvariantCulture), lab.Contains("--singles"), Patient: lab.Contains("--patient")) : null;
-            new Application().Run(new GameWindowUi(null) { CreepHpLog = log, CreepTiming = timing, CreepCuePort = Option("--cues") is { } port ? int.Parse(port) : null });
+            new Application().Run(new GameWindowUi(null) { CreepHpLog = log, CreepTiming = timing, CreepCuePort = Option("--cues") is { } port ? int.Parse(port) : null,
+                CreepFrames = Option("--frames") });
             return;
         }
         new Application().Run(new GameWindowUi(E2ERun.Load(args)));
@@ -100,6 +101,7 @@ internal sealed partial class GameWindowUi : Window
     public string? CreepHpLog { get; init; }
     public LastHitTiming? CreepTiming { get; init; }
     public int? CreepCuePort { get; init; }
+    public string? CreepFrames { get; init; }
 
     public GameWindowUi() : this(null) { }
     public GameWindowUi(E2ERun? run) : this(run, null) { }
@@ -254,7 +256,8 @@ internal sealed partial class GameWindowUi : Window
                 });
             }, () => gsi?.LatestMinimap(), () => gsi?.LatestLoadout(), excludeFromCapture: log == null,
                 // The lab's switches fix the timing; otherwise the panel's, read every frame.
-                CreepTiming != null || CreepCuePort != null ? () => CreepTiming : creepTiming == null ? null : () => creepTiming.Current.Timing, CueSender());
+                CreepTiming != null || CreepCuePort != null ? () => CreepTiming : creepTiming == null ? null : () => creepTiming.Current.Timing, CueSender(),
+                CreepFrames is { } directory ? new LabFrames(directory) : null);
             creepHp = started;
             creepHpButton.Content = "关闭小兵血量";
         } finally { creepHpBusy = false; creepHpButton.IsEnabled = !closing && !gsiOnlyConnection; }

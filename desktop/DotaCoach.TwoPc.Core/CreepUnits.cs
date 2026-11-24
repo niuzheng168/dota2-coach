@@ -40,6 +40,8 @@ public sealed class CreepUnitMatcher
     private (double X, double Y)? lookAt;
     private readonly CameraModel camera;
     public CreepUnitMatcher(CameraModel? camera = null) => this.camera = camera ?? CameraModel.Default;
+    /// <summary>The camera's look-at point found by the last <see cref="Match"/>, on the ground.</summary>
+    public (double X, double Y)? LookAt => lookAt;
 
     public static bool IsCreep(string name) => name.StartsWith("npc_dota_creep_", StringComparison.Ordinal) ||
         name.StartsWith("npc_dota_neutral_", StringComparison.Ordinal) || name is "npc_dota_goodguys_siege" or "npc_dota_badguys_siege" ||

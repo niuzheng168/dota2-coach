@@ -16,6 +16,7 @@ if (args.Contains("--last-hit")) { LastHitTests.Run(Check); return; }
 if (args is ["--last-hit-timing"]) { LastHitTimingTests.Run(Check); return; }
 if (args is ["--last-hit-eval", .. var evalArgs]) { LastHitEval.Run(evalArgs); return; }
 if (args is ["--last-hit-loop", var loopTrace]) { LastHitEval.Loop(loopTrace); return; }
+if (args is ["--vision-label", var visionTrace, var visionFrames]) { VisionLabel.Run(visionTrace, visionFrames); return; }
 if (args is ["--lane-role-audit",var samplesFile]) { LaneRoleTests.Audit(samplesFile); return; }
 if (args.Contains("--last-hit-latency")) { LastHitLatencyReplay.Run(); return; }
 if (args.Contains("--last-hit-gpu-bench")) { LastHitGpuBenchmark.Run(); return; }

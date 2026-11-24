@@ -8,6 +8,8 @@
 // turning red, by both rules, to this script; a simulated player reacts after N(--reaction 0.2, 0.04) s and the custom game's
 // coach_attack command (server side, this sandbox only) orders the hero's attack. Odd rounds follow the look-ahead rule
 // (--lead, --latency, --singles, --patient), even rounds the this-frame rule; the engine judges every attack.
+// --frames DIR: record mode in real time while the game client saves pictures of the Dota window into DIR (LabFrames), for
+// training a model on creep attacks; OUT.sync.jsonl pairs server times with this machine's QPC clock (the pictures' clock).
 import fs from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import dgram from 'node:dgram';
@@ -21,16 +23,17 @@ const option = (name: string, fallback: string) => { const i = args.indexOf(name
 if (!args[0] || args[0].startsWith('--')) throw new Error('Usage: node scripts/lasthit/lab.ts OUT.jsonl [--loop] [--hero NAME] [--level N] [--rounds N] [--timescale X]');
 const out = path.resolve(args[0]);
 const loop = args.includes('--loop');
+const frames = args.includes('--frames') ? path.resolve(option('--frames', '')) : null;
 const hero = option('--hero', 'npc_dota_hero_luna');
 const level = Number(option('--level', '1')), rounds = Number(option('--rounds', '60'));
-const timescale = loop ? 1 : Number(option('--timescale', '4'));
+const timescale = loop || frames ? 1 : Number(option('--timescale', '4'));
 const seed = Number(option('--seed', '1'));
 const reaction = Number(option('--reaction', '0.2')), lead = option('--lead', '0.15'), latency = option('--latency', '0.08');
 const [width, height] = option('--size', '1920x1080').split('x').map(Number);
 if (!/^npc_dota_hero_[a-z0-9_]{1,40}$/.test(hero) || !(level >= 1 && level <= 30) || !(rounds >= 1 && rounds <= 1000) ||
     !(timescale >= 1 && timescale <= 10) || !Number.isInteger(seed) || !(width >= 640 && height >= 480) || !(reaction >= 0 && reaction < 1) ||
-    !/^\d*\.?\d+$/.test(lead) || !/^\d*\.?\d+$/.test(latency))
-  throw new Error('Bad --hero, --level, --rounds, --timescale, --seed, --size, --reaction, --lead or --latency');
+    !/^\d*\.?\d+$/.test(lead) || !/^\d*\.?\d+$/.test(latency) || loop && frames)
+  throw new Error('Bad --hero, --level, --rounds, --timescale, --seed, --size, --reaction, --lead or --latency (or --loop with --frames)');
 const install = path.resolve(option('--install', 'C:/Steam/steamapps/common/dota 2 beta'));
 const exe = path.join(install, 'game/bin/win64/dota2.exe');
 const addon = path.join(install, 'game/dota_addons/coach_lasthit');
@@ -46,7 +49,8 @@ if (process.platform !== 'win32') throw new Error('Windows only');
 if (running()) throw new Error('Dota is running. The lab starts its own Dota only; close the game first.');
 if (await exists(out)) throw new Error(`${out} exists; keep it`);
 if (await exists(addon)) throw new Error(`${addon} exists (an earlier run left it?); check and remove it first`);
-if (loop && !await exists(gameClient)) throw new Error(`Build the game client first: ${gameClient}`);
+if ((loop || frames) && !await exists(gameClient)) throw new Error(`Build the game client first: ${gameClient}`);
+if (frames && await exists(frames)) throw new Error(`${frames} exists; keep it`);
 
 /** Line-oriented client for the game's -netconport console. */
 class Console {
@@ -103,7 +107,7 @@ await fs.cp(path.join(import.meta.dirname, 'addon'), addon, { recursive: true, e
 const marker = randomBytes(8).toString('hex');
 await fs.writeFile(path.join(addon, 'coach_lasthit_owned.txt'), marker, { flag: 'wx' });
 await fs.writeFile(path.join(addon, 'scripts/vscripts/coach_config.lua'),
-  `COACH_CONFIG = { hero = "${hero}", level = ${level}, mode = "${loop ? 'loop' : 'record'}", rounds = ${rounds}, seed = ${seed} }\n`, { flag: 'wx' });
+  `COACH_CONFIG = { hero = "${hero}", level = ${level}, mode = "${loop ? 'loop' : 'record'}", rounds = ${rounds}, seed = ${seed}, vision = ${frames ? 'true' : 'false'} }\n`, { flag: 'wx' });
 
 const password = randomBytes(24).toString('hex'), port = await freePort();
 const started = new Date();
@@ -115,6 +119,7 @@ child.on('error', () => {});
 const trace = createWriteStream(out, { flags: 'wx' });
 const log = createWriteStream(base + '.log', { flags: 'wx' });
 const cueLog = loop ? createWriteStream(base + '.cues.jsonl', { flags: 'wx' }) : null;
+const syncLog = frames ? createWriteStream(base + '.sync.jsonl', { flags: 'wx' }) : null;
 let console_: Console | null = null, client: ChildProcess | null = null, udp: dgram.Socket | null = null;
 const counts: Record<string, number> = {};
 try {
@@ -137,7 +142,7 @@ try {
 
   let resolveEnd!: () => void, rejectEnd!: (e: Error) => void;
   const ended = new Promise<void>((resolve, reject) => { resolveEnd = resolve; rejectEnd = reject; });
-  let round = 0;
+  let round = 0, lastFrame = -1;
   c.on(line => {
     const at = line.indexOf('[COACH_LASTHIT]');
     if (at < 0) return;
@@ -146,6 +151,11 @@ try {
     try { record = JSON.parse(text); } catch { log.write('unparsed: ' + text.slice(0, 300) + '\n'); counts.unparsed = (counts.unparsed ?? 0) + 1; return; }
     counts[record.k] = (counts[record.k] ?? 0) + 1;
     trace.write(text + '\n');
+    // A server frame's first line as it arrives, on the pictures' clock; the least lag over many is the offset.
+    if (syncLog && record.k === 'f') {
+      const t = (record as { t?: number }).t ?? -1;
+      if (t !== lastFrame) { lastFrame = t; syncLog.write(JSON.stringify({ t, q: qpc() }) + '\n'); }
+    }
     if (record.k === 'round') round = record.n ?? round;
     if (record.k === 'error' && counts.error > 50) rejectEnd(new Error('Lab script keeps failing: ' + record.message));
     if (record.k === 'end') resolveEnd();
@@ -153,6 +163,11 @@ try {
   const activated = c.wait(/\[COACH_LASTHIT\]\{"k":"activate"/, 240_000);
   c.send('sv_cheats 1', 'dota_launch_custom_game coach_lasthit dota');
   if (!await activated) throw new Error('The custom game did not start (see the .log)');
+  if (frames) {
+    // From the first round on: the pictures start once the game client finds the Dota window.
+    client = spawn(gameClient, ['--creep-hp-log', base + '.hp.jsonl', '--frames', frames], { stdio: 'ignore' });
+    c.send('engine_no_focus_sleep 0');
+  }
   const begun = c.wait(/\[COACH_LASTHIT\]\{"k":"begin"/, 180_000);
   // Cheats for host_timescale and dota_creeps_no_spawning; the setup and strategy phases pass by themselves.
   for (let i = 0; i < 6; i++) { await sleep(5000); c.send('sv_cheats 1', 'dota_creeps_no_spawning 1'); }
@@ -182,7 +197,7 @@ try {
   const deadline = setTimeout(() => rejectEnd(new Error('Lab timed out')), rounds * 60_000 / timescale + 300_000);
   const progress = setInterval(() => console.log(JSON.stringify(counts)), 30_000);
   try { await ended; } finally { clearTimeout(deadline); clearInterval(progress); }
-  console.log(JSON.stringify({ trace: out, loop, hero, level, rounds, timescale, seed, counts }));
+  console.log(JSON.stringify({ trace: out, loop, frames, hero, level, rounds, timescale, seed, counts }));
 } finally {
   client?.kill();
   udp?.close();
@@ -202,5 +217,5 @@ try {
     const now = await fs.readFile(file).catch(() => null);
     if (now && !now.equals(data)) await fs.writeFile(file, data);
   }
-  trace.end(); log.end(); cueLog?.end();
+  trace.end(); log.end(); cueLog?.end(); syncLog?.end();
 }
