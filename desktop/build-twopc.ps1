@@ -159,6 +159,8 @@ $manifest = [ordered]@{
     wardSpotWeights = "fitted-47-replays"; wardGuessMark = "yellow-eye"; wardSeenMark = "hollow-diamond"
     enemyPanelStats = @("attack", "armor", "move-speed"); visionLossSubtitleDelaySeconds = 5; visionLossSkipsKillsWithinSeconds = 1.5
     fogMarks = [ordered]@{ circleSeconds = 10; withdrawnAfterSeconds = 20; defaultOn = $true; olderGameClientsStripped = $true }
+    mapMarks = [ordered]@{ shapeScaleOfV065 = 0.6; textScaleOfV065 = 0.8; defaultSizePercent = 100; sizePercentRange = @(50, 150);
+        defaultOpacityPercent = 60; opacityPercentRange = @(20, 100); previewSampleMarks = $true; minuteRouteUnaffected = $true }
     sourceCommit = (& git -C (Join-Path $PSScriptRoot "..") rev-parse HEAD)
     sourceDirty = [bool](& git -C (Join-Path $PSScriptRoot "..") status --porcelain)
 }

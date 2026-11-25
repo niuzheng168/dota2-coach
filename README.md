@@ -2,7 +2,7 @@
 
 游戏机运行 `DotaCoach.GameClient`：在自己的 Dota 窗口看小兵血量、对手装备、眼位和路线。教练机运行 `DotaCoach.CoachClient`：接收本人 GSI，可接入 Dota Plus 队伍视角、调用模型，并在赛后复盘。两端通过配对的 TLS 连接通信，可在同一台 Windows 电脑上试用。
 
-**v0.6.5** 用上 Plus 队伍视角里的英雄朝向：敌人离开视野后，游戏端小地图标出它最后的位置、面朝方向和前 10 秒大概所在的范围；离开视野字幕默认看不到 5 秒才发，带「朝…」，刚被我方击杀的不报。对手面板加上次读到的攻击、护甲、移速。推测的眼位画成黄色小眼睛，目击的守卫用空心菱形框住；兵线不必先确认小地图框。请两端一起升级（旧游戏端连新教练端时不显示属性和离开视野位置）。游戏端仍不传画面，对手装备面板保留到局末。
+**v0.6.6** 游戏端小地图上的眼位、兵线和离开视野标记默认缩到原来的六成、60% 不透明，不再挡住地图；大小和不透明度在游戏端「设置 → 游戏内显示」调，「预览 8 秒」会在小地图框里画示例标记。只改了游戏端（教练端仅版本号）。**v0.6.5** 用上 Plus 队伍视角里的英雄朝向：敌人离开视野后，游戏端小地图标出它最后的位置、面朝方向和前 10 秒大概所在的范围；离开视野字幕默认看不到 5 秒才发，带「朝…」，刚被我方击杀的不报。对手面板加上次读到的攻击、护甲、移速。推测的眼位画成黄色小眼睛，目击的守卫用空心菱形框住；兵线不必先确认小地图框。请两端一起升级（旧游戏端连新教练端时不显示属性和离开视野位置）。游戏端仍不传画面，对手装备面板保留到局末。
 
 ## 我想做什么？
 
@@ -56,7 +56,7 @@ dotnet run --project desktop/DotaCoach.TwoPc.UiTests -c Release -- .tmp/twopc-ui
 
 ```powershell
 .\desktop\build-twopc.ps1
-.\desktop\verify-match-release.ps1 -Directory .\dist\twopc\v0.6.5
+.\desktop\verify-match-release.ps1 -Directory .\dist\twopc\v0.6.6
 ```
 
 版本取两端项目一致的 `<Version>`；默认输出 `dist/twopc/v<版本>/`，已存在即拒绝覆盖，可另选 `-OutputDirectory`。包内 `README.md` 是对局档案手册，`MODEL-PROVIDERS.md` 和 `MINUTE-FARM.md` 分别讲模型和分钟路线。另附 `NO-VIDEO.md`、`CREEP-HP.md`、`PLUS-ALERTS.md`、`ENEMY-WARDS.md`、`GAME-OVERLAY.md`；`USAGE.md` 保留 v0.4.3 的历史说明。本机已提取图标时，游戏端包可带图标（仅供自用）；未附的图标向教练端请求。
@@ -73,6 +73,7 @@ dotnet run --project desktop/DotaCoach.TwoPc.UiTests -c Release -- .tmp/twopc-ui
 
 | 版本 | 内容 |
 |---|---|
+| [v0.6.6](docs/twopc-game-overlay.md#小地图黄色眼睛是推测空心菱形是目击) | 小地图标记默认更小、半透明，可调大小和不透明度。 |
 | [v0.6.5](docs/twopc-enemy-wards.md#敌人离开视野字幕和小地图位置2026-11-24) | 离开视野的小地图位置和朝向，字幕默认 5 秒、不报刚阵亡的；对手面板攻击／护甲／移速；推测眼位改黄色眼睛，兵线不必先校准小地图框。 |
 | [v0.6.4](docs/twopc-game-overlay.md#兵线小地图) | 游戏端兵线、进雾估计和交汇倒计时；另有[按补丁、英雄、分钟保存的离线录像复盘](docs/daily-replay-memory.md)。 |
 | [v0.6.1](docs/twopc-model-providers.md) | 教练端选择 Foundry 或 Codey / GitHub Copilot。 |
