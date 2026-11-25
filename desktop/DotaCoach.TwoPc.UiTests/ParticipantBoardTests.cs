@@ -33,9 +33,10 @@ internal static partial class Program
             var target = new ScreenMark((m.Left + m.Size * .7) / w, (m.Top + m.Size * .4) / h);
             var route = new Reminder("minute", "session", 4, MinuteFarmContext.Kind, "空点跳过", target,
                 w, h, 5000, m, false, [target], ["有野再打"], FarmMinute: 10);
-            Canvas Draw(EnemyBoard b, Reminder? r = null, bool equipment = true, bool wards = true, int? physicalWidth = null, bool waves = true, bool fog = true) {
+            Canvas Draw(EnemyBoard b, Reminder? r = null, bool equipment = true, bool wards = true, int? physicalWidth = null, bool waves = true, bool fog = true,
+                GameOverlaySettings? look = null) {
                 var c = new Canvas { Width = w / dpi, Height = h / dpi };
-                AdviceOverlay.Compose(c, r, new() { ShowEnemies = equipment, ShowWards = wards, ShowLaneWaves = waves, ShowFog = fog }, DisplayGeometry.OverlayUnit(h, dpi),
+                AdviceOverlay.Compose(c, r, (look ?? new()) with { ShowEnemies = equipment, ShowWards = wards, ShowLaneWaves = waves, ShowFog = fog }, DisplayGeometry.OverlayUnit(h, dpi),
                     b, viewport: (physicalWidth ?? w, h));
                 c.Measure(new Size(c.Width, c.Height)); c.Arrange(new Rect(0, 0, c.Width, c.Height)); c.UpdateLayout();
                 return c;
@@ -99,7 +100,12 @@ internal static partial class Program
                     .Any(key => key.Contains("目击") && key.Contains("推测")) &&
                 new FrameworkElement[] { guess, seen }.All(e => Near((Canvas.GetLeft(e) + e.Width / 2) * dpi, .25 * m.Size) &&
                     Near((Canvas.GetTop(e) + e.Height / 2) * dpi, .75 * m.Size)),
-                "a coincident sighting (empty diamond) and estimate (ward-icon-sized eye, no '?' badge) stay distinct, at their own unmirrored source coordinates");
+                "a coincident sighting (empty diamond) and estimate (ward-icon-shaped eye, no '?' badge) stay distinct, at their own unmirrored source coordinates");
+            // 2026-11-24: the user could not read the minimap under v0.6.5's marks (a 10.5-unit eye, fully opaque).
+            var big = WardMap(Draw(board, look: new() { MapMarkSize = 150, MapMarkOpacity = 100 }));
+            Check(Near(map.Opacity, .6) && guess.Width <= 10.5 * .6 * unit + .01 && Near(big.Opacity, 1) &&
+                Near(Tagged(big, "ward-guess").Single().Width, 1.5 * guess.Width) && Near(Tagged(big, "ward-seen").Single().Width, 1.5 * seen.Width),
+                $"minimap marks are 0.6 of v0.6.5's size and 60 % opaque by default; the two sliders scale and fade only them ({h}p/{dpi}x)");
             Check(Draw(board, equipment: false).Children.Cast<UIElement>().Single() is Canvas &&
                 Draw(board, wards: false).Children.Cast<UIElement>().Single() is StackPanel &&
                 Draw(board, route, false, false).Children.Cast<UIElement>().Single() is Canvas &&

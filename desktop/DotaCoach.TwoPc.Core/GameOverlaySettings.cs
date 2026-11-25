@@ -42,8 +42,13 @@ public sealed record GameOverlaySettings
     public bool MinimapRight { get; init; }
     /// <summary>Minimap size, % of the default HUD's (raise it for Dota's extra-large minimap).</summary>
     public int MinimapSize { get; init; } = 100;
+    /// <summary>Ward, lane and fog marks on the minimap, % of the default size (not the minute route).</summary>
+    public int MapMarkSize { get; init; } = 100;
+    /// <summary>Those marks are see-through by default so the minimap underneath stays readable (user, 2026-11-24).</summary>
+    public int MapMarkOpacity { get; init; } = 60;
 
-    public const int MinSize = 50, MaxSize = 250, MinWidth = 20, MaxWidth = 95, MinTextOpacity = 20, MinMinimap = 70, MaxMinimap = 160;
+    public const int MinSize = 50, MaxSize = 250, MinWidth = 20, MaxWidth = 95, MinTextOpacity = 20, MinMinimap = 70, MaxMinimap = 160,
+        MinMarks = 50, MaxMarks = 150;
     private static readonly Regex Hex = new("^#[0-9A-Fa-f]{6}$");
 
     public static string DefaultPath => Path.Combine(
@@ -53,7 +58,7 @@ public sealed record GameOverlaySettings
         if (X is < 0 or > 100 || Y is < 0 or > 100 || Size is < MinSize or > MaxSize || Width is < MinWidth or > MaxWidth ||
             TextOpacity is < MinTextOpacity or > 100 || BackgroundOpacity is < 0 or > 100 ||
             EnemyY is < 0 or > 100 || EnemySize is < MinSize or > MaxSize || EnemyOpacity is < MinTextOpacity or > 100 ||
-            MinimapSize is < MinMinimap or > MaxMinimap ||
+            MinimapSize is < MinMinimap or > MaxMinimap || MapMarkSize is < MinMarks or > MaxMarks || MapMarkOpacity is < MinTextOpacity or > 100 ||
             new[] { TextColor, TitleColor, BackgroundColor }.Any(c => c == null || !Hex.IsMatch(c)))
             throw new ArgumentException("字幕、对手面板或小地图的位置、大小、透明度或颜色无效。");
     }

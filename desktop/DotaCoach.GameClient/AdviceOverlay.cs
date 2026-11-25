@@ -172,7 +172,7 @@ internal sealed partial class AdviceOverlay : Window
             }
             var (w, h) = viewport ?? (r?.SourceWidth ?? 0, r?.SourceHeight ?? 0);
             if (MapParts(board, style, w, h) is { } selected && WardLayout(selected, w, h, style) is { } layout) {
-                var layer = WardLayer(selected, layout.Size * canvas.Width / w, layout.Size * canvas.Height / h, unit, icon);
+                var layer = WardLayer(selected, layout.Size * canvas.Width / w, layout.Size * canvas.Height / h, unit, style, icon);
                 Canvas.SetLeft(layer, layout.Left * canvas.Width / w); Canvas.SetTop(layer, layout.Top * canvas.Height / h);
                 canvas.Children.Add(layer);
             }

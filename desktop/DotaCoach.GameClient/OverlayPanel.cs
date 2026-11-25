@@ -31,7 +31,8 @@ internal sealed class OverlayPanel : StackPanel
         size = Range(GameOverlaySettings.MinSize, GameOverlaySettings.MaxSize), width = Range(GameOverlaySettings.MinWidth, GameOverlaySettings.MaxWidth),
         textOpacity = Range(GameOverlaySettings.MinTextOpacity, 100), backgroundOpacity = Range(0, 100),
         enemyY = Range(0, 100), enemySize = Range(GameOverlaySettings.MinSize, GameOverlaySettings.MaxSize),
-        enemyOpacity = Range(GameOverlaySettings.MinTextOpacity, 100), minimapSize = Range(GameOverlaySettings.MinMinimap, GameOverlaySettings.MaxMinimap);
+        enemyOpacity = Range(GameOverlaySettings.MinTextOpacity, 100), minimapSize = Range(GameOverlaySettings.MinMinimap, GameOverlaySettings.MaxMinimap),
+        markSize = Range(GameOverlaySettings.MinMarks, GameOverlaySettings.MaxMarks), markOpacity = Range(GameOverlaySettings.MinTextOpacity, 100);
     private readonly ComboBox textColor = Ui.Choice(), titleColor = Ui.Choice(), backgroundColor = Ui.Choice();
     private readonly TextBlock status = Ui.Text("", 12, Ui.Accent);
     private readonly DispatcherTimer saver = new() { Interval = TimeSpan.FromMilliseconds(400) };
@@ -65,7 +66,9 @@ internal sealed class OverlayPanel : StackPanel
         Children.Add(Ui.Label("眼位：黄色眼睛是推测的敌方眼位（有瞳孔是侦查、空心是岗哨，淡的是备选）；◇ 框住队伍视角实际看到的守卫（绿己方、红敌方）。和装备、分钟路线分别显示。"));
         var mapChecks = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         mapChecks.Children.Add(minimapRight);
-        Children.Add(Ui.Columns(mapChecks, Cell("小地图大小", minimapSize, v => v == 100 ? "默认" : v + "%")));
+        Children.Add(Ui.Columns(mapChecks, Cell("小地图大小", minimapSize, v => v == 100 ? "默认" : v + "%"),
+            Cell("标记大小", markSize, v => v == 100 ? "默认" : v + "%"), Cell("标记不透明度", markOpacity, v => v + "%")));
+        Children.Add(Ui.Text("标记大小和不透明度管眼位、兵线和离开视野的标记，不管分钟路线；默认较小、半透明，盖住地图时再调低。", 11, Brushes.LightGray));
         Children.Add(waves);
         Children.Add(Ui.Text("兵线和眼位画在同一个小地图框里。● 是实见的小兵，○ 是进雾后的短时估计，△ 是理论增援，× 是交汇。", 11, Brushes.LightGray));
         Children.Add(fog);
@@ -105,7 +108,7 @@ internal sealed class OverlayPanel : StackPanel
         TextOpacity = Whole(textOpacity), BackgroundOpacity = Whole(backgroundOpacity),
         ShowEnemies = enemies.IsChecked == true, EnemyY = Whole(enemyY), EnemySize = Whole(enemySize), EnemyOpacity = Whole(enemyOpacity),
         ShowWards = wards.IsChecked == true, MinimapRight = minimapRight.IsChecked == true, MinimapSize = Whole(minimapSize),
-        ShowLaneWaves = waves.IsChecked == true, ShowFog = fog.IsChecked == true,
+        ShowLaneWaves = waves.IsChecked == true, ShowFog = fog.IsChecked == true, MapMarkSize = Whole(markSize), MapMarkOpacity = Whole(markOpacity),
     };
     private void Fill(GameOverlaySettings s)
     {
@@ -115,7 +118,7 @@ internal sealed class OverlayPanel : StackPanel
         textOpacity.Value = s.TextOpacity; backgroundOpacity.Value = s.BackgroundOpacity;
         enemies.IsChecked = s.ShowEnemies; enemyY.Value = s.EnemyY; enemySize.Value = s.EnemySize; enemyOpacity.Value = s.EnemyOpacity;
         wards.IsChecked = s.ShowWards; minimapRight.IsChecked = s.MinimapRight; minimapSize.Value = s.MinimapSize;
-        waves.IsChecked = s.ShowLaneWaves; fog.IsChecked = s.ShowFog;
+        waves.IsChecked = s.ShowLaneWaves; fog.IsChecked = s.ShowFog; markSize.Value = s.MapMarkSize; markOpacity.Value = s.MapMarkOpacity;
         Select(textColor, s.TextColor); Select(titleColor, s.TitleColor); Select(backgroundColor, s.BackgroundColor);
         loading = false;
     }

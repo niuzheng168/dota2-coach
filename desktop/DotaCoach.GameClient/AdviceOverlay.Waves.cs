@@ -12,7 +12,7 @@ internal sealed partial class AdviceOverlay
 {
     // Source-pixel calibration is applied by the parent layer. World +Y is north on BOTH left/right HUDs.
     // These passive shapes never synthesize pings/inputs and do not paint over any other foreground window.
-    private static void DrawWaves(Canvas map, LaneMap742 waves, string team, double u, List<Rect> boxes)
+    private static void DrawWaves(Canvas map, LaneMap742 waves, string team, double u, double t, List<Rect> boxes)
     {
         var rings = new List<(int Team, Point Center, double Radius)>();
         Point Pixel(int x, int y) {
@@ -61,7 +61,7 @@ internal sealed partial class AdviceOverlay
                 if (observed) continue;
                 string basis = m.Kind switch { "baseline" => "理", "held" => "若守", _ => "" };
                 var label = new TextBlock { Text = $"{basis}~{m.Meeting!.Value - waves.Clock}s", Foreground = ink, Background = Brush("#081018", 75),
-                    FontSize = 9*u, FontWeight = FontWeights.SemiBold, Tag = "wave-eta" };
+                    FontSize = 9*t, FontWeight = FontWeights.SemiBold, Tag = "wave-eta" };
                 label.Measure(new Size(map.Width, map.Height));
                 double lx = Math.Clamp(box.Right+u, 0, Math.Max(0, map.Width-label.DesiredSize.Width)),
                     ly = Math.Clamp(box.Top, 0, Math.Max(0, map.Height-label.DesiredSize.Height));

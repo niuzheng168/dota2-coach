@@ -482,14 +482,16 @@ internal static partial class Program
         var panel = Field<OverlayPanel>(game, "overlayPanel");
         var overlay = Field<AdviceOverlay>(game, "overlay");
         await Wait(() => panel.Current == new GameOverlaySettings() && overlay.Settings == panel.Current &&
-            Children(panel).OfType<Slider>().Count() == 10 && !File.Exists(file), "overlay panel starts from the default style and writes nothing");
+            Children(panel).OfType<Slider>().Count() == 12 && !File.Exists(file), "overlay panel starts from the default style and writes nothing");
         Member<Slider>(panel, "x").Value = 0; Member<Slider>(panel, "y").Value = 100;
         Member<CheckBox>(panel, "alerts").IsChecked = false;
         Member<CheckBox>(panel, "minimapRight").IsChecked = true; Member<Slider>(panel, "minimapSize").Value = 120;
+        Member<Slider>(panel, "markSize").Value = 70; Member<Slider>(panel, "markOpacity").Value = 40;
         var background = Member<ComboBox>(panel, "backgroundColor");
         background.SelectedItem = background.Items.OfType<ComboBoxItem>().Single(i => (string)i.Tag == "#FF5A5A");
         await Wait(() => File.Exists(file) && GameOverlaySettings.Load(file) is
-            { X: 0, Y: 100, ShowAlerts: false, BackgroundColor: "#FF5A5A", ShowWards: true, MinimapRight: true, MinimapSize: 120 } s &&
+            { X: 0, Y: 100, ShowAlerts: false, BackgroundColor: "#FF5A5A", ShowWards: true, MinimapRight: true, MinimapSize: 120,
+              MapMarkSize: 70, MapMarkOpacity: 40 } s &&
             overlay.Settings == s, "sliders, switches and colours apply to the overlay at once and are saved");
         var latest = host.Mailbox.Latest()!;
         host.Mailbox.SetReminder(latest.Meta.SessionId, latest.Meta.Sequence, "local-vision-observation", "剃刀 离开视野 · 最后在中路", null);
@@ -526,9 +528,10 @@ internal static partial class Program
             new("npc_dota_hero_lion", "sentry", .25, .75, 0, 1, 50, 370), new("npc_dota_hero_pudge", "ward", .75, .75, 0, 1, 380, 40, Rough: true)];
         var confirmed = new MinimapLayout(1280, 720, 10, 410, 300);
         var wards = new EnemyBoard([], marks, BoardMatch, "radiant", confirmed, [new("sentry", "dire", 2368, -2368)]);
+        // Shapes at full opacity and about v0.6.5's size; ParticipantBoardChecks pins the smaller, see-through default.
         Canvas WardCanvas(EnemyBoard b) {
             var c = new Canvas { Width = 1280, Height = 720 };
-            AdviceOverlay.Compose(c, null, panel.Current, 1.5, b, viewport: (1280, 720));
+            AdviceOverlay.Compose(c, null, panel.Current with { MapMarkSize = GameOverlaySettings.MaxMarks, MapMarkOpacity = 100 }, 1.5, b, viewport: (1280, 720));
             return c;
         }
         var minimap = WardCanvas(wards).Children.OfType<Canvas>().Single();
@@ -559,7 +562,7 @@ internal static partial class Program
             Near(75, 225, Strong) && Pixel(75, 225)[3] == 0 &&
             Yellow(Pixel(225, 225), 60) && !Near(225, 225, p => p[3] > 160) &&
             Pixel(187, 187)[3] == 0 && Near(187, 187, p => p is [< 40, < 90, > 150, > 150]),
-            "guesses are ward-icon-sized yellow eyes: observer with a dark pupil, faint alternative, hollow sentry, faint rough/expiring guess; " +
+            "guesses are ward-icon-shaped yellow eyes: observer with a dark pupil, faint alternative, hollow sentry, faint rough/expiring guess; " +
             "the observed enemy sentry is an empty red-edged diamond");
 
         const int W = 1280, H = 720;
