@@ -34,7 +34,7 @@ internal static class LaneFogEval
                     if (LaneWave742.Observe(own, packet, ms, trackers[i]) == null) throw new InvalidDataException("Unadmitted test input");
                     if (t < 300 || t % 5 != 0) continue;
                     var output = trackers[i].Project(t, true);
-                    if (!output.Valid()) throw new InvalidDataException("Invalid map at " + t);
+                    if (output.Marks.Length > 0 && !output.Valid()) throw new InvalidDataException("Invalid map at " + t);
                     samples.Add(new(i+2, output));
                     if (!savedExample && t >= 1200 && output.Marks.Any(m=>m.Kind=="fog") && output.Marks.Any(m=>m.Kind=="forecast")) {
                         File.WriteAllText(Path.Combine(root,"overlay-example.json"),JsonSerializer.Serialize(new {team=own.Team,map=output},Wire.Json));

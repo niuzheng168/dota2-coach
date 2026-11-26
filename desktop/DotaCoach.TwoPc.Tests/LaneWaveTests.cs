@@ -85,8 +85,8 @@ internal static class LaneWaveTests
                 $"clock-only live join at {t}s: all three roads, no fabricated individual or future spawn");
         }
         var at23 = tracker.Project(623,false);
-        check(at23.Marks.Any(m => m is { Lane:"mid", Kind:"contested", Spawn:600, Meeting:619 }) &&
-            at23.Marks.Any(m => m is { Lane:"mid", Kind:"baseline", Spawn:630, Meeting:649 }),
+        check(at23.Marks.Any(m => m is { Lane:"mid", Kind:"contested", Spawn:600, Meeting:618 }) &&
+            at23.Marks.Any(m => m is { Lane:"mid", Kind:"baseline", Spawn:630, Meeting:648 }),
             "at 10:23 distinguish possible surviving 10:00 fight from next same-spawn contact");
         LaneMap742 Tick(int t, params MinimapUnit[] units) {
             var pkt = Packet(t,units) with { ReceivedAt=t*1000L };
@@ -96,7 +96,7 @@ internal static class LaneWaveTests
         var first=Tick(1242).Marks.Single(m=>m.Kind=="fog"); var second=Tick(1243).Marks.Single(m=>m.Kind=="fog");
         check(seen.Marks.Single(m=>m.Kind=="seen") is { X:2400,Y:1745,Team:3 } &&
             first is { Lane:"mid", SeenAt:1241, LastX:2400, LastY:1745 } && first.X<2400 && second.X<first.X && second.Radius>first.Radius,
-            "at 20:42 a recently visible individual marches along its own route at observed speed; uncertainty grows");
+            "at 20:42 a recently visible individual marches on along its own route; uncertainty grows");
         check(!tracker.Project(1243,false).Marks.Any(m=>m.Kind=="fog" || m.SeenAt!=null),
             "clock-only projection cannot inherit team history");
         var correction=Tick(1244,C(3,second.X-130,second.Y-90));
@@ -117,11 +117,59 @@ internal static class LaneWaveTests
             "bounded typed wire marks: no precision promotion, future evidence, missing anchor or refresh-by-poll");
         var f=Tick(2500,C(3,2400,1800),C(2,2150,1670));
         for(int i=2501;i<=2520;i++) f=Tick(i);
-        check(f.Marks.Any(m=>m.Kind=="held" && m.Lane=="mid" && m.SeenAt==2500) &&
-            f.Marks.Any(m=>m.Kind=="last-clash" && m.X>2000) && !f.Marks.Any(m=>m.Kind=="fog"),
-            "41:40 deep observed fight outlives individual tracks only as a dated conditional reinforcement zone");
+        check(f.Marks.Any(m=>m.Kind=="last-clash" && m.Lane=="mid" && m.SeenAt==2500 && m.X>2000) &&
+            !f.Marks.Any(m=>m.Kind is "held" or "baseline" or "fog"),
+            "41:40 deep observed fight outlives individual tracks only as a dated clash zone; with the team's view no " +
+            "reinforcement or empty-lane guess (right 20-24 % and 3-11 % on the 2026-11-25 games)");
         for(int i=2521;i<=2531;i++) f=Tick(i);
         check(!f.Marks.Any(m=>m.Kind is "held" or "last-clash"),"a historical fight is not immortal");
+        Hypotheses(check);
+    }
+
+    // What the team view can trust, each measured on the 2026-11-25 games' debug against their replays (--lane-live-eval).
+    private static void Hypotheses(Action<bool,string> check)
+    {
+        (LaneMap742 Map, LaneWaveReading Mid) Tick(LaneWave742.Tracker tracker, int t, double ahead, params MinimapUnit[] units) {
+            var pkt = Packet(t,units) with { ReceivedAt=t*1000L };
+            var sample = LaneWave742.Observe(Witness(t),pkt,pkt.ReceivedAt,tracker)!;
+            return (tracker.Project(t,true,ahead), sample.Lanes[1]);
+        }
+        // Each 0:00 wave's centroid at 0:10 on the Plus clock, median of five replays (builds 6989 and 6996).
+        var replays = new Dictionary<(string, int), (int X, int Y)> {
+            [("top",2)] = (-6391,-1250), [("mid",2)] = (-2613,-2225), [("bot",2)] = (-152,-6438),
+            [("top",3)] = (-326,5874), [("mid",3)] = (2211,1614), [("bot",3)] = (6119,790) };
+        var opening = new LaneWave742.Tracker().Project(10,false).Marks.Where(m => m.Kind == "march").ToArray();
+        check(opening.Length == 6 && opening.All(m => m.Spawn == 0 && double.Hypot(m.X - replays[(m.Lane,m.Team)].X, m.Y - replays[(m.Lane,m.Team)].Y) <= 400),
+            "a fresh wave starts spread up its lane, the safe lanes' far ahead: each △ at 0:10 is where the replays had that wave");
+        var empty = Tick(new(), 10, 0).Map;
+        var dire = empty.Marks.Where(m => m.Kind == "march").ToArray();
+        check(dire.Length == 3 && dire.All(m => m.Team == 3 && m.Spawn == 0) && !empty.Marks.Any(m => m.Team == 0),
+            "with the team's view no △ for our own waves (we see them) and no empty-lane meeting guess (right 3-11 %)");
+        var mid = dire.Single(m => m.Lane == "mid");
+        var watched = Tick(new(), 10, 0, new MinimapUnit("npc_dota_hero_luna", 2, mid.X - 300, mid.Y, null, 1200, null)).Map;
+        var warded = Tick(new(), 10, 0, new MinimapUnit("npc_dota_observer_wards", 2, mid.X - 1000, mid.Y, null, 1600, null)).Map;
+        check(!watched.Marks.Any(m => m is { Kind:"march", Lane:"mid" }) && watched.Marks.Count(m => m.Kind == "march") == 2 &&
+            warded.Marks.Count(m => m.Kind == "march") == 3,
+            "a hidden wave can't stand in our sight: a hero watching that spot removes its △ (inside sight it was right 4-6 %); " +
+            "a ward or hero counts only to half its radius (trees and cliffs: past that creeps were visible 23-90 %)");
+        var seen = new LaneWave742.Tracker(); Tick(seen, 10, 0, C(3, mid.X, mid.Y));
+        var gone = Tick(seen, 11, 0).Map; var later = gone;
+        for (int t = 12; t <= 30; t++) later = Tick(seen, t, 0).Map;
+        check(gone.Marks.Any(m => m is { Kind:"fog", Lane:"mid", Team:3 }) && !gone.Marks.Any(m => m is { Kind:"march", Lane:"mid" }) &&
+            !later.Marks.Any(m => m is { Kind:"fog" } or { Kind:"march", Lane:"mid", Spawn:0 }) && later.Marks.Any(m => m is { Kind:"march", Lane:"mid", Spawn:30 }),
+            "an enemy wave once seen is followed from its sighting, never again by schedule; the next one still is");
+        var still = new LaneWave742.Tracker(); Tick(still, 3000, 0, C(3,2400,1745));
+        var shown = Tick(still, 3001, 1, C(3,2400,1745)).Map; Tick(still, 3002, 0);
+        var now = still.Project(3002, true).Marks.Single(m => m.Kind == "fog"); var next = still.Project(3002, true, 1).Marks.Single(m => m.Kind == "fog");
+        check(shown.Marks.Single(m => m.Kind == "seen") is { X:2400, Y:1745 } && double.Hypot(now.X - 2400, now.Y - 1745) is > 250 and < 400 &&
+            double.Hypot(next.X - now.X, next.Y - now.Y) is > 250 and < 400 && next.X < now.X,
+            "a hidden creep marches on at full speed though it stood still when last seen; a hypothesis is placed the given " +
+            "seconds ahead for the game's late display, a sighting stays where it was seen");
+        var (far, farMid) = Tick(new(), 3012, 1, C(2,-1920,-1650), C(3,1620,1220));
+        var (near, nearMid) = Tick(new(), 3012, 1, C(2,-700,-600), C(3,1620,1220));
+        check(farMid is { Basis:"two-visible-fronts", Meeting.Clock: > 3017 } && !far.Marks.Any(m => m.Team == 0) &&
+            nearMid is { Basis:"two-visible-fronts", Meeting.Clock: <= 3017 } && near.Marks.Any(m => m is { Kind:"forecast", Lane:"mid", Meeting: <= 3017 }),
+            "with the team's view a × only for a meeting at most 5 s away (right 78-82 %; 6-10 s away 46-47 %)");
     }
 
     // Offline only. The oracle determines the first observed <=500 separation by first-wave spawn IDs

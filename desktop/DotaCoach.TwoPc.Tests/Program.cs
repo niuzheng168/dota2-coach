@@ -24,6 +24,7 @@ if (args is ["--minute-farm"]) { await MinuteSuite(); return; }
 if (args is ["--lane-waves"]) { LaneWaveTests.Run(Check); Console.WriteLine($"Lane wave checks: {passed} passed."); return; }
 if (args is ["--lane-wave-eval", var openings]) { LaneWaveTests.Evaluate(openings); return; }
 if (args is ["--lane-wave-fog-eval", var waveData]) { LaneFogEval.Run(waveData); return; }
+if (args is ["--lane-live-eval", var liveEvents, var liveOracle, .. var liveOut] && liveOut.Length <= 1) { LaneLiveEval.Run(liveEvents, liveOracle, liveOut.FirstOrDefault()); return; }
 if (args is ["--copilot"]) {
     await CopilotContractTests.Run(Check); Console.WriteLine($"Offline Copilot contract checks: {passed} passed."); return;
 }

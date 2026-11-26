@@ -307,8 +307,10 @@ public sealed class LiveMatchState(MatchArchive? archive, Func<long>? monotonic 
         long tick = now(), age = Math.Max(tick - lastAt, teamView ? tick - wavesReceived : 0);
         int lease = (int)(LaneMap742.Lease - age);
         if (lease <= 0) return null;
-        var map = waveTracks.Project((int)Math.Floor(clock), teamView);
-        return map with { Marks = [.. map.Marks], LeaseMs = lease };
+        // The game client draws this about a second after the participant's GSI second (0.75 s polling, no interpolation):
+        // put moving hypotheses where they will be then. An empty map is no map, never an invalid board.
+        var map = waveTracks.Project((int)Math.Floor(clock), teamView, ahead: 1);
+        return map.Marks.Length == 0 ? null : map with { Marks = [.. map.Marks], LeaseMs = lease };
     }
     public void ObserveWards(string matchId, string team, double observedClock, ObservedWard[] wards)
     {

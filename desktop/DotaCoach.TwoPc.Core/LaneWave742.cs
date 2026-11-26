@@ -35,6 +35,9 @@ internal static partial class LaneWave742
         private readonly Pt[] points = geometry.Points.Select(p => new Pt(p[0], p[1])).ToArray();
         private readonly double[] arcs = Lengths(geometry.Points);
         public double Length => arcs[^1];
+        /// <summary>Where a fresh wave's middle and front stand along this path at its spawn second (see <see cref="Head"/>).</summary>
+        public double WaveMiddle { get; init; }
+        public double WaveFront { get; init; }
         private static double[] Lengths(double[][] p) {
             var s = new double[p.Length];
             for (int i = 1; i < p.Length; i++) s[i] = s[i - 1] + double.Hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]);
@@ -94,13 +97,18 @@ internal static partial class LaneWave742
             }
         return names;
     }
+    // A fresh wave does not start at its spawner's first path_corner: the creeps appear spread up the lane, the safe
+    // lanes' far ahead. Middle and front of never-seen waves in their first 20 s, ahead of that corner on the game clock,
+    // median of five replays (builds 6989 and 6996; each replay within about ±130). Roads top/mid/bot; Radiant, Dire.
+    private static readonly (int Middle, int Front)[,] Head = { { (267, 506), (1085, 1246) }, { (0, 173), (219, 367) }, { (771, 951), (330, 575) } };
     private static Lane[] Load() {
         var (routes, towers) = MinuteFarmSimulation.WaveGeometry;
         if (routes.Length != 6 || towers.Length != 18) throw new InvalidDataException("Invalid 7.42 lane geometry");
-        return Roads.Select(id => {
-            Path Route(string side) => new(routes.Single(r => r.Id == $"npc_dota_spawner_{side}_{id}"));
-            var l = new Lane(id, Route("good"), Route("bad"), towers.Where(t => t.Id.EndsWith("_" + id, StringComparison.Ordinal)).ToArray());
-            l.Baseline = Intercept(l, 0, l.Good.Scheduled(0), l.Bad.Scheduled(0)) ??
+        return Roads.Select((id, i) => {
+            Path Route(string side, int s) => new(routes.Single(r => r.Id == $"npc_dota_spawner_{side}_{id}")) {
+                WaveMiddle = Head[i, s].Middle, WaveFront = Head[i, s].Front };
+            var l = new Lane(id, Route("good", 0), Route("bad", 1), towers.Where(t => t.Id.EndsWith("_" + id, StringComparison.Ordinal)).ToArray());
+            l.Baseline = Intercept(l, 0, l.Good.Scheduled(l.Good.WaveFront), l.Bad.Scheduled(l.Bad.WaveFront)) ??
                 throw new InvalidDataException("Reference waves never meet: " + id);
             return l;
         }).ToArray();
@@ -151,9 +159,16 @@ internal static partial class LaneWave742
             }
         }
         var sample = new LaneWaveSample(clock, map.Select((l, i) => ReadLane(l, clock, units[i,0], units[i,1])).ToArray());
-        return tracker == null ? sample : tracker.Update(own, s.ReceivedAt, located, sample,
-            TeamViewEvidence.VisibleHeroes(s).Where(u => u.Team == s.OwnTeam).Select(u => (u.X, u.Y)));
+        return tracker == null ? sample : tracker.Update(own, s.ReceivedAt, located, sample, Sight(s));
     }
+    // This team's sight in the packet: every own unit with the vision radius Plus reports, which ignores trees and high
+    // ground. On the 2026-11-25 games an enemy creep within 0.9 of a creep's or building's radius was visible 96-100 % of
+    // the time, but past half a hero's or ward's radius only 23-90 % (wards stand behind trees and cliffs), so those count
+    // only to half their radius.
+    private static (double X, double Y, double R)[] Sight(SpectatorSnapshot s) => s.Minimap
+        .Where(u => u.Team == s.OwnTeam && u.Vision is > 0 and <= 4000 && (u.X != 0 || u.Y != 0) &&
+            Wire.Finite(u.X, -12_000, 12_000) && Wire.Finite(u.Y, -12_000, 12_000))
+        .Select(u => (u.X, u.Y, u.Vision!.Value * (u.Name.Contains("_hero_") || u.Name.Contains("_wards") ? .5 : .9))).Take(512).ToArray();
     private static LaneWaveReading ReadLane(Lane l, double clock, List<Front> good, List<Front> bad) {
         LaneWaveReading Read(string basis, LaneContact? contact = null, int? spawn = null) => new(l.Id, good.Count, bad.Count, basis, spawn, contact);
         // The minimum actual separation says something even when path_corners on this bend are offset.
@@ -196,7 +211,7 @@ internal static partial class LaneWave742
         int currentSpawn = (int)Math.Floor(clock / Period) * Period;
         foreach (var a in radiant ? ga : ba) {
             for (int spawn = Math.Max(0, currentSpawn - 2 * Period); spawn <= clock + Horizon; spawn += Period) {
-                double along = Math.Max(0, clock - spawn) * Speed; if (along >= other.Length) continue;
+                double along = other.WaveFront + Math.Max(0, clock - spawn) * Speed; if (along >= other.Length) continue;
                 Try(Intercept(l, clock, a, other.Scheduled(along), bWait: Math.Max(0, spawn - clock)), spawn);
             }
         }
