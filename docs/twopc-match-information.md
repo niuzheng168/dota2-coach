@@ -47,7 +47,7 @@
 # 仓库根目录，验证核心的本地归档、投影和权限约束
 dotnet run --project desktop/DotaCoach.TwoPc.Tests -c Release -- --match-history
 # 在已打包的工作区，核对两个 ZIP、共享协议，以及教练端内置解析器的每一个文件
-.\desktop\verify-match-release.ps1 -Directory .\dist\twopc\v0.6.6
+.\desktop\verify-match-release.ps1 -Directory .\dist\twopc\v0.6.7
 # 已解压的教练端目录，可独立分析同局号的已完成本地录像；输出必须是新文件
 .\replay-tools\PostgameReplay.exe --match-id 9097559249 --dem C:\replays\9097559249.dem --output C:\replays\review-9097559249.json
 ```

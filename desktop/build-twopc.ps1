@@ -143,7 +143,9 @@ $manifest = [ordered]@{
     matchArchive = [ordered]@{ live = "participant-and-matched-team-vision"; clock = "event-and-first-known";
         wardEvidence = @("seen", "inferred", "postgame-replay"); gameProjection = "selected-equipment-wards-lane-symbols-and-fog-marks";
         laneHud = @{ build = 6989; defaultOn = $true; requiresConfirmedMinimap = $false; individualMemoryGameSeconds = 12;
-            lastContactMemoryGameSeconds = 30; rawSpectatorOrReplaySent = $false };
+            lastContactMemoryGameSeconds = 30; rawSpectatorOrReplaySent = $false; waveHeadStarts = "median-5-replays";
+            hiddenCreepPace = 325; hypothesesAheadSeconds = 1; sightVeto = "plus-vision-radius-heroes-and-wards-half";
+            teamViewDrawsOwnWaves = $false; teamViewDrawsBaselineOrHeld = $false; teamViewForecastMaxSeconds = 5 };
         extraTeamContextForModelDefault = $false; replayCanReachLive = $false }
     postgameReplay = [ordered]@{ package = "coach-only"; portableWorkerManifestSha256 = $pin; requiresVerifiedEnd = $true }
     playerMinimapDebugIntervalMs = 1000; playerMinimapObservationOnly = $true

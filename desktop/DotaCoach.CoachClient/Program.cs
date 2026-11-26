@@ -151,7 +151,7 @@ internal sealed partial class CoachWindow : Window
         }
         try { heroNames = new HeroNames(System.IO.Path.Combine(AppContext.BaseDirectory, "data", "dota2-dictionary.json")); }
         catch { /* Alerts fall back to internal hero names. */ }
-        Title = "Dota Coach · 教练端 v0.6.6";
+        Title = "Dota Coach · 教练端 v0.6.7";
         Width = Math.Min(1320, SystemParameters.WorkArea.Width - 40);
         Height = Math.Min(940, SystemParameters.WorkArea.Height - 40);
         MinWidth = 1000; MinHeight = 640; WindowStartupLocation = WindowStartupLocation.CenterScreen;

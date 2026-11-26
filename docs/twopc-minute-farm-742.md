@@ -4,7 +4,7 @@
 
 ## 开一局
 
-1. 两端使用配套的 **v0.6.6** 客户端。可以在同一台 Windows 11 x64 电脑运行 `DotaCoach.CoachClient.exe` 和 `DotaCoach.GameClient.exe`，教练端接收地址选 `127.0.0.1`；用两台电脑则选局域网地址。按[模型服务说明](twopc-model-providers.md)在教练端选 Foundry 或 Codey（GitHub Copilot）；复制配对码，不要公开配对码或模型密钥。
+1. 两端使用配套的 **v0.6.7** 客户端。可以在同一台 Windows 11 x64 电脑运行 `DotaCoach.CoachClient.exe` 和 `DotaCoach.GameClient.exe`，教练端接收地址选 `127.0.0.1`；用两台电脑则选局域网地址。按[模型服务说明](twopc-model-providers.md)在教练端选 Foundry 或 Codey（GitHub Copilot）；复制配对码，不要公开配对码或模型密钥。
 2. 游戏端粘贴配对码并连接（只传本人 GSI，不传画面；本机小兵血量照常可开关）。游戏端会安装 GSI 配置。首次安装或配置更新后，在 Steam 的 Dota 启动选项保留原参数并加 `-gamestateintegration`，**完全退出再启动 Dota 一次**。游戏建议用无边框窗口。仅 GSI 模式不需要传视频、不需要 Dota Plus、观战账号或扫描器。
 3. 教练端主页勾选「自动教练」和「**7.42 分钟打钱**」，「设置 → AI 模型」里保持「小地图路线」勾选。第一次在该分辨率使用，打开「设置 → 小地图校准」：选**左下**或**右下**预设，必要时填实际 HUD 地图正方形的左、上、边长（原始游戏像素），点「**确认校准**」。游戏端不传画面，没有预览底图；如果不知道自定义 HUD 的准确边界，在游戏机截一张图量出小地图正方形的左、上、边长再填。
 4. 进入有正式对局号、进行中的本人对局后，确认**本局是标准 `dota` 地图、7.42 / build 6989，且小地图框已对准**。可在游戏机安装目录的 `game\dota\steam.inf` 检查 `appID=570`、`ClientVersion=6989` 和 `ServerVersion=6989`。换局或重新配对需再确认，不是每分钟确认；换地图、客户端更新或 HUD 改动后不要沿用旧确认。`provider.version` 不是这个版本证明。
