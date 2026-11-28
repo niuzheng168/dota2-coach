@@ -154,7 +154,7 @@ $manifest = [ordered]@{
     enemyWardGuesses = "coach-guess-game-minimap"; coachMapPatch = "7.42"
     creepHpDisplay = "game-local-gpu"; creepHpShown = "below-half"; creepHpLethal = "red-sure-kill-gsi-attack"
     towerPrepHits = "amber-count"; heroAttackDataBuild = 6989; gameStatusIntervalMs = 250
-    visionScanButton = $true; wardMarksMaxUnseenSeconds = 15
+    visionScanButton = $true; visionScanFollowsDotaRestart = $true; wardMarksMaxUnseenSeconds = 15
     clientLayout = [ordered]@{ home = "status-and-everyday-switches"; coachSettings = @("connection", "plus-and-scanner", "ai-model", "minimap-calibration", "debug");
         gameSettings = @("overlay-style", "creep-hp-help", "dota-and-gsi", "debug") }
     wardReads = "sub-second-per-change"; wardCarrierItemsEverySeconds = 0.4; wardInSightMark = "hero-facing-300-else-ahead-350"

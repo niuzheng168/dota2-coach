@@ -4,7 +4,7 @@ import { once } from 'node:events';
 
 export const models = ['gpt-6.2-astra', 'gpt-6.2-sol'];
 export const labels = ['GPT-6.2 Astra', 'GPT-6.2 Sol'];
-export const coachUA = 'DotaCoach/0.6.7';
+export const coachUA = 'DotaCoach/0.6.8';
 
 // Only this upstream is fake. In particular it never serves /v1/* or adds (github-copilot).
 export async function startMock(key, alternateKey, jpeg) {
