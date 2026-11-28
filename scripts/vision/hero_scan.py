@@ -443,9 +443,9 @@ class Scanner:
         print(f"Capturing the Dota window ({cw}x{ch}).", flush=True)  # the coach client shows the scan as running from here
 
     def reopen(self, end: float) -> bool:
-        """Dota's window changed size: minimized on alt-tab from fullscreen, resized, or a new display mode.
-        Keep publishing what is known, wait until the window is usable again and capture it afresh.
-        False when the run ended first."""
+        """Dota's window changed size: minimized on alt-tab from fullscreen, resized, or a new display mode; or it
+        closed, and a restarted Dota brings a new window, to capture and send the hero keys to. Keep publishing
+        what is known, wait until the window is usable again and capture it afresh. False when the run ended first."""
         self.capture.close()
         self.stats["reopened"] += 1
         print("Dota window changed: waiting for it, then capturing again.", flush=True)

@@ -4,8 +4,8 @@ Mirrors desktop/DotaCoach.TwoPc.Core/GpuCapture.cs: a free-threaded frame pool o
 MinUpdateInterval lifted to 1 ms (Windows 11 24H2+), no capture border. Each frame is cropped on
 the GPU to the requested client-area rectangle before the small CPU read-back, so reading the
 bottom HUD band of a 1080p window copies about 1.4 MB instead of 8 MB. Works while the window is
-covered; a minimised window produces no frames. The mouse cursor is left out of the image.
-Vtable slots follow the Windows SDK headers (IUnknown 0-2, IInspectable 0-5).
+covered; a minimised window produces no frames, and a closed one raises WindowChanged. The mouse
+cursor is left out of the image. Vtable slots follow the Windows SDK headers (IUnknown 0-2, IInspectable 0-5).
 """
 from __future__ import annotations
 import ctypes
@@ -20,6 +20,7 @@ user32, dwmapi, d3d11, combase = ctypes.windll.user32, ctypes.windll.dwmapi, cty
 HRESULT = ctypes.HRESULT  # raises OSError on failure
 DXGI_FORMAT_B8G8R8A8_UNORM = 87
 DXGI_ERROR_WAS_STILL_DRAWING = -2005270518  # 0x887A000A
+WINDOW_CHECK = 1.0  # seconds between checks that a window sending no frames still exists
 
 
 class GUID(ctypes.Structure):
@@ -125,6 +126,7 @@ class WindowCapture:
             raise ValueError("crop outside the client area")
         self.crop = (left + x, top + y, w, h)
         self.client = (cw, ch)
+        self.window, self.checked = window, time.perf_counter()
         device, context, level = c_void_p(), c_void_p(), c_int()
         d3d11.D3D11CreateDevice.restype = HRESULT
         d3d11.D3D11CreateDevice(None, 1, None, c_uint(0x20), None, 0, 7, byref(device), byref(level), byref(context))
@@ -189,6 +191,12 @@ class WindowCapture:
                 close(newest)
                 newest = frame.value
             if newest is None:
+                # Capture of a closed window just stops, without an error. On 2026-11-28 Dota restarted three minutes
+                # after the scan began, and the scanner watched the dead window for the whole match.
+                if time.perf_counter() - self.checked >= WINDOW_CHECK:
+                    self.checked = time.perf_counter()
+                    if not user32.IsWindow(self.window):
+                        raise WindowChanged("window closed")
                 return None
             content, stamp = SizeInt32(), c_int64()
             call(newest, 8, HRESULT, byref(content))

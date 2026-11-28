@@ -10,6 +10,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts/vision"))
 import hud_recognizer as hr  # noqa: E402
 import hero_scan  # noqa: E402
+import wgc  # noqa: E402
 
 HEROES = {"npc_dota_hero_juggernaut": "主宰", "npc_dota_hero_pudge": "帕吉", "npc_dota_hero_abyssal_underlord": "孽主",
           "npc_dota_hero_phantom_assassin": "幻影刺客", "npc_dota_hero_phantom_lancer": "幻影长矛手"}
@@ -178,6 +179,27 @@ class WardCounts(unittest.TestCase):
         self.assertIsNone(summary("item_ward_observer", count=1), "without digit templates no counts are claimed")
 
 
+class ClosedWindow(unittest.TestCase):
+    def test_a_closed_window_is_a_window_change_not_silence(self):
+        # Capture of a closed window just stops delivering frames. On 2026-11-28 Dota restarted after the scan began and
+        # the scanner, never told, watched the dead window (and sent hero keys to it) for a whole match: no enemy panel.
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        cap = object.__new__(wgc.WindowCapture)
+        cap.pool, cap.window, cap.checked = 1, 42, 0.0
+        alive = {42}
+        now = [1.0]
+        with patch.object(wgc, "call"), patch.object(wgc.time, "perf_counter", side_effect=lambda: now[0]), \
+                patch.object(wgc, "user32", SimpleNamespace(IsWindow=lambda h: h in alive)):
+            self.assertIsNone(cap.latest(), "no new frame from an open window")
+            alive.clear()
+            now[0] = 1.5
+            self.assertIsNone(cap.latest(), "existence is checked at most once per WINDOW_CHECK")
+            now[0] = 2.0
+            with self.assertRaises(wgc.WindowChanged):
+                cap.latest()
+
+
 class LiveScope(unittest.TestCase):
     """Exercise the real GSI parser and snapshot builder; no window, server, keys, images or model."""
     def setUp(self):
@@ -269,7 +291,7 @@ class LiveScope(unittest.TestCase):
                 during_ocr()
                 return {"hud": True, "hero": self.hero, "level": 16, "alive": True, "health": None, "mana": None,
                         "items": dict.fromkeys(hr.SLOTS) | {"slot0": {"name": "item_ward_observer"}},
-                        "wards": {"observer": 2, "sentry": 0, "unknown": 0}}
+                        "wards": {"observer": 2, "sentry": 0, "unknown": 0}, "stats": None, "attributes": None}
             sc.hud.read = hud
             sc.work.put((9, True, True, at, band)); sc.work.put(None)
             sc.recognize()  # actual worker, fixture pixels and recognizer; no window or GPU
